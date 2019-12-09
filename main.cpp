@@ -1,4 +1,5 @@
 #include <mpi.h>
+#include <random>
 #include "math/laplace/laplace.h"
 #include "math/tensor/dbcsr.hpp"
 
@@ -10,48 +11,111 @@ int main(int argv, char** argc) {
 	
 	dbcsr::init();
 	
-	std::optional<int> nsplit = 1;
-	std::optional<int> ndim = 1;
+	dbcsr::pgrid<4> pgrid4d(_comm = MPI_COMM_WORLD);
+							 
+	/* Alternatively:
+	 * pgrid<4> pgrid4d(MPI_COMM_WORLD, 1, 1);
+	 */
+							 
+	std::cout << "Created!" << std::endl;
 	
+	vec<int> blk1 = {3, 9, 12, 1};
+    vec<int> blk2 = {4, 2, 3, 1, 9, 2, 32, 10, 5, 8, 7};
+    vec<int> blk3 = {7, 3, 8, 7, 9, 5, 10, 23, 2};
+    vec<int> blk4 = {8, 1, 4, 13, 6};
+    vec<int> blk5 = {4, 2, 22};
 	
-	dbcsr::pgrid<4> p("comm"_arg = MPI_COMM_WORLD, "dimsplit"_arg = ndim, "nsplit"_arg = nsplit);
+	vec<int> d1 = dbcsr::random_dist(blk1.size(), pgrid4d.dims()[0]);
+	vec<int> d2 = dbcsr::random_dist(blk2.size(), pgrid4d.dims()[1]);
+	vec<int> d3 = dbcsr::random_dist(blk4.size(), pgrid4d.dims()[2]);
+	vec<int> d4 = dbcsr::random_dist(blk5.size(), pgrid4d.dims()[3]);
 	
-	auto dims = p.dims();
+	vec<int> map12 = {3,2};
+	vec<int> map22 = {1,0};
+	vec<vec<int>> dists = {d1,d2,d3,d4};
 	
-	auto dist1 = dbcsr::random_dist(dims.size(), dims[0]);
-	auto dist2 = dbcsr::random_dist(dims.size(), dims[1]);
-	auto dist3 = dbcsr::random_dist(dims.size(), dims[2]);
-	auto dist4 = dbcsr::random_dist(dims.size(), dims[3]);
+	dbcsr::dist<4> dist4d(_pgrid = pgrid4d, 
+						   _map12 = map12,
+						   _map22 = map22,
+						   _nd_dists = dists);
+						   
+	vec<vec<int>> blk_sizes = {blk1,blk2,blk4,blk5};
+						   
+    dbcsr::tensor<4,double> tensor4d(_name = "HELLO", _dist = dist4d, _map12 = map12,
+    _map22 = map22, _blk_sizes = blk_sizes);
 	
-	if (rank == 0) {
-		for (auto i : dist1) {
+	std::cout << "Tensor created." << std::endl;
+	
+	vec<int> nz21 = { 0, 0, 0, 0, 0, 1, 1, 1,  1,  1, 
+             1, 1, 1, 1, 1, 1, 1, 1,  1,  1, 
+             2, 2, 2, 2, 2, 2, 2, 2,  2,  2, 
+             3, 3, 3, 3, 3, 3 };
+    vec<int> nz22 = { 0, 2, 3, 5, 9,  1, 1, 3,  4,  4, 
+             5, 5, 5, 6,  6,  8, 8, 8, 9, 10, 
+             0, 2, 2, 3,  4,  5, 7, 8, 10, 10, 
+             0, 2, 3, 5, 9, 10 };
+	vec<int> nz24 = { 2, 4, 1, 2,  1,  2, 4, 0,  0,  3, 
+             1, 2, 3, 0,  3,  2, 3, 3,  1,  0, 
+             2, 0, 0, 2,  3,  2, 3, 1,  1,  2, 
+             0, 0, 2, 1,  4,  4 };
+    vec<int> nz25 = { 0, 2, 1, 0,  0,  1, 2,  0,  2, 0, 
+             1, 2, 1, 0,  2,  1, 2,  1,  0, 1, 
+             2, 0, 1, 2,  1,  1, 1,  2,  0, 1, 
+             0, 2, 1, 0,  2,  1 };		
+    
+    vec<vec<int>> nz = {nz21,nz22,nz24,nz25};
+    
+    tensor4d.reserve(nz);
+    
+    dbcsr::iterator<4,double> iter(tensor4d);
+    
+    std::cout << iter.blocks_left() << std::endl;
+    
+    while (iter.blocks_left()) {
+		  
+		iter.next();
+		
+		dbcsr::block<4,double> blk(iter.sizes());
+		
+		/*
+		for (auto i : iter.sizes()) {
+			std::cout << i << " ";
+		}
+		std::cout << std::endl;
+		*/
+		
+		blk.fill_rand();
+		
+		/*
+		for (auto i : blk.sizes()) {
 			std::cout << i << " ";
 		}
 		std::cout << std::endl;
 		
-		for (auto i : dist2) {
-			std::cout << i << " ";
-		}
-		std::cout << std::endl;
 		
-		for (auto i : dist3) {
-			std::cout << i << " ";
+		for (int i = 0; i != blk.ntot(); ++i) {
+			std::cout << blk(i) << " ";
 		}
-		std::cout << std::endl;
 		
-		for (auto i : dist4) {
-			std::cout << i << " ";
-		}
 		std::cout << std::endl;
+		*/
+		auto idx = iter.idx();
+		
+		std::cout << "PRE: " << std::endl;
+		std::cout << blk(0) << " " << idx[0] << std::endl;
+	
+		tensor4d.put_block(idx, blk);
+		
+		std::cout << "POST: " << std::endl;
+		std::cout << blk(0) << " " << idx[0] << std::endl;	
+		
 	}
+    
+    std::cout << iter.sizes()[0] << std::endl;
 	
-	dbcsr::dist<4> d1(p, vec<int>{0,1}, vec<int>{2,3}, vec<vec<int>>{dist1,dist2,dist3,dist4});
-
-	//math::laplace lp(6, -1, -2, 2, 1000);
-
-	//lp.compute();	
-	
-	p.destroy();
+	tensor4d.destroy();	   
+	pgrid4d.destroy();
+	dist4d.destroy();
 
 	dbcsr::finalize();
 
