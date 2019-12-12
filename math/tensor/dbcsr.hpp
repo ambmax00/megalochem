@@ -2,6 +2,32 @@
 #define DBCSR_HPP
 
 #define MAXDIM 4
+#define MAXIDX 3
+
+#define BOOST_PARAMETER_MAX_ARITY 20
+
+#define really_unparen(...) __VA_ARGS__
+#define invoke(expr) expr
+#define unparen(args) invoke(really_unparen args)
+#define concat(text,var) text##var
+
+#define PLUS_ONE(x) INCREMENT##x
+#define INCREMENT0 1
+#define INCREMENT1 2
+#define INCREMENT2 3
+#define INCREMENT3 4
+#define INCREMENT4 5
+#define INCREMENT5 6
+
+#define STEP0(func, x, n, del) 
+#define STEP1(func, x, n, del) func(x,n) STEP0(func, x, PLUS_ONE(n), del)
+#define STEP2(func, x, n, del) func(x,n)unparen(del) STEP1(func, x, PLUS_ONE(n), del)
+#define STEP3(func, x, n, del) func(x,n)unparen(del) STEP2(func, x, PLUS_ONE(n), del)
+#define STEP4(func, x, n, del) func(x,n)unparen(del) STEP3(func, x, PLUS_ONE(n), del)
+#define STEP5(func, x, n, del) func(x,n)unparen(del) STEP4(func, x, PLUS_ONE(n), del)
+#define REPEAT(func, x, n, del, start) concat(STEP,n) (func, x, start, del)
+
+#define VARANDSIZE(x,n) x[n], x##_size[n]
 
 #include <dbcsr.h>
 #include <dbcsr_tensor.h>
@@ -14,6 +40,8 @@
 #include <memory>
 #include <stdexcept>
 #include <random>
+
+#include "params/params.hpp"
 
 // debug
 #include <iostream>
@@ -49,7 +77,17 @@ BOOST_PARAMETER_NAME(blk)
 BOOST_PARAMETER_NAME(idx)
 BOOST_PARAMETER_NAME(sum)
 BOOST_PARAMETER_NAME(scale)
-
+BOOST_PARAMETER_NAME(found)
+BOOST_PARAMETER_NAME(nblks_total)
+BOOST_PARAMETER_NAME(nfull_total)
+BOOST_PARAMETER_NAME(nblks_local)
+BOOST_PARAMETER_NAME(nfull_local)
+BOOST_PARAMETER_NAME(pdims)
+BOOST_PARAMETER_NAME(my_ploc)
+BOOST_PARAMETER_NAME(blks_local)
+BOOST_PARAMETER_NAME(proc_dist)
+BOOST_PARAMETER_NAME(blk_offset)
+BOOST_PARAMETER_NAME(NIL)
 
 namespace dbcsr {
 
@@ -120,7 +158,7 @@ public:
 		int* fdimsplit = (m_dimsplit) ? &*m_dimsplit : nullptr;
 		
 		MPI_Fint fmpi = MPI_Comm_c2f(m_comm);
-		c_dbcsr_t_pgrid_create(&fmpi, m_dims.data(), N, &m_pgrid_ptr, fmap1, map1size, fmap2, map2size, fnsplit, fdimsplit);
+		c_dbcsr_t_pgrid_create(&fmpi, m_dims.data(), N, &m_pgrid_ptr, nullptr, fmap1, map1size, fmap2, map2size, fnsplit, fdimsplit);
 		
 		
 	}
@@ -226,15 +264,10 @@ public:
 			f_dists_size[i] = m_nd_dists[i].size();
 		}
 		
-		std::cout << typeid(decltype(args)).name() << std::endl;
-		
 		c_dbcsr_t_distribution_new(&m_dist_ptr, pgrid_ptr, 
 								   m_map12.data(), m_map12.size(),
                                    m_map22.data(), m_map22.size(), 
-                                   f_dists[0], f_dists_size[0],
-                                   f_dists[1], f_dists_size[1],
-                                   f_dists[2], f_dists_size[2],
-                                   f_dists[3], f_dists_size[3],
+                                   REPEAT(VARANDSIZE, f_dists, MAXDIM, (,), 0),
                                    f_own_comm);
                                    
 	}
@@ -407,6 +440,7 @@ public:
 	
 };		
 
+
 template <int N, typename T>
 class tensor_impl {
 protected:
@@ -419,11 +453,78 @@ protected:
 	vec<vec<int>> m_nzblks;
 	MPI_Comm m_comm;
 	
-	int n_blocks;
-	int n_nzblocks;
+	int m_n_blocks;
 	
 	template <int M, typename U>
 	friend class iterator;
+	
+	
+	BOOST_PARAMETER_MEMBER_FUNCTION(
+		(void), get_info, tag,
+		(required (NIL,*))
+		(optional (out(nblks_total),*,nullopt)
+				  (out(nfull_total),*,nullopt)
+				  (out(nblks_local),*,nullopt)
+				  (out(nfull_local),*,nullopt)
+				  (out(pdims),*,nullopt)
+				  (my_ploc,*,nullopt)
+				  (blks_local,*,nullopt)
+				  (proc_dist,*,nullopt)
+				  (blk_sizes,*,nullopt)
+				  (out(blk_offset),*,nullopt)
+				  (out(name),*,nullopt)
+		)
+	){
+		
+	
+		
+		/*
+		auto reserve = [] (std::optional<vec<int>>& o) -> int* {
+			
+			int* ptr = nullptr;
+			
+			if (o) {
+				o->reserve(N);
+				ptr = o->data();
+			} 
+			
+			return ptr;
+		
+		};
+		
+		int *nblks_total_p, *nfull_total_p, *nblks_local_p, *nfull_local_p, *pdims_p, *my_ploc_p;
+		
+		nblks_total_p = reserve(nblks_total);
+		nfull_total_p = reserve(nfull_total);
+		nblocks_local_p = reserve(nblocks_local);
+		nfull_local_p = reserve(nfull_local);
+		pdims_p = reserve(pdims);
+		my_ploc_p = reserve(my_ploc);
+		
+		vec<int*> blks_local_v(MAX_DIM,nullptr), proc_dist_v(MAX_DIM,nullptr);
+			blk_size_v(MAX_DIM,nullptr), blk_offset_v(MAX_DIM,nullptr);
+		
+		vec<int> blks_local_v_size(MAX_DIM,0), proc_dist_v_size(MAX_DIM,0);
+			blk_size_v_size(MAX_DIM,0), blk_offset_v_size(MAX_DIM,0);
+	
+	/*
+	   void c_dbcsr_t_get_info(m_tensor_ptr, N, 
+							   nblks_total_p,
+                               nfull_total_p,
+                               nblks_local_p,
+                               nfull_local_p,
+                               pdims_p, my_ploc_p, 
+                               blks_local_p
+                               REPEAT(VARANDSIZE,blks_local_v,MAXDIM,(,),0),
+                               ${extern_alloc_varlist_and_size("c_proc_dist")}$, 
+                               ${extern_alloc_varlist_and_size("c_blk_size")}$, 
+                               ${extern_alloc_varlist_and_size("c_blk_offset")}$, 
+                               void** c_distribution, 
+                               char** name, int* name_size,
+                               int* data_type);
+                               */
+                               
+	   }
 	
 public:
 
@@ -444,20 +545,14 @@ public:
 		vec<int*> f_blks(MAXDIM, nullptr);
 		vec<int> f_blks_size(MAXDIM, 0);
 		
+		m_n_blocks = 1;
+		
 		for (int i = 0; i != N; ++i) {
 			//std::cout << i << " " << m_blk_sizes[i].size() << std::endl;
 			f_blks[i] = m_blk_sizes[i].data();
 			f_blks_size[i] = m_blk_sizes[i].size();
+			m_n_blocks *= m_blk_sizes[i].size();
 		}
-		
-		//std::cout << m_map12.size() << " " << m_map22.size() << std::endl;
-		
-		/*for (int ndim = 0; ndim != N; ++ndim) {
-			for (int s = 0; s != f_blks_size[ndim]; ++s) {
-				std::cout << f_blks[ndim][s] << " ";
-			}
-			std::cout << std::endl;
-		}*/
 		
 		c_dbcsr_t_create_new(&m_tensor_ptr, f_name, dist_ptr, 
 						m_map12.data(), m_map12.size(),
@@ -515,16 +610,57 @@ public:
 		bool * c_summation = (sum) ? &*sum : nullptr;
 		T * c_scale = (scale) ? &*scale : nullptr;
 		
-		//auto blks = blk.sizes();
+		auto blks = blk.sizes();
 		
-		blk(0) = 5;
-		
-		idx[0] = 55;
-		
-		//c_dbcsr_t_put_block(m_tensor_ptr, idx.data(), blks.data(), blk.data(),
-		//	c_summation, c_scale);
+		c_dbcsr_t_put_block(m_tensor_ptr, idx.data(), blks.data(), blk.data(),
+			c_summation, c_scale);
 			
 	}
+	
+	BOOST_PARAMETER_MEMBER_FUNCTION(
+		(block<N,T>), get_block, tag, 
+		(required (idx,(index<N>))
+				  (found,*)
+		)
+	){
+		
+		vec<int> loc_sizes;
+		for (int i = 0; i != N; ++i) {
+			int idx_i = idx[i];
+			loc_sizes.push_back(m_blk_sizes[i][idx_i]);
+			std::cout << loc_sizes[i];
+		}		
+		
+		std::cout << std::endl;
+		
+		block<N,T> blk_out(loc_sizes);
+		
+		c_dbcsr_t_get_block(m_tensor_ptr, idx.data(), loc_sizes.data(), 
+			blk_out.data(), &found);
+			
+		return blk_out;
+			
+	}
+	
+	int proc(index<N> idx) {
+		int p = -1;
+		c_dbcsr_t_get_stored_coordinates(m_tensor_ptr, idx.data(), &p);
+		return p;
+	}
+	
+	void clear() {
+		c_dbcsr_t_clear(m_tensor_ptr);
+	}
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
 	
 	
 };
