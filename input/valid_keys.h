@@ -9,7 +9,10 @@ static const json valid_keys =
 	{"name", "string"},
 	{"molecule", {
 		{"file", "string"},
+		{"unit", "string"},
 		{"basis", "string"},
+		{"geometry", {0,0,0}},
+		{"symbols", "string"},
 		{"mult", 0},
 		{"charge", 0}
 	}}

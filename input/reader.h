@@ -5,6 +5,7 @@
 #include <stdexcept>
 
 #include "utils/options.h"
+#include "desc/molecule.h"
 
 class reader {
 

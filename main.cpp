@@ -82,7 +82,7 @@ int main(int argv, char** argc) {
 	int rank;
 	MPI_Comm_rank(MPI_COMM_WORLD,&rank);
 	
-	//reader filereader("test.json");
+	reader filereader("test.json");
 	
 	
 	dbcsr::init();
@@ -187,7 +187,7 @@ int main(int argv, char** argc) {
 	pgrid4d.destroy();
 	
 	
-	 * */
+	 
 	
 	dbcsr::pgrid<2> pgrid2d({.comm = MPI_COMM_WORLD});
 							 
@@ -241,7 +241,7 @@ int main(int argv, char** argc) {
 	dist2d.destroy();
 	pgrid2d.destroy();
 	
-	
+	*/
 
 	dbcsr::finalize();
 	

@@ -1,0 +1,6 @@
+#ifndef UTIL_CONSTANTS_H
+#define UTIL_CONSTANTS_H
+
+#define BOHR_RADIUS 0.529177210671212; 
+
+#endif

@@ -13,12 +13,18 @@ set (CMAKE_CXX_STANDARD 17)
 #list(APPEND CMAKE_MODULE_PATH /export/home/mambrois/ctx/gnu/share/cmake/ctx)
 
 find_package(Eigen3 REQUIRED NO_MODULE)
+
+get_target_property(dir Eigen3::Eigen INTERFACE_INCLUDE_DIRECTORIES)
+
+set(ENV{CPATH} ${dir})
+
 find_package(MPI REQUIRED)
 find_package(DBCSR 2.0.0 CONFIG REQUIRED)
 
 #set(libint2_DIR /export/home/mambrois/libint2/gcc/lib/cmake/libint2)
 
-find_package(libint2 CONFIG)
+find_package(Libint2 2.6.0 CONFIG REQUIRED)
+INCLUDE_DIRECTORIES(${LIBINT2_INCLUDE_DIRS})
 
 #set(ctx_DIR /export/home/mambrois/ctx/gnu/share/cmake/ctx)
 #find_package(ctx REQUIRED)
@@ -42,11 +48,15 @@ add_executable(
 	main.cpp 
 )
 
+add_dependencies(Libint2::cxx Eigen3::Eigen)
+
 target_link_libraries(
 	chem
+	PUBLIC
 	input
 	chem_math_laplace
 	MPI::MPI_CXX	
 	DBCSR::dbcsr_c
-	Libint2::int2
+	Eigen3::Eigen
+	Libint2::cxx
 )
