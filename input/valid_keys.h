@@ -11,10 +11,15 @@ static const json valid_keys =
 		{"file", "string"},
 		{"unit", "string"},
 		{"basis", "string"},
+		{"dfbasis", "string"},
 		{"geometry", {0,0,0}},
 		{"symbols", "string"},
 		{"mult", 0},
 		{"charge", 0}
+	}},
+	{"hf", {
+		{"diis", true},
+		{"conv", 1e-9}
 	}}
 };
 

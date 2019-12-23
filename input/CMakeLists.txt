@@ -3,4 +3,8 @@ set (SOURCES
 	reader.cpp
 )
 
-add_library(input ${SOURCES})
+add_library(chem_input ${SOURCES})
+target_link_libraries(chem_input 
+	Libint2::int2
+	chem_desc
+)

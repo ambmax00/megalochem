@@ -4,7 +4,7 @@
 #include <string>
 #include <stdexcept>
 
-#include "utils/options.h"
+#include "desc/options.h"
 #include "desc/molecule.h"
 
 class reader {

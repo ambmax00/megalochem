@@ -6,6 +6,8 @@
 #include <any>
 #include <type_traits>
 
+namespace desc {
+
 template <typename T, typename U = void>
 struct is_valid : std::false_type {};
 
@@ -81,4 +83,6 @@ public:
 		
 	
 };
+
+}
 

@@ -6,11 +6,10 @@
 #include <vector>
 #include <sstream>
 #include <utility>
-#include <libint2/atom.h>
-#include <libint2/shell.h>
-#include <libint2/basis.h>
 #include "utils/ele_to_int.h"
 #include "utils/constants.h"
+#include "desc/molecule.h"
+#include <libint2/basis.h>
 
 void validate(const json& j, const json& compare) {
 	
@@ -113,6 +112,56 @@ std::vector<libint2::Shell> get_basis(const json &j, std::vector<libint2::Atom> 
 	
 }
 
+optional<std::vector<libint2::Shell>,val> 
+get_dfbasis(const json &j, std::vector<libint2::Atom> &atoms) {
+	
+	// only ba name for now
+	if (j.find("dfbasis") != j.end()) {
+		
+		auto name = j["dfbasis"];
+		
+		libint2::BasisSet basis(name, atoms);
+		
+		optional<std::vector<libint2::Shell>,val> out(basis);
+		
+		return out;
+		
+	}	
+	
+	optional<std::vector<libint2::Shell>,val> out;
+	return out;
+	
+}
+
+void unpack(const json& j_in, desc::options& opt, std::string root) {
+	
+	auto j = j_in[root];
+	
+	for (auto it = j.begin(); it != j.end(); ++it) {
+		
+		if (it->type() == json::value_t::boolean) {
+			opt.set<bool>(root + "/" + it.key(), *it);
+		}
+		
+		if (it->type() == json::value_t::number_integer) {
+			opt.set<int>(root + "/" + it.key(), *it);
+		}
+		
+		if (it->type() == json::value_t::number_float) {
+			opt.set<double>(root + "/" + it.key(), *it);
+		}
+		
+		if (it->type() == json::value_t::string) {
+			opt.set<std::string>(root + "/" + it.key(), *it);
+		}
+		
+		//if (it->type() == json::value_t::array) {
+		//	opt.set<std::vector<int>>(root + it.key(), *it);
+		//}
+		
+	}
+}	
+
 reader::reader(std::string filename) {
 	
 	std::ifstream in;
@@ -131,5 +180,22 @@ reader::reader(std::string filename) {
 	auto atoms = get_geometry(data["molecule"]);
 	
 	auto basis = get_basis(data["molecule"],atoms);
+	
+	auto dfbasis = get_dfbasis(data["molecule"],atoms);
+	
+	int charge = data["molecule"]["charge"];
+	int mult = data["molecule"]["mult"];
+	
+	desc::molecule mol({.atoms = atoms, .charge = charge,
+		.mult = mult, .split = 20, .basis = basis, .dfbasis = dfbasis});
+		
+	mol.print_info(1);
+	
+	desc::options opt;
+	
+	unpack(data, opt, "hf");
+	
+	std::cout << opt.get<bool>("hf/diis") << std::endl;
+	std::cout << opt.get<double>("hf/conv") << std::endl;
 	
 }
