@@ -4,8 +4,8 @@
 #define MAXDIM 4
 
 #define really_unparen(...) __VA_ARGS__
-#define invoke(expr) expr
-#define unparen(args) invoke(really_unparen args)
+#define invoke_(expr) expr
+#define unparen(args) invoke_(really_unparen args)
 #define concat(text,var) text##var
 
 #define PLUS_ONE(x) INCREMENT##x

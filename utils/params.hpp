@@ -7,8 +7,6 @@
 #include <initializer_list>
 #include <iostream>
 
-
-
 template<typename T>
 struct has_const_iterator
 {

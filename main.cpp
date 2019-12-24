@@ -4,6 +4,7 @@
 #include "math/tensor/dbcsr.hpp"
 #include "math/tensor/dbcsr_conversions.hpp"
 #include "input/reader.h"
+#include "ints/aofactory.h"
 
 
 template <int N>
@@ -87,7 +88,6 @@ int main(int argv, char** argc) {
 	
 	dbcsr::init();
 	
-	/*
 	dbcsr::pgrid<3> pgrid3d({.comm = MPI_COMM_WORLD});
 	dbcsr::pgrid<4> pgrid4d({.comm = MPI_COMM_WORLD});
 							 
@@ -124,6 +124,8 @@ int main(int argv, char** argc) {
 		.map2 = map32, .blk_sizes = sizes3});
 	
 	std::cout << "Tensors created." << std::endl;
+	
+	pgrid3d.destroy();
 	
 	vec<int> nz11 = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 
 		    0, 1, 1, 1, 1, 1, 1, 1, 2, 2, 
@@ -183,11 +185,11 @@ int main(int argv, char** argc) {
 	tensor3.destroy();
 	//tensortest.destroy();
 	
-	pgrid3d.destroy();
+	
 	pgrid4d.destroy();
 	
 	
-	 
+	 /*
 	
 	dbcsr::pgrid<2> pgrid2d({.comm = MPI_COMM_WORLD});
 							 
@@ -240,7 +242,7 @@ int main(int argv, char** argc) {
 	ten2.destroy();
 	dist2d.destroy();
 	pgrid2d.destroy();
-	
+
 	*/
 
 	dbcsr::finalize();

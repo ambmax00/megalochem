@@ -6,11 +6,7 @@ enable_language(Fortran CXX)
 set(CMAKE_BUILD_TYPE Debug)
 set (CMAKE_CXX_STANDARD 17)
 
-#include(cmake/modules/AddMPQCLibrary.cmake)
-#set(CMAKE_MODULE_PATH ${CMAKE_SOURCE_DIR}/cmake/modules)
-
-#list(APPEND CMAKE_MODULE_PATH /export/home/mambrois/libint2/gcc/lib/cmake/libint2)
-#list(APPEND CMAKE_MODULE_PATH /export/home/mambrois/ctx/gnu/share/cmake/ctx)
+set(CMAKE_MODULE_PATH ${CMAKE_SOURCE_DIR}/cmake/modules)
 
 find_package(Eigen3 REQUIRED NO_MODULE)
 
@@ -24,7 +20,7 @@ find_package(DBCSR 2.0.0 CONFIG REQUIRED)
 find_package(Libint2 2.6.0 CONFIG REQUIRED)
 INCLUDE_DIRECTORIES(${LIBINT2_INCLUDE_DIRS})
 
-#find_package(TBB REQUIRED)
+find_package(TBB REQUIRED)
 
 include_directories(${CMAKE_CURRENT_SOURCE_DIR})
 
@@ -33,7 +29,7 @@ add_subdirectory(desc)
 #add_subdirectory(utils)
 #add_subdirectory(mpqc)
 add_subdirectory(input)
-#add_subdirectory(aofactory)
+add_subdirectory(ints)
 #add_subdirectory(hf)
 #add_subdirectory(mp2)
 
@@ -50,4 +46,5 @@ target_link_libraries(
 	MPI::MPI_CXX	
 	DBCSR::dbcsr_c
 	Eigen3::Eigen
+	chem_ints
 )

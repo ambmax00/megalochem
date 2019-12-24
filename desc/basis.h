@@ -20,12 +20,12 @@ public:
 	
 	cluster_basis(vshell& basis, int nsplit);
 	
-	cluster_basis(cluster_basis& cbasis) : 
+	cluster_basis(const cluster_basis& cbasis) : 
 		m_basis(cbasis.m_basis),
 		m_clusters(cbasis.m_clusters),
 		m_cluster_sizes(cbasis.m_cluster_sizes) {}
 		
-	cluster_basis& operator =(cluster_basis& cbasis) {
+	cluster_basis& operator =(const cluster_basis& cbasis) {
 		if (this != &cbasis) {
 			m_basis = cbasis.m_basis;
 			m_clusters = cbasis.m_clusters;

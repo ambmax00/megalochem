@@ -113,6 +113,18 @@ public:
 	~molecule() {}
 	
 	void print_info(int level = 0);
+	
+	cluster_basis c_basis() {
+		return m_cluster_basis;
+	}
+	
+	optional<cluster_basis,val> c_dfbasis() {
+		return m_cluster_dfbasis;
+	}
+	
+	std::vector<libint2::Atom> atoms() {
+		return m_atoms;
+	}
 
 };
 
