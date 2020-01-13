@@ -1,3 +1,6 @@
+#ifndef DESC_OPTIONS_H
+#define DESC_OPTIONS_H
+
 #include <iostream>
 #include <string>
 #include <vector>
@@ -5,6 +8,8 @@
 #include <utility>
 #include <any>
 #include <type_traits>
+
+// a fancy "any" map
 
 namespace desc {
 
@@ -23,21 +28,19 @@ struct is_valid<T,typename std::enable_if<(
 class options  {
 private:
 
-	std::map<std::string, std::any*> m_map;
+	std::map<std::string, std::any> m_map;
 	std::string m_prefix = "";
-	
-	options(options&) {};
 	
 public:
 
 	template <typename T>
 	typename std::enable_if<is_valid<T>::value, void>::type
-	set(std::string key, T val) {
+	set(std::string key, T in) {
 		
 		key = m_prefix + key;
 		
-		std::any* valptr = new std::any(val);
-		m_map[key] = valptr;
+		std::any val = std::any(in);
+		m_map[key] = val;
 	}
 	
 	template <typename T>
@@ -58,18 +61,19 @@ public:
 		if (m_map.find(key) == m_map.end())
 			throw std::runtime_error("Could not find keyword: " + key);
 		
-		auto valptr = m_map[key];
-		return std::any_cast<T>(*valptr);
+		auto val = m_map[key];
+		return std::any_cast<T>(val);
 		
 	}
 	
 	options() {}
 	
-	~options() {
-		for (auto& ele : m_map) {
-			delete ele.second;
-		}
+	options(options& opt) {
+		m_map = opt.m_map;
+		m_prefix = opt.m_prefix;
 	}
+	
+	~options() {}
 	
 	options subtext(std::string root) {
 		
@@ -86,3 +90,4 @@ public:
 
 }
 
+#endif

@@ -35,6 +35,7 @@
 #include <memory>
 #include <stdexcept>
 #include <random>
+#include <algorithm>
 
 #include "utils/params.hpp"
 
@@ -81,7 +82,7 @@ static void finalize() {
 	
 };
 
-auto default_dist = 
+static auto default_dist = 
 	[](int nel, int nbin, vec<int> weights) {
 		
 		std::vector<int> distvec(weights.size(),0);
@@ -197,7 +198,7 @@ public:
 	
 };
 
-vec<int> random_dist(int dist_size, int nbins)
+static vec<int> random_dist(int dist_size, int nbins)
 {
     vec<int> d(dist_size);
 
@@ -316,7 +317,7 @@ public:
 		m_nfull = 1;
 		for (int i = 0; i != N; ++i) m_nfull *= sizes[i];
 		
-		m_data = new T[m_nfull];
+		m_data = new T[m_nfull]();
 		
 	}
 	
@@ -329,7 +330,7 @@ public:
 		m_data = new T[m_nfull];
 		m_sizes = blk_in.m_sizes;
 		
-		memcpy ( m_data, blk_in.m_data, sizeof(T) * m_nfull );
+		std::copy(blk_in.m_data, blk_in.m_data + m_nfull, m_data);
 		
 	}
 	
@@ -345,7 +346,7 @@ public:
 		m_data = new T[m_nfull];
 		m_sizes = rhs.m_sizes;
 		
-		memcpy ( m_data, rhs.m_data, sizeof(T) * m_nfull );
+		std::copy(rhs.m_data, rhs.m_data + m_nfull, m_data);
 		   
 		return *this;
 	}
@@ -564,12 +565,13 @@ public:
 	}
 		
 	//move constructor
-	tensor(tensor<N,T>&& t) {
+	tensor(tensor<N,T>&& t) : m_blk_sizes(t.m_blk_sizes) {
 		std::cout << "Moving" << std::endl;
 		bool move = true;
 		this->m_tensor_ptr = t.m_tensor_ptr;
 		//c_dbcsr_t_create_template(t.m_tensor_ptr, &this->m_tensor_ptr, nullptr);
 		t.m_tensor_ptr = nullptr;
+		std::cout << "Done." << std::endl;
 	}
 	
 	struct tensor_params {
@@ -801,6 +803,10 @@ public:
 	
 	void clear() {
 		c_dbcsr_t_clear(m_tensor_ptr);
+	}
+	
+	MPI_Comm comm() {
+		return m_comm;
 	}
 	
 	vec<int> nblks_tot(){

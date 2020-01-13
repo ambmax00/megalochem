@@ -35,6 +35,10 @@ public:
 		return *this;
 	}
 	
+	vshell& operator[](int i) {
+		return m_clusters[i];
+	}
+	
 	size_t max_nprim();
 
 	size_t nbf();

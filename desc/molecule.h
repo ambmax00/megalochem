@@ -98,6 +98,8 @@ private:
 		
 	
 public:
+
+	molecule() {}
 	
 	struct mol_params {
 		required<std::vector<libint2::Atom>,ref>	atoms;
@@ -124,6 +126,26 @@ public:
 	
 	std::vector<libint2::Atom> atoms() {
 		return m_atoms;
+	}
+	
+	block_sizes dims() {
+		return m_blocks;
+	}
+
+	int nocc_alpha() {
+		return m_nocc_alpha;
+	}
+	
+	int nocc_beta() {
+		return m_nocc_beta;
+	}
+	
+	int nvir_alpha() {
+		return m_nvir_alpha;
+	}
+	
+	int nvir_beta() {
+		return m_nvir_beta;
 	}
 
 };

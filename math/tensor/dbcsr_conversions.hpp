@@ -8,6 +8,8 @@
 template <class T>
 using MatrixX = Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic>;
 
+namespace dbcsr {
+
 template <class T>
 MatrixX<T> tensor_to_eigen(dbcsr::tensor<2,T>& array, int l = 0) {
 	
@@ -176,7 +178,7 @@ dbcsr::tensor<2,T> eigen_to_tensor(MatrixX<T>& M, std::string name,
 
 }
 	
-	
+}
 	
 	
 #endif

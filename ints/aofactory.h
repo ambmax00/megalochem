@@ -17,17 +17,25 @@ class aofactory {
 	
 private:
 	
-	desc::molecule m_mol;
+	desc::molecule& m_mol;
 	MPI_Comm m_comm;
 	
 public:
 
-	aofactory(desc::molecule mol, MPI_Comm c) : m_mol(mol), m_comm(c)  {};
+	aofactory(desc::molecule& mol, MPI_Comm c) : m_mol(mol), m_comm(c)  {};
 	
 	~aofactory() {};
 	
+	struct aofac_params {
+		required<std::string,val> 	op;
+		required<std::string,val> 	bas;
+		required<std::string,val>	name;
+		required<vec<int>,val>		map1;
+		required<vec<int>,val>		map2;
+	};
+	
 	template <int N>
-	dbcsr::tensor<N,double> compute(std::string Op, std::string bis);
+	dbcsr::tensor<N,double> compute(aofac_params&& p);
 		
 }; // end class aofactory
 

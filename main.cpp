@@ -4,6 +4,7 @@
 #include "math/tensor/dbcsr.hpp"
 #include "math/tensor/dbcsr_conversions.hpp"
 #include "input/reader.h"
+#include "hf/hfmod.h"
 #include "ints/aofactory.h"
 
 
@@ -85,9 +86,22 @@ int main(int argv, char** argc) {
 	
 	reader filereader("test.json");
 	
-	
 	dbcsr::init();
 	
+	auto mol = filereader.get_mol();
+	auto opt = filereader.get_opt(); 
+	
+	hf::hfmod myhf(mol,opt,MPI_COMM_WORLD);
+	
+	myhf.compute();
+	
+	//ints::aofactory ao(mol, MPI_COMM_WORLD);
+	
+	//auto s = ao.compute<2>({.op = "overlap", .bas = "bb", .name = "S", .map1 = {0}, .map2 = {1}});
+	
+	//dbcsr::print(s);
+	
+	/*
 	dbcsr::pgrid<3> pgrid3d({.comm = MPI_COMM_WORLD});
 	dbcsr::pgrid<4> pgrid4d({.comm = MPI_COMM_WORLD});
 							 

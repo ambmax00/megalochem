@@ -198,4 +198,7 @@ reader::reader(std::string filename) {
 	std::cout << opt.get<bool>("hf/diis") << std::endl;
 	std::cout << opt.get<double>("hf/conv") << std::endl;
 	
+	m_mol = mol;
+	m_opt = opt;
+	
 }

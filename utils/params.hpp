@@ -92,7 +92,7 @@ public:
 	
 	// copy constructor. Pay attention that references remain valid
 	attribute_wrapper(attribute_wrapper<T,a0,a1>& awrp) : init(false), m_val(nullptr), m_ref(nullptr) {
-		std::cout << "Passing through!" << std::endl;
+		//std::cout << "Passing through!" << std::endl;
 		if (awrp.m_val != nullptr) {
 			this->m_val = new T(*awrp.m_val);
 			this->m_ref = m_val;
@@ -109,7 +109,7 @@ public:
 		typename = typename std::enable_if<(A1 != value_), int>::type>
 	[[deprecated("Converting attribute value to attribute reference.")]] 
 	attribute_wrapper(attribute_wrapper<T,a0,value_>& awrp) : init(false), m_val(nullptr), m_ref(nullptr) {
-		std::cout << "Passing through!" << std::endl;
+		//std::cout << "Passing through!" << std::endl;
 		
 		if (awrp.m_val != nullptr) {
 			this->m_val = new T(*awrp.m_val);
@@ -119,7 +119,7 @@ public:
 			this->m_ref = &*awrp.m_ref;
 			this->init = true;
 		} 
-		std::cout << "Done" << std::endl;
+		//std::cout << "Done" << std::endl;
 	}
 	
 	// a nice constructor to allow initializer lists
@@ -151,7 +151,7 @@ public:
 		
 		return *this;
 		
-		std::cout << "Done copying" << std::endl; 
+		//std::cout << "Done copying" << std::endl; 
 	}
 	
 	T& operator*() {
@@ -160,6 +160,7 @@ public:
 	}
 	
 	T* operator->() const {
+		 assert(("Optional parameter not initialized.", init == true));
 		 return m_ref;
 	}
 	

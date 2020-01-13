@@ -41,24 +41,17 @@ cluster_basis::cluster_basis(vshell& basis, int nsplit) {
 	
 			} else {
 				
-				//std::cout << "Different ";
-				
 				if ( n < nsplit ) {
 				
 					//std::cout << "...still okay" << std::endl;
 					cluster_part.push_back(basis[i]);
-					
 					n += 1;
-					
-					
+
 				} else {
 					
 					//std::cout << "...pushing." << std::endl;
-					
 					n = 1;
 					m_clusters.push_back(cluster_part);
-					m_cluster_sizes.push_back(cluster_part.size());
-					
 					cluster_part.clear();
 					cluster_part.push_back(basis[i]);
 					
@@ -68,10 +61,13 @@ cluster_basis::cluster_basis(vshell& basis, int nsplit) {
 		
 		if (i == basis.size() - 1) {
 			m_clusters.push_back(cluster_part);
-			m_cluster_sizes.push_back(cluster_part.size());
 		}
 			prev_shell = basis[i];
 		
+	}
+	
+	for (auto c : m_clusters) {
+		m_cluster_sizes.push_back(libint2::nbf(c));
 	}		
 	
 }

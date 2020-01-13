@@ -1,13 +1,20 @@
 #include <vector>
-
+#include <stdexcept>
 #include "ints/aofactory.h"
+#include "ints/integrals.h"
 #include "utils/pool.h"
+#include "utils/params.hpp"
 #include <libint2.hpp>
+
+#include <iostream>
 
 namespace ints {
 
 template <int N>
-dbcsr::tensor<N,double> aofactory::compute(std::string Op, std::string bis /*maybe other params later?*/) {
+dbcsr::tensor<N,double> aofactory::compute(aofac_params&& p) {
+		
+		std::string Op = *p.op;
+		std::string bis = *p.bas;
 		
 		libint2::initialize();
 		
@@ -20,7 +27,8 @@ dbcsr::tensor<N,double> aofactory::compute(std::string Op, std::string bis /*may
 		if (Op == "nuclear") libOp = libint2::Operator::nuclear;
 		if (Op == "erfc_coulomb") libOp = libint2::Operator::erfc_coulomb;
 		
-		if (libOp == libint2::Operator::invalid) std::cout << "INVALID!!" << std::endl;
+		if (libOp == libint2::Operator::invalid) 
+			throw std::runtime_error("Invalid operator: "+Op);
 		
 		vec<desc::cluster_basis> basvec;
 		
@@ -69,7 +77,9 @@ dbcsr::tensor<N,double> aofactory::compute(std::string Op, std::string bis /*may
 			
 		util::ShrPool<libint2::Engine> eng_pool = util::make_pool<libint2::Engine>(eng);
 		
-		dbcsr::tensor<N,double> out;// = integrals(world, eng_pool, basvec);
+		std::cout << "Op: " << Op << " bis: " << bis << std::endl;
+		
+		dbcsr::tensor<N,double> out = integrals<N>(m_comm, eng_pool, basvec, *p.name, *p.map1, *p.map2);
 		
 		libint2::finalize();
 		
@@ -78,9 +88,9 @@ dbcsr::tensor<N,double> aofactory::compute(std::string Op, std::string bis /*may
 }
 
 //forward declarations
-template dbcsr::tensor<2,double> aofactory::compute(std::string Op, std::string bis);
-template dbcsr::tensor<3,double> aofactory::compute(std::string Op, std::string bis);
-template dbcsr::tensor<4,double> aofactory::compute(std::string Op, std::string bis);
+template dbcsr::tensor<2,double> aofactory::compute(aofac_params&& p);
+//template dbcsr::tensor<3,double> aofactory::compute(aofac_params&& p);
+//template dbcsr::tensor<4,double> aofactory::compute(aofac_params&& p);
 
 
 } // end namespace ints

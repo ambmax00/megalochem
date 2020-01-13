@@ -14,6 +14,7 @@ get_target_property(dir Eigen3::Eigen INTERFACE_INCLUDE_DIRECTORIES)
 
 include_directories(${dir})
 
+find_package(OpenMP REQUIRED)
 find_package(MPI REQUIRED)
 find_package(DBCSR 2.0.0 CONFIG REQUIRED)
 
@@ -30,7 +31,7 @@ add_subdirectory(desc)
 #add_subdirectory(mpqc)
 add_subdirectory(input)
 add_subdirectory(ints)
-#add_subdirectory(hf)
+add_subdirectory(hf)
 #add_subdirectory(mp2)
 
 add_executable(
@@ -46,5 +47,5 @@ target_link_libraries(
 	MPI::MPI_CXX	
 	DBCSR::dbcsr_c
 	Eigen3::Eigen
-	chem_ints
+	chem_hf
 )
