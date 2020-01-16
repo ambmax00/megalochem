@@ -296,7 +296,7 @@ public:
 };
 
 
-template <int N, typename T>
+template <int N, typename T = double>
 class block {
 private:
 
@@ -405,7 +405,7 @@ public:
 	
 };		
 
-template <int N, typename T>
+template <int N, typename T = double>
 class tensor {
 protected:
 
@@ -556,29 +556,50 @@ public:
          
 	}
 	
-	tensor() : m_tensor_ptr(nullptr) {}
+	tensor() : m_tensor_ptr(nullptr), m_blk_sizes(0) {}
 	
 	//copy constructor
-	tensor(const tensor<N,T>& t): m_tensor_ptr(nullptr) {
-		c_dbcsr_t_create_template(t.m_tensor_ptr, &this->m_tensor_ptr, nullptr);
-		c_dbcsr_t_copy(t.m_tensor_ptr, N, this->m_tensor_ptr, nullptr, nullptr, nullptr, nullptr);
+	tensor(const tensor<N,T>& rhs): m_tensor_ptr(nullptr) {
+		
+		std::cout << "Copying..." << std::endl;
+		
+		if (this != &rhs) {
+		
+			c_dbcsr_t_create_template(rhs.m_tensor_ptr, &m_tensor_ptr, nullptr);
+			c_dbcsr_t_copy(rhs.m_tensor_ptr, N, m_tensor_ptr, nullptr, nullptr, nullptr, nullptr);
+			
+			m_blk_sizes = rhs.m_blk_sizes;
+			
+			for (auto v : m_blk_sizes) {
+				for (auto x : v) {
+					std::cout << x << " ";
+				} std::cout << std::endl;
+			}
+	
+			m_comm = rhs.m_comm;
+			
+		}
+		
 	}
 		
 	//move constructor
-	tensor(tensor<N,T>&& t) : m_blk_sizes(t.m_blk_sizes) {
+	tensor(tensor<N,T>&& rhs) : m_blk_sizes(rhs.m_blk_sizes), m_comm(rhs.m_comm) {
 		std::cout << "Moving" << std::endl;
-		bool move = true;
-		this->m_tensor_ptr = t.m_tensor_ptr;
+		//bool move = true;
+		m_tensor_ptr = rhs.m_tensor_ptr;
+		m_blk_sizes = rhs.m_blk_sizes;
+		m_comm = rhs.m_comm;
 		//c_dbcsr_t_create_template(t.m_tensor_ptr, &this->m_tensor_ptr, nullptr);
-		t.m_tensor_ptr = nullptr;
+		rhs.m_tensor_ptr = nullptr;
 		std::cout << "Done." << std::endl;
+		
 	}
 	
 	struct tensor_params {
 		required<std::string, val>	name;
 		required<dist<N>, ref>  	distN;
 		required<vec<int>,val>		map1,map2;
-		required<vec<vec<int>>,ref>	blk_sizes;
+		required<vec<vec<int>>,val>	blk_sizes;
 	};
 	tensor(tensor_params&& p) :
 		m_tensor_ptr(nullptr),
@@ -618,7 +639,7 @@ public:
 		required<std::string, val>	name;
 		required<pgrid<N>, ref>  	pgridN;
 		required<vec<int>,val>		map1,map2;
-		required<vec<vec<int>>,ref>	blk_sizes;
+		required<vec<vec<int>>,val>	blk_sizes;
 	};
 	tensor(tensor_params2&& p) :
 		m_tensor_ptr(nullptr),
@@ -767,7 +788,7 @@ public:
 		c_dbcsr_t_set(m_tensor_ptr, alpha);
 	}
 	
-	tensor<N,T>& operator+=(tensor<N,T>& t) {
+	tensor<N,T>& operator+=(const tensor<N,T>& t) {
 		
 		bool sum = true;
 		//c_dbcsr_t_create_template(t.m_tensor_ptr, &m_tensor_ptr, nullptr);
@@ -775,24 +796,41 @@ public:
 		return *this;
 		
 	}
-
-	tensor<N,T> operator+(tensor<N,T>& t) {
-		
-		tensor<N,T> out(*this);
-		return out += t;
-		
-	}
 	
-	tensor<N,T> operator=(const tensor<N,T>& t) {	
-		std::cout << "&" << std::endl;
-		tensor<N,T> out(std::forward<tensor<N,T>>(t));
-		return out;
+	tensor<N,T>& operator=(const tensor<N,T>& rhs) {	
+		
+		if (&rhs != this) {
+		
+			std::cout << "&" << std::endl;
+			m_blk_sizes = rhs.m_blk_sizes;
+			m_comm = rhs.m_comm;
+			
+			if (m_tensor_ptr == nullptr) {
+				c_dbcsr_t_create_template(rhs.m_tensor_ptr, &m_tensor_ptr, nullptr); 
+			}
+			
+			c_dbcsr_t_copy(rhs.m_tensor_ptr, N, m_tensor_ptr, nullptr, nullptr, nullptr, nullptr);
+			
+		}
+		
+		return *this;
 	}
 		
-	tensor<N,T> operator=(tensor<N,T>&& t) {
+	tensor<N,T>& operator=(tensor<N,T>&& rhs) {
 		std::cout << "&&" << std::endl;
-		tensor<N,T> out(std::forward<tensor<N,T>>(t));
-		return out;
+		
+		if (&rhs != this) {
+		
+			std::cout << "Now..." << std::endl;
+			
+			m_blk_sizes = rhs.m_blk_sizes;
+			m_comm = rhs.m_comm;
+			m_tensor_ptr = rhs.m_tensor_ptr;
+			rhs.m_tensor_ptr = nullptr;
+			
+		}
+		
+		return *this;
 	}
 	
 	int proc(index<N> idx) {
@@ -869,53 +907,27 @@ public:
 		return out;
 	}
 	
-	vec<int> map1() {
-		
-		std::cout << "Here" << std::endl;
-		
-		int *map1;
-		int map1size;
-		
-		c_get_nd_index(m_tensor_ptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
-		nullptr, nullptr, nullptr, &map1, &map1size, nullptr, nullptr, nullptr, nullptr, nullptr, 
-		nullptr);
-		
-		vec<int> out(map1size);
-		for (int n = 0; n != map1size; ++n) {
-			out[n] = map1[n];
-		}
-		
-		std::cout << "There" << std::endl;
-		
-		free(map1);
-		
-		std::cout << "End" << std::endl;
-		
-		return out;
-		
-	}
-	
-	vec<int> map2() {
-		
-		int *map2;
-		int map2size;
-		
-		c_get_nd_index(m_tensor_ptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
-		nullptr, nullptr, nullptr, nullptr, nullptr, &map2, &map2size, nullptr, nullptr, nullptr, 
-		nullptr);
-		
-		vec<int> out(map2, map2 + map2size);
-		
-		free(map2);
-		
-		return out;
-		
+	bool is_assigned() {
+		if (m_tensor_ptr) return true;
+		return false;
 	}
 	
 };
 
+template <int N, typename T = double>
+tensor<N,T> operator+(const tensor<N,T>& t1, const tensor<N,T>& t2) {
+		
+		std::cout << "+1" << std::endl;
+		tensor<N,T> out(t1);
+		std::cout << "+2" << std::endl;
+		out += t2;
+		
+		return out;
+		
+}
 
-template <int N, typename T>
+
+template <int N, typename T = double>
 class iterator {
 private:
 
@@ -977,7 +989,7 @@ public:
 		
 };
 
-template <int N, typename T>
+template <int N, typename T = double>
 struct tensor_copy {
 		required<tensor<N,T>,ref>  	tensor_in;
 		required<tensor<N,T>,ref>	tensor_out;
@@ -1007,7 +1019,7 @@ struct contract_param {
 	required<vec<int>,val>		con1, ncon1;
 	required<vec<int>,val>		con2, ncon2;
 	required<vec<int>,val>		map1, map2;
-	optional<vec<int>,val>		b1, b2, b3;
+	optional<vec<vec<int>>,val>		b1, b2, b3;
 	optional<double, val>		filter;
 	optional<long long int, ref> flop;
 	optional<bool, val>			move;
@@ -1023,9 +1035,20 @@ contract_param(T alpha, tensor<N1,T>& t1, tensor<N2,T>& t2,
 template <int N1, int N2, int N3, typename T  = double>
 void contract(contract_param<T,N1,N2,N3>&& p) {
 	
-	int* f_b1 = (p.b1) ? p.b1->data() : nullptr;
-	int* f_b2 = (p.b2) ? p.b2->data() : nullptr;
-	int* f_b3 = (p.b3) ? p.b3->data() : nullptr;
+	auto unfold_bounds = [](vec<vec<int>>& v) {
+			int b_size = v.size();
+			int* f_bounds = new int[2 * b_size];
+			for (int j = 0; j != b_size; ++j) {
+				for (int i = 0; i != 2; ++i) {
+					f_bounds[i + j * 2] = v[j][i];
+				}
+			}
+			return f_bounds;
+	};
+	
+	int* f_b1 = (p.b1) ? unfold_bounds(*p.b1) : nullptr;
+	int* f_b2 = (p.b2) ? unfold_bounds(*p.b2) : nullptr;
+	int* f_b3 = (p.b3) ? unfold_bounds(*p.b3) : nullptr;
 	
 	std::cout << "In here..." << std::endl;
 	
@@ -1042,7 +1065,8 @@ void contract(contract_param<T,N1,N2,N3>&& p) {
 						p.map1->data(), p.map1->size(), p.map2->data(), p.map2->size(), 
 						f_b1, f_b2, f_b3, nullptr, nullptr, nullptr, nullptr, f_filter, 
 						f_flop, f_move, f_unit, f_log);
-                       
+       
+     delete[] f_b1, f_b2, f_b3;               
 	
 }
 
@@ -1178,7 +1202,7 @@ struct einsum_param {
 	required<tensor<N3,T>,ref> 	t3;
 	required<T,val>				alpha = 1.0;
 	required<T,val>				beta = T();
-	optional<vec<int>,val>		b1, b2, b3;
+	optional<vec<vec<int>>,val>		b1, b2, b3;
 	optional<double, val>		filter;
 	optional<long long int, ref> flop;
 	optional<bool, val>			move;

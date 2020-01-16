@@ -18,6 +18,9 @@ void orthgon::compute() {
 	auto eigval = es.eigenvalues();
 	m_out = es.eigenvectors();
 	
+	std::cout << "EIGENVALUES: " << std::endl;
+	std::cout << eigval << std::endl;
+	
 	if (es.info() != Eigen::Success) throw std::runtime_error("Eigen hermitian eigensolver failed.");
 	
 	// for now, we dont throw any away.

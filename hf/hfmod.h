@@ -7,6 +7,7 @@
 
 #include <mpi.h>
 #include <memory>
+#include <iostream>
 
 namespace hf {
 	
@@ -24,19 +25,19 @@ private:
 	
 	// options
 	bool m_restricted;
+	bool m_nobeta;
 	
 	// results
 	double m_nuc_energy;
 	
-	tensor_ptr<2> m_s_bb, //overlap
+	dbcsr::tensor<2> m_s_bb, //overlap
 				  m_v_bb, // nuclear reulsion
 				  m_k_bb, // kinetic
 				  m_core_bb, // core hamiltonian
 				  m_x_bb, // orthogonalizing matrix
 				  m_f_bb_A, m_f_bb_B, // alpha/beta fock mat
 				  m_p_bb_A, m_p_bb_B, // alpha/beta density matrix
-				  m_c_ob_A, m_c_ob_B; // alpha/beta coefficient matrix
-				  
+				  m_c_bm_A, m_c_bm_B; // alpha/beta coefficient matrix	  
 	
 	void compute_nucrep();
 	void one_electron();

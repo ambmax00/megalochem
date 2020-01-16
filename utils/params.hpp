@@ -154,6 +154,23 @@ public:
 		//std::cout << "Done copying" << std::endl; 
 	}
 	
+	attribute_wrapper& operator=(const attribute_wrapper<T,a0,a1>&& in) {
+		
+		if (m_val) delete m_val;
+		
+		if (in.m_val != nullptr) {
+			this->m_val = new T(*in.m_val);
+			this->m_ref = m_val;
+			this->init = true;
+		} else if (in.m_ref != nullptr) {
+			this->m_ref = &*in.m_ref;
+			this->init = true;
+		}
+		
+		return *this;
+		
+	}
+	
 	T& operator*() {
 		assert(("Optional parameter not initialized.", init == true));
 		return *m_ref;
