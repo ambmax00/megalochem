@@ -1,4 +1,6 @@
 #include "hf/hfmod.h"
+#include "hf/fock_builder.h"
+#include "hf/hfdefaults.h"
 #include "ints/aofactory.h"
 #include "math/linalg/orthogonalizer.h"
 #include "math/tensor/dbcsr_conversions.hpp"
@@ -8,11 +10,16 @@ namespace hf {
 hfmod::hfmod(desc::molecule& mol, desc::options& opt, MPI_Comm comm) 
 	: m_mol(mol), 
 	  m_opt(opt), 
+	  LOG(m_opt.get<int>("print_level", HF_PRINT_LEVEL)),
+	  m_guess(m_opt.get<std::string>("guess", HF_GUESS)),
+	  m_max_iter(m_opt.get<int>("max_iter", HF_MAX_ITER)),
+	  m_scf_threshold(m_opt.get<double>("scf_thresh", HF_SCF_THRESH)),
+	  m_restricted(m_opt.get<bool>("restricted", true)),
 	  m_comm(comm),
-	  m_restricted(false),
 	  m_nobeta(false)
 {
-	if (m_mol.nocc_alpha() == m_mol.nocc_beta()) m_restricted = true;
+	if ((m_mol.nocc_alpha() != m_mol.nocc_beta()) && m_restricted) 
+		throw std::runtime_error("Cannot do restricted calculations for this multiplicity.");
 	if (m_mol.nocc_beta() == 0) m_nobeta = true;
 	
 	dbcsr::pgrid<2> grid({.comm = m_comm});
@@ -36,13 +43,16 @@ hfmod::hfmod(desc::molecule& mol, desc::options& opt, MPI_Comm comm)
 	m_s_bb = dbcsr::tensor<2>({.name = "s_bb", .pgridN = grid, .map1 = {0}, .map2 = {1}, .blk_sizes = bb});
 	m_x_bb = dbcsr::tensor<2>({.name = "x_bb", .pgridN = grid, .map1 = {0}, .map2 = {1}, .blk_sizes = bb});
 	m_v_bb = dbcsr::tensor<2>({.name = "v_bb", .pgridN = grid, .map1 = {0}, .map2 = {1}, .blk_sizes = bb});
-	m_k_bb = dbcsr::tensor<2>({.name = "k_bb", .pgridN = grid, .map1 = {0}, .map2 = {1}, .blk_sizes = bb});
+	m_t_bb = dbcsr::tensor<2>({.name = "k_bb", .pgridN = grid, .map1 = {0}, .map2 = {1}, .blk_sizes = bb});
 	
 	m_p_bb_A = dbcsr::tensor<2>({.name = "p_bb_A", .pgridN = grid, .map1 = {0}, .map2 = {1}, .blk_sizes = bb});
 	m_p_bb_B = dbcsr::tensor<2>({.name = "p_bb_B", .pgridN = grid, .map1 = {0}, .map2 = {1}, .blk_sizes = bb});
 	
 	m_c_bm_A = dbcsr::tensor<2>({.name = "c_bm_A", .pgridN = grid, .map1 = {0}, .map2 = {1}, .blk_sizes = bm_A});
 	m_c_bm_B = dbcsr::tensor<2>({.name = "c_bm_B", .pgridN = grid, .map1 = {0}, .map2 = {1}, .blk_sizes = bm_B});
+	
+	m_f_bb_A = dbcsr::tensor<2>({.name = "f_bb_A", .pgridN = grid, .map1 = {0}, .map2 = {1}, .blk_sizes = bb});
+	m_f_bb_B = dbcsr::tensor<2>({.name = "f_bb_B", .pgridN = grid, .map1 = {0}, .map2 = {1}, .blk_sizes = bb});
 	
 }
 
@@ -85,9 +95,9 @@ void hfmod::one_electron() {
 	);		 
 	
 	//kinetic
-	m_k_bb = int_engine.compute<2>(
+	m_t_bb = int_engine.compute<2>(
 		{.op = "kinetic", .bas = "bb", 
-		 .name = "k_bb", .map1 = {0}, .map2 = {1}
+		 .name = "t_bb", .map1 = {0}, .map2 = {1}
 		}
 	);
 	
@@ -111,12 +121,12 @@ void hfmod::one_electron() {
 	dbcsr::print(m_x_bb);
 	
 	std::cout << "Adding..." << std::endl;
-	m_core_bb = m_v_bb + m_k_bb;
+	m_core_bb = m_v_bb + m_t_bb;
 	
 	std::cout << "Overlap: " << std::endl;
 	dbcsr::print(m_s_bb);
 	std::cout << "Kinetic: " << std::endl;
-	dbcsr::print(m_k_bb);
+	dbcsr::print(m_t_bb);
 	std::cout << "Nuclear: " << std::endl;
 	dbcsr::print(m_v_bb);
 	std::cout << "Core: " << std::endl;
@@ -126,6 +136,26 @@ void hfmod::one_electron() {
 	
 }
 	
+void hfmod::calc_scf_energy() {
+	
+	double e1 = dbcsr::dot<2>(m_core_bb, m_p_bb_A);
+	double e2 = dbcsr::dot<2>(m_f_bb_A, m_p_bb_A);
+	
+	std::cout << "CORE: " << std::endl;
+	dbcsr::print(m_core_bb);
+	
+	std::cout << "FOCK:" << std::endl;
+	dbcsr::print(m_f_bb_A);
+	
+	std::cout << "Density" << std::endl;
+	dbcsr::print(m_p_bb_A);
+	
+	std::cout << "E1 " << e1 << std::endl;
+	std::cout << "E2 " << e2 << std::endl;
+	
+	m_scf_energy = 0.5 * (2.0 * (e1 + e2));
+	
+}
 
 void hfmod::compute() {
 	
@@ -137,8 +167,51 @@ void hfmod::compute() {
 	std::cout << "Guessing..." << std::endl;
 	compute_guess();
 	
+	// Now enter loop
+	int iter = 0;
+	bool converged = false;
 	
+	fockbuilder fbuilder(m_mol, m_opt, m_comm);
 	
+	/*
+	fbuilder.compute({.core = m_core_bb, .c_A = m_c_bm_A, .p_A = m_p_bb_A});
+	
+	m_f_bb_A = std::move(fbuilder.m_f_bb_A);
+	
+	std::cout << "FOCK MATRIX: " << std::endl;
+	dbcsr::print(m_f_bb_A);
+
+	double en = dbcsr::dot(m_core_bb, m_f_bb_A);
+
+	std::cout << "EN: " << en << std::endl;
+	*/
+
+	m_max_iter = 10;
+
+	while (!converged && iter < m_max_iter ) {
+		
+		LOG.os<>("Iteration: ", iter, '\n');
+		
+		// form fock matrix
+		fbuilder.compute({.core = m_core_bb, .c_A = m_c_bm_A, .p_A = m_p_bb_A});
+		std::swap(m_f_bb_A, fbuilder.fock_alpha());
+		
+		calc_scf_energy();
+		
+		std::cout << "ENERGY: " << m_scf_energy << std::endl;
+		
+		// compute error, do diis, compute energy
+		
+		// diag fock
+		diag_fock();
+		
+		// loop
+		 ++iter;
+		
+		
+	} // end while
+	
+	std::cout << "FINAL ENERGY: " << m_scf_energy << std::endl;
 		
 }
 

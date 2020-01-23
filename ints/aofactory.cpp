@@ -7,6 +7,7 @@
 #include <libint2.hpp>
 
 #include <iostream>
+#include <limits>
 
 namespace ints {
 
@@ -61,7 +62,7 @@ dbcsr::tensor<N,double> aofactory::compute(aofac_params&& p) {
 		
 		//std::cout << "MAX " << max_nprim << " " << max_l << std::endl;
 		
-		libint2::Engine eng(libOp, max_nprim, max_l);
+		libint2::Engine eng(libOp, max_nprim, max_l, 0, std::numeric_limits<double>::epsilon());
 			
 		if (libBraKet != libint2::BraKet::invalid) {
 			eng.set(libBraKet);
@@ -90,7 +91,7 @@ dbcsr::tensor<N,double> aofactory::compute(aofac_params&& p) {
 //forward declarations
 template dbcsr::tensor<2,double> aofactory::compute(aofac_params&& p);
 //template dbcsr::tensor<3,double> aofactory::compute(aofac_params&& p);
-//template dbcsr::tensor<4,double> aofactory::compute(aofac_params&& p);
+template dbcsr::tensor<4,double> aofactory::compute(aofac_params&& p);
 
 
 } // end namespace ints

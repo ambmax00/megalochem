@@ -91,6 +91,14 @@ int main(int argv, char** argc) {
 	auto mol = filereader.get_mol();
 	auto opt = filereader.get_opt(); 
 	
+	auto cbas = mol.c_basis();
+	
+	for (int i = 0; i != cbas.size(); ++i) {
+		for (auto s : cbas[i]) {
+			std::cout << s << std::endl;
+		}
+	}
+	
 	hf::hfmod myhf(mol,opt,MPI_COMM_WORLD);
 	
 	myhf.compute();
@@ -185,6 +193,11 @@ int main(int argv, char** argc) {
 	
 	if (rank == 0) unitnr = 6;
 	
+	std::cout << "NAME: " << std::endl;
+	std::cout << tensor2.name() << std::endl;
+	
+	
+	/*
 	//dbcsr::contract<3,4,3>({.alpha = 1.0d, .t1 = tensor1, .t2 = tensor2, .beta = 3.0d, 
 	//		.t3 = tensor3, .con1 = {0,1}, .ncon1 = {2}, .con2 = {0,1}, .ncon2 = {2,3},
 	//		.map1 = {0}, .map2 = {1,2}, .unit_nr = unitnr, .log = true });

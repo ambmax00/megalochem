@@ -74,7 +74,8 @@ MatrixX<T> tensor_to_eigen(dbcsr::tensor<2,T>& array, int l = 0) {
 				
 				std::cout << idx[0] << " " << idx[1] << std::endl;
 				
-				blk = array.get_block({.idx = idx, .found = found});
+				blk = array.get_block({.idx = iter.idx(), .blk_size = {blk_size[0][idx[0]],blk_size[1][idx[1]]}, 
+					.found = found});
 				sizes = blk.sizes();
 				
 				std::cout << "blk0 " << blk(0) << std::endl;

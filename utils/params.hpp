@@ -126,7 +126,7 @@ public:
 	template <typename D = T, attribute0 A0 = a0, attribute1 A1 = a1, 
 		typename = typename std::enable_if<(A1 == value_) && (is_container<D>::value), int>::type>
 	attribute_wrapper(std::initializer_list<typename D::value_type> r) 
-		: m_val(new T), m_ref(m_val), init(true) {*m_val = r;}
+		: m_val(new T(r)), m_ref(m_val), init(true) {/* *m_val = r; */}
 
 	template <class D = T, attribute0 A0 = a0, attribute1 A1 = a1, 
 		typename = typename std::enable_if<A1 == reference_ && !std::is_same<attribute_wrapper,D>::value, int>::type>

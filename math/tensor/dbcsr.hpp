@@ -15,6 +15,7 @@
 #define INCREMENT3 4
 #define INCREMENT4 5
 #define INCREMENT5 6
+#define INCREMENT6 7
 
 #define STEP0(func, x, n, del) 
 #define STEP1(func, x, n, del) func(x,n) STEP0(func, x, PLUS_ONE(n), del)
@@ -22,6 +23,7 @@
 #define STEP3(func, x, n, del) func(x,n)unparen(del) STEP2(func, x, PLUS_ONE(n), del)
 #define STEP4(func, x, n, del) func(x,n)unparen(del) STEP3(func, x, PLUS_ONE(n), del)
 #define STEP5(func, x, n, del) func(x,n)unparen(del) STEP4(func, x, PLUS_ONE(n), del)
+#define STEP6(func, x, n, del) func(x,n)unparen(del) STEP5(func, x, PLUS_ONE(n), del)
 #define REPEAT(func, x, n, del, start) concat(STEP,n) (func, x, start, del)
 
 #define VARANDSIZE(x,n) x[n], x##_size[n]
@@ -114,6 +116,7 @@ static auto default_dist =
 		
 		MPI_Comm_rank(MPI_COMM_WORLD, &myrank); 
 	    
+	    /*
 	    if (myrank == 0) {
 	    
 			std::cout << "Dist: " << std::endl;
@@ -121,7 +124,7 @@ static auto default_dist =
 				std::cout << x << " ";
 			} std::cout << std::endl;
 			
-		}
+		}*/
 		
 		return distvec;
 		
@@ -145,6 +148,7 @@ public:
 	struct pgrid_params{
 		required<MPI_Comm, val> 	comm;
 		optional<vec<int>, val> 	map1, map2;
+		optional<vec<int>, val>	    tensor_dims;
 		optional<int, val>			nsplit, dimsplit;
 	};
 
@@ -159,12 +163,18 @@ public:
 		int* fmap2 = (p.map2) ? p.map2->data() : nullptr;
 		int map1size = (p.map1) ? p.map1->size() : 0;
 		int map2size = (p.map2) ? p.map2->size() : 0;
+		int* ftendims = (p.tensor_dims) ? p.tensor_dims->data() : nullptr;
 
 		int* fnsplit = (p.nsplit) ? &*p.nsplit : nullptr;
 		int* fdimsplit = (p.dimsplit) ? &*p.dimsplit : nullptr;
 		
 		MPI_Fint fmpi = MPI_Comm_c2f(m_comm);
-		c_dbcsr_t_pgrid_create(&fmpi, m_dims.data(), N, &m_pgrid_ptr, nullptr, fmap1, map1size, fmap2, map2size, fnsplit, fdimsplit);
+		
+		if (p.map1 && p.map2) {
+			c_dbcsr_t_pgrid_create_expert(&fmpi, m_dims.data(), N, &m_pgrid_ptr, fmap1, map1size, fmap2, map2size, ftendims, fnsplit, fdimsplit);
+		} else {
+			c_dbcsr_t_pgrid_create(&fmpi, m_dims.data(), N, &m_pgrid_ptr, ftendims);
+		}
 		
 	}
 	
@@ -186,6 +196,10 @@ public:
 			
 		m_pgrid_ptr = nullptr;
 		
+	}
+	
+	MPI_Comm comm() {
+		return m_comm;
 	}
 	
 	~pgrid() {
@@ -215,8 +229,6 @@ private:
 
 	void* m_dist_ptr;
 	
-	vec<int> m_map1;
-	vec<int> m_map2;
 	vec<vec<int>> m_nd_dists;
 	MPI_Comm m_comm;
 	
@@ -227,22 +239,16 @@ public:
 
 	struct dist_params {
 		required<pgrid<N>,ref>			pgridN;
-		required<vec<int>,val>			map1, map2;
 		required<vec<vec<int>>,val>		nd_dists;
-		optional<bool,val>				own_comm;
 	};
 
 	dist(dist_params p) :
 		m_dist_ptr(nullptr),
-		m_map1(*p.map1),
-		m_map2(*p.map2),
 		m_nd_dists(*p.nd_dists)
 	{
 		
 		void* pgrid_ptr = p.pgridN->m_pgrid_ptr;
 		m_comm = p.pgridN->m_comm;
-		
-		bool* f_own_comm = (p.own_comm) ? &*p.own_comm : nullptr;
 		
 		vec<int*> f_dists(MAXDIM, nullptr);
 		vec<int> f_dists_size(MAXDIM, 0);
@@ -253,10 +259,8 @@ public:
 		}
 		
 		c_dbcsr_t_distribution_new(&m_dist_ptr, pgrid_ptr, 
-								   m_map1.data(), m_map1.size(),
-                                   m_map2.data(), m_map2.size(), 
-                                   REPEAT(VARANDSIZE, f_dists, MAXDIM, (,), 0),
-                                   f_own_comm);
+                                   REPEAT(VARANDSIZE, f_dists, MAXDIM, (,), 0)
+                                   );
                                    
 	}
 	
@@ -267,20 +271,20 @@ public:
 	
 	~dist() {
 		
-		std::cout << "DEST1START" << std::endl;
+		//std::cout << "DEST1START" << std::endl;
 		
 		if (m_dist_ptr != nullptr)
 			c_dbcsr_t_distribution_destroy(&m_dist_ptr);
 			
 		m_dist_ptr = nullptr;
 		
-		std::cout << "DEST1END" << std::endl;
+		//std::cout << "DEST1END" << std::endl;
 		
 	}
 	
 	void destroy() {
 		
-		std::cout << "DEST2START" << std::endl;
+		//std::cout << "DEST2START" << std::endl;
 		
 		if (m_dist_ptr != nullptr) {
 			c_dbcsr_t_distribution_destroy(&m_dist_ptr);
@@ -288,7 +292,7 @@ public:
 			
 		m_dist_ptr = nullptr;
 		
-		std::cout << "DEST2END" << std::endl;
+		//std::cout << "DEST2END" << std::endl;
 		
 	}
 	
@@ -303,21 +307,26 @@ private:
 	T* m_data;
 	vec<int> m_sizes;
 	int m_nfull;
+	bool m_own = true;
 	
 public:
 
 	block() : m_data(nullptr), m_sizes(N,0), m_nfull(0) {}
 	
-	block(const vec<int> sizes) : m_sizes(sizes) {
+	block(const vec<int> sizes, T* ptr = nullptr) : m_sizes(sizes) {
 		
 		if (sizes.size() != N) {
 			throw std::runtime_error("Wrong block dimensions passed to constr.");
 		}
 		
-		m_nfull = 1;
-		for (int i = 0; i != N; ++i) m_nfull *= sizes[i];
+		m_nfull = std::accumulate(sizes.begin(), sizes.end(), 1, std::multiplies<int>());
 		
-		m_data = new T[m_nfull]();
+		if (ptr) {
+			m_data = ptr; 
+			m_own = false;
+		} else {
+			m_data = new T[m_nfull]();
+		}
 		
 	}
 	
@@ -395,33 +404,36 @@ public:
 		}
 		
 	} 
-		
+	
+	//new constructor with raw pointer
+	
 	~block() {
 		
-		if (m_data != nullptr)
+		if (m_data != nullptr && m_own) {
 			delete [] m_data;
+			m_data = nullptr;
+		}
 		
 	}
 	
-};		
+};	
+
+template <int N, typename T>
+struct tensor_copy;
 
 template <int N, typename T = double>
 class tensor {
 protected:
 
 	void* m_tensor_ptr;
-	std::string m_name;
-	vec<int> m_map1;
-	vec<int> m_map2;
-	vec<vec<int>> m_blk_sizes;
-	vec<vec<int>> m_nzblks;
 	MPI_Comm m_comm;
-	
-	int m_n_blocks;
 	
 	tensor(void* ptr) : m_tensor_ptr(ptr) {}
 	
 public:
+
+	template <int M, typename D>
+	friend void copy(tensor_copy<M,D>&& p);
 
 	typedef T value_type;
 	
@@ -433,7 +445,7 @@ public:
 									blk_size, blk_offset;
 		optional<std::string,ref>	name;
 	};
-	void get_info(tensor_get_info_params&& p) {
+	void get_info(tensor_get_info_params&& p) const {
 	
 		auto reserve = [] (optional<vec<int>,ref>& opt) -> int* {
 			int* ptr = nullptr;
@@ -472,8 +484,8 @@ public:
 		if (p.blk_size) { reserve_vec(blk_size_v, blk_size_v_size); }
 		if (p.blk_offset) { reserve_vec(blk_offset_v, blk_offset_v_size); }
 	
-		char* name;
-		int name_size;
+		char* name = nullptr;
+		int name_size = 0;
 		
 		std::cout << "IN HERE" << std::endl;
 		
@@ -501,9 +513,9 @@ public:
 			std::cout << std::endl;
 		};
 		
-		std::cout << "OUT" << std::endl;
+		//std::cout << "OUT" << std::endl;
 		
-		if(p.nblks_total) printvec("Total number of blocks:\n",*p.nblks_total);
+		//if(p.nblks_total) printvec("Total number of blocks:\n",*p.nblks_total);
 		//if(p.nfull_total) printvec("Total number of elements:\n",*p.nfull_total);
 		//if(p.nblks_local) printvec("Total number of local blocks:\n",*p.nblks_local);
 		//if(p.nfull_local) printvec("Total number of local elements:\n",*p.nfull_local);
@@ -551,12 +563,16 @@ public:
 			*p.blk_offset = makevec(blk_offset_v, blk_offset_v_size);
 			//for (int i = 0; i != N; ++i) printvec("", out[i]);
 		} 
-         
+		
+		if (p.name) {
+			*p.name = name;
+        }
+        
         free(name); 
          
 	}
 	
-	tensor() : m_tensor_ptr(nullptr), m_blk_sizes(0) {}
+	tensor() : m_tensor_ptr(nullptr) {}
 	
 	//copy constructor
 	tensor(const tensor<N,T>& rhs): m_tensor_ptr(nullptr) {
@@ -565,29 +581,31 @@ public:
 		
 		if (this != &rhs) {
 		
-			c_dbcsr_t_create_template(rhs.m_tensor_ptr, &m_tensor_ptr, nullptr);
+			const char* name = rhs.name().c_str();
+		
+			c_dbcsr_t_create_template(rhs.m_tensor_ptr, &m_tensor_ptr, name);
 			c_dbcsr_t_copy(rhs.m_tensor_ptr, N, m_tensor_ptr, nullptr, nullptr, nullptr, nullptr);
-			
-			m_blk_sizes = rhs.m_blk_sizes;
-			
-			for (auto v : m_blk_sizes) {
-				for (auto x : v) {
-					std::cout << x << " ";
-				} std::cout << std::endl;
-			}
 	
 			m_comm = rhs.m_comm;
 			
 		}
 		
 	}
+	
+	// construct template only
+	tensor(const tensor<N,T>& rhs, std::string name) : m_tensor_ptr(nullptr), m_comm(rhs.m_comm) {
+		
+		const char* cname = rhs.name().c_str();
+		
+		c_dbcsr_t_create_template(rhs.m_tensor_ptr, &m_tensor_ptr, cname);
+		
+	}
 		
 	//move constructor
-	tensor(tensor<N,T>&& rhs) : m_blk_sizes(rhs.m_blk_sizes), m_comm(rhs.m_comm) {
+	tensor(tensor<N,T>&& rhs) : m_comm(rhs.m_comm) {
 		std::cout << "Moving" << std::endl;
 		//bool move = true;
 		m_tensor_ptr = rhs.m_tensor_ptr;
-		m_blk_sizes = rhs.m_blk_sizes;
 		m_comm = rhs.m_comm;
 		//c_dbcsr_t_create_template(t.m_tensor_ptr, &this->m_tensor_ptr, nullptr);
 		rhs.m_tensor_ptr = nullptr;
@@ -602,32 +620,26 @@ public:
 		required<vec<vec<int>>,val>	blk_sizes;
 	};
 	tensor(tensor_params&& p) :
-		m_tensor_ptr(nullptr),
-		m_name(*p.name),
-		m_map1(*p.map1),
-		m_map2(*p.map2),
-		m_blk_sizes(*p.blk_sizes)
+		m_tensor_ptr(nullptr)
 	{
 		
 		void* dist_ptr = p.distN->m_dist_ptr;
-		const char* f_name = m_name.c_str();
+		const char* f_name = p.name->c_str();
 		int* c_data_type = nullptr;
 		
 		vec<int*> f_blks(MAXDIM, nullptr);
 		vec<int> f_blks_size(MAXDIM, 0);
 		
-		m_n_blocks = 1;
-		
 		for (int i = 0; i != N; ++i) {
-			//std::cout << i << " " << m_blk_sizes[i].size() << std::endl;
-			f_blks[i] = m_blk_sizes[i].data();
-			f_blks_size[i] = m_blk_sizes[i].size();
-			m_n_blocks *= m_blk_sizes[i].size();
+
+			f_blks[i] = p.blk_sizes->at(i).data();
+			f_blks_size[i] = p.blk_sizes->at(i).size();
+			
 		}
 		
 		c_dbcsr_t_create_new(&m_tensor_ptr, f_name, dist_ptr, 
-						m_map1.data(), m_map1.size(),
-						m_map2.data(), m_map2.size(), c_data_type, 
+						p.map1->data(), p.map1->size(),
+						p.map2->data(), p.map2->size(), c_data_type, 
 						f_blks[0], f_blks_size[0],
 						f_blks[1], f_blks_size[1],
 						f_blks[2], f_blks_size[2],
@@ -643,10 +655,7 @@ public:
 	};
 	tensor(tensor_params2&& p) :
 		m_tensor_ptr(nullptr),
-		m_name(*p.name),
-		m_map1(*p.map1),
-		m_map2(*p.map2),
-		m_blk_sizes(*p.blk_sizes)
+		m_comm(p.pgridN->comm())
 	{
 		
 		vec<vec<int>> distvecs(N);
@@ -656,28 +665,23 @@ public:
 				p.pgridN->dims()[i], p.blk_sizes->at(i));
 		}
 		
-		dist<N> d({.pgridN = *p.pgridN, .map1 = *p.map1, .map2 = *p.map2, 
-				.nd_dists = distvecs});
+		dist<N> d({.pgridN = *p.pgridN, .nd_dists = distvecs});
 		
 		void* dist_ptr = d.m_dist_ptr;
-		const char* f_name = m_name.c_str();
+		const char* f_name = p.name->c_str();
 		int* c_data_type = nullptr;
 		
 		vec<int*> f_blks(MAXDIM, nullptr);
 		vec<int> f_blks_size(MAXDIM, 0);
 		
-		m_n_blocks = 1;
-		
 		for (int i = 0; i != N; ++i) {
-			//std::cout << i << " " << m_blk_sizes[i].size() << std::endl;
-			f_blks[i] = m_blk_sizes[i].data();
-			f_blks_size[i] = m_blk_sizes[i].size();
-			m_n_blocks *= m_blk_sizes[i].size();
+			f_blks[i] = p.blk_sizes->at(i).data();
+			f_blks_size[i] = p.blk_sizes->at(i).size();
 		}
 		
 		c_dbcsr_t_create_new(&m_tensor_ptr, f_name, dist_ptr, 
-						m_map1.data(), m_map1.size(),
-						m_map2.data(), m_map2.size(), c_data_type, 
+						p.map1->data(), p.map1->size(),
+						p.map2->data(), p.map2->size(), c_data_type, 
 						f_blks[0], f_blks_size[0],
 						f_blks[1], f_blks_size[1],
 						f_blks[2], f_blks_size[2],
@@ -749,23 +753,17 @@ public:
 	}
 	
 	struct tensor_get_block_params {
-		required<index<N>,val> idx;
+		required<const index<N>,val> idx;
+		required<const vec<int>,val> blk_size;
 		required<bool,ref> found;
 	};	
 	block<N,T> get_block(tensor_get_block_params&& p) {
-	
-		vec<int> loc_sizes;
-		for (int i = 0; i != N; ++i) {
-			int idx_i = p.idx->at(i);
-			loc_sizes.push_back(m_blk_sizes[i][idx_i]);
-			//std::cout << loc_sizes[i];
-		}		
 		
 		//std::cout << std::endl;
 		
-		block<N,T> blk_out(loc_sizes);
+		block<N,T> blk_out(*p.blk_size);
 		
-		c_dbcsr_t_get_block(m_tensor_ptr, p.idx->data(), loc_sizes.data(), 
+		c_dbcsr_t_get_block(m_tensor_ptr, p.idx->data(), p.blk_size->data(), 
 			blk_out.data(), &*p.found);
 			
 		return blk_out;
@@ -778,6 +776,90 @@ public:
 	};	
 	void get_stored_coordinates(tensor_get_stored_params&& p) {
 		c_dbcsr_t_get_stored_coordinates(m_tensor_ptr, N, p.idx->data(), &*p.proc);
+	}
+	
+	struct tensor_mapping_info {
+		optional<int,ref> ndim_nd;
+		optional<int,ref> ndim1_2d;
+		optional<int,ref> ndim2_2d;
+		optional<vec<long long int>,ref> dims_2d_i8;
+		optional<vec<int>,ref> dims_2d;
+		optional<vec<int>,ref> dims_nd;
+		optional<vec<int>,ref> dims1_2d;
+		optional<vec<int>,ref> dims2_2d;
+		optional<vec<int>,ref> map1_2d;
+		optional<vec<int>,ref> map2_2d;
+		optional<vec<int>,ref> map_nd;
+		optional<int,ref> base;
+		optional<bool,ref> col_major;
+	};
+	
+private:
+	void get_mapping_info_base(void* nd, tensor_mapping_info&& p) {
+		
+		int* c_ndim_nd = (p.ndim_nd) ? &*p.ndim_nd : nullptr;
+		int* c_ndim1_2d = (p.ndim1_2d) ? &*p.ndim1_2d : nullptr;
+		int* c_ndim2_2d = (p.ndim2_2d) ? &*p.ndim1_2d : nullptr;
+		
+		long long int* c_dims_2d_i8 = (p.dims_2d_i8) ? p.dims_2d_i8->data() : nullptr;
+		int* c_dims_2d = (p.dims_2d) ? p.dims_2d->data() : nullptr;
+
+#define set_array(name) \
+	int** c_##name = (p.name) ? new int*() : nullptr; \
+	int* name##_size = (p.name) ? new int() : nullptr;
+
+		set_array(dims_nd)
+		set_array(dims1_2d)
+		set_array(dims2_2d)
+		set_array(map1_2d)
+		set_array(map2_2d)
+		set_array(map_nd)
+		
+		int* c_base = (p.base) ? &*p.base : nullptr;
+		bool* c_col_major = (p.col_major) ? &*p.col_major : nullptr;
+		
+		c_dbcsr_t_get_mapping_info(nd, c_ndim_nd, c_ndim1_2d, c_ndim2_2d, 
+                        c_dims_2d_i8, c_dims_2d, c_dims_nd, dims_nd_size, 
+                        c_dims1_2d, dims1_2d_size, c_dims2_2d, dims2_2d_size, 
+                        c_map1_2d, map1_2d_size, c_map2_2d, map2_2d_size, 
+                        c_map_nd, map_nd_size, c_base, c_col_major);
+		
+		
+		auto make_vector = [](int** arr, int* size) 
+		{
+			vec<int> out(arr[0], arr[0] + *size); 
+			return out;
+		};
+		
+#define set_arg(name) if (p.name) {  \
+		*p.name = make_vector(c_##name, name##_size); \
+		free(c_##name[0]); \
+		delete c_##name; \
+		delete name##_size; \
+		}
+	  
+		set_arg(dims_nd)
+		set_arg(dims1_2d)
+		set_arg(dims2_2d)
+		set_arg(map1_2d)
+		set_arg(map2_2d)
+		set_arg(map_nd)
+		
+	}
+		
+
+public:	
+
+	void get_mapping_info(tensor_mapping_info&& p) {	
+		void* nd = nullptr;
+		c_dbcsr_t_get_nd_index(m_tensor_ptr, &nd);
+		get_mapping_info_base(nd, std::forward<tensor_mapping_info>(p));	
+	}
+	
+	void get_blk_mapping_info(tensor_mapping_info&& p) {
+		void* nd = nullptr;
+		c_dbcsr_t_get_nd_index_blk(m_tensor_ptr, &nd);
+		get_mapping_info_base(nd, std::forward<tensor_mapping_info>(p));
 	}
 	
 	void scale(T alpha) {
@@ -800,9 +882,10 @@ public:
 	tensor<N,T>& operator=(const tensor<N,T>& rhs) {	
 		
 		if (&rhs != this) {
-		
+			
+			this->destroy();
+			
 			std::cout << "&" << std::endl;
-			m_blk_sizes = rhs.m_blk_sizes;
 			m_comm = rhs.m_comm;
 			
 			if (m_tensor_ptr == nullptr) {
@@ -822,8 +905,7 @@ public:
 		if (&rhs != this) {
 		
 			std::cout << "Now..." << std::endl;
-			
-			m_blk_sizes = rhs.m_blk_sizes;
+			this->destroy();
 			m_comm = rhs.m_comm;
 			m_tensor_ptr = rhs.m_tensor_ptr;
 			rhs.m_tensor_ptr = nullptr;
@@ -847,72 +929,85 @@ public:
 		return m_comm;
 	}
 	
-	vec<int> nblks_tot(){
+	std::string name() const {
+		std::string out;
+		get_info({.name=out});
+		std::cout << "NAME: " << out << std::endl;
+		return out;
+	}
+	
+	vec<int> nblks_tot() const {
 		vec<int> out(N);
 		get_info({.nblks_total=out});
 		return out;
 	}
 	
-	vec<int> nblks_loc(){
+	vec<int> nblks_loc() const {
 		vec<int> out(N);
 		get_info({.nblks_local=out});
 		return out;
 	}
 	
-	vec<int> nfull_tot(){
+	vec<int> nfull_tot() const {
 		vec<int> out(N);
 		get_info({.nfull_total=out});
 		return out;
 	}
 	
-	vec<int> nfull_loc(){
+	vec<int> nfull_loc() const {
 		vec<int> out(N);
 		get_info({.nfull_local=out});
 		return out;
 	}
 	
-	vec<int> pdims() {
+	vec<int> pdims() const {
 		vec<int> out(N); 
 		get_info({.pdims=out});
 		return out;
 	}
 	
-	vec<int> my_ploc() {
+	vec<int> my_ploc() const {
 		vec<int> out(N);
 		get_info({.my_ploc=out});
 		return out;
 	}
 	
-	vec<vec<int>> blks_local() {
+	vec<vec<int>> blks_local() const {
 		vec<vec<int>> out;
 		get_info({.blks_local=out});
 		return out;
 	}
 	
-	vec<vec<int>> proc_dist() {
+	vec<vec<int>> proc_dist() const {
 		vec<vec<int>> out;
 		get_info({.proc_dist=out});
 		return out;
 	}
 	
-	vec<vec<int>> blk_size() {
+	vec<vec<int>> blk_size() const {
 		vec<vec<int>> out;
 		get_info({.blk_size=out});
 		return out;
 	}
 	
-	vec<vec<int>> blk_offset() {
+	vec<vec<int>> blk_offset() const {
 		vec<vec<int>> out;
 		get_info({.blk_offset=out});
 		return out;
 	}
 	
-	bool is_assigned() {
-		if (m_tensor_ptr) return true;
-		return false;
+	int num_blocks() const {
+		return c_dbcsr_t_get_num_blocks(m_tensor_ptr);
+	}
+	
+	long long int num_blocks_total() const {
+		return c_dbcsr_t_get_num_blocks_total(m_tensor_ptr);
 	}
 	
 };
+
+template <int N, typename T = double>
+using ptensor = std::shared_ptr<tensor<N,T>>;
 
 template <int N, typename T = double>
 tensor<N,T> operator+(const tensor<N,T>& t1, const tensor<N,T>& t2) {
@@ -924,6 +1019,15 @@ tensor<N,T> operator+(const tensor<N,T>& t1, const tensor<N,T>& t2) {
 		
 		return out;
 		
+}
+
+template <int N, typename T = double>
+tensor<N,T> operator*(const T alpha, const tensor<N,T>& t) {
+	
+	tensor<N,T> out = t;
+	out.scale(alpha);
+	return out;
+	
 }
 
 
@@ -967,15 +1071,15 @@ public:
 		return c_dbcsr_t_iterator_blocks_left(m_iter_ptr);	
 	}
 	
-	index<N> idx() {
+	const index<N>& idx() {
 		return m_idx;	
 	}
 	
-	vec<int> sizes() {	
+	const vec<int>& sizes() {	
 		return m_sizes;	
 	}
 	
-	vec<int> offset() {		
+	const vec<int>& offset() {		
 		return m_offset;		
 	}
 	
@@ -991,21 +1095,21 @@ public:
 
 template <int N, typename T = double>
 struct tensor_copy {
-		required<tensor<N,T>,ref>  	tensor_in;
-		required<tensor<N,T>,ref>	tensor_out;
+		required<tensor<N,T>,ref>  	t_in;
+		required<tensor<N,T>,ref>	t_out;
 		optional<index<N>,val>		order;
-		optional<bool,val>			summation, move_data;
+		optional<bool,val>			sum, move_data;
 		optional<int,val>			unit_nr;
-	};
+};
 template <int N, typename T = double>
 void copy(tensor_copy<N,T>&& p) {
 		
 		int* forder = (p.order) ? p.order->data() : nullptr;
-		bool* fsum = (p.summation) ? &*p.summation : nullptr;
+		bool* fsum = (p.sum) ? &*p.sum : nullptr;
 		bool* fmove = (p.move_data) ? &*p.move_data : nullptr;
 		int* funit = (p.unit_nr) ? &*p.unit_nr : nullptr;
 		
-		c_dbcsr_t_copy(p.tensor_in->m_tensor_ptr,N,p.tensor_out->m_tensor_ptr,forder,fsum,fmove,funit);
+		c_dbcsr_t_copy(p.t_in->m_tensor_ptr,N,p.t_out->m_tensor_ptr,forder,fsum,fmove,funit);
 	
 }
 
@@ -1057,6 +1161,12 @@ void contract(contract_param<T,N1,N2,N3>&& p) {
 	bool* f_move = (p.move) ? &*p.move : nullptr;
 	int* f_unit = (p.unit_nr) ? &*p.unit_nr : nullptr;
 	bool* f_log = (p.log) ? &*p.log : nullptr;
+	
+	if (p.log) {
+		if (*f_log) {
+			std::cout << "LOGGING!!!" << std::endl;
+			
+		}}
 
 	c_dbcsr_t_contract_r_dp(*p.alpha, p.t1->data(), p.t2->data(), 
 						*p.beta, p.t3->data(), p.con1->data(), p.con1->size(),
@@ -1210,6 +1320,158 @@ struct einsum_param {
 	optional<bool, val>			log;
 };
 
+template <int N, typename T = double>
+dbcsr::tensor<N+1,T> add_dummy(tensor<N,T>& t) {
+	
+	std::cout << "REARRANGING!" << std::endl;
+	
+	// get maps of tensor
+	vec<int> map1, map2; 
+	
+	t.get_mapping_info({.map1_2d = map1, .map2_2d = map2});
+	
+	vec<int> new_map1 = map1;
+	new_map1.insert(new_map1.end(), map2.begin(), map2.end());
+	
+	vec<int> new_map2 = {N};
+	
+	pgrid<N+1> grid({.comm = t.comm()});
+	
+	auto blksizes = t.blk_size();
+	blksizes.push_back({1});
+	
+	tensor<N+1,T> new_t({.name = t.name(), .pgridN = grid, .map1 = new_map1, .map2 = new_map2,
+		.blk_sizes = blksizes});
+	
+	iterator<N> it(t);
+	
+	// parallelize this:
+	
+	std::cout << "NUMBER OF BLOCKS: " << std::endl;
+	std::cout << t.num_blocks() << std::endl;
+	
+	while (it.blocks_left()) {
+		
+		it.next();
+		
+		index<N> idx = it.idx();
+		index<N+1> new_idx;
+		
+		for (int i = 0; i != N; ++i) {
+			new_idx[i] = idx[i];
+		}
+		
+		new_idx[N] = 0;
+		
+		std::cout << "INDEX: " << std::endl;
+		for (auto x  : new_idx) {
+			std::cout << x << " ";
+		} std::cout << std::endl;
+		
+		vec<int> blksz(N);
+		
+		for (int i = 0; i != N; ++i) {
+			blksz[i] = blksizes[i][idx[i]];
+		}
+	
+		bool found = false;
+		auto blk = t.get_block({.idx = idx, .blk_size = blksz, .found = found});
+		blksz.push_back(1);
+		
+		block<N+1,T> new_blk(blksz, blk.data());
+		
+		std::cout << "IDX: " << new_idx.size() << std::endl;
+		std::cout << "BLK: " << new_blk.sizes().size() << std::endl;
+		
+		vec<vec<int>> res(N+1, vec<int>(1));
+		for (int i = 0; i != N; ++i) {
+			res[i][0] = idx[i];
+		}
+		res[N][0] = 0;
+		
+		new_t.reserve(res); 
+				
+		new_t.put_block({.idx = new_idx, .blk = new_blk});
+		
+	}
+		
+	print(new_t);
+	
+	grid.destroy();
+	
+	return new_t;
+	
+}
+
+template <int N, typename T = double>
+dbcsr::tensor<N-1,T> remove_dummy(tensor<N,T>& t, vec<int> map1, vec<int> map2) {
+	
+	std::cout << "Removing dummy dim." << std::endl;
+	
+	pgrid<N-1> grid({.comm = t.comm()});
+	
+	auto blksizes = t.blk_size();
+	blksizes.pop_back();
+	
+	tensor<N-1,T> new_t({.name = t.name(), .pgridN = grid, .map1 = map1, .map2 = map2,
+		.blk_sizes = blksizes});
+	
+	iterator<N> it(t);
+	
+	// parallelize this:
+	while (it.blocks_left()) {
+		
+		it.next();
+		
+		index<N> idx = it.idx();
+		index<N-1> new_idx;
+		
+		for (int i = 0; i != N-1; ++i) {
+			new_idx[i] = idx[i];
+		}
+		
+		vec<int> blksz(N);
+		
+		for (int i = 0; i != N-1; ++i) {
+			blksz[i] = blksizes[i][new_idx[i]];
+		}
+		blksz[N-1] = 1;
+		
+		std::cout << "INDEX: " << std::endl;
+		for (auto x  : new_idx) {
+			std::cout << x << " ";
+		} std::cout << std::endl;
+	
+		bool found = false;
+		auto blk = t.get_block({.idx = idx, .blk_size = blksz, .found = found});
+		auto sizes = blk.sizes();
+		sizes.pop_back();
+		
+		const int M = N - 1;
+		
+		block<M,T> new_blk(sizes, blk.data());
+		
+		std::cout << "IDX: " << new_idx.size() << std::endl;
+		std::cout << "BLK: " << new_blk.sizes().size() << std::endl;
+		
+		vec<vec<int>> res(N-1, vec<int>(1));
+		for (int i = 0; i != N-1; ++i) {
+			res[i][0] = idx[i];
+		}
+		
+		new_t.reserve(res); 
+				
+		new_t.put_block({.idx = new_idx, .blk = new_blk});
+		
+	}
+		
+	print(new_t);
+	
+	grid.destroy();
+	
+	return new_t;
+	
+}
 
 template <int N1, int N2, int N3, typename T  = double>
 void einsum(einsum_param<T,N1,N2,N3>&& p) {
@@ -1217,12 +1479,46 @@ void einsum(einsum_param<T,N1,N2,N3>&& p) {
 	vec<int> c1(0), c2(0), nc1(0), nc2(0), m1(0), m2(0);
 	eval(*p.x, c1, c2, nc1, nc2, m1, m2);
 	
-	if (p.b1) std::cout << "THERE!" << std::endl;
-	
 	contract<N1,N2,N3,T>({p.alpha, p.t1, p.t2, p.beta, p.t3, c1, nc1,
 		c2, nc2, m1, m2, p.b1, p.b2, p.b3, p.filter, p.flop, p.move, p.unit_nr, p.log});
 		
 	std::cout << "OUT" << std::endl;
+		
+}
+
+template <int N, typename T = double>
+T dot(tensor<N,T>& t1, tensor<N,T>& t2) {
+	
+	// dot product only for N = 2 at the moment
+	assert(N == 2);
+	
+	iterator<N,T> it(t1);
+	
+	T sum = T();
+	
+	while (it.blocks_left()) {
+		
+		it.next();
+		
+		bool found = false;
+		auto b1 = t1.get_block({.idx = it.idx(), .blk_size = it.sizes(), .found = found});
+		auto b2 = t2.get_block({.idx = it.idx(), .blk_size = it.sizes(), .found = found});
+		
+		if (!found) continue;
+		
+		std::cout  << std::inner_product(b1.data(), b1.data() + b1.ntot(), b2.data(), T()) << std::endl;
+		
+		std::cout << "ELE: " << std::endl;
+		for (int i = 0; i != b1.ntot(); ++i) { std::cout << b1(i) << " " << b2(i) << std::endl; }
+		
+		
+		sum += std::inner_product(b1.data(), b1.data() + b1.ntot(), b2.data(), T());
+		
+		//std::cout << "SUM: " << std::inner_product(b1.data(), b1.data() + b1.ntot(), b2.data(), T()) << std::endl;
+		
+	}
+	
+	return sum;
 		
 }
 
@@ -1234,6 +1530,8 @@ void print(tensor<N,T>& t_in) {
 	MPI_Comm_rank(MPI_COMM_WORLD, &myrank); 
 	MPI_Comm_size(MPI_COMM_WORLD, &mpi_size);
 	
+	auto blkszs = t_in.blk_size();
+	
 	iterator<N,T> iter(t_in);
     
     for (int p = 0; p != mpi_size; ++p) {
@@ -1244,8 +1542,13 @@ void print(tensor<N,T>& t_in) {
 				bool found = false;
 				auto idx = iter.idx();
 				
-				auto blk = t_in.get_block({.idx = idx, .found = found});
-				auto sizes = blk.sizes();
+				vec<int> sizes(N);
+				
+				for (int i = 0; i != N; ++i) {
+					sizes[i] = blkszs[i][idx[i]];
+				}
+				
+				auto blk = t_in.get_block({.idx = idx, .blk_size = sizes, .found = found});
 				
 				std::cout << myrank << ": [";
 				for (int s = 0; s != sizes.size(); ++s) {

@@ -4,6 +4,7 @@
 #include "desc/molecule.h"
 #include "desc/options.h"
 #include "math/tensor/dbcsr.hpp"
+#include "utils/mpi_time.h"
 
 #include <mpi.h>
 #include <memory>
@@ -22,17 +23,22 @@ private:
 	desc::molecule& m_mol;
 	desc::options& m_opt;
 	MPI_Comm m_comm;
+	util::mpi_log LOG;
 	
 	// options
 	bool m_restricted;
 	bool m_nobeta;
+	std::string m_guess;
+	int m_max_iter;
+	double m_scf_threshold;
 	
 	// results
 	double m_nuc_energy;
+	double m_scf_energy;
 	
 	dbcsr::tensor<2> m_s_bb, //overlap
 				  m_v_bb, // nuclear reulsion
-				  m_k_bb, // kinetic
+				  m_t_bb, // kinetic
 				  m_core_bb, // core hamiltonian
 				  m_x_bb, // orthogonalizing matrix
 				  m_f_bb_A, m_f_bb_B, // alpha/beta fock mat
@@ -44,6 +50,8 @@ private:
 	
 	void compute_guess();
 	void diag_fock();
+	
+	void calc_scf_energy();
 
 public:
 

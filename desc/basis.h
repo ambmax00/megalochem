@@ -45,6 +45,10 @@ public:
 
 	int max_l();
 	
+	size_t size() {
+		return m_clusters.size();
+	}
+	
 	std::vector<int> cluster_sizes();
 
 };

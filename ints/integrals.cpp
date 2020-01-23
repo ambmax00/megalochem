@@ -131,6 +131,7 @@ void calc_ints(dbcsr::tensor<2,double>& t, util::ShrPool<libint2::Engine>& engin
 	
 	dbcsr::iterator<2,double> iter(t);
 	
+	//DONT DO THIS (?)
 	while (iter.blocks_left()) {
 		iter.next();
 		auto idx = iter.idx();
@@ -145,6 +146,195 @@ void calc_ints(dbcsr::tensor<2,double>& t, util::ShrPool<libint2::Engine>& engin
 		
 		
 		t.put_block({.idx = idx, .blk = *blocks[idx[0] * nblks[1] + idx[1]]});
+		
+		// delete !!!!!
+		
+	}
+		
+	std::cout << "Done reading." << std::endl;
+
+}
+
+// return just block?
+void calc_ints(dbcsr::tensor<4,double>& t, util::ShrPool<libint2::Engine>& engine, 
+	std::vector<desc::cluster_basis>& basvec) {
+	
+	int myrank = 0;
+	int mpi_size = 0;
+	
+	MPI_Comm_rank(MPI_COMM_WORLD, &myrank); 
+	MPI_Comm_size(MPI_COMM_WORLD, &mpi_size);
+
+	auto v = t.blks_local();
+	auto nblks = t.nblks_tot();
+	auto blk_size = t.blk_size();
+	auto blk_off = t.blk_offset();
+	
+	std::map<int, dbcsr::block<4,double>*> blocks;
+	vec<vec<int>> reserve(4);
+	
+	auto& cbas1 = basvec[0];
+	auto& cbas2 = basvec[1];
+	auto& cbas3 = basvec[2];
+	auto& cbas4 = basvec[3];
+	
+	// CALCULATE SCREENING MATRIX
+
+
+#pragma omp parallel 
+{	
+	
+	auto& loc_eng = engine->local();
+	const auto &results = loc_eng.results();
+	
+	#pragma omp for collapse(4)	
+	for (int i1 = 0; i1 != v[0].size(); ++i1) {	
+		for (int i2 = 0; i2 != v[1].size(); ++i2) {
+			for (int i3 = 0; i3 != v[2].size(); ++i3) {
+				for (int i4 = 0; i4 != v[3].size(); ++i4) {
+					
+					int idx1 = v[0][i1];
+					int idx2 = v[1][i2];
+					int idx3 = v[2][i3];
+					int idx4 = v[3][i4];
+					
+					std::vector<libint2::Shell>& c1 = cbas1[idx1];
+					std::vector<libint2::Shell>& c2 = cbas2[idx2];
+					std::vector<libint2::Shell>& c3 = cbas3[idx3];
+					std::vector<libint2::Shell>& c4 = cbas4[idx4];
+					
+					int blkidx = idx1 * nblks[1] * nblks[2] * nblks[3] 
+						+ idx2 * nblks[2] * nblks[3]
+						+ idx3 * nblks[3]
+						+ idx4;
+					
+					std::cout << "WE ARE IN BLOCK: " << idx1 << idx2 << idx3 << idx4 << std::endl;
+					std::cout << "BLOCK NUMBER: " << blkidx << std::endl;
+					
+					/*
+					#pragma omp critical 
+					{
+						for (int r = 0; r != mpi_size; ++r) {
+							if (r == myrank) {
+								std::cout << "Hello from process " << r << " out of "
+								<< mpi_size << " and from thread " << omp_get_thread_num() << " out of " 
+								<< omp_get_num_threads() << " " << idx1 << " " << idx2 << " : " << blkidx << std::endl;
+							}
+							MPI_Barrier(MPI_COMM_WORLD);
+						}
+					} */
+					
+					// tensor offsets
+					int lb1 = blk_off[0][i1];
+					int lb2 = blk_off[1][i2];
+					int lb3 = blk_off[2][i3];
+					int lb4 = blk_off[3][i4];
+					
+					// Block offsets
+					int off1 = 0;
+					int off2 = 0;
+					int off3 = 0;
+					int off4 = 0;
+					
+					vec<int> sizes = {blk_size[0][idx1],blk_size[1][idx2],blk_size[2][idx3],blk_size[3][idx4]};
+					auto blk_ptr = new dbcsr::block<4,double>(sizes);
+					
+					for (int s1 = 0; s1!= c1.size(); ++s1) {
+						
+						auto& sh1 = c1[s1];
+						
+						if (lb1 < lb2) continue;
+						for (int s3 = 0; s3 != c3.size(); ++s3) {
+							
+							auto& sh3 = c3[s3];
+							
+							for (int s3 = 0; s3 != c3.size(); ++s3) {
+								
+								auto& sh3 = c3[s3];
+								
+								for (int s4 = 0; s4 != c4.size(); ++s4) {
+									
+									auto& sh4 = c4[s4];
+										
+										std::cout << "Shells: " << s1 << " " << s2 << " " << s3 << " " << s4 << std::endl;
+										std::cout << "Sizes: " << sh1.size() << " " << sh2.size() << " " << sh3.size() << " " << sh4.size() << std::endl;
+										std::cout << "Offset: " << off1 << " " << off2 << " " << off3 << " " << off4 << std::endl;
+										
+										loc_eng.compute(sh1,sh2,sh3,sh4);
+										
+										auto ints_shellsets = results[0];
+										
+										if (ints_shellsets != nullptr) {
+											int idx = 0;
+											for (int i = 0; i != sh1.size(); ++i) {
+												for (int j = 0; j != sh2.size(); ++j) {
+													for (int k = 0; k != sh3.size(); ++k) {
+														for (int l = 0; l != sh4.size(); ++l) {
+															blk_ptr->operator()(i + off1, j + off2, k + off3, l + off4) 
+																= ints_shellsets[idx++];
+															std::cout << i << " " << j << " " << k << " " << l << 
+																" " << blk_ptr->operator()(i + off1, j + off2, k + off3, l + off4) << std::endl;
+											}}}}
+										}		
+										
+								}//endfor s4
+								off4=0;
+								off3 += sh3.size();
+							} //endfor s3
+							off3 = 0;
+							off2 += sh2.size();
+						}//endfor s2
+						
+						off2 = 0;
+						off1 += sh1.size();
+					}//endfor s1
+					
+					// check block norm
+					
+					if (blk_ptr != nullptr) {
+						#pragma omp critical 
+						{
+							blocks[blkidx] = blk_ptr;
+							reserve[0].push_back(i1);
+							reserve[1].push_back(i2);
+							reserve[2].push_back(i3);
+							reserve[3].push_back(i4);
+						}
+					}
+					
+				}//endfor i4
+			}//endfor i3
+		}//endfor i2
+	}//endfor i1
+}//end parallel omp	
+	
+	//std::cout << "Done." << std::endl;
+	
+	t.reserve(reserve);
+	
+	std::cout << "Reserved." << std::endl;
+	
+	dbcsr::iterator<4,double> iter(t);
+	// LOOP THROUGH MAP INSTEAD
+	while (iter.blocks_left()) {
+		iter.next();
+		auto idx = iter.idx();
+		
+		
+		for (int r = 0; r != mpi_size; ++r) {
+			if (r == myrank) {
+				std::cout << r << ": " << idx[0] << " " << idx[1] << " " << idx[2] << " " << idx[3] << std::endl;
+			}
+			MPI_Barrier(MPI_COMM_WORLD);
+		}
+		
+		int blkidx = idx[0] * nblks[1] * nblks[2] * nblks[3] 
+						+ idx[1] * nblks[2] * nblks[3]
+						+ idx[2] * nblks[3]
+						+ idx[3];
+		
+		t.put_block({.idx = idx, .blk = *blocks[blkidx]});
+		// remove block
 		
 	}
 		
@@ -180,6 +370,10 @@ dbcsr::tensor<N,double> integrals(MPI_Comm comm, util::ShrPool<libint2::Engine>&
 }
 
 template dbcsr::tensor<2,double> integrals(MPI_Comm comm, util::ShrPool<libint2::Engine>& engine, 
+	std::vector<desc::cluster_basis>& basvec, std::string name, 
+	std::vector<int> map1, std::vector<int> map2);
+	
+template dbcsr::tensor<4,double> integrals(MPI_Comm comm, util::ShrPool<libint2::Engine>& engine, 
 	std::vector<desc::cluster_basis>& basvec, std::string name, 
 	std::vector<int> map1, std::vector<int> map2);
 
