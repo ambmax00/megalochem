@@ -239,6 +239,7 @@ void calc_ints(dbcsr::tensor<4,double>& t, util::ShrPool<libint2::Engine>& engin
 					vec<int> sizes = {blk_size[0][idx1],blk_size[1][idx2],blk_size[2][idx3],blk_size[3][idx4]};
 					auto blk_ptr = new dbcsr::block<4,double>(sizes);
 					
+					/*
 					for (int s1 = 0; s1!= c1.size(); ++s1) {
 						
 						auto& sh1 = c1[s1];
@@ -288,6 +289,7 @@ void calc_ints(dbcsr::tensor<4,double>& t, util::ShrPool<libint2::Engine>& engin
 						off2 = 0;
 						off1 += sh1.size();
 					}//endfor s1
+					* */
 					
 					// check block norm
 					

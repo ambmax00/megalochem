@@ -3,6 +3,8 @@ set(SOURCES
 	aofactory.cpp
 	integrals.h
 	integrals.cpp
+	screening.h
+	screening.cpp
 )
 
 add_library(chem_ints ${SOURCES})

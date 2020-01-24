@@ -3,6 +3,7 @@
 
 #include <iostream> 
 #include <mpi.h>
+#include <omp.h>
 #include <string>
 #include <sstream>
 #include <vector>
@@ -18,13 +19,16 @@ class mpi_log {
 private:
 
 	int global_plev_;
+	MPI_Comm m_comm;
 	
 public:
  
-    mpi_log(int glb) 
-		: global_plev_(glb) {};
+    mpi_log(int glb, MPI_Comm comm = MPI_COMM_WORLD) 
+		: global_plev_(glb), m_comm(comm) {};
     
     ~mpi_log() {}
+    
+    void flush() {std::cout << std::flush; }
     
 	void print_() { std::cout << std::flush; }
     
@@ -34,18 +38,34 @@ public:
 		print_(args...);
 	}
     
-    template <int nprint = 0, int nproc = 0, typename T, typename... Args>
+    template <int nprint = 0, int nproc = 0, int nthread = 0, typename T, typename... Args>
     void os(T in, Args ... args) {
 		
 		if (nprint <= global_plev_) {
 			int rank_;
-			MPI_Comm_rank(MPI_COMM_WORLD,&rank_); 
+			MPI_Comm_rank(m_comm,&rank_);
 			
-			if ((nproc == rank_) || (nproc == -1)) print_(in, args...);
+			if (nproc == -1) {
+				
+				if (omp_in_parallel()) 
+					throw std::runtime_error("ERROR: You should not use mpi_log for all processes (-1) in parallel regions.");
+				
+				int size;
+				MPI_Comm_size(m_comm,&size);
+				for (int i = 0; i != size; ++i) {
+					if (i == rank_) print_(in, args...);
+					MPI_Barrier(m_comm);
+				}
+					
+			} else {
+				
+				if (nproc == rank_) print_(in, args...);
+					
+			} //end ifelse	
 			
-		}
+		}//endif nprint
 		
-	}
+	} //end os
     
     template <int nproc = 0, typename T>
     void dbg(T& in) {

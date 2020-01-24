@@ -405,6 +405,17 @@ public:
 		
 	} 
 	
+	T norm() {
+		
+		T out = 0;
+		for (int i = 0; i != m_nfull; ++i) {
+			out += pow(m_data[i],2);
+		}
+		
+		return sqrt(out);
+		
+	}
+			
 	//new constructor with raw pointer
 	
 	~block() {
@@ -420,6 +431,8 @@ public:
 
 template <int N, typename T>
 struct tensor_copy;
+
+static double eps_filter = 1e-9;
 
 template <int N, typename T = double>
 class tensor {
@@ -1002,6 +1015,21 @@ public:
 	
 	long long int num_blocks_total() const {
 		return c_dbcsr_t_get_num_blocks_total(m_tensor_ptr);
+	}
+	
+	struct tensor_filter {
+		optional<T,val> eps;
+		optional<int,val> method;
+		optional<bool,val> use_absolute;
+	};
+	void filter(tensor_filter p = tensor_filter()) {
+		
+		T eps = (p.eps) ? *p.eps : eps_filter;
+		const int * method = (p.method) ? &*p.method : nullptr;
+		const bool * use_absolute = (p.use_absolute) ? &*p.use_absolute : nullptr;
+		
+		c_dbcsr_t_filter(m_tensor_ptr, eps, method, use_absolute);
+		
 	}
 	
 };

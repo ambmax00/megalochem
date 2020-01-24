@@ -2,6 +2,7 @@
 #include <stdexcept>
 #include "ints/aofactory.h"
 #include "ints/integrals.h"
+#include "ints/screening.h"
 #include "utils/pool.h"
 #include "utils/params.hpp"
 #include <libint2.hpp>
@@ -79,6 +80,19 @@ dbcsr::tensor<N,double> aofactory::compute(aofac_params&& p) {
 		util::ShrPool<libint2::Engine> eng_pool = util::make_pool<libint2::Engine>(eng);
 		
 		std::cout << "Op: " << Op << " bis: " << bis << std::endl;
+		
+		
+		std::cout << "COMPUTE SCREENING: " << std::endl;
+		
+		libint2::Engine screen(libint2::Operator::coulomb, max_nprim, max_l, 0, std::numeric_limits<double>::epsilon());
+		screen.set(libint2::BraKet::xx_xx);
+		util::ShrPool<libint2::Engine> eng2_pool = util::make_pool<libint2::Engine>(screen);
+		
+		Zmat Z(m_comm, m_mol, eng2_pool, "schwarz");
+		
+		Z.compute();
+		
+		exit(0);
 		
 		dbcsr::tensor<N,double> out = integrals<N>(m_comm, eng_pool, basvec, *p.name, *p.map1, *p.map2);
 		

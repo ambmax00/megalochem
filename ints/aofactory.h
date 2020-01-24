@@ -20,6 +20,8 @@ private:
 	desc::molecule& m_mol;
 	MPI_Comm m_comm;
 	
+	
+	
 public:
 
 	aofactory(desc::molecule& mol, MPI_Comm c) : m_mol(mol), m_comm(c)  {};
