@@ -1,5 +1,6 @@
 #include "hf/hfmod.h"
 #include "math/tensor/dbcsr_conversions.hpp"
+#include "math/linalg/symmetrize.h"
 
 #include <Eigen/Eigenvalues>
 
@@ -18,6 +19,9 @@ void hfmod::diag_fock() {
 		vec<int> blk_sizes;
 		int nele;
 		
+		//symmetrize fock matrix
+		//auto f_bb_sym = math::symmetrize(f_bb, "f_bb_sym_"+x);
+		
 		std::cout << "Making XFX" << std::endl;
 		// Form F' = Xt F X
 		
@@ -27,11 +31,14 @@ void hfmod::diag_fock() {
 		std::cout << "Summing." << std::endl;
 		dbcsr::einsum<2,2,2>({"IJ, JK -> IK", f_bb, m_x_bb, FX});
 		
+		//f_bb_sym.destroy();
+		
 		std::cout << "FX" << std::endl;
 		dbcsr::print(FX);
 		
 		dbcsr::einsum<2,2,2>({"JI, JK -> IK", m_x_bb, FX, XFX});
 		
+		FX.destroy();
 		std::cout << "XFX" << std::endl;
 		dbcsr::print(XFX);
 		
@@ -52,7 +59,6 @@ void hfmod::diag_fock() {
 		std::cout << "EIGVEC" << std::endl;
 		std::cout << eigvec << std::endl;
 		
-		
 		Eigen::MatrixXd eigen_c_bm_x = es.eigenvectors(); //.leftCols(nele);
 		
 		std::cout << "eigen: " << eigen_c_bm_x << std::endl;
@@ -62,10 +68,7 @@ void hfmod::diag_fock() {
 			
 		std::cout << "TRANS COEFF TEN:" << std::endl;
 		dbcsr::print(c_bm_x);
-		
-		std::cout << "X" << std::endl;
-		dbcsr::print(m_x_bb);
-				
+	
 		//Transform back
 		dbcsr::einsum<2,2,2>({"IJ, Ji -> Ii", m_x_bb, c_bm_x, c_bm});
 			
@@ -74,7 +77,6 @@ void hfmod::diag_fock() {
 		
 		std::cout << "Done." << std::endl;
 		
-		FX.destroy();
 		XFX.destroy();
 		c_bm_x.destroy();
 			
@@ -92,17 +94,65 @@ void hfmod::diag_fock() {
 		
 		dbcsr::einsum<2,2,2>({.x = "Mi, Ni -> MN", .t1 = m_c_bm_A, .t2 = m_c_bm_A, .t3 = p_bb, .b1 = occ_bounds});
 	
+		std::cout << "Before desymm: " << std::endl;
 		dbcsr::print(p_bb);
+		
+		/*
+		// desymmtrize it 
+		dbcsr::iterator<2> iter(p_bb);
+		auto offsets = p_bb.blk_offset();
+		
+		while (iter.blocks_left()) {
+			
+			iter.next();
+			
+			auto idx = iter.idx();
+			auto blksize = iter.sizes();
+			
+			if (idx[0] < idx[1]) {
+				
+				dbcsr::block<2> blk(blksize);
+				p_bb.put_block({.idx = idx, .blk = blk});
+				
+			} else {
+				
+				bool found = false;
+				auto blk = p_bb.get_block({.idx = idx, .blk_size = blksize, .found = found});
+				
+				if (idx[0] != idx[1]) {
+					p_bb.put_block({.idx = idx, .blk = blk, .scale = 2.0});
+				} else {
+					for (int i = 0; i != blksize[0]; ++i) {
+						for (int j = 0; j != blksize[1]; ++j) {
+							if (i < j) {
+								blk(i,j) *= 0;
+							} else if (i != j) {
+								blk(i,j) *= 2;
+							}
+						}
+					}
+					p_bb.put_block({.idx = idx, .blk = blk});
+				}
+				
+			}
+			
+		}*/
+		
+		p_bb.filter();
+		/*
+		std::cout << "After desymm: " << std::endl;
+		dbcsr::print(p_bb); */
+		
 		
 	};
 	
 	diagonalize(m_f_bb_A, m_c_bm_A, "A");
-	if (!m_restricted || m_nobeta) 
-		diagonalize(m_f_bb_B, m_c_bm_B, "B");
+	if (m_f_bb_B) 
+		diagonalize(*m_f_bb_B, *m_c_bm_B, "B");
 	
 	form_density(m_p_bb_A, m_c_bm_A, "A");
-	if (!m_restricted || m_nobeta) 
-		form_density(m_p_bb_B, m_c_bm_B, "B");
+	if (m_p_bb_B) 
+		form_density(*m_p_bb_B, *m_c_bm_B, "B");
 	
 	
 	grid.destroy();

@@ -40,7 +40,9 @@ private:
 		std::vector<int> m_vir_alpha_sizes;
 		std::vector<int> m_vir_beta_sizes;
 		std::vector<int> m_bas_sizes;
+		std::vector<int> m_shell_sizes;
 		optional<std::vector<int>,val> m_dfbas_sizes;
+		optional<std::vector<int>,val> m_dfshell_sizes;
 	
 	public:
 	
@@ -74,7 +76,19 @@ private:
 				std::cout << "ITS IN BLOCK." << std::endl;
 				optional<std::vector<int>,val> opt(mol.m_cluster_dfbasis->cluster_sizes());
 				m_dfbas_sizes = opt;
-			}		
+			}
+			
+			for (int i = 0; i != mol.m_cluster_basis.size(); ++i) {
+				m_shell_sizes.push_back(mol.m_cluster_basis[i].size());
+			}
+			if (mol.m_cluster_dfbasis) {
+				optional<std::vector<int>,val> opt(std::vector<int>(0));
+				for (int i = 0; i != mol.m_cluster_dfbasis->size(); ++i) {
+					opt->push_back(mol.m_cluster_dfbasis->operator[](i).size());
+				}
+				m_dfshell_sizes = opt;
+			}
+					
 		}
 		
 		std::vector<int> oa() { return m_occ_alpha_sizes; }
@@ -85,6 +99,14 @@ private:
 		std::vector<int> x() { 
 			if (m_dfbas_sizes) {
 				return *m_dfbas_sizes;
+			} else {
+				throw std::runtime_error("Df basis not given.");
+			}
+		}
+		std::vector<int> s() { return m_shell_sizes; }
+		std::vector<int> xs() {
+			if (m_dfshell_sizes) {
+				return *m_dfshell_sizes;
 			} else {
 				throw std::runtime_error("Df basis not given.");
 			}

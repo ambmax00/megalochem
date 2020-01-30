@@ -332,14 +332,23 @@ public:
 	
 	block(const block<N,T>& blk_in) : m_data(nullptr) {
 		
-		if (m_data != nullptr) 
-			delete [] m_data;
-			
 		m_nfull = blk_in.m_nfull;
 		m_data = new T[m_nfull];
 		m_sizes = blk_in.m_sizes;
 		
 		std::copy(blk_in.m_data, blk_in.m_data + m_nfull, m_data);
+		
+	}
+	
+	block(block<N,T>&& blk_in) : m_data(nullptr) {
+			
+		m_nfull = blk_in.m_nfull;
+		m_data = blk_in.m_data;
+		m_sizes = blk_in.m_sizes;
+		
+		blk_in.m_nfull = 0;
+		blk_in.m_data = nullptr;
+		blk_in.m_sizes.clear();
 		
 	}
 	
@@ -360,6 +369,39 @@ public:
 		return *this;
 	}
 	
+	block& operator=(block && rhs)
+	{
+		if(this == &rhs)
+		   return *this;
+		   
+		if (m_data != nullptr)  
+			delete [] m_data;
+			
+		m_nfull = rhs.m_nfull;
+		m_data = rhs.m_data;
+		m_sizes = rhs.m_sizes;
+		
+		rhs.m_data = nullptr;
+		rhs.m_sizes.clear();
+		   
+		return *this;
+	}
+	
+	void print() {
+		
+		std::cout << "(";
+		for (int i = 0; i != N; ++i) {
+			std::cout << m_sizes[i];
+			if (i != N - 1) std::cout << ",";
+		} std::cout << ") [";
+		
+		for (int i = 0; i != m_nfull; ++i) {
+			std::cout << m_data[i];
+			if (i != m_nfull - 1) std::cout << " ";
+		} std::cout << "]" << std::endl;
+		
+	}
+	 
 	int dim() { return N; }
 	int ntot() { return m_nfull; }
 	vec<int> sizes() { return m_sizes; }
@@ -463,7 +505,7 @@ public:
 		auto reserve = [] (optional<vec<int>,ref>& opt) -> int* {
 			int* ptr = nullptr;
 			if (opt) {
-				std::cout << "Here" << opt-> size() << std::endl;
+				//std::cout << "Here" << opt-> size() << std::endl;
 				opt->reserve(N);
 				ptr = opt->data();
 			} 
@@ -500,10 +542,7 @@ public:
 		char* name = nullptr;
 		int name_size = 0;
 		
-		std::cout << "IN HERE" << std::endl;
-		
-		if (nfull_total_p == nullptr) { std::cout << "its null" << std::endl; } 
-		else { std::cout << "Not null!" << std::endl; }
+		//std::cout << "IN HERE" << std::endl;
 	
 	    c_dbcsr_t_get_info(m_tensor_ptr, N, 
 							   nblks_total_p,
@@ -590,7 +629,7 @@ public:
 	//copy constructor
 	tensor(const tensor<N,T>& rhs): m_tensor_ptr(nullptr) {
 		
-		std::cout << "Copying..." << std::endl;
+		//std::cout << "Copying..." << std::endl;
 		
 		if (this != &rhs) {
 		
@@ -898,7 +937,7 @@ public:
 			
 			this->destroy();
 			
-			std::cout << "&" << std::endl;
+			//std::cout << "&" << std::endl;
 			m_comm = rhs.m_comm;
 			
 			if (m_tensor_ptr == nullptr) {
@@ -913,11 +952,11 @@ public:
 	}
 		
 	tensor<N,T>& operator=(tensor<N,T>&& rhs) {
-		std::cout << "&&" << std::endl;
+		//std::cout << "&&" << std::endl;
 		
 		if (&rhs != this) {
 		
-			std::cout << "Now..." << std::endl;
+			//std::cout << "Now..." << std::endl;
 			this->destroy();
 			m_comm = rhs.m_comm;
 			m_tensor_ptr = rhs.m_tensor_ptr;
@@ -945,7 +984,6 @@ public:
 	std::string name() const {
 		std::string out;
 		get_info({.name=out});
-		std::cout << "NAME: " << out << std::endl;
 		return out;
 	}
 	
@@ -1040,9 +1078,9 @@ using ptensor = std::shared_ptr<tensor<N,T>>;
 template <int N, typename T = double>
 tensor<N,T> operator+(const tensor<N,T>& t1, const tensor<N,T>& t2) {
 		
-		std::cout << "+1" << std::endl;
+		//std::cout << "+1" << std::endl;
 		tensor<N,T> out(t1);
-		std::cout << "+2" << std::endl;
+		//std::cout << "+2" << std::endl;
 		out += t2;
 		
 		return out;
@@ -1125,7 +1163,7 @@ template <int N, typename T = double>
 struct tensor_copy {
 		required<tensor<N,T>,ref>  	t_in;
 		required<tensor<N,T>,ref>	t_out;
-		optional<index<N>,val>		order;
+		optional<vec<int>,val>		order;
 		optional<bool,val>			sum, move_data;
 		optional<int,val>			unit_nr;
 };
@@ -1182,7 +1220,7 @@ void contract(contract_param<T,N1,N2,N3>&& p) {
 	int* f_b2 = (p.b2) ? unfold_bounds(*p.b2) : nullptr;
 	int* f_b3 = (p.b3) ? unfold_bounds(*p.b3) : nullptr;
 	
-	std::cout << "In here..." << std::endl;
+	//std::cout << "In here..." << std::endl;
 	
 	double* f_filter = (p.filter) ? &*p.filter : nullptr;
 	long long int* f_flop = (p.flop) ? &*p.flop : nullptr;
@@ -1212,7 +1250,7 @@ static void eval(std::string str, std::vector<int>& con1, std::vector<int>& con2
 	std::vector<int>& ncon1, std::vector<int>& ncon2,
 	std::vector<int>& map1, std::vector<int>& map2) {
 	
-	std::cout << str << std::endl;
+	//std::cout << str << std::endl;
 	
 	std::vector<std::string> idxs(4);
 	
@@ -1246,16 +1284,16 @@ static void eval(std::string str, std::vector<int>& con1, std::vector<int>& con2
 	
 	if (idxs[2].size() == 0) throw std::runtime_error("Implicit mode not implemented.");
 	
-	for (auto v : idxs) {
-		std::cout << v << std::endl;
-	}
+	//for (auto v : idxs) {
+	//	std::cout << v << std::endl;
+	//}
 	
 	// evaluating input
 	auto t1 = idxs[0];
 	auto t2 = idxs[1];
 	auto t3 = idxs[2];
 	
-	std::cout << "t3 map" << std::endl;
+	//std::cout << "t3 map" << std::endl;
 	
 	if ((std::unique(t1.begin(), t1.end()) != t1.end()) || 
 		(std::unique(t2.begin(), t2.end()) != t2.end()) ||
@@ -1277,12 +1315,12 @@ static void eval(std::string str, std::vector<int>& con1, std::vector<int>& con2
 		}
 	}
 			
-	std::cout << "To be contrcated: " << scon << std::endl;	
-	std::cout << "Maps:" << std::endl;
-	for (auto v : con1) std::cout << v << " ";
-	std::cout << std::endl;
-	for (auto v : con2) std::cout << v << " ";
-	std::cout << std::endl;
+	//std::cout << "To be contrcated: " << scon << std::endl;	
+	//std::cout << "Maps:" << std::endl;
+	//for (auto v : con1) std::cout << v << " ";
+	//std::cout << std::endl;
+	//for (auto v : con2) std::cout << v << " ";
+	//std::cout << std::endl;
 			
 	for (int i = 0; i != t1.size(); ++i) {
 		auto found = std::find(scon.begin(), scon.end(), t1[i]);
@@ -1300,13 +1338,13 @@ static void eval(std::string str, std::vector<int>& con1, std::vector<int>& con2
 		}
 	}
 	
-	std::cout << "not con1: " << sncon1 << std::endl;
-	std::cout << "not con2: " << sncon2 << std::endl;
-	std::cout << "Maps:" << std::endl;
-	for (auto v : ncon1) std::cout << v << " ";
-	std::cout << std::endl;
-	for (auto v : ncon2) std::cout << v << " ";
-	std::cout << std::endl;
+	//std::cout << "not con1: " << sncon1 << std::endl;
+	//std::cout << "not con2: " << sncon2 << std::endl;
+	//std::cout << "Maps:" << std::endl;
+	//for (auto v : ncon1) std::cout << v << " ";
+	//std::cout << std::endl;
+	//for (auto v : ncon2) std::cout << v << " ";
+	//std::cout << std::endl;
 	
 	if (ncon1.size() + ncon2.size() != t3.size()) throw std::runtime_error("Wrong tensor dimensions: "+str);
 	
@@ -1321,11 +1359,11 @@ static void eval(std::string str, std::vector<int>& con1, std::vector<int>& con2
 		}
 	}
 	
-	std::cout << "Maps tensor 3" << std::endl;
-	for (auto v : map1) std::cout << v << " ";
-	std::cout << std::endl;
-	for (auto v : map2) std::cout << v << " ";
-	std::cout << std::endl;
+	//std::cout << "Maps tensor 3" << std::endl;
+	//for (auto v : map1) std::cout << v << " ";
+	//std::cout << std::endl;
+	//for (auto v : map2) std::cout << v << " ";
+	//std::cout << std::endl;
 	
 	if (map1.size() + map2.size() != t3.size()) 
 		throw std::runtime_error("Incompatible tensor dimensions: "+str);
@@ -1351,7 +1389,7 @@ struct einsum_param {
 template <int N, typename T = double>
 dbcsr::tensor<N+1,T> add_dummy(tensor<N,T>& t) {
 	
-	std::cout << "REARRANGING!" << std::endl;
+	std::cout << "Adding dummy dimension!" << std::endl;
 	
 	// get maps of tensor
 	vec<int> map1, map2; 
@@ -1375,8 +1413,8 @@ dbcsr::tensor<N+1,T> add_dummy(tensor<N,T>& t) {
 	
 	// parallelize this:
 	
-	std::cout << "NUMBER OF BLOCKS: " << std::endl;
-	std::cout << t.num_blocks() << std::endl;
+	//std::cout << "NUMBER OF BLOCKS: " << std::endl;
+	//std::cout << t.num_blocks() << std::endl;
 	
 	while (it.blocks_left()) {
 		
@@ -1391,10 +1429,10 @@ dbcsr::tensor<N+1,T> add_dummy(tensor<N,T>& t) {
 		
 		new_idx[N] = 0;
 		
-		std::cout << "INDEX: " << std::endl;
-		for (auto x  : new_idx) {
-			std::cout << x << " ";
-		} std::cout << std::endl;
+		//std::cout << "INDEX: " << std::endl;
+		//for (auto x  : new_idx) {
+		//	std::cout << x << " ";
+		//} std::cout << std::endl;
 		
 		vec<int> blksz(N);
 		
@@ -1408,8 +1446,8 @@ dbcsr::tensor<N+1,T> add_dummy(tensor<N,T>& t) {
 		
 		block<N+1,T> new_blk(blksz, blk.data());
 		
-		std::cout << "IDX: " << new_idx.size() << std::endl;
-		std::cout << "BLK: " << new_blk.sizes().size() << std::endl;
+		//std::cout << "IDX: " << new_idx.size() << std::endl;
+		//std::cout << "BLK: " << new_blk.sizes().size() << std::endl;
 		
 		vec<vec<int>> res(N+1, vec<int>(1));
 		for (int i = 0; i != N; ++i) {
@@ -1465,10 +1503,10 @@ dbcsr::tensor<N-1,T> remove_dummy(tensor<N,T>& t, vec<int> map1, vec<int> map2) 
 		}
 		blksz[N-1] = 1;
 		
-		std::cout << "INDEX: " << std::endl;
-		for (auto x  : new_idx) {
-			std::cout << x << " ";
-		} std::cout << std::endl;
+		//std::cout << "INDEX: " << std::endl;
+		//for (auto x  : new_idx) {
+		//	std::cout << x << " ";
+		//} std::cout << std::endl;
 	
 		bool found = false;
 		auto blk = t.get_block({.idx = idx, .blk_size = blksz, .found = found});
@@ -1479,8 +1517,8 @@ dbcsr::tensor<N-1,T> remove_dummy(tensor<N,T>& t, vec<int> map1, vec<int> map2) 
 		
 		block<M,T> new_blk(sizes, blk.data());
 		
-		std::cout << "IDX: " << new_idx.size() << std::endl;
-		std::cout << "BLK: " << new_blk.sizes().size() << std::endl;
+		//std::cout << "IDX: " << new_idx.size() << std::endl;
+		//std::cout << "BLK: " << new_blk.sizes().size() << std::endl;
 		
 		vec<vec<int>> res(N-1, vec<int>(1));
 		for (int i = 0; i != N-1; ++i) {
@@ -1510,19 +1548,19 @@ void einsum(einsum_param<T,N1,N2,N3>&& p) {
 	contract<N1,N2,N3,T>({p.alpha, p.t1, p.t2, p.beta, p.t3, c1, nc1,
 		c2, nc2, m1, m2, p.b1, p.b2, p.b3, p.filter, p.flop, p.move, p.unit_nr, p.log});
 		
-	std::cout << "OUT" << std::endl;
+	//std::cout << "OUT" << std::endl;
 		
 }
 
-template <int N, typename T = double>
-T dot(tensor<N,T>& t1, tensor<N,T>& t2) {
+template <int N>
+double dot(tensor<N,double>& t1, tensor<N,double>& t2) {
 	
 	// dot product only for N = 2 at the moment
 	assert(N == 2);
 	
-	iterator<N,T> it(t1);
+	iterator<N> it(t1);
 	
-	T sum = T();
+	double sum = 0.0;
 	
 	while (it.blocks_left()) {
 		
@@ -1534,20 +1572,84 @@ T dot(tensor<N,T>& t1, tensor<N,T>& t2) {
 		
 		if (!found) continue;
 		
-		std::cout  << std::inner_product(b1.data(), b1.data() + b1.ntot(), b2.data(), T()) << std::endl;
+		//std::cout  << std::inner_product(b1.data(), b1.data() + b1.ntot(), b2.data(), T()) << std::endl;
 		
-		std::cout << "ELE: " << std::endl;
-		for (int i = 0; i != b1.ntot(); ++i) { std::cout << b1(i) << " " << b2(i) << std::endl; }
+		//std::cout << "ELE: " << std::endl;
+		//for (int i = 0; i != b1.ntot(); ++i) { std::cout << b1(i) << " " << b2(i) << std::endl; }
 		
 		
-		sum += std::inner_product(b1.data(), b1.data() + b1.ntot(), b2.data(), T());
+		sum += std::inner_product(b1.data(), b1.data() + b1.ntot(), b2.data(), 0.0);
 		
 		//std::cout << "SUM: " << std::inner_product(b1.data(), b1.data() + b1.ntot(), b2.data(), T()) << std::endl;
 		
 	}
 	
-	return sum;
+	double MPIsum = 0.0;
+	
+	MPI_Allreduce(&sum,&MPIsum,1,MPI_DOUBLE,MPI_SUM,t1.comm());
+	
+	return MPIsum;
 		
+}
+
+template <typename T = double>
+T dot_sym (dbcsr::tensor<2,T>& t1, dbcsr::tensor<2,T>& t2) {
+		
+		T result = T();
+		
+		auto offsets = t1.blk_offset();
+		
+		dbcsr::iterator<2> iter(t1);
+		
+		while (iter.blocks_left()) {
+			
+			iter.next();
+			auto idx = iter.idx();
+			auto blksize = iter.sizes();
+			
+			bool found = false;
+			auto blk1 = t1.get_block({.idx = idx, .blk_size = blksize, .found = found});
+			auto blk2 = t2.get_block({.idx = idx, .blk_size = blksize, .found = found});
+			
+			if (!found) continue;
+			
+			int toff1 = offsets[0][idx[0]];
+			int toff2 = offsets[1][idx[1]];
+			
+			T prefac = 1.0;
+			
+			for (int i = 0; i != blksize[0]; ++i) {
+				toff1 += i;
+				for (int j = 0; j != blksize[1]; ++j) {
+					toff2 += j;
+					prefac = (toff1 == toff2) ? 1.0 : 0.25;		
+					result += prefac * blk1(i,j) * blk2(i,j);
+				}
+				toff2 = 0;
+			}
+			toff1 = 0;
+			
+		}
+		
+		return result;
+		          
+}
+
+template <int N, typename T>
+T RMS(tensor<N,T>& t_in) {
+	
+	T prod = dot(t_in, t_in);
+	
+	// get total number of elements
+	auto tot = t_in.nfull_tot();
+	
+	size_t ntot = 1.0;
+	for (auto i : tot) {
+		ntot *= i;
+	}
+	
+	return sqrt(prod/ntot);
+	
 }
 
 template <int N, typename T>

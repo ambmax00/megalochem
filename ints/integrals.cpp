@@ -7,30 +7,43 @@
 #include <iostream>
 
 namespace ints {
+	
+static double screening_threshold = 1e-9;
 
 // return just block?
 void calc_ints(dbcsr::tensor<2,double>& t, util::ShrPool<libint2::Engine>& engine, 
-	std::vector<desc::cluster_basis>& basvec) {
+	std::vector<desc::cluster_basis>& basvec, Zmat* bra, Zmat* ket) {
 
-	// refactor into previous function
-	// make sure to use move for decreasing number of local variables
-	// make template, put shell loop in kernels which are specialized
-	
 	int myrank = 0;
 	int mpi_size = 0;
 	
 	MPI_Comm_rank(MPI_COMM_WORLD, &myrank); 
 	MPI_Comm_size(MPI_COMM_WORLD, &mpi_size);
 
-	auto v = t.blks_local();
+	auto blksloc = t.blks_local();
 	auto nblks = t.nblks_tot();
 	auto blk_size = t.blk_size();
+	auto blk_off = t.blk_offset();
 	
-	std::map<int, dbcsr::block<2,double>*> blocks;
 	vec<vec<int>> reserve(2);
 	
-	desc::cluster_basis& cbas1 = basvec[0];
-	desc::cluster_basis& cbas2 = basvec[1];
+	auto& cbas1 = basvec[0];
+	auto& cbas2 = basvec[1];
+		
+	for (int i1 = 0; i1 != blksloc[0].size(); ++i1) {
+		for (int i2 = 0; i2 != blksloc[1].size(); ++i2) {
+						
+				int ix1 = blksloc[0][i1];
+				int ix2 = blksloc[1][i2];
+						
+				if (ix1 < ix2) continue;
+				
+				reserve[0].push_back(ix1);
+				reserve[1].push_back(ix2);
+			
+	}}
+	
+	t.reserve(reserve);
 
 #pragma omp parallel 
 {	
@@ -38,126 +51,93 @@ void calc_ints(dbcsr::tensor<2,double>& t, util::ShrPool<libint2::Engine>& engin
 	auto& loc_eng = engine->local();
 	const auto &results = loc_eng.results();
 	
-	#pragma omp for collapse(2)	
-	for (int i1 = 0; i1 != v[0].size(); ++i1) {
-		for (int i2 = 0; i2 != v[1].size(); ++i2) {
-			
-			int idx1 = v[0][i1];
-			int idx2 = v[1][i2];
-			
-			int blkidx = idx1 * nblks[1] + idx2;
-			
-			/*
-			#pragma omp critical 
-			{
-				for (int r = 0; r != mpi_size; ++r) {
-					if (r == myrank) {
-						std::cout << "Hello from process " << r << " out of "
-						<< mpi_size << " and from thread " << omp_get_thread_num() << " out of " 
-						<< omp_get_num_threads() << " " << idx1 << " " << idx2 << " : " << blkidx << std::endl;
-					}
-					MPI_Barrier(MPI_COMM_WORLD);
-				}
-			} 
-			*/
-			
-			std::vector<libint2::Shell>& c1 = cbas1[idx1];
-			std::vector<libint2::Shell>& c2 = cbas2[idx2];
-			
-			//std::cout << "Block: " << i1 << " " << i2 << std::endl;
-			
-			int off1 = 0;
-			int off2 = 0;
-			
-			vec<int> sizes = {blk_size[0][idx1],blk_size[1][idx2]};
-			auto blk_ptr = new dbcsr::block<2,double>(sizes);
-			
-			for (int s1 = 0; s1!= c1.size(); ++s1) {
+	#pragma omp for 
+	for (size_t I = 0; I != reserve[0].size(); ++I) {	
+					
+		int i1 = reserve[0][I];
+		int i2 = reserve[1][I];
+
+					
+		std::vector<libint2::Shell>& c1 = cbas1[i1];
+		std::vector<libint2::Shell>& c2 = cbas2[i2];
+		
+		std::cout << "WE ARE IN BLOCK: " << i1 << i2 << std::endl;
+					
+		dbcsr::idx2 IDX = {i1,i2};
+		vec<int> blkdim = {blk_size[0][i1],blk_size[1][i2]};
+		bool found = false;
+		dbcsr::block<2> blk(blkdim); //= t.get_block({.idx = IDX, .blk_size = blkdim, .found = found});
+					
+		//block lower bounds
+		int lb1 = blk_off[0][i1];
+		int lb2 = blk_off[1][i2];
+		
+		// tensor offsets
+		int toff1 = lb1;
+		int toff2 = lb2;
+		// local Block offsets
+		int locblkoff1 = 0;
+		int locblkoff2 = 0;
+					
+		for (int s1 = 0; s1!= c1.size(); ++s1) {
+						
+			auto& sh1 = c1[s1];
+			toff1 += locblkoff1;
 				
-				auto& sh1 = c1[s1];
+			for (int s2 = 0; s2 != c2.size(); ++s2) {
 				
-				for (int s2 = 0; s2 != c2.size(); ++s2) {
+				auto& sh2 = c2[s2];
+				toff2 += locblkoff2;
+				
+				std::cout << "Tensor offsets: " << toff1 << " " << toff2 << std::endl;
+				std::cout << "Local offsets: " << locblkoff1 << " " << locblkoff2 << std::endl;
+				std::cout << "MULT: " << multiplicity(toff1,toff2) << std::endl;
+										
+				if (is_canonical(toff1,toff2)) {
 					
-					auto& sh2 = c2[s2];
+					int sfac = multiplicity(toff1,toff2);
 					
-					//std::cout << "Shells: " << s1 << " " << s2 << std::endl;
-					//std::cout << "Sizes: " << sh1.size() << " " << sh2.size() << std::endl;
-					//std::cout << "Offset: " << off1 << " " << off2 << std::endl;
-					
-					loc_eng.compute(sh1,sh2);
-					
+					loc_eng.compute(sh1,sh2);										
 					auto ints_shellsets = results[0];
-					
+										
 					if (ints_shellsets != nullptr) {
 						int idx = 0;
+					
 						for (int i = 0; i != sh1.size(); ++i) {
 							for (int j = 0; j != sh2.size(); ++j) {
-								blk_ptr->operator()(i + off1, j + off2) = ints_shellsets[idx++];
-								
-								std::cout << blk_ptr->operator()(i + off1, j + off2) << std::endl;
+								blk(i + locblkoff1, j + locblkoff2) = sfac * ints_shellsets[idx++];
 						}}
-					} //endif
-					
-					
-					off2 += c2[s2].size();
-				}//endfor s2
+					}
+				}
 				
-				off2 = 0;
-				off1 += c1[s1].size();
-			}//endofor s1
+				locblkoff2 += sh2.size();						
+			}//endfor s2
 			
-			#pragma omp critical 
-			{
-				blocks[blkidx] = blk_ptr;
-				reserve[0].push_back(i1);
-				reserve[1].push_back(i2);
-			}
-			
-		}//endfor i2
-	}//endfor i1
+			toff2 = lb2;
+			locblkoff2 = 0;
+			locblkoff1 += sh1.size();
+		}//endfor s1
+					
+		#pragma omp critical
+		{
+			t.put_block({.idx = IDX, .blk = blk});
+		}
+					
+	}//end BLOCK LOOP
 }//end parallel omp	
 	
 	//std::cout << "Done." << std::endl;
 	
-	t.reserve(reserve);
+	t.filter();
 	
-	for (auto v : reserve) {
-		for (auto x : v) {
-			std::cout << x << " ";
-		} std::cout << std::endl;
-	}
-	
-	std::cout << "Reserved." << std::endl;
-	
-	dbcsr::iterator<2,double> iter(t);
-	
-	//DONT DO THIS (?)
-	while (iter.blocks_left()) {
-		iter.next();
-		auto idx = iter.idx();
-		
-		
-		for (int r = 0; r != mpi_size; ++r) {
-			if (r == myrank) {
-				std::cout << r << ": " << idx[0] << " " << idx[1] << std::endl;
-			}
-			MPI_Barrier(MPI_COMM_WORLD);
-		}
-		
-		
-		t.put_block({.idx = idx, .blk = *blocks[idx[0] * nblks[1] + idx[1]]});
-		
-		// delete !!!!!
-		
-	}
+	dbcsr::print(t);
 		
 	std::cout << "Done reading." << std::endl;
 
 }
 
-// return just block?
 void calc_ints(dbcsr::tensor<4,double>& t, util::ShrPool<libint2::Engine>& engine, 
-	std::vector<desc::cluster_basis>& basvec) {
+	std::vector<desc::cluster_basis>& basvec, Zmat* bra, Zmat* ket) {
 	
 	int myrank = 0;
 	int mpi_size = 0;
@@ -165,12 +145,11 @@ void calc_ints(dbcsr::tensor<4,double>& t, util::ShrPool<libint2::Engine>& engin
 	MPI_Comm_rank(MPI_COMM_WORLD, &myrank); 
 	MPI_Comm_size(MPI_COMM_WORLD, &mpi_size);
 
-	auto v = t.blks_local();
+	auto blksloc = t.blks_local();
 	auto nblks = t.nblks_tot();
 	auto blk_size = t.blk_size();
 	auto blk_off = t.blk_offset();
 	
-	std::map<int, dbcsr::block<4,double>*> blocks;
 	vec<vec<int>> reserve(4);
 	
 	auto& cbas1 = basvec[0];
@@ -178,7 +157,70 @@ void calc_ints(dbcsr::tensor<4,double>& t, util::ShrPool<libint2::Engine>& engin
 	auto& cbas3 = basvec[2];
 	auto& cbas4 = basvec[3];
 	
-	// CALCULATE SCREENING MATRIX
+	// reserve blocks
+	//if (bra) {
+	if (false) {
+		
+		for (auto& e1 : bra->m_blkmap) {
+			for (auto& e2 : ket->m_blkmap) {
+				
+				auto i1 = e1.first;
+				auto i2 = e2.first;
+				
+				//if (!is_canonical(i1[0],i1[1],i2[0],i2[1])) continue;
+				
+				auto n1 = e1.second.first;
+				auto n2 = e2.second.first;
+				
+				std::cout << "NN " << n1 * n2 << std::endl;
+				if (n1 * n2 < screening_threshold) {
+					std::cout << "SCREENED!" << std::endl; 
+					continue;
+				}
+				
+				int p = -1;
+				dbcsr::idx4 IDX = {i1[0],i1[1],i2[0],i2[1]};
+				t.get_stored_coordinates({.idx = IDX, .proc = p});
+				
+				std::cout << "RESERVE: " << std::endl;
+				std::cout << p << " " << i1[0] << " " << i1[1] << " " << i2[0] << " " << i2[1] << std::endl;
+				
+				if (myrank == p) {
+					reserve[0].push_back(i1[0]);
+					reserve[1].push_back(i1[1]);
+					reserve[2].push_back(i2[0]);
+					reserve[3].push_back(i2[1]);
+				}
+				
+			}
+		}
+		
+	} else {
+		
+		for (int i1 = 0; i1 != blksloc[0].size(); ++i1) {
+			for (int i2 = 0; i2 != blksloc[1].size(); ++i2) {
+				for (int i3 = 0; i3!= blksloc[2].size(); ++i3) {
+					for (int i4 = 0; i4 != blksloc[3].size(); ++i4) {
+						
+						int ix1 = blksloc[0][i1];
+						int ix2 = blksloc[1][i2];
+						int ix3 = blksloc[2][i3];
+						int ix4 = blksloc[3][i4];
+						
+						reserve[0].push_back(ix1);
+						reserve[1].push_back(ix2);
+						reserve[2].push_back(ix3);
+						reserve[3].push_back(ix4);
+						
+						std::cout << "RESERVE: " << std::endl;
+						std::cout << ix1 << " " << ix2 << " " << ix3 << " " << ix4 << std::endl;
+			
+		}}}}
+		
+	}
+	
+	t.reserve(reserve);	
+
 
 
 #pragma omp parallel 
@@ -187,197 +229,163 @@ void calc_ints(dbcsr::tensor<4,double>& t, util::ShrPool<libint2::Engine>& engin
 	auto& loc_eng = engine->local();
 	const auto &results = loc_eng.results();
 	
-	#pragma omp for collapse(4)	
-	for (int i1 = 0; i1 != v[0].size(); ++i1) {	
-		for (int i2 = 0; i2 != v[1].size(); ++i2) {
-			for (int i3 = 0; i3 != v[2].size(); ++i3) {
-				for (int i4 = 0; i4 != v[3].size(); ++i4) {
+	#pragma omp for 
+	for (int I = 0; I != reserve[0].size(); ++I) {	
 					
-					int idx1 = v[0][i1];
-					int idx2 = v[1][i2];
-					int idx3 = v[2][i3];
-					int idx4 = v[3][i4];
+					int i1 = reserve[0][I];
+					int i2 = reserve[1][I];
+					int i3 = reserve[2][I];
+					int i4 = reserve[3][I];
 					
-					std::vector<libint2::Shell>& c1 = cbas1[idx1];
-					std::vector<libint2::Shell>& c2 = cbas2[idx2];
-					std::vector<libint2::Shell>& c3 = cbas3[idx3];
-					std::vector<libint2::Shell>& c4 = cbas4[idx4];
+					std::vector<libint2::Shell>& c1 = cbas1[i1];
+					std::vector<libint2::Shell>& c2 = cbas2[i2];
+					std::vector<libint2::Shell>& c3 = cbas3[i3];
+					std::vector<libint2::Shell>& c4 = cbas4[i4];
 					
-					int blkidx = idx1 * nblks[1] * nblks[2] * nblks[3] 
-						+ idx2 * nblks[2] * nblks[3]
-						+ idx3 * nblks[3]
-						+ idx4;
+					std::cout << "WE ARE IN BLOCK: " << i1 << i2 << i3 << i4 << std::endl;
 					
-					std::cout << "WE ARE IN BLOCK: " << idx1 << idx2 << idx3 << idx4 << std::endl;
-					std::cout << "BLOCK NUMBER: " << blkidx << std::endl;
+					dbcsr::idx4 IDX = {i1,i2,i3,i4};
+					vec<int> blkdim = {blk_size[0][i1],blk_size[1][i2],blk_size[2][i3],blk_size[3][i4]};
 					
-					/*
-					#pragma omp critical 
-					{
-						for (int r = 0; r != mpi_size; ++r) {
-							if (r == myrank) {
-								std::cout << "Hello from process " << r << " out of "
-								<< mpi_size << " and from thread " << omp_get_thread_num() << " out of " 
-								<< omp_get_num_threads() << " " << idx1 << " " << idx2 << " : " << blkidx << std::endl;
-							}
-							MPI_Barrier(MPI_COMM_WORLD);
-						}
-					} */
+					std::cout << "BLOCK DIMENSIONS: " << std::endl;
+					std::cout << blk_size[0][i1] << " " << blk_size[1][i2] << " " << blk_size[2][i3] << " " << blk_size[3][i4] << std::endl;
 					
-					// tensor offsets
+					
+					bool found = false;
+					dbcsr::block<4> blk(blkdim); //= t.get_block({.idx = IDX, .blk_size = blkdim, .found = found});
+					
+					// load bra and ket block for screening
+					//auto& brablk = bra->m_blkmap[dbcsr::idx2{i1,i2}].second;
+					//auto& ketblk = ket->m_blkmap[dbcsr::idx2{i3,i4}].second;
+					
+					//lower bounds
 					int lb1 = blk_off[0][i1];
 					int lb2 = blk_off[1][i2];
 					int lb3 = blk_off[2][i3];
 					int lb4 = blk_off[3][i4];
 					
-					// Block offsets
-					int off1 = 0;
-					int off2 = 0;
-					int off3 = 0;
-					int off4 = 0;
+					// tensor offsets
+					int toff1 = lb1;
+					int toff2 = lb2;
+					int toff3 = lb3;
+					int toff4 = lb4;
 					
-					vec<int> sizes = {blk_size[0][idx1],blk_size[1][idx2],blk_size[2][idx3],blk_size[3][idx4]};
-					auto blk_ptr = new dbcsr::block<4,double>(sizes);
+					// local Block offsets
+					int locblkoff1 = 0;
+					int locblkoff2 = 0;
+					int locblkoff3 = 0;
+					int locblkoff4 = 0;
 					
-					/*
 					for (int s1 = 0; s1!= c1.size(); ++s1) {
 						
 						auto& sh1 = c1[s1];
-						
-						if (lb1 < lb2) continue;
-						for (int s3 = 0; s3 != c3.size(); ++s3) {
+						toff1 += locblkoff1;
+				
+						for (int s2 = 0; s2 != c2.size(); ++s2) {
 							
-							auto& sh3 = c3[s3];
+							auto& sh2 = c2[s2];
+							toff2 += locblkoff2;
 							
 							for (int s3 = 0; s3 != c3.size(); ++s3) {
 								
 								auto& sh3 = c3[s3];
+								toff3 += locblkoff3;
 								
 								for (int s4 = 0; s4 != c4.size(); ++s4) {
 									
 									auto& sh4 = c4[s4];
+									toff4 += locblkoff4;
+									
+									//if (is_canonical(toff1,toff2,toff3,toff4) /*&& brablk(s1,s2)*ketblk(s3,s4) > screening_threshold*/) {
+									//if (true) {
+										//int sfac = multiplicity(toff1,toff2,toff3,toff4);
 										
-										std::cout << "Shells: " << s1 << " " << s2 << " " << s3 << " " << s4 << std::endl;
-										std::cout << "Sizes: " << sh1.size() << " " << sh2.size() << " " << sh3.size() << " " << sh4.size() << std::endl;
-										std::cout << "Offset: " << off1 << " " << off2 << " " << off3 << " " << off4 << std::endl;
+										//std::cout << "TENSOR AT " << toff1 << " " << toff2 << " " << toff3 << " " << toff4 << " : mult " << sfac << std::endl;
+										
+										//std::cout << "Shells: " << s1 << " " << s2 << " " << s3 << " " << s4 << std::endl;
+										//std::cout << "Sizes: " << sh1.size() << " " << sh2.size() << " " << sh3.size() << " " << sh4.size() << std::endl;
+										//std::cout << "Offset: " << off1 << " " << off2 << " " << off3 << " " << off4 << std::endl;
 										
 										loc_eng.compute(sh1,sh2,sh3,sh4);
 										
 										auto ints_shellsets = results[0];
 										
 										if (ints_shellsets != nullptr) {
-											int idx = 0;
+											size_t idx = 0;
 											for (int i = 0; i != sh1.size(); ++i) {
 												for (int j = 0; j != sh2.size(); ++j) {
 													for (int k = 0; k != sh3.size(); ++k) {
 														for (int l = 0; l != sh4.size(); ++l) {
-															blk_ptr->operator()(i + off1, j + off2, k + off3, l + off4) 
-																= ints_shellsets[idx++];
-															std::cout << i << " " << j << " " << k << " " << l << 
-																" " << blk_ptr->operator()(i + off1, j + off2, k + off3, l + off4) << std::endl;
+															blk(i + locblkoff1, j + locblkoff2, k + locblkoff3, l + locblkoff4) 
+																= /*sfac */ ints_shellsets[idx++];
+															//std::cout << blk(i + off1, j + off2, k + off3, l + off4)
+															//<< std::endl;
 											}}}}
-										}		
-										
+										}//endif shellsets
+									//}//end if canonicaö		
+									locblkoff4 += sh4.size();
 								}//endfor s4
-								off4=0;
-								off3 += sh3.size();
+								toff4 = lb4;
+								locblkoff4 = 0;
+								locblkoff3 += sh3.size();
 							} //endfor s3
-							off3 = 0;
-							off2 += sh2.size();
+							toff3 = lb3;
+							locblkoff3 = 0;
+							locblkoff2 += sh2.size();
 						}//endfor s2
-						
-						off2 = 0;
-						off1 += sh1.size();
+						toff2 = lb2;
+						locblkoff2 = 0;
+						locblkoff1 += sh1.size();
 					}//endfor s1
-					* */
 					
-					// check block norm
-					
-					if (blk_ptr != nullptr) {
-						#pragma omp critical 
-						{
-							blocks[blkidx] = blk_ptr;
-							reserve[0].push_back(i1);
-							reserve[1].push_back(i2);
-							reserve[2].push_back(i3);
-							reserve[3].push_back(i4);
-						}
+					#pragma omp critical
+					{
+						t.put_block({.idx = IDX, .blk = blk});
 					}
 					
-				}//endfor i4
-			}//endfor i3
-		}//endfor i2
-	}//endfor i1
+				}//end BLOCK LOOP
 }//end parallel omp	
 	
 	//std::cout << "Done." << std::endl;
 	
-	t.reserve(reserve);
+	t.filter();
 	
-	std::cout << "Reserved." << std::endl;
-	
-	dbcsr::iterator<4,double> iter(t);
-	// LOOP THROUGH MAP INSTEAD
-	while (iter.blocks_left()) {
-		iter.next();
-		auto idx = iter.idx();
+	dbcsr::print(t);
 		
-		
-		for (int r = 0; r != mpi_size; ++r) {
-			if (r == myrank) {
-				std::cout << r << ": " << idx[0] << " " << idx[1] << " " << idx[2] << " " << idx[3] << std::endl;
-			}
-			MPI_Barrier(MPI_COMM_WORLD);
-		}
-		
-		int blkidx = idx[0] * nblks[1] * nblks[2] * nblks[3] 
-						+ idx[1] * nblks[2] * nblks[3]
-						+ idx[2] * nblks[3]
-						+ idx[3];
-		
-		t.put_block({.idx = idx, .blk = *blocks[blkidx]});
-		// remove block
-		
-	}
-		
-	std::cout << "Done reading." << std::endl;
+	std::cout << "Done with 2e." << std::endl;
 
 }
 	
-	
 template <int N>
-dbcsr::tensor<N,double> integrals(MPI_Comm comm, util::ShrPool<libint2::Engine>& engine, 
-	std::vector<desc::cluster_basis>& basvec, std::string name, 
-	std::vector<int> map1, std::vector<int> map2) {
+dbcsr::tensor<N,double> integrals(integral_parameters<N>&& p) {
 		
-	if (basvec.size() != N) throw std::runtime_error("Basis vector incompatible with tensor dimensions.");
+	if (p.basvec->size() != N) throw std::runtime_error("Basis vector incompatible with tensor dimensions.");
 	
 	//create pgrid
-	dbcsr::pgrid<N> pgridN({.comm = comm});
+	dbcsr::pgrid<N> pgridN({.comm = *p.comm});
 	
 	vec<vec<int>> blk_sizes;
 	
 	for (int i = 0; i != N; ++i) {
-		blk_sizes.push_back(basvec[i].cluster_sizes());
+		blk_sizes.push_back(p.basvec->operator[](i).cluster_sizes());
 	}
 	
 	//create tensor 
-	dbcsr::tensor<N,double> out({.name = "test", .pgridN = pgridN, .map1 = map1, 
-		.map2 = map2, .blk_sizes = blk_sizes});
+	dbcsr::tensor<N,double> out({.name = *p.name, .pgridN = pgridN, .map1 = *p.map1, 
+		.map2 = *p.map2, .blk_sizes = blk_sizes});
 	
-	calc_ints(out, engine, basvec);
+	Zmat* bra_ptr = (p.bra) ? &*p.bra : nullptr;
+	Zmat* ket_ptr = (p.ket) ? &*p.ket : nullptr;
+	
+	calc_ints(out, *p.engine, *p.basvec, bra_ptr, ket_ptr);
 	
 	return out;
 		
 }
 
-template dbcsr::tensor<2,double> integrals(MPI_Comm comm, util::ShrPool<libint2::Engine>& engine, 
-	std::vector<desc::cluster_basis>& basvec, std::string name, 
-	std::vector<int> map1, std::vector<int> map2);
+template dbcsr::tensor<2,double> integrals(integral_parameters<2>&& p);
 	
-template dbcsr::tensor<4,double> integrals(MPI_Comm comm, util::ShrPool<libint2::Engine>& engine, 
-	std::vector<desc::cluster_basis>& basvec, std::string name, 
-	std::vector<int> map1, std::vector<int> map2);
+template dbcsr::tensor<4,double> integrals(integral_parameters<4>&& p);
 
 
 }

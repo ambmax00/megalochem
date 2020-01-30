@@ -41,17 +41,21 @@ private:
 				  m_t_bb, // kinetic
 				  m_core_bb, // core hamiltonian
 				  m_x_bb, // orthogonalizing matrix
-				  m_f_bb_A, m_f_bb_B, // alpha/beta fock mat
-				  m_p_bb_A, m_p_bb_B, // alpha/beta density matrix
-				  m_c_bm_A, m_c_bm_B; // alpha/beta coefficient matrix	  
+				  m_f_bb_A, // alpha fock mat
+				  m_p_bb_A, // alpha/beta density matrix
+				  m_c_bm_A; // alpha/beta coefficient matrix	  
+				  
+	optional<dbcsr::tensor<2>,val> m_f_bb_B, m_p_bb_B, m_c_bm_B;
 	
 	void compute_nucrep();
 	void one_electron();
 	
 	void compute_guess();
+	dbcsr::tensor<2> compute_errmat(dbcsr::tensor<2>& F, dbcsr::tensor<2>& P, 
+		dbcsr::tensor<2>& S, std::string x);
 	void diag_fock();
 	
-	void calc_scf_energy();
+	void compute_scf_energy();
 
 public:
 

@@ -5,6 +5,8 @@
 #include "math/tensor/dbcsr.hpp"
 #include "utils/mpi_log.h"
 
+#include <limits>
+
 template <class T>
 using MatrixX = Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic>;
 
@@ -156,7 +158,7 @@ dbcsr::tensor<2,T> eigen_to_tensor(MatrixX<T>& M, std::string name,
 			
 			std::cout << eigen_blk << std::endl;
 			
-			if (eigen_blk.norm() >= 1e-6) {
+			if (eigen_blk.norm() > eps_filter) {
 			
 				std::cout << "RESERVED" << std::endl;
 				out.reserve({{ix},{jx}});
@@ -165,7 +167,9 @@ dbcsr::tensor<2,T> eigen_to_tensor(MatrixX<T>& M, std::string name,
 				
 				for (int n = 0; n != sizes[0]; ++n) {
 					for (int m = 0; m != sizes[1]; ++m) {
-						blk(n,m) = eigen_blk(n,m);
+						double val = eigen_blk(n,m);
+						blk(n,m) = (fabs(val) < std::numeric_limits<double>::epsilon())
+							? 0.0 : val;
 				}}
 				
 				out.put_block({.idx = idx, .blk = blk});

@@ -1,4 +1,5 @@
 #include "ints/screening.h"
+#include "ints/integrals.h"
 #include "math/tensor/dbcsr.hpp"
 #include "utils/mpi_log.h"
 
@@ -18,15 +19,16 @@ void Zmat::compute_schwarz() {
 	MPI_Comm_rank(m_comm, &rank);
 	
 	// make tensor
-	auto b = m_mol.dims().b();
-	vec<vec<int>> sizes = {b,b};
-	dbcsr::tensor<2> Ztensor({.name = "Zmat_schwarz", .pgridN = grid, .map1 = {0}, .map2 = {1}, .blk_sizes = sizes});
+	
+	auto s = m_mol.dims().s();
+	m_blk_sizes = {s,s};
+	dbcsr::tensor<2> Ztensor({.name = "Zmat_schwarz", .pgridN = grid, .map1 = {0}, .map2 = {1}, .blk_sizes = m_blk_sizes});
 	
 	// reserve
 	vec<vec<int>> reserved(2);
 	
-	for (int i = 0; i != sizes[0].size(); ++i) {
-		for (int j = i; j != sizes[1].size(); ++j) {
+	for (int i = 0; i != s.size(); ++i) {
+		for (int j = 0; j <= i; ++j) {
 			
 			dbcsr::idx2 idx = {i,j};
 			int proc = -1;
@@ -59,10 +61,9 @@ void Zmat::compute_schwarz() {
 		int idx1 = reserved[1][idx];
 		dbcsr::idx2 IDX = {idx0,idx1};
 		
-		bool found = false;
-		auto blk = Ztensor.get_block({.idx = IDX, .blk_size = {b[idx0],b[idx1]}, .found = found});
+		dbcsr::block<2> blk(vec<int>{m_blk_sizes[0][idx0],m_blk_sizes[1][idx1]});
 		
-		if (!found) continue;
+		std::cout << "HERE1" << std::endl;
 		
 		//LOG.os<0,-1>("Rank: ", rank, ", Thread: ", omp_get_thread_num(), " IDX: ", idx0, " ", idx1, '\n');		
 		
@@ -72,7 +73,6 @@ void Zmat::compute_schwarz() {
 		int off0 = 0;
 		int off1 = 0;
 		
-		// no perm here for now
 		for (int s0 = 0; s0 != cl0.size(); ++s0) {
 			auto& sh0 = cl0[s0];
 			for (int s1 = 0; s1 != cl1.size(); ++s1) {
@@ -81,27 +81,37 @@ void Zmat::compute_schwarz() {
 				loc_eng.compute(sh0,sh1,sh0,sh1);
 				auto ints_shellsets = results[0];
 				
+				double norm = 0.0;
+				
 				if (ints_shellsets != nullptr) {
-					int loc_idx = 0;
 					int sh0size = sh0.size();
 					int sh1size = sh1.size();
 					for (int i0 = 0; i0 != sh0.size(); ++i0) {
 						for (int i1 = 0; i1 != sh1.size(); ++i1) {
-							blk(i0 + off0, i1 + off1) = sqrt(fabs(
-								ints_shellsets[i0*sh1size*sh0size*sh1size + i1*sh1size*sh0size + i1*sh1size + i0]));
+							norm += pow(
+								ints_shellsets[i0*sh1size*sh0size*sh1size + i1*sh1size*sh0size + i1*sh1size + i0],2);
 						}
-					}
+					}	
 				}
+				
+				norm = sqrt(norm);
+				
+				blk(s0,s1) = sqrt(norm);
+				
 				off1 += sh1.size();
 			}
 			off1 = 0;
 			off0 += sh0.size();
 		}
 		
+		std::cout << "HERE2" << std::endl;
+		
 		#pragma omp critical 
 		{
 			Ztensor.put_block({.idx = IDX, .blk = blk});
 		}
+		
+		std::cout << "HERE3" << std::endl;
 				
 	}
 	
@@ -109,21 +119,25 @@ void Zmat::compute_schwarz() {
 
 	Ztensor.filter();
 	
+	std::cout << "HERE35" << std::endl;
+	
 	dbcsr::print(Ztensor);
+	
+	std::cout << "HERE4" << std::endl;
 	
 	LOG.os<0,-1>("HERE\n");
 	// new para: get norm and index
 	dbcsr::iterator<2> iter(Ztensor);
-	int nzblks = Ztensor.num_blocks();
+	int loc_nzblks = Ztensor.num_blocks();
 	int off = cbas.size();
 	
-	int64_t* indices = new int64_t[nzblks];
-	double* norms = new double[nzblks];
+	dbcsr::idx2* loc_indices = new dbcsr::idx2[loc_nzblks];
+	float* loc_norms = new float[loc_nzblks];
+	dbcsr::block<2>* loc_blocks = new dbcsr::block<2>[loc_nzblks];
 	
-	//LOG.os<0,-1>("Entering Para\n");
-	
+	// Loop again to collect blocks
 	#pragma omp parallel for
-	for (int inz = 0; inz != nzblks; ++inz) {
+	for (int inz = 0; inz != loc_nzblks; ++inz) {
 		
 		vec<int> blksize;
 		dbcsr::idx2 idx;
@@ -136,15 +150,14 @@ void Zmat::compute_schwarz() {
 		}
 		
 		bool found = false;
-		auto blk = Ztensor.get_block({.idx = idx, .blk_size = blksize, .found = found});
+		loc_blocks[inz] = Ztensor.get_block({.idx = idx, .blk_size = blksize, .found = found});
 		
-		int64_t mapidx = (int64_t)idx[0] * off + (int64_t)idx[1];
-		double norm = blk.norm();
-		
-		norms[inz] = norm; std::cout << norm << std::endl;
-		indices[inz] = mapidx;
+		loc_norms[inz] = loc_blocks[inz].norm(); 
+		loc_indices[inz] = idx;
 		
 	}
+	
+	
 	
 	std::cout << rank << "OUT!" << std::endl;
 	MPI_Barrier(m_comm);
@@ -154,74 +167,108 @@ void Zmat::compute_schwarz() {
 	// Nicely done! Now communicate that stuff
 	std::cout << rank << "Getting blocks" << std::endl;
 	size_t blkstot = Ztensor.num_blocks_total();
+	Ztensor.destroy();
 	std::cout << rank << "Ok. " << std::endl;
 	
 	
 	LOG.os<0,0>("ALL BLOCKS: ", blkstot, '\n');
 	LOG.flush();
 	
-	int* counts = new int[comm_size](); 
+	int* nzblks = new int[comm_size]();
+	nzblks[rank] = loc_nzblks; 
 	
-	// get numbers of non zero blocks
-	MPI_Gather(&nzblks, 1, MPI_INT, counts, 1, MPI_INT, 0, m_comm);
+	// collect all numbers of nonzero blocks on all nodes
+	for (int r = 0; r != comm_size; ++r) {
+		MPI_Bcast(&nzblks[r], 1, MPI_INT, r, m_comm);
+	}
 
-	// Place to hold the gathered data
-	// Allocate at root only
 	
 	if (rank == 0) {
 		for (int i = 0; i != comm_size; ++i) {
-			std::cout << counts[i] << " "; 
+			std::cout << nzblks[i] << " "; 
 		} std::cout << std::endl;
 	}
 	
-	std::cout << "HERE " << std::endl;
-	int64_t *allidxs = new int64_t[blkstot];
-	double *allnorms = new double[blkstot];
+	// data structures
+	dbcsr::idx2 *allidxs = new dbcsr::idx2[blkstot]();
+	float *allnorms = new float[blkstot]();
+	dbcsr::block<2> *allblocks = new dbcsr::block<2>[blkstot]();
 	
-	off = 0;
+	int offset = 0;
 	
-	for (int i = 1; i != comm_size; ++i) {
-		if (rank != 0) {
-			MPI_Send(norms,nzblks,MPI_DOUBLE, 0, 10, m_comm);
-			MPI_Send(indices,nzblks,MPI_INT64_T, 0, 11, m_comm);
-		} else {
-			off += counts[i-1];
-			MPI_Recv(&allnorms[off],counts[i],MPI_DOUBLE,i,10,m_comm, MPI_STATUS_IGNORE);
-			MPI_Recv(&allidxs[off],counts[i],MPI_INT64_T,i,11,m_comm, MPI_STATUS_IGNORE);
+	for (int r = 0; r != comm_size; ++r) {
+		
+		if (r == rank) {
+			for (int n = 0; n != loc_nzblks; ++n) {
+				allidxs[n + offset] = loc_indices[n];
+				allnorms[n + offset] = loc_norms[n];
+			}
 		}
-	}
-	
-	if (rank == 0) {
-		std::copy(norms, norms + nzblks, allnorms);
-		std::copy(indices, indices + nzblks, allidxs);
-	}
+		
+		//norms
+		MPI_Bcast(&allnorms[offset],nzblks[r],MPI_FLOAT,r,m_comm);
+		
+		for (int n = 0; n != nzblks[r]; ++n) {
 			
+			// indices
+			MPI_Bcast(&allidxs[n + offset].data()[0],2,MPI_INT,r,m_comm);
+			
+			 // block sizes
+			 int* bsizes = new int[2];
+			
+			if (r == rank) {
+				bsizes[0] = loc_blocks[n].sizes()[0];
+				bsizes[1] = loc_blocks[n].sizes()[1];
+			} 
+			
+			MPI_Bcast(bsizes,2,MPI_INT,r,m_comm);
+			
+			dbcsr::block<2> blk = dbcsr::block<2>(vec<int>{bsizes[0],bsizes[1]});
+			
+			if (r == rank) {
+				blk = std::move(loc_blocks[n]);
+			}
+			
+			MPI_Bcast(blk.data(),bsizes[0]*bsizes[1],MPI_DOUBLE,r,m_comm);
+			
+			allblocks[offset + n] = std::move(blk);
+			
+			delete[] bsizes;
+			
+		}
+	
+		offset += nzblks[r];
+		
+	}
+
 	
     if (rank == 0) {
     for (int i = 0; i != blkstot; ++i) {
 		std::cout << allnorms[i] << " ";
 	} std::cout << std::endl;
 	for (int i = 0; i != blkstot; ++i) {
-		std::cout << allidxs[i] << " ";
+		std::cout << allidxs[i].data()[0] << " " << allidxs[i].data()[1] << " ";
+	} std::cout << std::endl;
+	for (int i = 0; i != blkstot; ++i) {
+		allblocks[i].print();
 	} std::cout << std::endl;
 	}
 	
-	MPI_Bcast(allnorms, blkstot, MPI_DOUBLE, 0, m_comm);
-	MPI_Bcast(allidxs, blkstot, MPI_INT64_T, 0, m_comm);
-	
-	delete [] counts;
-	delete [] allidxs;
-	delete [] allnorms;
-	
-	MPI_Barrier(m_comm);
-	
-	for (size_t i = 0; i != blkstot; ++i) {
-		m_blkmap.insert(std::make_pair(allidxs[i], allnorms[i]));
+	// ZIP IT UP SCOTTY!!!
+	for (int i = 0; i != blkstot; ++i) {
+		std::pair<float,dbcsr::block<2>> pair = std::make_pair(allnorms[i],std::move(allblocks[i]));
+		std::pair<dbcsr::idx2,std::pair<float,dbcsr::block<2>>> pairtot =
+			std::make_pair(allidxs[i],std::move(pair));
+		m_blkmap.insert(std::move(pairtot));
 	}
 	
-	// have another map with individual shell info
-		
-	
+	delete[] allnorms;
+	delete[] allidxs;
+	delete[] allblocks;
+	delete[] nzblks;
+	delete[] loc_indices;
+	delete[] loc_norms;
+	delete[] loc_blocks;
 }
 			
 void Zmat::compute() {

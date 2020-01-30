@@ -31,14 +31,15 @@ private:
 	bool m_restricted;
 	
 	// pure 3c2e ints
-	std::optional<dbcsr::tensor<3>> m_3c2e_ints;
-	std::optional<dbcsr::tensor<4>> m_2e_ints;
+	optional<dbcsr::tensor<3>,val> m_3c2e_ints;
+	optional<dbcsr::tensor<4>,val> m_2e_ints;
 	
 	dbcsr::tensor<2> m_j_bb;
 	dbcsr::tensor<2> m_k_bb_A;
-	dbcsr::tensor<2> m_k_bb_B;
 	dbcsr::tensor<2> m_f_bb_A;
-	dbcsr::tensor<2> m_f_bb_B;
+	
+	optional<dbcsr::tensor<2>,val> m_k_bb_B;
+	optional<dbcsr::tensor<2>,val> m_f_bb_B;
 	
 	void build_j(compute_param&& p);
 	void build_k(compute_param&& p);

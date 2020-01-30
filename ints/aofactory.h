@@ -12,15 +12,15 @@
 */
 
 namespace ints {
-	
+
+class Zmat;
+
 class aofactory {
 	
 private:
 	
 	desc::molecule& m_mol;
 	MPI_Comm m_comm;
-	
-	
 	
 public:
 
@@ -38,6 +38,9 @@ public:
 	
 	template <int N>
 	dbcsr::tensor<N,double> compute(aofac_params&& p);
+	
+	optional<Zmat,val> m_2e_ints_zmat;
+	optional<Zmat,val> m_3c2e_ints_zmat;
 		
 }; // end class aofactory
 

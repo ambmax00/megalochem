@@ -79,22 +79,22 @@ dbcsr::tensor<N,double> aofactory::compute(aofac_params&& p) {
 			
 		util::ShrPool<libint2::Engine> eng_pool = util::make_pool<libint2::Engine>(eng);
 		
-		std::cout << "Op: " << Op << " bis: " << bis << std::endl;
-		
-		
-		std::cout << "COMPUTE SCREENING: " << std::endl;
-		
-		libint2::Engine screen(libint2::Operator::coulomb, max_nprim, max_l, 0, std::numeric_limits<double>::epsilon());
-		screen.set(libint2::BraKet::xx_xx);
-		util::ShrPool<libint2::Engine> eng2_pool = util::make_pool<libint2::Engine>(screen);
-		
-		Zmat Z(m_comm, m_mol, eng2_pool, "schwarz");
-		
-		Z.compute();
-		
-		exit(0);
-		
-		dbcsr::tensor<N,double> out = integrals<N>(m_comm, eng_pool, basvec, *p.name, *p.map1, *p.map2);
+		//if (Op == "coulomb") {
+				
+			//libint2::Engine screen(libint2::Operator::coulomb, max_nprim, max_l, 0, std::numeric_limits<double>::epsilon());
+			//			screen.set(libint2::BraKet::xx_xx);
+						
+			//util::ShrPool<libint2::Engine> screen_pool = util::make_pool<libint2::Engine>(screen);
+				
+			//m_2e_ints_zmat = Zmat(m_comm, m_mol, screen_pool, "schwarz");
+				
+			//m_2e_ints_zmat->compute();
+				
+		//}
+			
+		dbcsr::tensor<N,double> out = integrals<N>({.comm = m_comm, .engine = eng_pool, 
+			.basvec = basvec, .bra = m_2e_ints_zmat, .ket = m_2e_ints_zmat, 
+			.name = *p.name, .map1 = *p.map1, .map2 = *p.map2});
 		
 		libint2::finalize();
 		

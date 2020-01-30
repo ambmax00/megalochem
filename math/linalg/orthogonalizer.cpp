@@ -1,5 +1,6 @@
 #include "math/linalg/orthogonalizer.h"
 #include "math/tensor/dbcsr_conversions.hpp"
+#include "math/linalg/symmetrize.h"
 
 #include <Eigen/Eigenvalues>
 
@@ -9,7 +10,12 @@ namespace math {
 	
 void orthgon::compute() {
 	
+	//auto t = symmetrize(m_tensor, "SYM");
+	
 	auto mat = dbcsr::tensor_to_eigen(m_tensor);
+	
+	std::cout << "MATRIX S" << std::endl;
+	std::cout << mat << std::endl;
 	
 	Eigen::SelfAdjointEigenSolver<Eigen::MatrixXd> es;
 	
@@ -31,7 +37,6 @@ void orthgon::compute() {
 		}
 	}
 	
-	//std::cout << m_out << std::endl;
 	
 }
 	

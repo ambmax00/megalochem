@@ -3,6 +3,8 @@
 #include "hf/hfdefaults.h"
 #include "ints/aofactory.h"
 #include "math/linalg/orthogonalizer.h"
+#include "math/linalg/symmetrize.h"
+#include "math/solvers/diis.h"
 #include "math/tensor/dbcsr_conversions.hpp"
 
 namespace hf {
@@ -94,6 +96,8 @@ void hfmod::one_electron() {
 			 }
 	);		 
 	
+	m_s_bb = math::symmetrize(m_s_bb, "m_s_bb");
+	
 	//kinetic
 	m_t_bb = int_engine.compute<2>(
 		{.op = "kinetic", .bas = "bb", 
@@ -101,12 +105,15 @@ void hfmod::one_electron() {
 		}
 	);
 	
+	m_t_bb = math::symmetrize(m_t_bb, "m_t_bb");
+	
 	// nuclear
 	m_v_bb = int_engine.compute<2>(
 		{.op = "nuclear", .bas = "bb",
 		 .name = "v_bb", .map1 = {0}, .map2 = {1}
 		}
 	);
+	m_v_bb = math::symmetrize(m_v_bb, "m_t_bb");
 	
 	// get X
 	math::orthgon og(m_s_bb);
@@ -136,24 +143,46 @@ void hfmod::one_electron() {
 	
 }
 	
-void hfmod::calc_scf_energy() {
+void hfmod::compute_scf_energy() {		
 	
-	double e1 = dbcsr::dot<2>(m_core_bb, m_p_bb_A);
-	double e2 = dbcsr::dot<2>(m_f_bb_A, m_p_bb_A);
+	double e1A, e2A, e1B = 0.0, e2B = 0.0;
 	
-	std::cout << "CORE: " << std::endl;
-	dbcsr::print(m_core_bb);
+	e1A = dbcsr::dot(m_core_bb, m_p_bb_A);
+	e2A = dbcsr::dot(m_f_bb_A, m_p_bb_A);
 	
-	std::cout << "FOCK:" << std::endl;
-	dbcsr::print(m_f_bb_A);
+	if (!m_restricted && !m_nobeta) {
+		e1B = dbcsr::dot(m_core_bb, *m_p_bb_B);
+		e2B = dbcsr::dot(*m_f_bb_B, *m_p_bb_B);
+	}
 	
-	std::cout << "Density" << std::endl;
-	dbcsr::print(m_p_bb_A);
+	std::cout << "E1 " << e1A << std::endl;
+	std::cout << "E2 " << e2A << std::endl;
 	
-	std::cout << "E1 " << e1 << std::endl;
-	std::cout << "E2 " << e2 << std::endl;
+	if (m_restricted) {
+		m_scf_energy = 0.5 * (2.0 * (e1A + e2A));
+	} else {
+		m_scf_energy = 0.5 * ((e1A + e2A) + (e1B + e2B));
+	}
 	
-	m_scf_energy = 0.5 * (2.0 * (e1 + e2));
+}
+
+dbcsr::tensor<2> hfmod::compute_errmat(dbcsr::tensor<2>& F_x, dbcsr::tensor<2>& P_x, dbcsr::tensor<2>& S, std::string x) {
+	
+	//create
+	dbcsr::pgrid<2> grid({.comm = m_comm});
+	dbcsr::tensor<2> e_1({.name = "e_1_"+x, .pgridN = grid, .map1 = {0}, .map2 = {1}, .blk_sizes = F_x.blk_size()});
+	dbcsr::tensor<2> e_2({.name = "e_2_"+x, .pgridN = grid, .map1 = {0}, .map2 = {1}, .blk_sizes = F_x.blk_size()});
+	
+	//DO E = FPS - SPF 
+	dbcsr::einsum<2,2,2>({.x = "ij, jk -> ik", .t1 = F_x, .t2 = P_x, .t3 = e_1}); // e1 = F * P
+	dbcsr::einsum<2,2,2>({.x = "ij, jk -> ik", .t1 = e_1, .t2 = S, .t3 = e_1}); // e1 = e1 * S
+	dbcsr::einsum<2,2,2>({.x = "ij, jk -> ik", .t1 = S, .t2 = P_x, .t3 = e_2, .alpha = -1.0}); // e2 =  - S *P
+	dbcsr::einsum<2,2,2>({.x = "ij, jk -> ik", .t1 = e_2, .t2 = F_x, .t3 = e_1, .beta = 1.0}); // e1 = e1 + e2 * F
+	
+	e_2.destroy();
+	grid.destroy();
+	
+	return e_1;
 	
 }
 
@@ -167,28 +196,28 @@ void hfmod::compute() {
 	std::cout << "Guessing..." << std::endl;
 	compute_guess();
 	
+	compute_nucrep();
+	
 	// Now enter loop
 	int iter = 0;
 	bool converged = false;
 	
 	fockbuilder fbuilder(m_mol, m_opt, m_comm);
-	
-	/*
-	fbuilder.compute({.core = m_core_bb, .c_A = m_c_bm_A, .p_A = m_p_bb_A});
-	
-	m_f_bb_A = std::move(fbuilder.m_f_bb_A);
-	
-	std::cout << "FOCK MATRIX: " << std::endl;
-	dbcsr::print(m_f_bb_A);
-
-	double en = dbcsr::dot(m_core_bb, m_f_bb_A);
-
-	std::cout << "EN: " << en << std::endl;
-	*/
+	math::diis_helper<2> diis_A(2,6,true);
+	math::diis_helper<2> diis_B(2,6,true);
 
 	m_max_iter = 10;
+	
+	// ERROR MATRICES
+	dbcsr::tensor<2> e_A;
+	optional<dbcsr::tensor<2>,val> e_B;
+	
+	double rms = 10;
 
-	while (!converged && iter < m_max_iter ) {
+	while (true) {
+		
+		if (rms < HF_SCF_THRESH) break;
+		if (iter > HF_MAX_ITER) break;
 		
 		LOG.os<>("Iteration: ", iter, '\n');
 		
@@ -196,11 +225,23 @@ void hfmod::compute() {
 		fbuilder.compute({.core = m_core_bb, .c_A = m_c_bm_A, .p_A = m_p_bb_A});
 		std::swap(m_f_bb_A, fbuilder.fock_alpha());
 		
-		calc_scf_energy();
-		
-		std::cout << "ENERGY: " << m_scf_energy << std::endl;
-		
 		// compute error, do diis, compute energy
+		
+		e_A = compute_errmat(m_f_bb_A, m_p_bb_A, m_s_bb, "A");
+		if (!m_restricted && !m_nobeta)
+			e_B = compute_errmat(*m_f_bb_B, *m_p_bb_B, m_s_bb, "B");
+		
+		compute_scf_energy();
+		
+		rms = dbcsr::RMS(e_A);
+		
+		std::cout << "ENERGY/ERROR: " << m_scf_energy << "/" << rms << std::endl;
+		
+		diis_A.compute_extrapolation_parameters(m_f_bb_A, e_A, iter);
+		if (!m_restricted && !m_nobeta)
+			diis_B.compute_extrapolation_parameters(*m_f_bb_B, *e_B, iter);
+			
+		diis_A.extrapolate(m_f_bb_A, iter);
 		
 		// diag fock
 		diag_fock();
@@ -211,7 +252,7 @@ void hfmod::compute() {
 		
 	} // end while
 	
-	std::cout << "FINAL ENERGY: " << m_scf_energy << std::endl;
+	std::cout << "FINAL ENERGY: " << m_scf_energy + m_nuc_energy << std::endl;
 		
 }
 
