@@ -28,6 +28,7 @@ private:
 	// options
 	bool m_restricted;
 	bool m_nobeta;
+	bool m_diis;
 	std::string m_guess;
 	int m_max_iter;
 	double m_scf_threshold;

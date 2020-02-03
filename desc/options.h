@@ -10,6 +10,7 @@
 #include <type_traits>
 
 // a fancy "any" map
+#include <iostream>
 
 namespace desc {
 
@@ -38,6 +39,8 @@ public:
 	set(std::string key, T in) {
 		
 		key = m_prefix + key;
+		
+		std::cout << "SETTING: " << key << std::endl;
 		
 		std::any val = std::any(in);
 		m_map[key] = val;

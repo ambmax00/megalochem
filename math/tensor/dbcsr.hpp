@@ -1220,6 +1220,8 @@ void contract(contract_param<T,N1,N2,N3>&& p) {
 	int* f_b2 = (p.b2) ? unfold_bounds(*p.b2) : nullptr;
 	int* f_b3 = (p.b3) ? unfold_bounds(*p.b3) : nullptr;
 	
+	if (p.b2) std::cout << "ITS HERE!!!!" << std::endl;
+	
 	//std::cout << "In here..." << std::endl;
 	
 	double* f_filter = (p.filter) ? &*p.filter : nullptr;
@@ -1315,12 +1317,12 @@ static void eval(std::string str, std::vector<int>& con1, std::vector<int>& con2
 		}
 	}
 			
-	//std::cout << "To be contrcated: " << scon << std::endl;	
-	//std::cout << "Maps:" << std::endl;
-	//for (auto v : con1) std::cout << v << " ";
-	//std::cout << std::endl;
-	//for (auto v : con2) std::cout << v << " ";
-	//std::cout << std::endl;
+	std::cout << "To be contrcated: " << scon << std::endl;	
+	std::cout << "Maps:" << std::endl;
+	for (auto v : con1) std::cout << v << " ";
+	std::cout << std::endl;
+	for (auto v : con2) std::cout << v << " ";
+	std::cout << std::endl;
 			
 	for (int i = 0; i != t1.size(); ++i) {
 		auto found = std::find(scon.begin(), scon.end(), t1[i]);
@@ -1338,13 +1340,13 @@ static void eval(std::string str, std::vector<int>& con1, std::vector<int>& con2
 		}
 	}
 	
-	//std::cout << "not con1: " << sncon1 << std::endl;
-	//std::cout << "not con2: " << sncon2 << std::endl;
-	//std::cout << "Maps:" << std::endl;
-	//for (auto v : ncon1) std::cout << v << " ";
-	//std::cout << std::endl;
-	//for (auto v : ncon2) std::cout << v << " ";
-	//std::cout << std::endl;
+	std::cout << "not con1: " << sncon1 << std::endl;
+	std::cout << "not con2: " << sncon2 << std::endl;
+	std::cout << "Maps:" << std::endl;
+	for (auto v : ncon1) std::cout << v << " ";
+	std::cout << std::endl;
+	for (auto v : ncon2) std::cout << v << " ";
+	std::cout << std::endl;
 	
 	if (ncon1.size() + ncon2.size() != t3.size()) throw std::runtime_error("Wrong tensor dimensions: "+str);
 	
@@ -1359,11 +1361,11 @@ static void eval(std::string str, std::vector<int>& con1, std::vector<int>& con2
 		}
 	}
 	
-	//std::cout << "Maps tensor 3" << std::endl;
-	//for (auto v : map1) std::cout << v << " ";
-	//std::cout << std::endl;
-	//for (auto v : map2) std::cout << v << " ";
-	//std::cout << std::endl;
+	std::cout << "Maps tensor 3" << std::endl;
+	for (auto v : map1) std::cout << v << " ";
+	std::cout << std::endl;
+	for (auto v : map2) std::cout << v << " ";
+	std::cout << std::endl;
 	
 	if (map1.size() + map2.size() != t3.size()) 
 		throw std::runtime_error("Incompatible tensor dimensions: "+str);
@@ -1663,6 +1665,8 @@ void print(tensor<N,T>& t_in) {
 	auto blkszs = t_in.blk_size();
 	
 	iterator<N,T> iter(t_in);
+	
+	if (myrank == 0) std::cout << "Tensor: " << t_in.name() << std::endl;
     
     for (int p = 0; p != mpi_size; ++p) {
 		if (myrank == p) {

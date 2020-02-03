@@ -219,18 +219,15 @@ void unpack(const json& j_in, desc::options& opt, std::string root) {
 		
 		if (it->type() == json::value_t::boolean) {
 			opt.set<bool>(root + "/" + it.key(), *it);
-		}
-		
-		if (it->type() == json::value_t::number_integer) {
+		} else if (it->type() == json::value_t::number_integer ||
+			it->type() == json::value_t::number_unsigned) {
 			opt.set<int>(root + "/" + it.key(), *it);
-		}
-		
-		if (it->type() == json::value_t::number_float) {
+		} else if (it->type() == json::value_t::number_float) {
 			opt.set<double>(root + "/" + it.key(), *it);
-		}
-		
-		if (it->type() == json::value_t::string) {
+		} else if (it->type() == json::value_t::string) {
 			opt.set<std::string>(root + "/" + it.key(), *it);
+		} else {
+			throw std::runtime_error("Invalid type for keyword.");
 		}
 		
 		//if (it->type() == json::value_t::array) {
@@ -268,20 +265,12 @@ reader::reader(std::string filename) {
 	}
 	
 	optional<std::vector<libint2::Shell>,val> dfbasis;
-	/*if (jmol.find("dfbasis") != jmol.end()) {	
-		libint2::BasisSet bas(jmol["basis"], atoms);
-		
-		dfbasis = std::move(bas);
-	} else { 
-		basis = read_basis(jmol["gen_basis"],atoms);
+	if (jmol.find("dfbasis") != jmol.end()) {
+		auto b = libint2::BasisSet(jmol["dfbasis"], atoms);
+		dfbasis = optional<std::vector<libint2::Shell>,val>(std::move(b));
 	}
 	
-	
-	if (jmol.find("gen_dfbasis") != jmol.end()) {
-		 optional<std::vector<libint2::Shell>,val> temp(
-			read_basis(jmol["gen_dfbasis"],atoms));
-		dfbasis = std::move(temp);
-	}*/
+	if (dfbasis) std::cout << "DFBASIS IS HERE." << std::endl;
 	
 	int charge = jmol["charge"];
 	int mult = jmol["mult"];
@@ -297,6 +286,10 @@ reader::reader(std::string filename) {
 	
 	std::cout << opt.get<bool>("hf/diis") << std::endl;
 	std::cout << opt.get<double>("hf/conv") << std::endl;
+	
+	if (opt.get<bool>("hf/use_df",false)) {
+		std::cout << "Using DENSITY FITTING." << std::endl;
+	}
 	
 	m_mol = mol;
 	m_opt = opt;

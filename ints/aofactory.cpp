@@ -104,7 +104,7 @@ dbcsr::tensor<N,double> aofactory::compute(aofac_params&& p) {
 
 //forward declarations
 template dbcsr::tensor<2,double> aofactory::compute(aofac_params&& p);
-//template dbcsr::tensor<3,double> aofactory::compute(aofac_params&& p);
+template dbcsr::tensor<3,double> aofactory::compute(aofac_params&& p);
 template dbcsr::tensor<4,double> aofactory::compute(aofac_params&& p);
 
 

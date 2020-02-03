@@ -19,12 +19,8 @@ static const std::vector<int> conf_orb = {0, 2, 10, 18, 36, 54, 86, 118};
 
 molecule::molecule(mol_params&& p) : 
 	m_mult(*p.mult), 
-	m_charge(*p.charge),
-	m_cluster_dfbasis() {
-		
-	if (m_cluster_dfbasis) {
-		std::cout << "ITS HERE" << std::endl;
-	}
+	m_charge(*p.charge)
+	{
 	
 	//atoms
 	m_atoms = *p.atoms;
@@ -35,7 +31,6 @@ molecule::molecule(mol_params&& p) :
 	m_cluster_basis = cbas;
 	
 	if (p.dfbasis) {
-		
 		std::cout << "There is a df basis." << std::endl;
 		cluster_basis cdfbas(*p.dfbasis,1);
 		m_cluster_dfbasis = cdfbas;

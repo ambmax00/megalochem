@@ -99,7 +99,9 @@ int main(int argv, char** argc) {
 		}
 	}
 	
-	hf::hfmod myhf(mol,opt,MPI_COMM_WORLD);
+	auto hfopt = opt.subtext("hf");
+	
+	hf::hfmod myhf(mol,hfopt,MPI_COMM_WORLD);
 	
 	myhf.compute();
 	

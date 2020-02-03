@@ -28,6 +28,8 @@ public:
     
     ~mpi_log() {}
     
+    int global_plev() { return global_plev_; }
+    
     void flush() {std::cout << std::flush; }
     
 	void print_() { std::cout << std::flush; }

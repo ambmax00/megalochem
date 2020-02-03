@@ -15,12 +15,16 @@ static int multiplicity(int i, int j) {
 	return (i == j) ? 1 : 2;
 }
 
-//static int multiplicity(int i, int j, int k, int l) {
-//	return (i != k) ? 2 : ((j == l) ? 1 : 2);
-//}
+static int multiplicity(int i, int j, int k) {
+	return (j != k) ? 2 : 1;
+}
 
 static bool is_canonical(int i, int j) {
 	return (i >= j);
+}
+
+static bool is_canonical(int i, int j, int k) {
+	return (j >= k);
 }
 
 //static bool is_canonical(int i, int j, int k, int l) {

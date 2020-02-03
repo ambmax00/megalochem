@@ -19,8 +19,11 @@ static const json valid_keys =
 		{"charge", 0}
 			}},
 	{"hf", {
+		{"guess", "core"},
 		{"diis", true},
-		{"conv", 1e-9}
+		{"conv", 1e-9},
+		{"use_df", false},
+		{"print", 0}
 	}}
 };
 

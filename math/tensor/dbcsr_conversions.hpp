@@ -74,13 +74,13 @@ MatrixX<T> tensor_to_eigen(dbcsr::tensor<2,T>& array, int l = 0) {
 				bool found = false;
 				idx = iter.idx();
 				
-				std::cout << idx[0] << " " << idx[1] << std::endl;
+				//std::cout << idx[0] << " " << idx[1] << std::endl;
 				
 				blk = array.get_block({.idx = iter.idx(), .blk_size = {blk_size[0][idx[0]],blk_size[1][idx[1]]}, 
 					.found = found});
 				sizes = blk.sizes();
 				
-				std::cout << "blk0 " << blk(0) << std::endl;
+				//std::cout << "blk0 " << blk(0) << std::endl;
 				
 				data = blk.data();
 				
@@ -93,7 +93,7 @@ MatrixX<T> tensor_to_eigen(dbcsr::tensor<2,T>& array, int l = 0) {
 			LOG.os<>("Offsets: ", off1, " ", off2, '\n');
 			
 			MPI_Bcast(&sizes[0], 2, MPI_INT, p, comm);
-			std::cout << "Sizes: " << sizes[0] << " " << sizes[1] << std::endl;
+			//std::cout << "Sizes: " << sizes[0] << " " << sizes[1] << std::endl;
 			
 			std::vector<T> vec(sizes[0]*sizes[1],T());
 			if (p != myrank) {
@@ -134,7 +134,7 @@ MatrixX<T> tensor_to_eigen(dbcsr::tensor<2,T>& array, int l = 0) {
 
 template <typename T>
 dbcsr::tensor<2,T> eigen_to_tensor(MatrixX<T>& M, std::string name, 
-	dbcsr::pgrid<2>& grid, vec<int> map1, vec<int> map2, vec<vec<int>> blk_sizes, double eps = 1e-6) {
+	dbcsr::pgrid<2>& grid, vec<int> map1, vec<int> map2, vec<vec<int>> blk_sizes, double eps = eps_filter) {
 	
 	dbcsr::tensor<2,T> out({.name = name, .pgridN = grid, .map1 = map1,
 		.map2 = map2, .blk_sizes = blk_sizes});
@@ -142,7 +142,7 @@ dbcsr::tensor<2,T> eigen_to_tensor(MatrixX<T>& M, std::string name,
 	auto blkloc = out.blks_local();
 	auto blkoff = out.blk_offset();
 	
-	std::cout << M << std::endl;
+	//std::cout << M << std::endl;
 	
 	for (int i = 0; i != blkloc[0].size(); ++i) {
 		for (int j = 0; j != blkloc[1].size(); ++j) {
@@ -160,7 +160,7 @@ dbcsr::tensor<2,T> eigen_to_tensor(MatrixX<T>& M, std::string name,
 			
 			if (eigen_blk.norm() > eps_filter) {
 			
-				std::cout << "RESERVED" << std::endl;
+				//std::cout << "RESERVED" << std::endl;
 				out.reserve({{ix},{jx}});
 				
 				dbcsr::block<2,T> blk(sizes);

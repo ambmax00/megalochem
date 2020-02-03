@@ -11,6 +11,7 @@ static const int HF_MAX_ITER = 100;
 static const double HF_SCF_THRESH = 1e-9;
 
 static const bool HF_USE_DF = false;
+static const bool HF_SCF_DIIS = true;
 
 static const std::string HF_GUESS = "core";
 

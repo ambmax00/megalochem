@@ -94,11 +94,20 @@ public:
 				LOG.os<>(1, "B before resizing...\n", m_B, '\n');
 				// reomve max element column and row
 				// first the row
-				m_B.block(max_pos, 0, m_B.rows() - max_pos, m_B.cols())
-					= m_B.block(max_pos + 1, 0, m_B.rows() - max_pos, m_B.cols());
+				
+				std::cout  << max_pos << " " << 0 << " " << m_B.rows() - max_pos << " " << m_B.cols() << std::endl;
+				std::cout << max_pos + 1 << " " << 0 << " " << m_B.rows() - max_pos << " " <<  m_B.cols() << std::endl;
+				
+				m_B.block(max_pos, 0, m_B.rows() - max_pos -1, m_B.cols())
+					= m_B.block(max_pos + 1, 0, m_B.rows() - max_pos - 1, m_B.cols());
 					
-				m_B.block(0, max_pos, m_B.rows(), m_B.cols() - max_pos)
-					= m_B.block(0, max_pos + 1, m_B.rows(), m_B.cols() - max_pos);
+				std::cout << 0 << " " << max_pos << " " << m_B.rows() << " " << m_B.cols() - max_pos << std::endl;
+				std::cout << 0 << max_pos + 1 << " " << m_B.rows() << " " << m_B.cols() - max_pos << std::endl; 
+					
+				m_B.block(0, max_pos, m_B.rows(), m_B.cols() - max_pos -1)
+					= m_B.block(0, max_pos + 1, m_B.rows(), m_B.cols() - max_pos -1);
+					
+				
 				
 				//std::cout << "Reducing!" << std::endl;
 				//Eigen::MatrixXd Bcrop = m_B.bottomRightCorner(nerr-1,nerr-1);

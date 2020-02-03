@@ -1,4 +1,6 @@
 set (sources
+	inverse.h
+	inverse.cpp
 	symmetrize.h
 	symmetrize.cpp
 	orthogonalizer.h

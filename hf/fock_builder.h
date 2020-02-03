@@ -5,6 +5,7 @@
 #include "desc/options.h"
 #include "desc/molecule.h"
 #include "utils/params.hpp"
+#include "utils/mpi_log.h"
 #include <mpi.h>
 
 namespace hf {
@@ -18,6 +19,7 @@ public:
 		required<dbcsr::tensor<2>,ref> p_A;
 		optional<dbcsr::tensor<2>,ref> c_B;
 		optional<dbcsr::tensor<2>,ref> p_B;
+		optional<bool,val> SAD_iter;
 	};
 	
 private:
@@ -25,6 +27,7 @@ private:
 	desc::molecule& m_mol;
 	desc::options& m_opt;
 	MPI_Comm m_comm;
+	util::mpi_log LOG;
 	
 	//options
 	bool m_use_df;
@@ -32,6 +35,10 @@ private:
 	
 	// pure 3c2e ints
 	optional<dbcsr::tensor<3>,val> m_3c2e_ints;
+	optional<dbcsr::tensor<2>,val> m_inv_xx; // <- inverse metric
+	optional<dbcsr::tensor<2>,val> m_sqrtinv_xx; // <- square root inverse metric
+	
+	// 2 electron ints
 	optional<dbcsr::tensor<4>,val> m_2e_ints;
 	
 	dbcsr::tensor<2> m_j_bb;
@@ -46,7 +53,7 @@ private:
 	
 public:
 
-	fockbuilder(desc::molecule& mol, desc::options& opt, MPI_Comm comm);
+	fockbuilder(desc::molecule& mol, desc::options& opt, MPI_Comm comm, int print = 0);
 			
 	void compute(compute_param&& p);
 	

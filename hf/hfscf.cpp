@@ -12,14 +12,18 @@ namespace hf {
 hfmod::hfmod(desc::molecule& mol, desc::options& opt, MPI_Comm comm) 
 	: m_mol(mol), 
 	  m_opt(opt), 
-	  LOG(m_opt.get<int>("print_level", HF_PRINT_LEVEL)),
+	  LOG(m_opt.get<int>("print", HF_PRINT_LEVEL)),
 	  m_guess(m_opt.get<std::string>("guess", HF_GUESS)),
 	  m_max_iter(m_opt.get<int>("max_iter", HF_MAX_ITER)),
 	  m_scf_threshold(m_opt.get<double>("scf_thresh", HF_SCF_THRESH)),
+	  m_diis(m_opt.get<bool>("diis", HF_SCF_DIIS)),
 	  m_restricted(m_opt.get<bool>("restricted", true)),
 	  m_comm(comm),
 	  m_nobeta(false)
 {
+	
+	std::cout << "PRINT LEVEL: " << m_opt.get<int>("print") << std::endl;
+	
 	if ((m_mol.nocc_alpha() != m_mol.nocc_beta()) && m_restricted) 
 		throw std::runtime_error("Cannot do restricted calculations for this multiplicity.");
 	if (m_mol.nocc_beta() == 0) m_nobeta = true;
@@ -48,13 +52,13 @@ hfmod::hfmod(desc::molecule& mol, desc::options& opt, MPI_Comm comm)
 	m_t_bb = dbcsr::tensor<2>({.name = "k_bb", .pgridN = grid, .map1 = {0}, .map2 = {1}, .blk_sizes = bb});
 	
 	m_p_bb_A = dbcsr::tensor<2>({.name = "p_bb_A", .pgridN = grid, .map1 = {0}, .map2 = {1}, .blk_sizes = bb});
-	m_p_bb_B = dbcsr::tensor<2>({.name = "p_bb_B", .pgridN = grid, .map1 = {0}, .map2 = {1}, .blk_sizes = bb});
+	if (!m_restricted && !m_nobeta) m_p_bb_B = dbcsr::tensor<2>({.name = "p_bb_B", .pgridN = grid, .map1 = {0}, .map2 = {1}, .blk_sizes = bb});
 	
 	m_c_bm_A = dbcsr::tensor<2>({.name = "c_bm_A", .pgridN = grid, .map1 = {0}, .map2 = {1}, .blk_sizes = bm_A});
-	m_c_bm_B = dbcsr::tensor<2>({.name = "c_bm_B", .pgridN = grid, .map1 = {0}, .map2 = {1}, .blk_sizes = bm_B});
+	if (m_p_bb_B) m_c_bm_B = dbcsr::tensor<2>({.name = "c_bm_B", .pgridN = grid, .map1 = {0}, .map2 = {1}, .blk_sizes = bm_B});
 	
 	m_f_bb_A = dbcsr::tensor<2>({.name = "f_bb_A", .pgridN = grid, .map1 = {0}, .map2 = {1}, .blk_sizes = bb});
-	m_f_bb_B = dbcsr::tensor<2>({.name = "f_bb_B", .pgridN = grid, .map1 = {0}, .map2 = {1}, .blk_sizes = bb});
+	if (m_p_bb_B) m_f_bb_B = dbcsr::tensor<2>({.name = "f_bb_B", .pgridN = grid, .map1 = {0}, .map2 = {1}, .blk_sizes = bb});
 	
 }
 
@@ -222,7 +226,7 @@ void hfmod::compute() {
 		LOG.os<>("Iteration: ", iter, '\n');
 		
 		// form fock matrix
-		fbuilder.compute({.core = m_core_bb, .c_A = m_c_bm_A, .p_A = m_p_bb_A});
+		fbuilder.compute({.core = m_core_bb, .c_A = m_c_bm_A, .p_A = m_p_bb_A, .c_B = m_c_bm_B, .p_B = m_p_bb_B});
 		std::swap(m_f_bb_A, fbuilder.fock_alpha());
 		
 		// compute error, do diis, compute energy
@@ -237,11 +241,14 @@ void hfmod::compute() {
 		
 		std::cout << "ENERGY/ERROR: " << m_scf_energy << "/" << rms << std::endl;
 		
-		diis_A.compute_extrapolation_parameters(m_f_bb_A, e_A, iter);
-		if (!m_restricted && !m_nobeta)
-			diis_B.compute_extrapolation_parameters(*m_f_bb_B, *e_B, iter);
-			
-		diis_A.extrapolate(m_f_bb_A, iter);
+		if (m_diis) {
+			diis_A.compute_extrapolation_parameters(m_f_bb_A, e_A, iter);
+			diis_A.extrapolate(m_f_bb_A, iter);
+			if (!m_restricted && !m_nobeta) {
+				diis_B.compute_extrapolation_parameters(*m_f_bb_B, *e_B, iter);
+				diis_B.extrapolate(*m_f_bb_B, iter);
+			}
+		}
 		
 		// diag fock
 		diag_fock();
@@ -253,6 +260,7 @@ void hfmod::compute() {
 	} // end while
 	
 	std::cout << "FINAL ENERGY: " << m_scf_energy + m_nuc_energy << std::endl;
+	std::cout << "Converged in: " << iter << " iterations. " << std::endl;
 		
 }
 
