@@ -27,8 +27,8 @@ private:
 	int m_nele_alpha;
 	int m_nele_beta;
 	
-	optional<std::vector<int>,val> m_frac_occ_alpha;
-	optional<std::vector<int>,val> m_frac_occ_beta;
+	optional<std::vector<double>,val> m_frac_occ_alpha;
+	optional<std::vector<double>,val> m_frac_occ_beta;
 	
 	bool m_frac = false;
 	
@@ -154,6 +154,14 @@ public:
 		return m_blocks;
 	}
 
+	int nele_alpha() {
+		return m_nele_alpha;
+	}
+	
+	int nele_beta() {
+		return m_nele_beta;
+	}
+	
 	int nocc_alpha() {
 		return m_nocc_alpha;
 	}
@@ -168,6 +176,13 @@ public:
 	
 	int nvir_beta() {
 		return m_nvir_beta;
+	}
+
+	optional<std::vector<double>,val> frac_occ_alpha() {
+		return m_frac_occ_alpha;
+	}
+	optional<std::vector<double>,val> frac_occ_beta() {
+		return m_frac_occ_beta;
 	}
 
 };

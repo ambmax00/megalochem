@@ -22,7 +22,7 @@ MatrixX<T> tensor_to_eigen(dbcsr::tensor<2,T>& array, int l = 0) {
 	MPI_Comm_rank(comm, &myrank); 
 	MPI_Comm_size(comm, &mpi_size);
 	
-	std::cout << myrank << std::endl;
+	//std::cout << myrank << std::endl;
 	
 	auto total_elem = array.nfull_tot();
 	auto nblocks = array.nblks_tot();
@@ -36,7 +36,7 @@ MatrixX<T> tensor_to_eigen(dbcsr::tensor<2,T>& array, int l = 0) {
 	
 	util::mpi_log LOG(l);
 	
-	LOG.os<1>("Dimensions: ", dim1, " ", dim2, '\n');
+	//LOG.os<1>("Dimensions: ", dim1, " ", dim2, '\n');
 	
 	MatrixX<T> m_out = MatrixX<T>::Zero(dim1,dim2);
 	
@@ -90,7 +90,7 @@ MatrixX<T> tensor_to_eigen(dbcsr::tensor<2,T>& array, int l = 0) {
 			int off1 = blk_offset[0][idx[0]];
 			int off2 = blk_offset[1][idx[1]];
 			
-			LOG.os<>("Offsets: ", off1, " ", off2, '\n');
+			//LOG.os<>("Offsets: ", off1, " ", off2, '\n');
 			
 			MPI_Bcast(&sizes[0], 2, MPI_INT, p, comm);
 			//std::cout << "Sizes: " << sizes[0] << " " << sizes[1] << std::endl;
@@ -122,11 +122,11 @@ MatrixX<T> tensor_to_eigen(dbcsr::tensor<2,T>& array, int l = 0) {
 		
 	}
 	
-	LOG.os<1,0>(m_out, '\n');
+	//LOG.os<1,0>(m_out, '\n');
 	MPI_Barrier(comm);
-	LOG.os<1,1>(m_out, '\n');
+	//LOG.os<1,1>(m_out, '\n');
 	
-	return m_out;
+	return std::move(m_out);
 	
 	
 }
@@ -156,7 +156,7 @@ dbcsr::tensor<2,T> eigen_to_tensor(MatrixX<T>& M, std::string name,
 			
 			auto eigen_blk = M.block(off[0],off[1],sizes[0],sizes[1]);
 			
-			std::cout << eigen_blk << std::endl;
+			//std::cout << eigen_blk << std::endl;
 			
 			if (eigen_blk.norm() > eps_filter) {
 			
@@ -179,7 +179,7 @@ dbcsr::tensor<2,T> eigen_to_tensor(MatrixX<T>& M, std::string name,
 			
 			
 	
-	return out;
+	return std::move(out);
 
 }
 	

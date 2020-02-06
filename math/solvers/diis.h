@@ -27,30 +27,31 @@ private:
 	Eigen::MatrixXd m_B;
 	Eigen::MatrixXd m_coeffs;
 	
-	const int m_max_diis;
-	const int m_start_diis;
+	const int m_max;
+	const int m_min;
+	const int m_start;
 	const bool m_print;
 	
 	util::mpi_log LOG;
 
 public:
 
-	diis_helper(int start, int max, bool print = false) :
-		m_max_diis(max), m_start_diis(start), m_B(0,0), m_coeffs(0,0), 
-		m_print(print), LOG(m_print == false ? 0 : 1) {};
+	diis_helper(MPI_Comm comm, int start, int min, int max, bool print = false) :
+		m_min(min), m_max(max), m_print(print), m_start(start), m_B(0,0), m_coeffs(0,0),
+		LOG(m_print == false ? 0 : 1, comm) {};
 	
 	
 	void compute_extrapolation_parameters(tensor<N>& T, tensor<N>& err, int iter) {
 		
-		if (iter >= m_start_diis) {
+		if (iter >= m_start) {
 		
 			//std::cout << "Iteration: " << iter << std::endl;
-			LOG.os<>(1, "Number of error vectors stored: ", m_delta.size(), '\n'); 
-			LOG.os<>(1, "Number of trial vectors stored: ", m_trialvecs.size(), '\n');
+			LOG.os<2>("Number of error vectors stored: ", m_delta.size(), '\n'); 
+			LOG.os<2>("Number of trial vectors stored: ", m_trialvecs.size(), '\n');
 			//std::cout << "Size of delta: " << m_delta.size() << std::endl;
 			
 			bool reduce = false;
-			if (m_delta.size() >= m_max_diis) reduce = true;
+			if (m_delta.size() >= m_max) reduce = true;
 			
 			m_delta.push_back(err);
 			
@@ -61,7 +62,7 @@ public:
 				});
 			
 			size_t max_pos = to_erase - m_delta.begin();
-			LOG.os<>(1, "Max element found at position: ", max_pos, '\n');
+			LOG.os<2>("Max element found at position: ", max_pos, '\n');
 			
 			
 			if (reduce) m_delta.erase(to_erase);
@@ -91,18 +92,18 @@ public:
 			
 			if (reduce) {
 				
-				LOG.os<>(1, "B before resizing...\n", m_B, '\n');
+				LOG.os<2>("B before resizing...\n", m_B, '\n');
 				// reomve max element column and row
 				// first the row
 				
-				std::cout  << max_pos << " " << 0 << " " << m_B.rows() - max_pos << " " << m_B.cols() << std::endl;
-				std::cout << max_pos + 1 << " " << 0 << " " << m_B.rows() - max_pos << " " <<  m_B.cols() << std::endl;
+				//std::cout  << max_pos << " " << 0 << " " << m_B.rows() - max_pos << " " << m_B.cols() << std::endl;
+				//std::cout << max_pos + 1 << " " << 0 << " " << m_B.rows() - max_pos << " " <<  m_B.cols() << std::endl;
 				
 				m_B.block(max_pos, 0, m_B.rows() - max_pos -1, m_B.cols())
 					= m_B.block(max_pos + 1, 0, m_B.rows() - max_pos - 1, m_B.cols());
 					
-				std::cout << 0 << " " << max_pos << " " << m_B.rows() << " " << m_B.cols() - max_pos << std::endl;
-				std::cout << 0 << max_pos + 1 << " " << m_B.rows() << " " << m_B.cols() - max_pos << std::endl; 
+				//std::cout << 0 << " " << max_pos << " " << m_B.rows() << " " << m_B.cols() - max_pos << std::endl;
+				//std::cout << 0 << max_pos + 1 << " " << m_B.rows() << " " << m_B.cols() - max_pos << std::endl; 
 					
 				m_B.block(0, max_pos, m_B.rows(), m_B.cols() - max_pos -1)
 					= m_B.block(0, max_pos + 1, m_B.rows(), m_B.cols() - max_pos -1);
@@ -114,7 +115,7 @@ public:
 				//std::cout << Bcrop << std::endl;
 				m_B.conservativeResize(nerr,nerr);
 				
-				LOG.os<>(1, "B after resizing...\n", m_B, '\n');
+				LOG.os<2>(1, "B after resizing...\n", m_B, '\n');
 				//m_B = Bcrop;
 				
 			} else {
@@ -129,7 +130,7 @@ public:
 					m_B(i,nerr-1) = v(i);
 			}
 				
-			LOG.os<>(1, "New B: ", '\n', m_B, '\n');
+			LOG.os<2>("New B: ", '\n', m_B, '\n');
 			//std::cout << "Here is m_B" << std::endl;
 			//std::cout << m_B << std::endl;
 			
@@ -146,7 +147,7 @@ public:
 				
 				Bsolve(nerr,nerr) = 0;
 				
-				LOG.os<>(1, "B solve: ", '\n', Bsolve, '\n');
+				LOG.os<2>("B solve: ", '\n', Bsolve, '\n');
 				//std::cout << "B solve" << std::endl;
 				//std::cout << Bsolve << std::endl;
 				
@@ -166,7 +167,7 @@ public:
 				
 				m_coeffs = X.block(0,0,nerr,1);
 				
-				LOG.os<>(1, "New coefficients: ", '\n', m_coeffs, '\n');
+				LOG.os<2>("New coefficients: ", '\n', m_coeffs, '\n');
 				//std::cout << "m_coeffs: " << std::endl;
 				//std::cout << m_coeffs_ << std::endl;
 				
@@ -178,7 +179,14 @@ public:
 	
 	void extrapolate(tensor<N>& trial, int iter) {
 		
-		if (iter >= m_start_diis) { 
+		static bool first = true;
+		
+		if (iter >= m_start && m_trialvecs.size() >= m_min) { 
+			
+			if (first) {
+				LOG.os<>("Starting DIIS...\n");
+				first = false;
+			}
 			
 			trial.clear();
 			

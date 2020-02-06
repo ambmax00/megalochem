@@ -7,7 +7,7 @@
 
 namespace math {
 	
-dbcsr::tensor<2> symmetrize(dbcsr::tensor<2>& unsym_tensor, std::string name);
+dbcsr::stensor<2> symmetrize(dbcsr::stensor<2>& unsym_tensor, std::string name);
 
 
 }

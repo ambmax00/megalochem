@@ -37,7 +37,7 @@ private:
 	double m_nuc_energy;
 	double m_scf_energy;
 	
-	dbcsr::tensor<2> m_s_bb, //overlap
+	dbcsr::stensor<2> m_s_bb, //overlap
 				  m_v_bb, // nuclear reulsion
 				  m_t_bb, // kinetic
 				  m_core_bb, // core hamiltonian
@@ -46,7 +46,7 @@ private:
 				  m_p_bb_A, // alpha/beta density matrix
 				  m_c_bm_A; // alpha/beta coefficient matrix	  
 				  
-	optional<dbcsr::tensor<2>,val> m_f_bb_B, m_p_bb_B, m_c_bm_B;
+	dbcsr::stensor<2> m_f_bb_B, m_p_bb_B, m_c_bm_B;
 	
 	void compute_nucrep();
 	void one_electron();
@@ -65,7 +65,23 @@ public:
 	hfmod() = delete;
 	hfmod(hfmod& hfmod_in) = delete;
 	
-	~hfmod() {}
+	~hfmod() {
+		
+		/*
+		m_s_bb->destroy();
+		m_v_bb.destroy();
+		m_t_bb.destroy();
+		m_core_bb.destroy();
+		m_x_bb.destroy();
+		m_f_bb_A.destroy();
+		m_p_bb_A.destroy();
+		m_c_bm_A.destroy();
+		
+		if (m_f_bb_B) m_f_bb_B->destroy();
+		if (m_p_bb_B) m_p_bb_B->destroy();
+		if (m_c_bm_B) m_c_bm_B->destroy();
+		*/
+	}
 	
 	void compute();	
 	

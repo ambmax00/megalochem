@@ -6,8 +6,8 @@
 
 namespace math {
 	
-dbcsr::tensor<2> eigen_inverse(dbcsr::tensor<2>& t_in, std::string name);
-dbcsr::tensor<2> eigen_sqrt_inverse(dbcsr::tensor<2>& t_in, std::string name);
+dbcsr::stensor<2> eigen_inverse(dbcsr::stensor<2>& t_in, std::string name);
+dbcsr::stensor<2> eigen_sqrt_inverse(dbcsr::stensor<2>& t_in, std::string name);
 
 } // end namespace
 

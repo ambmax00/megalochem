@@ -40,7 +40,9 @@ public:
 		
 		key = m_prefix + key;
 		
-		std::cout << "SETTING: " << key << std::endl;
+		//if (m_map.find(key) != m_map.end()) throw std::runtime_error("Already in options: "+key);
+		
+		//std::cout << "SETTING: " << key << std::endl;
 		
 		std::any val = std::any(in);
 		m_map[key] = val;
@@ -87,7 +89,6 @@ public:
 		return out;
 		
 	}
-		
 	
 };
 

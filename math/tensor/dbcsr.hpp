@@ -69,6 +69,9 @@ class dist;
 template <int N, typename T>
 class tensor;
 
+template <int N, typename T = double>
+using stensor = std::shared_ptr<tensor<N,T>>;
+
 template <int N, typename T>
 class iterator;
 	
@@ -476,6 +479,22 @@ struct tensor_copy;
 
 static double eps_filter = 1e-9;
 
+template <int N, typename T>
+struct tensor_params {
+		required<std::string, val>	name;
+		required<dist<N>, ref>  	distN;
+		required<vec<int>,val>		map1,map2;
+		required<vec<vec<int>>,val>	blk_sizes;
+};
+
+template <int N, typename T>
+struct tensor_params2 {
+		required<std::string, val>	name;
+		required<pgrid<N>, ref>  	pgridN;
+		required<vec<int>,val>		map1,map2;
+		required<vec<vec<int>>,val>	blk_sizes;
+};
+
 template <int N, typename T = double>
 class tensor {
 protected:
@@ -534,7 +553,7 @@ public:
 			}
 		};
 		
-		if (p.blks_local) { reserve_vec(blks_local_v, blks_local_v_size); std::cout << "reserved" << std::endl;}
+		if (p.blks_local) { reserve_vec(blks_local_v, blks_local_v_size);}
 		if (p.proc_dist) { reserve_vec(proc_dist_v, proc_dist_v_size); }
 		if (p.blk_size) { reserve_vec(blk_size_v, blk_size_v_size); }
 		if (p.blk_offset) { reserve_vec(blk_offset_v, blk_offset_v_size); }
@@ -629,7 +648,7 @@ public:
 	//copy constructor
 	tensor(const tensor<N,T>& rhs): m_tensor_ptr(nullptr) {
 		
-		//std::cout << "Copying..." << std::endl;
+		std::cout << "Copying..." << std::endl;
 		
 		if (this != &rhs) {
 		
@@ -655,23 +674,17 @@ public:
 		
 	//move constructor
 	tensor(tensor<N,T>&& rhs) : m_comm(rhs.m_comm) {
-		std::cout << "Moving" << std::endl;
+		//std::cout << "Moving" << std::endl;
 		//bool move = true;
 		m_tensor_ptr = rhs.m_tensor_ptr;
 		m_comm = rhs.m_comm;
 		//c_dbcsr_t_create_template(t.m_tensor_ptr, &this->m_tensor_ptr, nullptr);
 		rhs.m_tensor_ptr = nullptr;
-		std::cout << "Done." << std::endl;
+		//std::cout << "Done." << std::endl;
 		
 	}
 	
-	struct tensor_params {
-		required<std::string, val>	name;
-		required<dist<N>, ref>  	distN;
-		required<vec<int>,val>		map1,map2;
-		required<vec<vec<int>>,val>	blk_sizes;
-	};
-	tensor(tensor_params&& p) :
+	tensor(tensor_params<N,T>&& p) :
 		m_tensor_ptr(nullptr)
 	{
 		
@@ -699,13 +712,7 @@ public:
 					
 	}
 	
-	struct tensor_params2 {
-		required<std::string, val>	name;
-		required<pgrid<N>, ref>  	pgridN;
-		required<vec<int>,val>		map1,map2;
-		required<vec<vec<int>>,val>	blk_sizes;
-	};
-	tensor(tensor_params2&& p) :
+	tensor(tensor_params2<N,T>&& p) :
 		m_tensor_ptr(nullptr),
 		m_comm(p.pgridN->comm())
 	{
@@ -745,6 +752,7 @@ public:
 		
 	~tensor() {
 		
+		if (m_tensor_ptr != nullptr) std::cout << "Destroying: " << this->name() << std::endl;
 		destroy();
 		
 	}
@@ -1070,10 +1078,37 @@ public:
 		
 	}
 	
+	stensor<N,T> get_stensor() {
+		
+		tensor<N,T>* t = new tensor<N,T>();
+		
+		t->m_tensor_ptr = m_tensor_ptr;
+		t->m_comm = m_comm;
+		
+		m_tensor_ptr = nullptr;
+		
+		return stensor<N,T>(t);
+		
+	} 
+		
+	
 };
 
 template <int N, typename T = double>
-using ptensor = std::shared_ptr<tensor<N,T>>;
+stensor<N,T> make_stensor(tensor_params<N,T>&& p) {
+	
+	stensor<N,T> out(new tensor<N,T>(std::forward<tensor_params<N,T>>(p)));
+	return out;
+	
+}
+
+template <int N, typename T = double>
+stensor<N,T> make_stensor(tensor_params2<N,T>&& p) {
+	
+	stensor<N,T> out(new tensor<N,T>(std::forward<tensor_params2<N,T>>(p)));
+	return out;
+	
+}
 
 template <int N, typename T = double>
 tensor<N,T> operator+(const tensor<N,T>& t1, const tensor<N,T>& t2) {
@@ -1220,7 +1255,7 @@ void contract(contract_param<T,N1,N2,N3>&& p) {
 	int* f_b2 = (p.b2) ? unfold_bounds(*p.b2) : nullptr;
 	int* f_b3 = (p.b3) ? unfold_bounds(*p.b3) : nullptr;
 	
-	if (p.b2) std::cout << "ITS HERE!!!!" << std::endl;
+	//if (p.b2) std::cout << "ITS HERE!!!!" << std::endl;
 	
 	//std::cout << "In here..." << std::endl;
 	
@@ -1230,11 +1265,11 @@ void contract(contract_param<T,N1,N2,N3>&& p) {
 	int* f_unit = (p.unit_nr) ? &*p.unit_nr : nullptr;
 	bool* f_log = (p.log) ? &*p.log : nullptr;
 	
-	if (p.log) {
-		if (*f_log) {
-			std::cout << "LOGGING!!!" << std::endl;
+	//if (p.log) {
+	//	if (*f_log) {
+	//		std::cout << "LOGGING!!!" << std::endl;
 			
-		}}
+	//	}}
 
 	c_dbcsr_t_contract_r_dp(*p.alpha, p.t1->data(), p.t2->data(), 
 						*p.beta, p.t3->data(), p.con1->data(), p.con1->size(),
@@ -1316,14 +1351,15 @@ static void eval(std::string str, std::vector<int>& con1, std::vector<int>& con2
 			}
 		}
 	}
-			
+	
+	/*		
 	std::cout << "To be contrcated: " << scon << std::endl;	
 	std::cout << "Maps:" << std::endl;
 	for (auto v : con1) std::cout << v << " ";
 	std::cout << std::endl;
 	for (auto v : con2) std::cout << v << " ";
 	std::cout << std::endl;
-			
+	*/	
 	for (int i = 0; i != t1.size(); ++i) {
 		auto found = std::find(scon.begin(), scon.end(), t1[i]);
 		if (found == scon.end()) {
@@ -1340,6 +1376,7 @@ static void eval(std::string str, std::vector<int>& con1, std::vector<int>& con2
 		}
 	}
 	
+	/*
 	std::cout << "not con1: " << sncon1 << std::endl;
 	std::cout << "not con2: " << sncon2 << std::endl;
 	std::cout << "Maps:" << std::endl;
@@ -1347,7 +1384,7 @@ static void eval(std::string str, std::vector<int>& con1, std::vector<int>& con2
 	std::cout << std::endl;
 	for (auto v : ncon2) std::cout << v << " ";
 	std::cout << std::endl;
-	
+	*/
 	if (ncon1.size() + ncon2.size() != t3.size()) throw std::runtime_error("Wrong tensor dimensions: "+str);
 	
 	for (int i = 0; i != t3.size(); ++i) {
@@ -1361,12 +1398,13 @@ static void eval(std::string str, std::vector<int>& con1, std::vector<int>& con2
 		}
 	}
 	
+	/*
 	std::cout << "Maps tensor 3" << std::endl;
 	for (auto v : map1) std::cout << v << " ";
 	std::cout << std::endl;
 	for (auto v : map2) std::cout << v << " ";
 	std::cout << std::endl;
-	
+	*/
 	if (map1.size() + map2.size() != t3.size()) 
 		throw std::runtime_error("Incompatible tensor dimensions: "+str);
 	
@@ -1391,7 +1429,7 @@ struct einsum_param {
 template <int N, typename T = double>
 dbcsr::tensor<N+1,T> add_dummy(tensor<N,T>& t) {
 	
-	std::cout << "Adding dummy dimension!" << std::endl;
+	//std::cout << "Adding dummy dimension!" << std::endl;
 	
 	// get maps of tensor
 	vec<int> map1, map2; 
@@ -1463,7 +1501,7 @@ dbcsr::tensor<N+1,T> add_dummy(tensor<N,T>& t) {
 		
 	}
 		
-	print(new_t);
+	//print(new_t);
 	
 	grid.destroy();
 	
@@ -1474,7 +1512,7 @@ dbcsr::tensor<N+1,T> add_dummy(tensor<N,T>& t) {
 template <int N, typename T = double>
 dbcsr::tensor<N-1,T> remove_dummy(tensor<N,T>& t, vec<int> map1, vec<int> map2) {
 	
-	std::cout << "Removing dummy dim." << std::endl;
+	//std::cout << "Removing dummy dim." << std::endl;
 	
 	pgrid<N-1> grid({.comm = t.comm()});
 	
@@ -1533,7 +1571,7 @@ dbcsr::tensor<N-1,T> remove_dummy(tensor<N,T>& t, vec<int> map1, vec<int> map2) 
 		
 	}
 		
-	print(new_t);
+	//print(new_t);
 	
 	grid.destroy();
 	

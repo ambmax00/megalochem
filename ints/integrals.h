@@ -44,7 +44,7 @@ struct integral_parameters {
 };
 
 template <int N>
-dbcsr::tensor<N,double> integrals(integral_parameters<N>&& p);
+dbcsr::stensor<N,double> integrals(integral_parameters<N>&& p);
 	
 }
 

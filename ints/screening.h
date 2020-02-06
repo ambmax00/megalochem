@@ -63,12 +63,7 @@ public:
 	
 	void compute();
 	
-	~Zmat() {
-		
-		//for (auto m : m_blkmap) {
-		//	delete m.second.second;;
-		//}
-	}
+	~Zmat() {}
 	
 	// map storing the block index, and its associated norm and block
 	blockmap m_blkmap;

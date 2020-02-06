@@ -13,7 +13,7 @@
 namespace ints {
 
 template <int N>
-dbcsr::tensor<N,double> aofactory::compute(aofac_params&& p) {
+dbcsr::stensor<N,double> aofactory::compute(aofac_params&& p) {
 		
 		std::string Op = *p.op;
 		std::string bis = *p.bas;
@@ -34,8 +34,14 @@ dbcsr::tensor<N,double> aofactory::compute(aofac_params&& p) {
 		
 		vec<desc::cluster_basis> basvec;
 		
+		std::cout << "A1" << std::endl;
+		
 		desc::cluster_basis c_bas = m_mol.c_basis();
 		optional<desc::cluster_basis,val> x_bas = m_mol.c_dfbasis();
+		
+		if (x_bas) std::cout << "ITS HERE IN INTS" << std::endl;
+		
+		std::cout << "A3" << std::endl;
 		
 		if (bis == "bb") { 
 			basvec = {c_bas, c_bas};
@@ -91,8 +97,9 @@ dbcsr::tensor<N,double> aofactory::compute(aofac_params&& p) {
 			//m_2e_ints_zmat->compute();
 				
 		//}
-			
-		dbcsr::tensor<N,double> out = integrals<N>({.comm = m_comm, .engine = eng_pool, 
+		
+		std::cout << "OUT" << std::endl;
+		dbcsr::stensor<N,double> out = integrals<N>({.comm = m_comm, .engine = eng_pool, 
 			.basvec = basvec, .bra = m_2e_ints_zmat, .ket = m_2e_ints_zmat, 
 			.name = *p.name, .map1 = *p.map1, .map2 = *p.map2});
 		
@@ -103,9 +110,9 @@ dbcsr::tensor<N,double> aofactory::compute(aofac_params&& p) {
 }
 
 //forward declarations
-template dbcsr::tensor<2,double> aofactory::compute(aofac_params&& p);
-template dbcsr::tensor<3,double> aofactory::compute(aofac_params&& p);
-template dbcsr::tensor<4,double> aofactory::compute(aofac_params&& p);
+template dbcsr::stensor<2,double> aofactory::compute(aofac_params&& p);
+template dbcsr::stensor<3,double> aofactory::compute(aofac_params&& p);
+template dbcsr::stensor<4,double> aofactory::compute(aofac_params&& p);
 
 
 } // end namespace ints

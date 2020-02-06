@@ -2,6 +2,7 @@
 #define MATH_ORTHOGONALIZER_H
 
 #include "math/tensor/dbcsr.hpp"
+#include <string>
 #include <Eigen/Core>
 
 namespace math {
@@ -9,18 +10,17 @@ namespace math {
 class orthgon {
 private:
 
-	dbcsr::tensor<2,double>& m_tensor;
+	dbcsr::stensor<2,double>& m_tensor;
 	Eigen::MatrixXd m_out;
+	int m_plev;
 
 public:
 
-	orthgon(dbcsr::tensor<2,double>& t) : m_tensor(t) {};
+	orthgon(dbcsr::stensor<2,double>& t) : m_tensor(t), m_plev(0) {};
 	
 	void compute();
 
-	Eigen::MatrixXd result() {
-		return m_out;
-	};
+	dbcsr::stensor<2,double> result(std::string name);
 	
 };
 

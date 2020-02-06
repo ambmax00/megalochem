@@ -3,9 +3,7 @@
 
 namespace desc {
 
-cluster_basis::cluster_basis(vshell& basis, int nsplit) {
-	
-	m_basis = basis;
+cluster_basis::cluster_basis(vshell& basis, int nsplit) : m_basis(basis) {
 	
 	std::vector<size_t> shell2bf = libint2::BasisSet::compute_shell2bf(basis);
 	

@@ -35,6 +35,10 @@ public:
 		return *this;
 	}
 	
+	vshell libint_basis() {
+		return m_basis;
+	}
+	
 	vshell& operator[](int i) {
 		return m_clusters[i];
 	}

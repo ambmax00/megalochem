@@ -4,6 +4,11 @@
 #include <stdexcept>
 #include <iostream>
 
+#define printvec(LOG, n, v) \
+	for (auto x : v) { \
+		LOG.os<n>(x, " "); \
+	} LOG.os<n>('\n');
+
 namespace desc {
 	
 // Taken from PSI4
@@ -31,15 +36,22 @@ molecule::molecule(mol_params&& p) :
 	m_cluster_basis = cbas;
 	
 	if (p.dfbasis) {
-		std::cout << "There is a df basis." << std::endl;
+		std::cout << "There is a df basis: " << p.dfbasis->size() << std::endl;
 		cluster_basis cdfbas(*p.dfbasis,1);
-		m_cluster_dfbasis = cdfbas;
+		
+		for (auto i : cdfbas.cluster_sizes()) {
+			std::cout << i << std::endl;
+		}
+		
+		m_cluster_dfbasis = optional<cluster_basis,val>(cdfbas);
 	}
 	
 	// secondly: occ/virt info
 	
 	m_frac = false;
 	if (p.fractional) m_frac = *p.fractional;
+	
+	if (m_frac) std::cout << "FRACTIONAL" << std::endl;
 	
 	if (m_frac) {
 		
@@ -91,9 +103,8 @@ molecule::molecule(mol_params&& p) :
 		optional<std::vector<double>,val> opt_occ_a(occ_a);
 		optional<std::vector<double>,val> opt_occ_b(occ_b);
 		
-		m_frac_occ_alpha = opt_occ_a;
-		m_frac_occ_beta = opt_occ_b;
-		
+		m_frac_occ_alpha = optional<std::vector<double>,val>(opt_occ_a);
+		m_frac_occ_beta = optional<std::vector<double>,val>(opt_occ_b);
 		
 	} else {
 		
@@ -126,11 +137,6 @@ molecule::molecule(mol_params&& p) :
 	
 }
 
-#define printvec(LOG, n, v) \
-	for (auto x : v) { \
-		LOG.os<n>(x, " "); \
-	} LOG.os<n>('\n');
-
 void molecule::print_info(int level) {
 	
 	util::mpi_log LOG(level);
@@ -154,6 +160,14 @@ void molecule::print_info(int level) {
 	
 	if (m_cluster_dfbasis) {
 		LOG.os<1>("dfbasis: "); printvec(LOG, 1, m_blocks.x());
+	}
+	
+	if (m_frac_occ_alpha) {
+		LOG.os<1>("Frac. occ. alpha: "); printvec(LOG, 1, *m_frac_occ_alpha);
+	}
+	
+	if (m_frac_occ_beta) {
+		LOG.os<1>("Frac. occ. beta: "); printvec(LOG, 1, *m_frac_occ_beta);
 	}
 	
 	

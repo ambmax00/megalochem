@@ -61,7 +61,7 @@ void calc_ints(dbcsr::tensor<2,double>& t, util::ShrPool<libint2::Engine>& engin
 		std::vector<libint2::Shell>& c1 = cbas1[i1];
 		std::vector<libint2::Shell>& c2 = cbas2[i2];
 		
-		std::cout << "WE ARE IN BLOCK: " << i1 << i2 << std::endl;
+		//std::cout << "WE ARE IN BLOCK: " << i1 << i2 << std::endl;
 					
 		dbcsr::idx2 IDX = {i1,i2};
 		vec<int> blkdim = {blk_size[0][i1],blk_size[1][i2]};
@@ -89,9 +89,9 @@ void calc_ints(dbcsr::tensor<2,double>& t, util::ShrPool<libint2::Engine>& engin
 				auto& sh2 = c2[s2];
 				toff2 += locblkoff2;
 				
-				std::cout << "Tensor offsets: " << toff1 << " " << toff2 << std::endl;
-				std::cout << "Local offsets: " << locblkoff1 << " " << locblkoff2 << std::endl;
-				std::cout << "MULT: " << multiplicity(toff1,toff2) << std::endl;
+				//std::cout << "Tensor offsets: " << toff1 << " " << toff2 << std::endl;
+				//std::cout << "Local offsets: " << locblkoff1 << " " << locblkoff2 << std::endl;
+				//std::cout << "MULT: " << multiplicity(toff1,toff2) << std::endl;
 										
 				if (is_canonical(toff1,toff2)) {
 					
@@ -130,9 +130,9 @@ void calc_ints(dbcsr::tensor<2,double>& t, util::ShrPool<libint2::Engine>& engin
 	
 	t.filter();
 	
-	dbcsr::print(t);
+	//dbcsr::print(t);
 		
-	std::cout << "Done reading." << std::endl;
+	//std::cout << "Done reading." << std::endl;
 
 }
 
@@ -155,6 +155,8 @@ void calc_ints(dbcsr::tensor<3,double>& t, util::ShrPool<libint2::Engine>& engin
 	auto& cbas1 = basvec[0];
 	auto& cbas2 = basvec[1];
 	auto& cbas3 = basvec[2];
+	
+	//std::cout << "Reserving..." << std::endl;
 	
 	// reserve blocks
 	//if (bra) {
@@ -233,13 +235,13 @@ void calc_ints(dbcsr::tensor<3,double>& t, util::ShrPool<libint2::Engine>& engin
 					std::vector<libint2::Shell>& c2 = cbas2[i2];
 					std::vector<libint2::Shell>& c3 = cbas3[i3];
 					
-					std::cout << "WE ARE IN BLOCK: " << i1 << i2 << i3 << std::endl;
+					//std::cout << "WE ARE IN BLOCK: " << i1 << i2 << i3 << std::endl;
 					
 					dbcsr::idx3 IDX = {i1,i2,i3};
 					vec<int> blkdim = {blk_size[0][i1],blk_size[1][i2],blk_size[2][i3]};
 					
-					std::cout << "BLOCK DIMENSIONS: " << std::endl;
-					std::cout << blk_size[0][i1] << " " << blk_size[1][i2] << " " << blk_size[2][i3] << std::endl;
+					//std::cout << "BLOCK DIMENSIONS: " << std::endl;
+					//std::cout << blk_size[0][i1] << " " << blk_size[1][i2] << " " << blk_size[2][i3] << std::endl;
 					
 					
 					bool found = false;
@@ -330,9 +332,9 @@ void calc_ints(dbcsr::tensor<3,double>& t, util::ShrPool<libint2::Engine>& engin
 	
 	t.filter();
 	
-	dbcsr::print(t);
+	//dbcsr::print(t);
 		
-	std::cout << "Done with 3c2e." << std::endl;
+	//std::cout << "Done with 3c2e." << std::endl;
 
 }
 
@@ -557,7 +559,7 @@ void calc_ints(dbcsr::tensor<4,double>& t, util::ShrPool<libint2::Engine>& engin
 }
 	
 template <int N>
-dbcsr::tensor<N,double> integrals(integral_parameters<N>&& p) {
+dbcsr::stensor<N,double> integrals(integral_parameters<N>&& p) {
 		
 	if (p.basvec->size() != N) throw std::runtime_error("Basis vector incompatible with tensor dimensions.");
 	
@@ -570,22 +572,35 @@ dbcsr::tensor<N,double> integrals(integral_parameters<N>&& p) {
 		blk_sizes.push_back(p.basvec->operator[](i).cluster_sizes());
 	}
 	
+	/*
+	int iter = 0;
+	for (auto x : blk_sizes) {
+		std::cout << iter++ << " : ";
+		for (auto e : x) {
+			std::cout << e << " ";
+		} std::cout << std::endl;
+	}
+	*/
 	//create tensor 
-	dbcsr::tensor<N,double> out({.name = *p.name, .pgridN = pgridN, .map1 = *p.map1, 
+	auto out = dbcsr::make_stensor<N>({.name = *p.name, .pgridN = pgridN, .map1 = *p.map1, 
 		.map2 = *p.map2, .blk_sizes = blk_sizes});
+		
+	//std::cout << "Q1" << std::endl;
 	
 	Zmat* bra_ptr = (p.bra) ? &*p.bra : nullptr;
 	Zmat* ket_ptr = (p.ket) ? &*p.ket : nullptr;
 	
-	calc_ints(out, *p.engine, *p.basvec, bra_ptr, ket_ptr);
+	calc_ints(*out, *p.engine, *p.basvec, bra_ptr, ket_ptr);
+	
+	//std::cout << "Q2" << std::endl;
 	
 	return out;
 		
 }
 
-template dbcsr::tensor<2,double> integrals(integral_parameters<2>&& p);
-template dbcsr::tensor<3,double> integrals(integral_parameters<3>&& p);
-template dbcsr::tensor<4,double> integrals(integral_parameters<4>&& p);
+template dbcsr::stensor<2,double> integrals(integral_parameters<2>&& p);
+template dbcsr::stensor<3,double> integrals(integral_parameters<3>&& p);
+template dbcsr::stensor<4,double> integrals(integral_parameters<4>&& p);
 
 
 }

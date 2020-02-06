@@ -61,19 +61,39 @@ enum attribute0 { required_, optional_ };
 enum attribute1 { reference_, value_ };
 
 template <class T, attribute0 a0, attribute1 a1>
-class attribute_wrapper {
+class attribute_wrapper;
+
+template <typename T> 
+struct is_attribute_wrapper {
 private:
+		
+	typedef std::true_type yes;
+	typedef std::false_type no;
+		
+	template<typename U> static auto test(int) -> decltype(U::is_attribute_wrapper_ == true, yes());
+	template<typename> static no test(...);
+		
+public:
+ 
+	static constexpr bool value = std::is_same<decltype(test<T>(0)),yes>::value;
 	
+};
+		
+template <class T, attribute0 a0, attribute1 a1>
+class attribute_wrapper {
+private:	
 	// if a1 = value, the class stores it own copy,
 	// and then m_ref points to that value
 	T* m_val = nullptr;
 	T* m_ref = nullptr;
 	bool init;
+
+public:
+
+	static const bool is_attribute_wrapper_ = true;
 	
 	template <typename D, attribute0 A0, attribute1 A1> 
 	friend class attribute_wrapper;
-	
-public:
 
 	// delete for required, such that default initilization is disbaled
 	template <attribute0 A0 = a0, 
@@ -83,23 +103,59 @@ public:
 	// optional can be default initialized
 	template <attribute0 A0 = a0, 
 		typename = typename std::enable_if<A0 == optional_, int>::type>
-	attribute_wrapper() : init(false), m_val(nullptr), m_ref(nullptr) {}
+	attribute_wrapper() : init(false), m_val(nullptr), m_ref(nullptr) { /*std::cout << "D2" << std::endl;*/ }
 	
 	// only enable for a1 = value
 	template <class D = T, attribute0 A0 = a0, attribute1 A1 = a1, 
-		typename = typename std::enable_if<A1 == value_ && !std::is_same<attribute_wrapper,D>::value, int>::type>
-	attribute_wrapper(D r) : m_val(new T(r)), m_ref(m_val), init(true) {}
+		typename = typename std::enable_if<A1 == value_ && !is_attribute_wrapper<D>::value, int>::type>
+	attribute_wrapper(D r) : m_val(new T(r)), m_ref(m_val), init(true) { /*std::cout << typeid(r).name() << "D1" << std::endl;*/ }
 	
 	// copy constructor. Pay attention that references remain valid
-	attribute_wrapper(attribute_wrapper<T,a0,a1>& awrp) : init(false), m_val(nullptr), m_ref(nullptr) {
+	attribute_wrapper(const attribute_wrapper<T,a0,a1>& awrp) : init(false), m_val(nullptr), m_ref(nullptr) {
 		//std::cout << "Passing through!" << std::endl;
 		if (awrp.m_val != nullptr) {
-			this->m_val = new T(*awrp.m_val);
-			this->m_ref = m_val;
+			
+			//int* i = (int*) awrp.m_val;
+			
+			//std::cout << *i << std::endl;
+			
+			//std::cout << "Pointer: " << awrp.m_val << std::endl;
+			
+			this->m_val = new T();
+			
+			*m_val = *(awrp.m_val);
+			
+			this->m_ref = this->m_val;
 			this->init = true;
 		} else if (awrp.m_ref != nullptr) {
+			//std::cout << "Doing that..:" << std::endl;
 			this->m_ref = &*awrp.m_ref;
 			this->init = true;
+		} 
+		
+		//std::cout << "Done in copy..." << std::endl;
+		
+	}
+	
+	// move constructor
+	attribute_wrapper(attribute_wrapper<T,a0,a1>&& awrp) : init(false), m_val(nullptr), m_ref(nullptr) {
+
+		if (awrp.m_val != nullptr) {
+			
+			this->m_val = awrp.m_val;
+			awrp.m_val = nullptr;
+			
+			this->m_ref = this->m_val;
+			awrp.m_ref = nullptr;
+			
+			this->init = true;
+			
+		} else if (awrp.m_ref != nullptr) {
+			
+			this->m_ref = awrp.m_ref;
+			awrp.m_ref = nullptr;
+			this->init = true;
+			
 		} 
 		
 	}
@@ -109,11 +165,11 @@ public:
 		typename = typename std::enable_if<(A1 != value_), int>::type>
 	[[deprecated("Converting attribute value to attribute reference.")]] 
 	attribute_wrapper(attribute_wrapper<T,a0,value_>& awrp) : init(false), m_val(nullptr), m_ref(nullptr) {
-		//std::cout << "Passing through!" << std::endl;
+		std::cout << "D3" << std::endl;
 		
 		if (awrp.m_val != nullptr) {
 			this->m_val = new T(*awrp.m_val);
-			this->m_ref = m_val;
+			this->m_ref = this->m_val;
 			this->init = true;
 		} else if (awrp.m_ref != nullptr) {
 			this->m_ref = &*awrp.m_ref;
@@ -129,10 +185,12 @@ public:
 		: m_val(new T(r)), m_ref(m_val), init(true) {/* *m_val = r; */}
 
 	template <class D = T, attribute0 A0 = a0, attribute1 A1 = a1, 
-		typename = typename std::enable_if<A1 == reference_ && !std::is_same<attribute_wrapper,D>::value, int>::type>
-	attribute_wrapper(D& r) : m_ref(&r), init(true) {}
+		typename = typename std::enable_if<A1 == reference_ && !is_attribute_wrapper<D>::value, int>::type>
+	attribute_wrapper(D& r) : m_ref(&r), init(true) { /*std::cout << "D4" << std::endl;*/ }
 	
 	attribute_wrapper& operator=(const attribute_wrapper<T,a0,a1>& in) {
+		
+		//std::cout << "making copy...:" << std::endl;
 		
 		if (this != &in) {
 			
@@ -140,11 +198,13 @@ public:
 		
 			if (in.m_val != nullptr) {
 				this->m_val = new T(*in.m_val);
-				this->m_ref = m_val;
+				this->m_ref = this->m_val;
 				this->init = true;
+				return *this;
 			} else if (in.m_ref != nullptr) {
 				this->m_ref = &*in.m_ref;
 				this->init = true;
+				return *this;
 			} 
 			
 		}
@@ -154,16 +214,24 @@ public:
 		//std::cout << "Done copying" << std::endl; 
 	}
 	
-	attribute_wrapper& operator=(const attribute_wrapper<T,a0,a1>&& in) {
+	attribute_wrapper& operator=(attribute_wrapper<T,a0,a1>&& in) {
 		
 		if (m_val) delete m_val;
 		
+		//std::cout << "Also doing this..." << std::endl;
+		
 		if (in.m_val != nullptr) {
-			this->m_val = new T(*in.m_val);
+			
+			//std::cout << "Going in here..." << std::endl;
+			
+			this->m_val = in.m_val;
 			this->m_ref = m_val;
 			this->init = true;
+			
+			in.m_val = nullptr;
+			
 		} else if (in.m_ref != nullptr) {
-			this->m_ref = &*in.m_ref;
+			this->m_ref = in.m_ref;
 			this->init = true;
 		}
 		
@@ -172,12 +240,12 @@ public:
 	}
 	
 	T& operator*() {
-		assert(("Optional parameter not initialized.", init == true));
+		//assert(("Optional parameter not initialized.", init == true));
 		return *m_ref;
 	}
 	
 	T* operator->() const {
-		 assert(("Optional parameter not initialized.", init == true));
+		 //assert(("Optional parameter not initialized.", init == true));
 		 return m_ref;
 	}
 	

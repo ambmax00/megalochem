@@ -1,6 +1,7 @@
 #include "hf/hfmod.h"
 #include "math/tensor/dbcsr_conversions.hpp"
 #include "math/linalg/symmetrize.h"
+#include "math/other/scale.h"
 
 #include <Eigen/Eigenvalues>
 
@@ -16,13 +17,10 @@ void hfmod::diag_fock() {
 	
 	bool log = false;
 	int u = 0;
-	
-	std::cout << "LOVAL: " << LOG.global_plev() << std::endl;
 		
 	if (LOG.global_plev() >= 2) {
 		log = true;
 		u = 6;
-		std::cout << "LOGTRUE" << std::endl;
 	}
 	
 	auto diagonalize = [&](dbcsr::tensor<2>& f_bb, dbcsr::tensor<2>& c_bm, std::string x) {
@@ -32,13 +30,12 @@ void hfmod::diag_fock() {
 		
 		LOG.os<2>("Orthogonalizing Fock Matrix.");
 		
-		dbcsr::tensor<2> FX({.name = "FX", .pgridN = grid, .map1 = {0}, .map2 = {1}, .blk_sizes = m_s_bb.blk_size()});
-		dbcsr::tensor<2> XFX({.name = "XFX", .pgridN = grid, .map1 = {0}, .map2 = {1}, .blk_sizes = m_s_bb.blk_size()});
+		dbcsr::tensor<2> FX({.name = "FX", .pgridN = grid, .map1 = {0}, .map2 = {1}, .blk_sizes = m_s_bb->blk_size()});
+		dbcsr::tensor<2> XFX({.name = "XFX", .pgridN = grid, .map1 = {0}, .map2 = {1}, .blk_sizes = m_s_bb->blk_size()});
 		
-		std::cout << "Summing." << std::endl;
-		dbcsr::einsum<2,2,2>({"IJ, JK -> IK", f_bb, m_x_bb, FX, .unit_nr = u, .log = log});
+		dbcsr::einsum<2,2,2>({"IJ, JK -> IK", f_bb, *m_x_bb, FX, .unit_nr = u, .log = log});
 		
-		dbcsr::einsum<2,2,2>({"JI, JK -> IK", m_x_bb, FX, XFX, .unit_nr = u, .log = log});
+		dbcsr::einsum<2,2,2>({"JI, JK -> IK", *m_x_bb, FX, XFX, .unit_nr = u, .log = log});
 		
 		FX.destroy();
 		
@@ -54,11 +51,11 @@ void hfmod::diag_fock() {
 		auto eigval = es.eigenvalues();
 		auto eigvec = es.eigenvectors();
 		
-		std::cout << "EIGVAL" << std::endl;
-		std::cout << eigval << std::endl;
+		LOG.os<2>("Eigenvalues: \n");
+		LOG.os<2>(eigval);
 		
-		std::cout << "EIGVEC" << std::endl;
-		std::cout << eigvec << std::endl;
+		LOG.os<2>("Eigenvectors: \n");
+		LOG.os<2>(eigvec);
 		
 		Eigen::MatrixXd eigen_c_bm_x = es.eigenvectors();
 	
@@ -69,7 +66,7 @@ void hfmod::diag_fock() {
 			dbcsr::print(c_bm_x);
 	
 		//Transform back
-		dbcsr::einsum<2,2,2>({"IJ, Ji -> Ii", m_x_bb, c_bm_x, c_bm, .unit_nr = u, .log = log});
+		dbcsr::einsum<2,2,2>({"IJ, Ji -> Ii", *m_x_bb, c_bm_x, c_bm, .unit_nr = u, .log = log});
 			
 		if (LOG.global_plev() >= 1) 
 			dbcsr::print(c_bm);
@@ -89,7 +86,7 @@ void hfmod::diag_fock() {
 		// make bounds
 		std::vector<std::vector<int>> occ_bounds = {{0,limit}};
 		
-		dbcsr::einsum<2,2,2>({.x = "Mi, Ni -> MN", .t1 = m_c_bm_A, .t2 = m_c_bm_A, .t3 = p_bb, .b1 = occ_bounds});
+		dbcsr::einsum<2,2,2>({.x = "Mi, Ni -> MN", .t1 = c_bm, .t2 = c_bm, .t3 = p_bb, .b1 = occ_bounds});
 		
 		p_bb.filter();
 		
@@ -98,12 +95,23 @@ void hfmod::diag_fock() {
 		
 	};
 	
-	diagonalize(m_f_bb_A, m_c_bm_A, "A");
+	diagonalize(*m_f_bb_A, *m_c_bm_A, "A");
 	if (m_f_bb_B) {
 		diagonalize(*m_f_bb_B, *m_c_bm_B, "B");
 	}
 	
-	form_density(m_p_bb_A, m_c_bm_A, "A");
+	auto fraca = m_mol.frac_occ_alpha();
+	if (fraca) {
+		std::cout << "Scaling!" << std::endl;
+		math::scale(*m_c_bm_A, *fraca);
+	}
+	
+	auto fracb = m_mol.frac_occ_beta();
+	if (fracb && m_c_bm_B) {
+		math::scale(*m_c_bm_B, *fracb);
+	}
+	
+	form_density(*m_p_bb_A, *m_c_bm_A, "A");
 	if (m_p_bb_B) 
 		form_density(*m_p_bb_B, *m_c_bm_B, "B");
 
