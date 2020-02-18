@@ -1,14 +1,12 @@
 #include <mpi.h>
 #include <random>
-#include "math/laplace/laplace.h"
-#include "math/tensor/dbcsr.hpp"
-#include "math/tensor/dbcsr_conversions.hpp"
+#include <stdexcept>
+#include <string>
 #include "input/reader.h"
 #include "hf/hfmod.h"
-#include "ints/aofactory.h"
 #include "utils/mpi_time.h"
 
-
+/*
 template <int N>
 void fill_random(dbcsr::tensor<N,double>& t_in, vec<vec<int>>& nz) {
 	
@@ -77,19 +75,25 @@ void fill_random(dbcsr::tensor<N,double>& t_in, vec<vec<int>>& nz) {
 	}
 	
 }
+*/
 
+int main(int argc, char** argv) {
 
-int main(int argv, char** argc) {
-
-	MPI_Init(&argv, &argc);
+	MPI_Init(&argc, &argv);
 	int rank;
 	MPI_Comm_rank(MPI_COMM_WORLD,&rank);
 	
 	util::mpi_time time(MPI_COMM_WORLD, "Megalochem");
 	
+	if (argc < 2) {
+		throw std::runtime_error("Wrong number of command line inputs.");
+	}
+	
+	std::string filename(argv[1]);
+	
 	time.start();
 	
-	reader filereader(MPI_COMM_WORLD, "test.json");
+	reader filereader(MPI_COMM_WORLD, filename);
 	
 	dbcsr::init();
 	

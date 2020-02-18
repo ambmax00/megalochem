@@ -5,7 +5,7 @@
 
 namespace ints {
 
-// Z_mn = |(mn|mn)|^-1/2
+// Z_mn = |(mn|mn)|^1/2
 void Zmat::compute_schwarz() {
 	
 	// it's symmetric!

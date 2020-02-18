@@ -1,14 +1,20 @@
-#include "input/reader.h"
-#include "utils/json.hpp"
-#include "input/valid_keys.h"
 #include <fstream>
 #include <iostream>
 #include <vector>
 #include <sstream>
 #include <utility>
+
+#include "input/reader.h"
+#include "input/valid_keys.h"
+
 #include "utils/ele_to_int.h"
 #include "utils/constants.h"
+#include "utils/json.hpp"
+
 #include "desc/molecule.h"
+
+#include "math/other/rcm.h"
+
 #include <libint2/basis.h>
 
 void validate(const json& j, const json& compare) {
@@ -240,7 +246,7 @@ void unpack(const json& j_in, desc::options& opt, std::string root) {
 reader::reader(MPI_Comm comm, std::string filename) : m_comm(comm) {
 	
 	std::ifstream in;
-	in.open(filename);
+	in.open(filename + ".json");
 	
 	if (!in) {
 		throw std::runtime_error("Input file not found.");
@@ -255,6 +261,26 @@ reader::reader(MPI_Comm comm, std::string filename) : m_comm(comm) {
 	json& jmol = data["molecule"];
 	
 	auto atoms = get_geometry(jmol);
+	
+	bool reorder = (jmol.find("reorder") != jmol.end()) 
+		? jmol["reorder"].get<bool>() 
+		: true;
+	
+	if (reorder) {
+		
+		math::rcm<libint2::Atom> sorter(atoms,3.0,
+			[](libint2::Atom a1, libint2::Atom a2) -> double {
+				return sqrt(
+					pow(a1.x - a2.x,2) +
+					pow(a1.y - a2.y,2) +
+					pow(a1.z - a2.z,2));
+				});
+				
+		sorter.compute();
+	
+		sorter.reorder(atoms);
+	
+	}
 	
 	std::vector<libint2::Shell> basis;
 	if (jmol.find("basis") != jmol.end()) {	
