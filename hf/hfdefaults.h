@@ -12,9 +12,11 @@ static const int HF_DIIS_MIN_VECS = 2;
 static const int HF_DIIS_START = 0;
 
 static const double HF_SCF_THRESH = 1e-9;
+static const double HF_GWH_K = 1.75;
 
 static const bool HF_USE_DF = false;
 static const bool HF_SCF_DIIS = true;
+static const bool HF_DIIS_BETA = true;
 
 static const std::string HF_GUESS = "core";
 

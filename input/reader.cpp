@@ -237,7 +237,7 @@ void unpack(const json& j_in, desc::options& opt, std::string root) {
 	}
 }	
 
-reader::reader(std::string filename) {
+reader::reader(MPI_Comm comm, std::string filename) : m_comm(comm) {
 	
 	std::ifstream in;
 	in.open(filename);
@@ -276,20 +276,20 @@ reader::reader(std::string filename) {
 	int mult = jmol["mult"];
 	
 	desc::molecule mol({.atoms = atoms, .charge = charge,
-		.mult = mult, .split = 20, .basis = basis, .dfbasis = dfbasis});
+		.mult = mult, .split = 10, .basis = basis, .dfbasis = dfbasis});
 		
-	mol.print_info(1);
+	mol.print_info(m_comm,1);
 	
 	desc::options opt;
 	
 	unpack(data, opt, "hf");
 	
-	std::cout << opt.get<bool>("hf/diis") << std::endl;
-	std::cout << opt.get<double>("hf/conv") << std::endl;
+	//std::cout << opt.get<bool>("hf/diis") << std::endl;
+	//std::cout << opt.get<double>("hf/conv") << std::endl;
 	
-	if (opt.get<bool>("hf/use_df",false)) {
-		std::cout << "Using DENSITY FITTING." << std::endl;
-	}
+	//if (opt.get<bool>("hf/use_df",false)) {
+	//	std::cout << "Using DENSITY FITTING." << std::endl;
+	//}
 	
 	m_mol = mol;
 	m_opt = opt;

@@ -20,12 +20,13 @@ static const json valid_keys =
 			}},
 	{"hf", {
 		{"guess", "core"}, // HF guess
+		{"scf_thresh", 1e-9}, // convergence criteria
 		{"unrestricted", true}, // unrestricted HF calc
 		{"diis", true}, // use diis or not
 		{"diis_max_vecs", 8}, // maximum number of diis vectors in subsdpace
 		{"diis_min_vecs", 2}, // minimum number of diis vectors in subspace
 		{"diis_start", 0}, // at what iteration to start diis
-		{"conv", 1e-9}, // convergence criteria
+		{"diis_beta", true}, // whether to use separate coeficients for beta
 		{"use_df", false}, // whether to use df 
 		{"print", 0} // print level (0, 1 or 2 at the moment, -1 for silent output)
 	}}

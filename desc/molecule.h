@@ -6,6 +6,7 @@
 
 #include <vector>
 #include <libint2/atom.h>
+#include <mpi.h>
 
 namespace desc {
 
@@ -56,11 +57,14 @@ private:
 				int nblock = n%split == 0 ? n/split : n/split + 1;
 				bool even = n%split == 0 ? true : false;
 				
+				std::cout << "NBLOCK: " << nblock << std::endl;
+				std::cout << "NSPLIT: " << split << std::endl;
+				
 				if (even) {
-					std::vector<int> out(nblock,n/split);
+					std::vector<int> out(nblock,split);
 					return out;
 				} else {
-					std::vector<int> out(nblock,n/split);
+					std::vector<int> out(nblock,split);
 					out[nblock-1] = n%split;
 					return out;
 				}
@@ -73,7 +77,7 @@ private:
 			
 			m_bas_sizes = mol.m_cluster_basis.cluster_sizes();
 			if (mol.m_cluster_dfbasis) {
-				std::cout << "ITS IN BLOCK." << std::endl;
+				//std::cout << "ITS IN BLOCK." << std::endl;
 				optional<std::vector<int>,val> opt(mol.m_cluster_dfbasis->cluster_sizes());
 				m_dfbas_sizes = opt;
 			}
@@ -136,7 +140,7 @@ public:
 
 	~molecule() {}
 	
-	void print_info(int level = 0);
+	void print_info(MPI_Comm comm, int level = 0);
 	
 	cluster_basis c_basis() {
 		return m_cluster_basis;

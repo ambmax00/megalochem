@@ -11,6 +11,10 @@ void hfmod::diag_fock() {
 	
 	//updates coeffcient matrices (c_bo_A, c_bo_B) and densities (p_bo_A, p_bo_B)
 	
+	auto& t_diag = TIME.sub("Fock Diagonalization");
+	
+	t_diag.start();
+	
 	Eigen::SelfAdjointEigenSolver<Eigen::MatrixXd> es;
 	
 	dbcsr::pgrid<2> grid({.comm = m_comm});
@@ -61,13 +65,23 @@ void hfmod::diag_fock() {
 	
 		auto c_bm_x = dbcsr::eigen_to_tensor
 			(eigen_c_bm_x, "c_bm_x_"+x, grid, {0}, {1}, c_bm.blk_size());
+		
+		c_bm_x.filter();
 			
 		if (LOG.global_plev() >= 2) 
 			dbcsr::print(c_bm_x);
 	
 		//Transform back
 		dbcsr::einsum<2,2,2>({"IJ, Ji -> Ii", *m_x_bb, c_bm_x, c_bm, .unit_nr = u, .log = log});
-			
+		
+		//debug: eigen
+		//auto xe = dbcsr::tensor_to_eigen(*m_x_bb);
+		
+		//auto c = xe * eigen_c_bm_x;
+		
+		//std::cout << "EIGEN: " << std::endl;
+		//std::cout << c << std::endl;
+		
 		if (LOG.global_plev() >= 1) 
 			dbcsr::print(c_bm);
 		
@@ -82,6 +96,8 @@ void hfmod::diag_fock() {
 		
 		if (x == "A") limit = m_mol.nocc_alpha() - 1;
 		if (x == "B") limit = m_mol.nocc_beta() - 1;
+		
+		//std::cout << "LIMIT " << limit << std::endl;
 		
 		// make bounds
 		std::vector<std::vector<int>> occ_bounds = {{0,limit}};
@@ -100,20 +116,38 @@ void hfmod::diag_fock() {
 		diagonalize(*m_f_bb_B, *m_c_bm_B, "B");
 	}
 	
+	t_diag.finish();
+	
 	auto fraca = m_mol.frac_occ_alpha();
 	if (fraca) {
-		std::cout << "Scaling!" << std::endl;
-		math::scale(*m_c_bm_A, *fraca);
+		//std::cout << "Scaling!" << std::endl;
+		std::vector<int> b = {0,fraca->size() - 1};
+		math::scale({.t_in = *m_c_bm_A, .v_in = *fraca, .bounds = b});
 	}
 	
 	auto fracb = m_mol.frac_occ_beta();
 	if (fracb && m_c_bm_B) {
-		math::scale(*m_c_bm_B, *fracb);
+		std::vector<int> b = {0,fracb->size() - 1};
+		math::scale({.t_in = *m_c_bm_B, .v_in = *fracb, .bounds = b});
 	}
 	
+	auto& t_density = TIME.sub("Form Density Matrix.");
+	
+	t_density.start();
+	
 	form_density(*m_p_bb_A, *m_c_bm_A, "A");
-	if (m_p_bb_B) 
+	if (m_p_bb_B && !m_nobeta) {
 		form_density(*m_p_bb_B, *m_c_bm_B, "B");
+	} else if (!m_restricted && m_nobeta) {
+		m_p_bb_B = dbcsr::make_stensor<2>({.name = "p_bb_B", .pgridN = grid, .map1 = {0}, .map2 = {1}, .blk_sizes = m_p_bb_A->blk_size()});
+		m_p_bb_B->set(0.0);
+		
+		if (LOG.global_plev() >= 1) 
+			dbcsr::print(*m_p_bb_B);
+		
+	}
+	
+	t_density.finish();
 
 	grid.destroy();
 	

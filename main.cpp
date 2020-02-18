@@ -6,6 +6,7 @@
 #include "input/reader.h"
 #include "hf/hfmod.h"
 #include "ints/aofactory.h"
+#include "utils/mpi_time.h"
 
 
 template <int N>
@@ -84,7 +85,11 @@ int main(int argv, char** argc) {
 	int rank;
 	MPI_Comm_rank(MPI_COMM_WORLD,&rank);
 	
-	reader filereader("test.json");
+	util::mpi_time time(MPI_COMM_WORLD, "Megalochem");
+	
+	time.start();
+	
+	reader filereader(MPI_COMM_WORLD, "test.json");
 	
 	dbcsr::init();
 	
@@ -105,6 +110,9 @@ int main(int argv, char** argc) {
 	
 	myhf.compute();
 	
+	time.finish();
+	
+	time.print_info();
 	//ints::aofactory ao(mol, MPI_COMM_WORLD);
 	
 	//auto s = ao.compute<2>({.op = "overlap", .bas = "bb", .name = "S", .map1 = {0}, .map2 = {1}});

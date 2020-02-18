@@ -2,7 +2,18 @@
 
 namespace math {
 
-void scale(dbcsr::tensor<2>& t, std::vector<double>& v) {
+void scale(scale_params&& p) {
+	
+	auto& t = *p.t_in;
+	auto& v = *p.v_in;
+	
+	std::vector<int> b(0);
+	
+	if (p.bounds) {
+		if (p.bounds->size() != 2) 
+			throw std::runtime_error("Scale: bounds needs to be size 2 (at the moment).");
+		b = *p.bounds;
+	}
 	
 	dbcsr::iterator<2> iter(t);
 	
@@ -10,16 +21,35 @@ void scale(dbcsr::tensor<2>& t, std::vector<double>& v) {
 	auto blksizes = t.blk_size();
 	auto dims = t.nfull_tot();
 	
-	std::cout << "ij: " << dims[0] << " " << dims[1] << std::endl;
-	std::cout << "vec: " << v.size() << std::endl;
+	//std::cout << "ij: " << dims[0] << " " << dims[1] << std::endl;
+	//std::cout << "vec: " << v.size() << std::endl;
+	//std::cout << "bounds: " << b.size() << std::endl;
 	
-	for (auto x : v) {
-		std::cout << x << " ";
-	} std::cout << std::endl;
+//	for (auto x : v) {
+//		std::cout << x << " ";
+//	} std::cout << std::endl;
 	
-	if (dims[1] != v.size()) throw std::runtime_error("Scale: incompatible dimensions.");
+	int nbound = dims[1];
 	
-	dbcsr::print(t);
+	if (p.bounds) { nbound = b[1] - b[0] + 1; } 
+	
+	if (nbound > dims[1]) throw std::runtime_error("Scale: bounds too large.");
+	if (nbound != v.size()) throw std::runtime_error("Scale: incompatible dimensions.");
+	
+	// make bounding functions
+	std::function<bool(int i,vec<int>& b)> inbound;
+	
+	if (p.bounds) {
+		inbound = [](int i,vec<int>& b) {
+			if ((i >= b[0]) && (i <= b[1])) return true;
+			return false;
+		};
+	} else {
+		inbound = [](int i,vec<int>& b) { return true; };
+	}
+		
+	
+	//dbcsr::print(t);
 	
 	while (iter.blocks_left()) {
 		
@@ -32,10 +62,13 @@ void scale(dbcsr::tensor<2>& t, std::vector<double>& v) {
 		int off1 = blkoff[0][idx[0]];
 		int off2 = blkoff[1][idx[1]];
 		
+		if (!inbound(off2,b)) continue;
+		
 		auto blk = t.get_block({.idx = idx, .blk_size = blksize, .found = found});
 		
 		// loop over columns
 		for (int j = 0; j != blksize[1]; ++j) {
+			if (!inbound(off2+j,b)) continue;
 			int ncol = off2 + j;
 			for (int i = 0; i != blksize[0]; ++i) {
 				blk(i,j) *= v[ncol];
@@ -46,7 +79,7 @@ void scale(dbcsr::tensor<2>& t, std::vector<double>& v) {
 		
 	}
 	
-	dbcsr::print(t);
+	//dbcsr::print(t);
 
 }	
 	

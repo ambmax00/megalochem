@@ -115,9 +115,9 @@ static auto default_dist =
 			
 		}
 		
-		int myrank = 0;
+		//int myrank = 0;
 		
-		MPI_Comm_rank(MPI_COMM_WORLD, &myrank); 
+		//MPI_Comm_rank(MPI_COMM_WORLD, &myrank); 
 	    
 	    /*
 	    if (myrank == 0) {
@@ -477,7 +477,7 @@ public:
 template <int N, typename T>
 struct tensor_copy;
 
-static double eps_filter = 1e-9;
+static double eps_filter = 1e-16;
 
 template <int N, typename T>
 struct tensor_params {
@@ -648,7 +648,7 @@ public:
 	//copy constructor
 	tensor(const tensor<N,T>& rhs): m_tensor_ptr(nullptr) {
 		
-		std::cout << "Copying..." << std::endl;
+		//std::cout << "Copying..." << std::endl;
 		
 		if (this != &rhs) {
 		
@@ -1066,13 +1066,13 @@ public:
 	struct tensor_filter {
 		optional<T,val> eps;
 		optional<int,val> method;
-		optional<bool,val> use_absolute;
+		optional<bool,val> use_absolute = true;
 	};
 	void filter(tensor_filter p = tensor_filter()) {
 		
 		T eps = (p.eps) ? *p.eps : eps_filter;
 		const int * method = (p.method) ? &*p.method : nullptr;
-		const bool * use_absolute = (p.use_absolute) ? &*p.use_absolute : nullptr;
+		const bool * use_absolute = &*p.use_absolute;
 		
 		c_dbcsr_t_filter(m_tensor_ptr, eps, method, use_absolute);
 		
@@ -1697,8 +1697,8 @@ void print(tensor<N,T>& t_in) {
 	
 	int myrank, mpi_size;
 	
-	MPI_Comm_rank(MPI_COMM_WORLD, &myrank); 
-	MPI_Comm_size(MPI_COMM_WORLD, &mpi_size);
+	MPI_Comm_rank(t_in.comm(), &myrank); 
+	MPI_Comm_size(t_in.comm(), &mpi_size);
 	
 	auto blkszs = t_in.blk_size();
 	
@@ -1743,8 +1743,78 @@ void print(tensor<N,T>& t_in) {
 				
 			}
 		}
-		MPI_Barrier(MPI_COMM_WORLD);
+		MPI_Barrier(t_in.comm());
 	}
+}
+
+template <typename T>
+vec<T> diag(tensor<2,T>& t) {
+	
+	int myrank = -1;
+	int commsize = 0;
+	
+	MPI_Comm_rank(t.comm(), &myrank); 
+	MPI_Comm_size(t.comm(), &commsize);
+	
+	auto nfull = t.nfull_tot();
+	
+	int n = nfull[0];
+	int m = nfull[1];
+	
+	if (n != m) throw std::runtime_error("Cannot take diagonal of non-square matrix.");
+	
+	vec<T> dvec(n, T());
+	
+	auto blksize = t.blk_size();
+	auto blkoff = t.blk_offset();
+	
+	// loop over diagonal blocks
+	for (int D = 0; D != blksize[0].size(); ++D) {
+		
+		int proc = -1;
+		idx2 idx = {D,D};
+		
+		//std::cout << "BLOCK: " << D << " " << D << std::endl;
+		
+		t.get_stored_coordinates({.idx = idx, .proc = proc});
+		
+		//std::cout << "RANK: " << proc << std::endl;
+		
+		block<2,T> blk;
+		int size = blksize[0][D];
+		
+		int off = blkoff[0][D];
+		
+		if (proc == myrank) {
+			
+			bool found = false;
+			blk = t.get_block({.idx = idx, .blk_size = {size,size}, .found = found});	
+			
+			if (found) {
+				//std::cout << "FOUND" << std::endl;
+			
+				for (int d = 0; d != size; ++d) {
+					dvec[off + d] = blk(d,d);
+				}
+				
+			}
+			
+		}
+			
+		MPI_Bcast(&dvec[off],size,MPI_DOUBLE,proc,t.comm());
+		
+	}
+	
+	//print(t);
+	
+	//if (myrank == 0) {
+	//	for (auto x : dvec) {
+	//		std::cout << x << " ";
+	//	} std::cout << std::endl;
+	//}
+	
+	return dvec;
+	
 }
                       
 

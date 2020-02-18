@@ -165,7 +165,7 @@ public:
 		typename = typename std::enable_if<(A1 != value_), int>::type>
 	[[deprecated("Converting attribute value to attribute reference.")]] 
 	attribute_wrapper(attribute_wrapper<T,a0,value_>& awrp) : init(false), m_val(nullptr), m_ref(nullptr) {
-		std::cout << "D3" << std::endl;
+		//std::cout << "D3" << std::endl;
 		
 		if (awrp.m_val != nullptr) {
 			this->m_val = new T(*awrp.m_val);

@@ -34,12 +34,12 @@ dbcsr::stensor<N,double> aofactory::compute(aofac_params&& p) {
 		
 		vec<desc::cluster_basis> basvec;
 		
-		std::cout << "A1" << std::endl;
+		//std::cout << "A1" << std::endl;
 		
 		desc::cluster_basis c_bas = m_mol.c_basis();
 		optional<desc::cluster_basis,val> x_bas = m_mol.c_dfbasis();
 		
-		if (x_bas) std::cout << "ITS HERE IN INTS" << std::endl;
+		//if (x_bas) std::cout << "ITS HERE IN INTS" << std::endl;
 		
 		std::cout << "A3" << std::endl;
 		
@@ -98,7 +98,7 @@ dbcsr::stensor<N,double> aofactory::compute(aofac_params&& p) {
 				
 		//}
 		
-		std::cout << "OUT" << std::endl;
+		//std::cout << "OUT" << std::endl;
 		dbcsr::stensor<N,double> out = integrals<N>({.comm = m_comm, .engine = eng_pool, 
 			.basvec = basvec, .bra = m_2e_ints_zmat, .ket = m_2e_ints_zmat, 
 			.name = *p.name, .map1 = *p.map1, .map2 = *p.map2});

@@ -12,10 +12,11 @@ private:
 
 	desc::molecule m_mol;
 	desc::options m_opt;
+	MPI_Comm m_comm;
 
 public:	
 	
-	reader(std::string filename);
+	reader(MPI_Comm comm, std::string filename);
 	
 	desc::molecule get_mol() {
 		return m_mol;

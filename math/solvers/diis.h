@@ -38,7 +38,7 @@ public:
 
 	diis_helper(MPI_Comm comm, int start, int min, int max, bool print = false) :
 		m_min(min), m_max(max), m_print(print), m_start(start), m_B(0,0), m_coeffs(0,0),
-		LOG(m_print == false ? 0 : 1, comm) {};
+		LOG(comm, m_print == false ? 0 : 999) {};
 	
 	
 	void compute_extrapolation_parameters(tensor<N>& T, tensor<N>& err, int iter) {
@@ -179,7 +179,15 @@ public:
 	
 	void extrapolate(tensor<N>& trial, int iter) {
 		
+		extrapolate(trial, m_coeffs, iter);
+		
+	}
+	
+	void extrapolate(tensor<N>& trial, Eigen::MatrixXd& coeffs, int iter) {
+		
 		static bool first = true;
+		
+		if (coeffs.size() != m_trialvecs.size()) throw std::runtime_error("DIIS: Wrong dimensions.");
 		
 		if (iter >= m_start && m_trialvecs.size() >= m_min) { 
 			
@@ -188,13 +196,20 @@ public:
 				first = false;
 			}
 			
+			LOG.os<2>("Extrapolating...\n");
+			LOG.os<2>("Extrapolation factors:\n");
+		
+			for (int i = 0; i != m_coeffs.size(); ++i) {
+				LOG.os<>(coeffs(i), " ");
+			} LOG.os<>('\n');
+			
 			trial.clear();
 			
 			// do M = c1 * T1 + c2 * T2 + ...
-			for (int i = 0; i != m_coeffs.size(); ++i) {
+			for (int i = 0; i != coeffs.size(); ++i) {
 				
 				auto T = m_trialvecs[i];
-				double c = m_coeffs(i);
+				double c = coeffs(i);
 				
 				T.scale(c);
 				
@@ -212,6 +227,10 @@ public:
 			
 		}
 		
+	}
+		
+	Eigen::MatrixXd& coeffs() {
+		return m_coeffs;
 	}
 			
 		

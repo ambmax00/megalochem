@@ -24,11 +24,13 @@ private:
 	desc::options& m_opt;
 	MPI_Comm m_comm;
 	util::mpi_log LOG;
+	util::mpi_time TIME;
 	
 	// options
 	bool m_restricted;
 	bool m_nobeta;
 	bool m_diis;
+	bool m_diis_beta;
 	std::string m_guess;
 	int m_max_iter;
 	double m_scf_threshold;
@@ -84,6 +86,14 @@ public:
 	}
 	
 	void compute();	
+	
+	dbcsr::stensor<2> p_bb_A() {
+		return m_p_bb_A;
+	}
+	
+	dbcsr::stensor<2> p_bb_B() {
+		return m_p_bb_B;
+	}
 	
 };
 

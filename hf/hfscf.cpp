@@ -12,12 +12,14 @@ namespace hf {
 hfmod::hfmod(desc::molecule& mol, desc::options& opt, MPI_Comm comm) 
 	: m_mol(mol), 
 	  m_opt(opt), 
-	  LOG(m_opt.get<int>("print", HF_PRINT_LEVEL),comm),
+	  m_comm(comm),
+	  LOG(m_comm,m_opt.get<int>("print", HF_PRINT_LEVEL)),
+	  TIME(comm, "Hartree Fock", LOG.global_plev()),
 	  m_guess(m_opt.get<std::string>("guess", HF_GUESS)),
 	  m_max_iter(m_opt.get<int>("max_iter", HF_MAX_ITER)),
 	  m_scf_threshold(m_opt.get<double>("scf_thresh", HF_SCF_THRESH)),
 	  m_diis(m_opt.get<bool>("diis", HF_SCF_DIIS)),
-	  m_comm(comm),
+	  m_diis_beta(m_opt.get<bool>("diis_beta", HF_DIIS_BETA)),
 	  m_scf_energy(0.0),
 	  m_nobeta(false)
 {
@@ -98,6 +100,9 @@ void hfmod::compute_nucrep() {
 void hfmod::one_electron() {
 	
 	LOG.os<>("Forming one-electron integrals...");
+	auto& TIME_1e = TIME.sub("One-Electron Integrals");
+	
+	TIME_1e.start();
 	
 	ints::aofactory int_engine(m_mol, m_comm);
 	
@@ -107,7 +112,7 @@ void hfmod::one_electron() {
 			 .name = "S_bb", .map1 = {0}, .map2 = {1}
 			 });		 
 	
-	m_s_bb = math::symmetrize(m_s_bb, "m_s_bb");
+	//m_s_bb = math::symmetrize(m_s_bb, "m_s_bb");
 	
 	//kinetic
 	m_t_bb = int_engine.compute<2>(
@@ -115,7 +120,7 @@ void hfmod::one_electron() {
 		 .name = "t_bb", .map1 = {0}, .map2 = {1}
 		});
 	
-	m_t_bb = math::symmetrize(m_t_bb, "m_t_bb");
+	//m_t_bb = math::symmetrize(m_t_bb, "m_t_bb");
 	
 	// nuclear
 	m_v_bb = int_engine.compute<2>(
@@ -123,21 +128,22 @@ void hfmod::one_electron() {
 		 .name = "v_bb", .map1 = {0}, .map2 = {1}
 		});
 		
-	m_v_bb = math::symmetrize(m_v_bb, "m_v_bb");
+	//m_v_bb = math::symmetrize(m_v_bb, "m_v_bb");
 	
 	// get X
 	math::orthgon og(m_s_bb);
 	og.compute();
 	m_x_bb = og.result("x_bb");
 	
-	std::cout << "H1" << std::endl;
+	//std::cout << "H1" << std::endl;
 	dbcsr::copy<2>({.t_in = *m_v_bb, .t_out = *m_core_bb});
 	
-	std::cout << "H2" << std::endl;
+	//std::cout << "H2" << std::endl;
 	dbcsr::copy<2>({.t_in = *m_t_bb, .t_out = *m_core_bb, .sum = true});
 	
-	std::cout << "H3" << std::endl;
+	//std::cout << "H3" << std::endl;
 	
+	TIME_1e.finish();
 	
 	if (LOG.global_plev() >= 2) {
 		dbcsr::print(*m_x_bb);
@@ -197,7 +203,10 @@ dbcsr::tensor<2> hfmod::compute_errmat(dbcsr::tensor<2>& F_x, dbcsr::tensor<2>& 
 
 void hfmod::compute() {
 	
-	LOG.banner<>("HARTREE FOCK", 50, '*');
+	TIME.start();
+	
+	if (LOG.global_plev() >= 0) 
+		LOG.banner<>("HARTREE FOCK", 50, '*');
 	
 	// first, get one-electron integrals...
 	one_electron();
@@ -215,7 +224,8 @@ void hfmod::compute() {
 	int dmin = m_opt.get<int>("diis_min_vecs", HF_DIIS_MIN_VECS);
 	int dstart = m_opt.get<int>("diis_start", HF_DIIS_START);
 	
-	fockbuilder fbuilder(m_mol, m_opt, m_comm, LOG.global_plev());
+	fockbuilder fbuilder(m_mol, m_opt, m_comm, LOG.global_plev(), TIME);
+	
 	math::diis_helper<2> diis_A(m_comm,dstart, dmin, dmax, (LOG.global_plev() >= 2) ? true : false );
 	math::diis_helper<2> diis_B(m_comm,dstart, dmin, dmax, (LOG.global_plev() >= 2) ? true : false );
 
@@ -225,17 +235,21 @@ void hfmod::compute() {
 	dbcsr::tensor<2> e_A;
 	dbcsr::tensor<2> e_B;
 	
-	double rms = 10;
+	double rms_A = 10;
+	double rms_B = 10;
 	
-	LOG.os<>("Iteration Nr\t", "Energy (Ht)\t", "Error (Ht)\t", "RMS (Ht)\n");
+	// ---------> print info here <-------
+	
+	LOG.os<>("Iteration Nr\t", "Energy (Ht)\t", "Error (Ht)\t", "RMS alpha(Ht)\t", "RMS beta(Ht)\n");
 
 	while (true) {
 		
-		if (rms < HF_SCF_THRESH) break;
-		if (iter > HF_MAX_ITER) break;
-		
 		// form fock matrix
-		fbuilder.compute({.core = m_core_bb, .c_A = m_c_bm_A, .p_A = m_p_bb_A, .c_B = m_c_bm_B, .p_B = m_p_bb_B});
+		
+		bool SAD_iter = ((iter == 0) && (m_guess == "SAD")) ? true : false;
+		
+		fbuilder.compute({.core = m_core_bb, .c_A = m_c_bm_A, .p_A = m_p_bb_A, 
+				.c_B = m_c_bm_B, .p_B = m_p_bb_B, .SAD_iter = SAD_iter});
 		
 		m_f_bb_A = fbuilder.fock_alpha();
 		m_f_bb_B = fbuilder.fock_beta();
@@ -249,16 +263,36 @@ void hfmod::compute() {
 		double old_energy = m_scf_energy;
 		compute_scf_energy();
 		
-		rms = dbcsr::RMS(e_A);
+		rms_A = dbcsr::RMS(e_A);
+		if (m_restricted || m_nobeta) {
+			rms_B = rms_A;
+		} else {
+			rms_B = dbcsr::RMS(e_B);
+		}
 		
-		LOG.os<>(iter, '\t', m_scf_energy, '\t', old_energy - m_scf_energy, '\t', rms, '\n');
+		LOG.os<>("UHF@", iter, '\t', m_scf_energy + m_nuc_energy, '\t', old_energy - m_scf_energy, '\t', rms_A, '\t', rms_B, '\n');
+		
+		if (rms_A < m_scf_threshold && rms_B < m_scf_threshold) break;
+		if (iter > HF_MAX_ITER) break;
 		
 		if (m_diis) {
 			diis_A.compute_extrapolation_parameters(*m_f_bb_A, e_A, iter);
 			diis_A.extrapolate(*m_f_bb_A, iter);
 			if (!m_restricted && !m_nobeta) {
-				diis_B.compute_extrapolation_parameters(*m_f_bb_B, e_B, iter);
-				diis_B.extrapolate(*m_f_bb_B, iter);
+				
+				if (m_diis_beta) {	
+					// separate diis optimization for beta
+					diis_B.compute_extrapolation_parameters(*m_f_bb_B, e_B, iter);
+					diis_B.extrapolate(*m_f_bb_B, iter);
+					
+				} else {
+					
+					// impose the same coefficients for both alpha and beta
+					auto coeffA = diis_A.coeffs();
+					diis_B.compute_extrapolation_parameters(*m_f_bb_B, e_B, iter);
+					diis_B.extrapolate(*m_f_bb_B,coeffA,iter);
+					
+				}
 			}
 		}
 		
@@ -274,9 +308,19 @@ void hfmod::compute() {
 	e_A.destroy();
 	e_B.destroy();
 	
-	LOG.os<>("Done with SCF cycle.\n");
+	if (m_nobeta) {
+		// take care of density
+		dbcsr::pgrid<2> grid({.comm = m_comm});
+		m_p_bb_B = dbcsr::make_stensor<2>({.name = "p_bb_B", .pgridN = grid, .map1 = {0}, .map2 = {1}, .blk_sizes = m_p_bb_A->blk_size()});
+		m_p_bb_B->set(0.0);
+	}
+	
+	LOG.os<>("Done with SCF cycle. Took ", iter, " iterations.\n");
 	LOG.os<>("Final SCF energy: ", m_scf_energy, '\n');
 	LOG.os<>("Total energy: ", m_scf_energy + m_nuc_energy, '\n');
+	
+	TIME.finish();
+	TIME.print_info();
 	
 		
 }

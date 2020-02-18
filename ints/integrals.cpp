@@ -17,8 +17,8 @@ void calc_ints(dbcsr::tensor<2,double>& t, util::ShrPool<libint2::Engine>& engin
 	int myrank = 0;
 	int mpi_size = 0;
 	
-	MPI_Comm_rank(MPI_COMM_WORLD, &myrank); 
-	MPI_Comm_size(MPI_COMM_WORLD, &mpi_size);
+	MPI_Comm_rank(t.comm(), &myrank); 
+	MPI_Comm_size(t.comm(), &mpi_size);
 
 	auto blksloc = t.blks_local();
 	auto nblks = t.nblks_tot();
@@ -36,7 +36,7 @@ void calc_ints(dbcsr::tensor<2,double>& t, util::ShrPool<libint2::Engine>& engin
 				int ix1 = blksloc[0][i1];
 				int ix2 = blksloc[1][i2];
 						
-				if (ix1 < ix2) continue;
+				//if (ix1 < ix2) continue;
 				
 				reserve[0].push_back(ix1);
 				reserve[1].push_back(ix2);
@@ -92,10 +92,13 @@ void calc_ints(dbcsr::tensor<2,double>& t, util::ShrPool<libint2::Engine>& engin
 				//std::cout << "Tensor offsets: " << toff1 << " " << toff2 << std::endl;
 				//std::cout << "Local offsets: " << locblkoff1 << " " << locblkoff2 << std::endl;
 				//std::cout << "MULT: " << multiplicity(toff1,toff2) << std::endl;
-										
-				if (is_canonical(toff1,toff2)) {
+				
+				//std::cout << "Shells: " << std::endl;
+				//std::cout << sh1 << std::endl;
+				//std::cout << sh2 << std::endl;	
+				//if (is_canonical(toff1,toff2)) {
 					
-					int sfac = multiplicity(toff1,toff2);
+					//int sfac = multiplicity(toff1,toff2);
 					
 					loc_eng.compute(sh1,sh2);										
 					auto ints_shellsets = results[0];
@@ -105,10 +108,11 @@ void calc_ints(dbcsr::tensor<2,double>& t, util::ShrPool<libint2::Engine>& engin
 					
 						for (int i = 0; i != sh1.size(); ++i) {
 							for (int j = 0; j != sh2.size(); ++j) {
-								blk(i + locblkoff1, j + locblkoff2) = sfac * ints_shellsets[idx++];
+								blk(i + locblkoff1, j + locblkoff2) = /*sfac*/ ints_shellsets[idx++];
+								//std::cout << i << " " << j << " " << blk(i + locblkoff1, j + locblkoff2) << std::endl;
 						}}
 					}
-				}
+				//}
 				
 				locblkoff2 += sh2.size();						
 			}//endfor s2
@@ -142,8 +146,8 @@ void calc_ints(dbcsr::tensor<3,double>& t, util::ShrPool<libint2::Engine>& engin
 	int myrank = 0;
 	int mpi_size = 0;
 	
-	MPI_Comm_rank(MPI_COMM_WORLD, &myrank); 
-	MPI_Comm_size(MPI_COMM_WORLD, &mpi_size);
+	MPI_Comm_rank(t.comm(), &myrank); 
+	MPI_Comm_size(t.comm(), &mpi_size);
 
 	auto blksloc = t.blks_local();
 	auto nblks = t.nblks_tot();
@@ -344,8 +348,8 @@ void calc_ints(dbcsr::tensor<4,double>& t, util::ShrPool<libint2::Engine>& engin
 	int myrank = 0;
 	int mpi_size = 0;
 	
-	MPI_Comm_rank(MPI_COMM_WORLD, &myrank); 
-	MPI_Comm_size(MPI_COMM_WORLD, &mpi_size);
+	MPI_Comm_rank(t.comm(), &myrank); 
+	MPI_Comm_size(t.comm(), &mpi_size);
 
 	auto blksloc = t.blks_local();
 	auto nblks = t.nblks_tot();
@@ -414,8 +418,8 @@ void calc_ints(dbcsr::tensor<4,double>& t, util::ShrPool<libint2::Engine>& engin
 						reserve[2].push_back(ix3);
 						reserve[3].push_back(ix4);
 						
-						std::cout << "RESERVE: " << std::endl;
-						std::cout << ix1 << " " << ix2 << " " << ix3 << " " << ix4 << std::endl;
+						//std::cout << "RESERVE: " << std::endl;
+						//std::cout << ix1 << " " << ix2 << " " << ix3 << " " << ix4 << std::endl;
 			
 		}}}}
 		
@@ -444,13 +448,13 @@ void calc_ints(dbcsr::tensor<4,double>& t, util::ShrPool<libint2::Engine>& engin
 					std::vector<libint2::Shell>& c3 = cbas3[i3];
 					std::vector<libint2::Shell>& c4 = cbas4[i4];
 					
-					std::cout << "WE ARE IN BLOCK: " << i1 << i2 << i3 << i4 << std::endl;
+					//std::cout << "WE ARE IN BLOCK: " << i1 << i2 << i3 << i4 << std::endl;
 					
 					dbcsr::idx4 IDX = {i1,i2,i3,i4};
 					vec<int> blkdim = {blk_size[0][i1],blk_size[1][i2],blk_size[2][i3],blk_size[3][i4]};
 					
-					std::cout << "BLOCK DIMENSIONS: " << std::endl;
-					std::cout << blk_size[0][i1] << " " << blk_size[1][i2] << " " << blk_size[2][i3] << " " << blk_size[3][i4] << std::endl;
+					//std::cout << "BLOCK DIMENSIONS: " << std::endl;
+					//std::cout << blk_size[0][i1] << " " << blk_size[1][i2] << " " << blk_size[2][i3] << " " << blk_size[3][i4] << std::endl;
 					
 					
 					bool found = false;
@@ -552,9 +556,9 @@ void calc_ints(dbcsr::tensor<4,double>& t, util::ShrPool<libint2::Engine>& engin
 	
 	t.filter();
 	
-	dbcsr::print(t);
+	//dbcsr::print(t);
 		
-	std::cout << "Done with 2e." << std::endl;
+	//std::cout << "Done with 2e." << std::endl;
 
 }
 	

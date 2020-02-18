@@ -12,7 +12,7 @@ void Zmat::compute_schwarz() {
 	// make tensor
 	dbcsr::pgrid<2> grid({.comm = m_comm});
 	
-	util::mpi_log LOG(0,m_comm);
+	util::mpi_log LOG(m_comm,0);
 	
 	int comm_size, rank;
 	MPI_Comm_size(m_comm, &comm_size);
@@ -125,7 +125,7 @@ void Zmat::compute_schwarz() {
 	
 	std::cout << "HERE4" << std::endl;
 	
-	LOG.os<0,-1>("HERE\n");
+	//LOG.os<0,-1>("HERE\n");
 	// new para: get norm and index
 	dbcsr::iterator<2> iter(Ztensor);
 	int loc_nzblks = Ztensor.num_blocks();
@@ -171,7 +171,7 @@ void Zmat::compute_schwarz() {
 	std::cout << rank << "Ok. " << std::endl;
 	
 	
-	LOG.os<0,0>("ALL BLOCKS: ", blkstot, '\n');
+	//LOG.os<0,0>("ALL BLOCKS: ", blkstot, '\n');
 	LOG.flush();
 	
 	int* nzblks = new int[comm_size]();

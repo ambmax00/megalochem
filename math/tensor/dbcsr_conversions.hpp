@@ -17,7 +17,7 @@ MatrixX<T> tensor_to_eigen(dbcsr::tensor<2,T>& array, int l = 0) {
 	
 	int myrank, mpi_size;
 	
-	MPI_Comm comm = MPI_COMM_WORLD;
+	MPI_Comm comm = array.comm();
 	
 	MPI_Comm_rank(comm, &myrank); 
 	MPI_Comm_size(comm, &mpi_size);
@@ -34,7 +34,7 @@ MatrixX<T> tensor_to_eigen(dbcsr::tensor<2,T>& array, int l = 0) {
 	auto blk1 = nblocks[0];
 	auto blk2 = nblocks[1];
 	
-	util::mpi_log LOG(l);
+	util::mpi_log LOG(array.comm(), l);
 	
 	//LOG.os<1>("Dimensions: ", dim1, " ", dim2, '\n');
 	
@@ -142,44 +142,52 @@ dbcsr::tensor<2,T> eigen_to_tensor(MatrixX<T>& M, std::string name,
 	auto blkloc = out.blks_local();
 	auto blkoff = out.blk_offset();
 	
-	//std::cout << M << std::endl;
+	std::vector<std::vector<int>> rsv(2);
 	
+	//std::cout << "CONVERTING: " << name << std::endl;
+	// reserving blocks:
 	for (int i = 0; i != blkloc[0].size(); ++i) {
 		for (int j = 0; j != blkloc[1].size(); ++j) {
-			
-			int ix = blkloc[0][i];
-			int jx = blkloc[1][j];
+			rsv[0].push_back(blkloc[0][i]);
+			rsv[1].push_back(blkloc[1][j]);
+		}
+	}
 	
-			dbcsr::index<2> idx = {ix,jx};
-			vec<int> off = {blkoff[0][ix],blkoff[1][jx]};
-			vec<int> sizes = {blk_sizes[0][ix],blk_sizes[1][jx]};
-			
-			auto eigen_blk = M.block(off[0],off[1],sizes[0],sizes[1]);
-			
-			//std::cout << eigen_blk << std::endl;
-			
-			if (eigen_blk.norm() > eps_filter) {
-			
-				//std::cout << "RESERVED" << std::endl;
-				out.reserve({{ix},{jx}});
-				
-				dbcsr::block<2,T> blk(sizes);
-				
-				for (int n = 0; n != sizes[0]; ++n) {
-					for (int m = 0; m != sizes[1]; ++m) {
-						double val = eigen_blk(n,m);
-						blk(n,m) = (fabs(val) < std::numeric_limits<double>::epsilon())
-							? 0.0 : val;
-				}}
-				
-				out.put_block({.idx = idx, .blk = blk});
-			
-			}
-	}}
-			
-			
+	out.reserve(rsv);
 	
-	return std::move(out);
+	dbcsr::iterator<2> iter(out);
+	
+	while (iter.blocks_left()) {
+		
+		iter.next();
+		
+		auto idx = iter.idx();
+		auto blksize = iter.sizes();
+		
+		dbcsr::block<2> blk(blksize);
+		auto eigenblk = M.block(blkoff[0][idx[0]],
+			blkoff[1][idx[1]],blksize[0],blksize[1]);
+			
+		//std::cout << "IDX: " << idx[0] << " " << idx[1] << std::endl;
+		//std::cout << eigenblk << std::endl;
+		
+		for (int n = 0; n != blksize[0]; ++n) {
+					for (int m = 0; m != blksize[1]; ++m) {
+						//double val = eigen_blk(n,m);
+						//blk(n,m) = val; //(fabs(val) < std::numeric_limits<double>::epsilon())
+							//? 0.0 : val;
+						blk(n,m) = eigenblk(n,m);
+		}}
+		
+		out.put_block({.idx = idx, .blk = blk});
+		
+	}
+	
+	//out.filter();	
+	//std::cout << "Done!" << std::endl;
+	//print(out);		
+	
+	return out;
 
 }
 	

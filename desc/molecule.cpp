@@ -84,8 +84,7 @@ molecule::molecule(mol_params&& p) :
 			ncore = (*nlimit) / 2;
 			nact = (*(++nlimit)) / 2 - ncore;
 		}
-		
-		
+	
 		m_nocc_alpha = m_nocc_beta = nact + ncore;
 		
 		double nfraca = sqrt(((double)m_nele_alpha - (double)ncore)/(double)nact);
@@ -100,11 +99,8 @@ molecule::molecule(mol_params&& p) :
 		for (size_t i = ncore; i < m_nocc_alpha; ++i) occ_a[i] = nfraca;
 		for (size_t i = ncore; i < m_nocc_beta; ++i) occ_b[i] = nfracb;
 		
-		optional<std::vector<double>,val> opt_occ_a(occ_a);
-		optional<std::vector<double>,val> opt_occ_b(occ_b);
-		
-		m_frac_occ_alpha = optional<std::vector<double>,val>(opt_occ_a);
-		m_frac_occ_beta = optional<std::vector<double>,val>(opt_occ_b);
+		m_frac_occ_alpha = optional<std::vector<double>,val>(occ_a);
+		m_frac_occ_beta = optional<std::vector<double>,val>(occ_b);
 		
 	} else {
 		
@@ -137,9 +133,9 @@ molecule::molecule(mol_params&& p) :
 	
 }
 
-void molecule::print_info(int level) {
+void molecule::print_info(MPI_Comm comm, int level) {
 	
-	util::mpi_log LOG(level);
+	util::mpi_log LOG(comm,level);
 	
 	LOG.os<0>("Printing relevant info for molecule...\n");
 	LOG.os<0>("Charge/multiplicity: ", m_charge, "/", m_mult, '\n');

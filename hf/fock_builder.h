@@ -5,7 +5,7 @@
 #include "desc/options.h"
 #include "desc/molecule.h"
 #include "utils/params.hpp"
-#include "utils/mpi_log.h"
+#include "utils/mpi_time.h"
 #include <mpi.h>
 
 namespace hf {
@@ -28,6 +28,7 @@ private:
 	desc::options& m_opt;
 	MPI_Comm m_comm;
 	util::mpi_log LOG;
+	util::mpi_time& TIME;
 	
 	//options
 	bool m_use_df;
@@ -53,7 +54,8 @@ private:
 	
 public:
 
-	fockbuilder(desc::molecule& mol, desc::options& opt, MPI_Comm comm, int print = 0);
+	fockbuilder(desc::molecule& mol, desc::options& opt, MPI_Comm comm, 
+		int print, util::mpi_time& TIME_IN);
 	
 	~fockbuilder() {
 		if (m_3c2e_ints) m_3c2e_ints->destroy();

@@ -18,12 +18,13 @@ class mpi_log {
 
 private:
 
+	int m_proc = 0;
 	int global_plev_;
 	MPI_Comm m_comm;
 	
 public:
  
-    mpi_log(int glb, MPI_Comm comm = MPI_COMM_WORLD) 
+    mpi_log(MPI_Comm comm, int glb) 
 		: global_plev_(glb), m_comm(comm) {};
     
     ~mpi_log() {}
@@ -40,14 +41,14 @@ public:
 		print_(args...);
 	}
     
-    template <int nprint = 0, int nproc = 0, int nthread = 0, typename T, typename... Args>
+    template <int nprint = 0, typename T, typename... Args>
     void os(T in, Args ... args) {
 		
 		if (nprint <= global_plev_) {
 			int rank_;
 			MPI_Comm_rank(m_comm,&rank_);
 			
-			if (nproc == -1) {
+			if (m_proc == -1) {
 				
 				if (omp_in_parallel()) 
 					throw std::runtime_error("ERROR: You should not use mpi_log for all processes (-1) in parallel regions.");
@@ -61,30 +62,36 @@ public:
 					
 			} else {
 				
-				if (nproc == rank_) print_(in, args...);
+				if (m_proc == rank_) print_(in, args...);
 					
 			} //end ifelse	
 			
 		}//endif nprint
 		
 	} //end os
+	
+	mpi_log operator()(int n) {
+		mpi_log sub(m_comm, global_plev_);
+		sub.m_proc = n;
+		return sub;
+	}
     
-    template <int nproc = 0, typename T>
+    template <typename T>
     void dbg(T& in) {
 		std::cout << std::string("[DEBUG]: ");
-		os<999, nproc>(in);
+		this->operator()(999).os<-1>(in);
 	}
 	
-	template <int nproc = 0, typename T>
+	template <typename T>
     void warning(T& in) { 
 		std::cout << "[WARNING!]: ";
-		os<-1,nproc>(in);
+		this->operator()(-1).os<-1>(in);
 	}
 	
-	template <int nproc = 0, typename T>
+	template <typename T>
     void error(T& in) {
 		std::cout << "[ERROR!]: ";
-		os<-1, nproc>(in);
+		this->operator()(-1).os<-1>(in);
 		throw std::runtime_error("LOG ERROR.");
 		
 	}
@@ -93,7 +100,7 @@ public:
 	void banner(T m, int totl, char del) {
 	
 	  int rank_;
-	  MPI_Comm_rank(MPI_COMM_WORLD,&rank_);
+	  MPI_Comm_rank(m_comm,&rank_);
 	  
 	  if (rank_ == nproc) {
 	

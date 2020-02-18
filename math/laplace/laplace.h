@@ -55,7 +55,7 @@ public:
 		m_k(t_k), m_emin(t_emin), m_ehomo(t_ehomo),
 		m_elumo(t_elumo), m_emax(t_emax),
 		m_omega(t_k), m_alpha(t_k), m_xi(2*t_k + 1),
-		LOG(1), m_limit(std::numeric_limits<double>::epsilon()) {};
+		LOG(MPI_COMM_WORLD, 1), m_limit(std::numeric_limits<double>::epsilon()) {};
 	
 	~laplace() {}
 	
