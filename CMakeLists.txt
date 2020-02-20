@@ -15,17 +15,17 @@ get_target_property(dir Eigen3::Eigen INTERFACE_INCLUDE_DIRECTORIES)
 include_directories(${dir})
 
 find_package(OpenMP REQUIRED)
+find_package(Boost REQUIRED)
 find_package(MPI REQUIRED)
 find_package(DBCSR 2.0.0 CONFIG REQUIRED)
-
-find_package(Libint2 2.6.0 CONFIG REQUIRED)
-INCLUDE_DIRECTORIES(${LIBINT2_INCLUDE_DIRS})
-
-message(${LIBINT2_INCLUDE_DIRS})
-
 find_package(TBB REQUIRED)
+find_package(Libint2 2.6.0 CONFIG REQUIRED)
 
-include_directories(${CMAKE_CURRENT_SOURCE_DIR})
+get_target_property(DBCSR_INCLUDE_DIRS DBCSR::dbcsr INTERFACE_INCLUDE_DIRECTORIES)
+include_directories(
+	${DBCSR_INCLUDE_DIRS} ${MPI_CXX_HEADER_DIR} ${Boost_INCLUDE_DIRS}
+	${LIBINT2_INCLUDE_DIRS} ${CMAKE_CURRENT_SOURCE_DIR}
+)
 
 add_subdirectory(math)
 add_subdirectory(desc)
