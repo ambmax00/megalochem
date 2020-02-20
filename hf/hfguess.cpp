@@ -1,4 +1,5 @@
 #include "hf/hfmod.h"
+#include "ints/registry.h"
 #include "hf/hfdefaults.h"
 #include "math/tensor/dbcsr_conversions.hpp"
 #include "math/linalg/symmetrize.h"
@@ -188,7 +189,9 @@ void hfmod::compute_guess() {
 				}
 			}
 			
-			desc::molecule at_mol({.atoms = atvec, .charge = charge,
+			std::string name = "ATOM_rank" + std::to_string(myrank) + "_" + std::to_string(Z);
+			
+			desc::molecule at_mol({.name = name, .atoms = atvec, .charge = charge,
 				.mult = mult, .split = 20, .basis = at_basis, .dfbasis = at_dfbasis, .fractional = true});
 				
 			auto at_smol = std::make_shared<desc::molecule>(std::move(at_mol));
@@ -211,6 +214,8 @@ void hfmod::compute_guess() {
 			pA->scale(0.5);
 			
 			locdensitymap[Z] = dbcsr::tensor_to_eigen(*pA);
+			
+			ints::INT_REGISTRY.clear(name);
 			
 		}
 		

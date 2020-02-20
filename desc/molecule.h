@@ -14,6 +14,8 @@ namespace desc {
 class molecule {	
 private:
 
+	std::string m_name;
+
 	int m_mult;
 	int m_charge;
 	std::vector<libint2::Atom> m_atoms;
@@ -129,6 +131,7 @@ public:
 	molecule() {}
 	
 	struct mol_params {
+		required<std::string,val>					name;
 		required<std::vector<libint2::Atom>,ref>	atoms;
 		required<int,val>							charge;
 		required<int,val>							mult;

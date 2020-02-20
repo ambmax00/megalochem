@@ -8,7 +8,8 @@ static const json valid_keys =
 {
 	{"name", "string"},
 	{"molecule", {
-		{"file", "string"}, // filename.xyz
+		{"file", "string"}, 
+		{"name", "string"}, // filename.xyz
 		{"reorder", true}, // whether to reorder atoms
 		{"unit", "string"}, // angstrom
 		{"basis", "string"}, // basisset name

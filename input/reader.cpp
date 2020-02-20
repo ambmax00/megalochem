@@ -300,8 +300,9 @@ reader::reader(MPI_Comm comm, std::string filename) : m_comm(comm) {
 	
 	int charge = jmol["charge"];
 	int mult = jmol["mult"];
+	std::string name = jmol["name"];
 	
-	desc::molecule mol({.atoms = atoms, .charge = charge,
+	desc::molecule mol({.name = name, .atoms = atoms, .charge = charge,
 		.mult = mult, .split = 10, .basis = basis, .dfbasis = dfbasis});
 		
 	mol.print_info(m_comm,1);

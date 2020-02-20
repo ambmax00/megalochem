@@ -23,6 +23,7 @@ static const std::vector<int> reference_S = {  0,
 static const std::vector<int> conf_orb = {0, 2, 10, 18, 36, 54, 86, 118};
 
 molecule::molecule(mol_params&& p) : 
+	m_name(*p.name),
 	m_mult(*p.mult), 
 	m_charge(*p.charge)
 	{
