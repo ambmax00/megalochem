@@ -10,6 +10,9 @@
 #include <memory>
 #include <iostream>
 
+template <typename T>
+using svector = std::shared_ptr<std::vector<T>>;
+
 namespace hf {
 	
 class hfmod {
@@ -20,8 +23,8 @@ class hfmod {
 private:
 	
 	// descriptors
-	desc::molecule& m_mol;
-	desc::options& m_opt;
+	desc::smolecule m_mol;
+	desc::options m_opt;
 	MPI_Comm m_comm;
 	util::mpi_log LOG;
 	util::mpi_time TIME;
@@ -50,6 +53,8 @@ private:
 				  
 	dbcsr::stensor<2> m_f_bb_B, m_p_bb_B, m_c_bm_B;
 	
+	svector<double> m_eps_A, m_eps_B;
+	
 	void compute_nucrep();
 	void one_electron();
 	
@@ -62,7 +67,7 @@ private:
 
 public:
 
-	hfmod(desc::molecule& mol, desc::options& opt, MPI_Comm comm);
+	hfmod(desc::smolecule mol, desc::options opt, MPI_Comm comm);
 	
 	hfmod() = delete;
 	hfmod(hfmod& hfmod_in) = delete;
@@ -87,12 +92,44 @@ public:
 	
 	void compute();	
 	
+	svector<double> eps_A() {
+		return m_eps_A;
+	}
+	
+	svector<double> eps_B() {
+		return m_eps_B;
+	}
+	
+	dbcsr::stensor<2> c_bm_A() {
+		return m_c_bm_A;
+	}
+	
+	dbcsr::stensor<2> c_bm_B() {
+		return m_c_bm_B;
+	}
+	
 	dbcsr::stensor<2> p_bb_A() {
 		return m_p_bb_A;
 	}
 	
 	dbcsr::stensor<2> p_bb_B() {
 		return m_p_bb_B;
+	}
+	
+	dbcsr::stensor<2> f_bb_A() {
+		return m_f_bb_A;
+	}
+	
+	dbcsr::stensor<2> f_bb_B() {
+		return m_f_bb_B;
+	}
+	
+	dbcsr::stensor<2> s_bb() {
+		return m_s_bb;
+	}
+	
+	double tot_energy() {
+		return m_scf_energy + m_nuc_energy;
 	}
 	
 };

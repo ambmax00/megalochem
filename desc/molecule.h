@@ -7,6 +7,7 @@
 #include <vector>
 #include <libint2/atom.h>
 #include <mpi.h>
+#include <memory>
 
 namespace desc {
 
@@ -191,6 +192,8 @@ public:
 
 };
 
-}
+using smolecule = std::shared_ptr<molecule>;
+
+} // end namespace
 
 #endif

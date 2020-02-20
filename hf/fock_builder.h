@@ -24,8 +24,8 @@ public:
 	
 private:
 
-	desc::molecule& m_mol;
-	desc::options& m_opt;
+	desc::smolecule m_mol;
+	desc::options m_opt;
 	MPI_Comm m_comm;
 	util::mpi_log LOG;
 	util::mpi_time& TIME;
@@ -54,7 +54,7 @@ private:
 	
 public:
 
-	fockbuilder(desc::molecule& mol, desc::options& opt, MPI_Comm comm, 
+	fockbuilder(desc::smolecule mol, desc::options opt, MPI_Comm comm, 
 		int print, util::mpi_time& TIME_IN);
 	
 	~fockbuilder() {

@@ -9,7 +9,7 @@
 
 namespace hf {
 	
-hfmod::hfmod(desc::molecule& mol, desc::options& opt, MPI_Comm comm) 
+hfmod::hfmod(desc::smolecule mol, desc::options opt, MPI_Comm comm) 
 	: m_mol(mol), 
 	  m_opt(opt), 
 	  m_comm(comm),
@@ -24,17 +24,17 @@ hfmod::hfmod(desc::molecule& mol, desc::options& opt, MPI_Comm comm)
 	  m_nobeta(false)
 {
 	
-	m_restricted = (m_mol.nele_alpha() == m_mol.nele_beta()) ? true : false; 
+	m_restricted = (m_mol->nele_alpha() == m_mol->nele_beta()) ? true : false; 
 	
-	if (m_mol.nele_beta() == 0) m_nobeta = true;
+	if (m_mol->nele_beta() == 0) m_nobeta = true;
 	
 	dbcsr::pgrid<2> grid({.comm = m_comm});
 	
-	auto b = m_mol.dims().b();
-	auto oA = m_mol.dims().oa();
-	auto oB = m_mol.dims().ob();
-	auto vA = m_mol.dims().va();
-	auto vB = m_mol.dims().vb();
+	auto b = m_mol->dims().b();
+	auto oA = m_mol->dims().oa();
+	auto oB = m_mol->dims().ob();
+	auto vA = m_mol->dims().va();
+	auto vB = m_mol->dims().vb();
 	
 	vec<int> mA = oA;
 	mA.insert(mA.end(), vA.begin(), vA.end());
@@ -64,6 +64,9 @@ hfmod::hfmod(desc::molecule& mol, desc::options& opt, MPI_Comm comm)
 	if (m_p_bb_B) 
 		m_f_bb_B = dbcsr::make_stensor<2>({.name = "f_bb_B", .pgridN = grid, .map1 = {0}, .map2 = {1}, .blk_sizes = bb});
 		
+	m_eps_A = std::make_shared<std::vector<double>>(std::vector<double>(0));
+	if (m_p_bb_B) m_eps_B = std::make_shared<std::vector<double>>(std::vector<double>(0));
+		
 	LOG.os<>("Options: \n");
 	LOG.os<>("print ", LOG.global_plev(), '\n');
 	LOG.os<>("m_guess ", m_guess, '\n');
@@ -74,7 +77,7 @@ void hfmod::compute_nucrep() {
 	
 	m_nuc_energy = 0.0;
 	
-	auto atoms = m_mol.atoms();
+	auto atoms = m_mol->atoms();
 	
 	for (int i = 0; i != atoms.size(); ++i) {
 		for (int j = i+1; j < atoms.size(); ++j) {
@@ -104,7 +107,7 @@ void hfmod::one_electron() {
 	
 	TIME_1e.start();
 	
-	ints::aofactory int_engine(m_mol, m_comm);
+	ints::aofactory int_engine(*m_mol, m_comm);
 	
 	// overlap			 
 	m_s_bb = int_engine.compute<2>(
@@ -273,7 +276,7 @@ void hfmod::compute() {
 		LOG.os<>("UHF@", iter, '\t', m_scf_energy + m_nuc_energy, '\t', old_energy - m_scf_energy, '\t', rms_A, '\t', rms_B, '\n');
 		
 		if (rms_A < m_scf_threshold && rms_B < m_scf_threshold) break;
-		if (iter > HF_MAX_ITER) break;
+		if (iter > m_max_iter) break;
 		
 		if (m_diis) {
 			diis_A.compute_extrapolation_parameters(*m_f_bb_A, e_A, iter);
@@ -307,6 +310,8 @@ void hfmod::compute() {
 	
 	e_A.destroy();
 	e_B.destroy();
+	
+	if (iter > m_max_iter) throw std::runtime_error("HF did not converge.");
 	
 	if (m_nobeta) {
 		// take care of density

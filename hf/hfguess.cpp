@@ -98,7 +98,7 @@ void hfmod::compute_guess() {
 		// get mol info, check for atom types...
 		std::vector<libint2::Atom> atypes;
 		
-		for (auto atom1 : m_mol.atoms()) {
+		for (auto atom1 : m_mol->atoms()) {
 			
 			auto found = std::find_if(atypes.begin(), atypes.end(), 
 				[&atom1](const libint2::Atom& atom2) {
@@ -175,15 +175,15 @@ void hfmod::compute_guess() {
 			optional<std::vector<libint2::Shell>,val> at_dfbasis;
 			
 			// find basis functions
-			for (auto shell : m_mol.c_basis().libint_basis()) {
+			for (auto shell : m_mol->c_basis().libint_basis()) {
 				if (are_oncentre(atom, shell)) at_basis.push_back(shell);
 			}
 			
-			if (m_mol.c_dfbasis()) {
+			if (m_mol->c_dfbasis()) {
 				//std::cout << "INSIDE HERE." << std::endl;
 				std::vector<libint2::Shell> temp;
 				at_dfbasis = optional<std::vector<libint2::Shell>,val>(temp);
-				for (auto shell : m_mol.c_dfbasis()->libint_basis()) {
+				for (auto shell : m_mol->c_dfbasis()->libint_basis()) {
 					if (are_oncentre(atom, shell)) at_dfbasis->push_back(shell);
 				}
 			}
@@ -191,9 +191,11 @@ void hfmod::compute_guess() {
 			desc::molecule at_mol({.atoms = atvec, .charge = charge,
 				.mult = mult, .split = 20, .basis = at_basis, .dfbasis = at_dfbasis, .fractional = true});
 				
-			at_mol.print_info(mycomm,LOG.global_plev());
+			auto at_smol = std::make_shared<desc::molecule>(std::move(at_mol));
+				
+			at_smol->print_info(mycomm,LOG.global_plev());
 			
-			hf::hfmod atomic_hf(at_mol,at_opt,mycomm);
+			hf::hfmod atomic_hf(at_smol,at_opt,mycomm);
 			
 			LOG(myrank).os<1>("Starting Atomic UHF for atom nr. ", I, " on rank ", myrank, '\n');
 			atomic_hf.compute();
@@ -283,16 +285,16 @@ void hfmod::compute_guess() {
 		}
 			
 		
-		size_t nbas = m_mol.c_basis().nbf();
+		size_t nbas = m_mol->c_basis().nbf();
 		
 		Eigen::MatrixXd ptot = Eigen::MatrixXd::Zero(nbas,nbas);
-		auto csizes = m_mol.dims().b();
+		auto csizes = m_mol->dims().b();
 		int off = 0;
 		int size = 0;
 		
-		for (int i = 0; i != m_mol.atoms().size(); ++i) {
+		for (int i = 0; i != m_mol->atoms().size(); ++i) {
 			
-			int Z = m_mol.atoms()[i].atomic_number;
+			int Z = m_mol->atoms()[i].atomic_number;
 			size = csizes[i];
 			
 			ptot.block(off,off,size,size) = densitymap[Z];

@@ -9,7 +9,7 @@
 
 namespace hf {
 	
-fockbuilder::fockbuilder(desc::molecule& mol, desc::options& opt, MPI_Comm comm, int print,
+fockbuilder::fockbuilder(desc::smolecule mol, desc::options opt, MPI_Comm comm, int print,
 	util::mpi_time& TIME_IN) :
 	m_mol(mol), 
 	m_opt(opt), 
@@ -19,9 +19,9 @@ fockbuilder::fockbuilder(desc::molecule& mol, desc::options& opt, MPI_Comm comm,
 	m_use_df(opt.get<bool>("use_df", HF_USE_DF)) {
 
 	// build the integrals 
-	ints::aofactory ao(m_mol, m_comm);
+	ints::aofactory ao(*m_mol, m_comm);
 	
-	m_restricted = (m_mol.nele_alpha() == m_mol.nele_beta()) ? true : false;
+	m_restricted = (m_mol->nele_alpha() == m_mol->nele_beta()) ? true : false;
 	
 	std::cout << std::scientific;
 	std::cout << std::setprecision(12);
@@ -88,13 +88,13 @@ fockbuilder::fockbuilder(desc::molecule& mol, desc::options& opt, MPI_Comm comm,
 	// set up tensors
 	dbcsr::pgrid<2> grid({.comm = m_comm});
 	
-	auto b = m_mol.dims().b();
+	auto b = m_mol->dims().b();
 	
 	m_j_bb = dbcsr::make_stensor<2>({.name = "j_bb", .pgridN = grid, .map1 = {0}, .map2 = {1}, .blk_sizes = {b,b}});
 	m_k_bb_A = dbcsr::make_stensor<2>({.name = "k_bb_A", .pgridN = grid, .map1 = {0}, .map2 = {1}, .blk_sizes = {b,b}});
 	m_f_bb_A = dbcsr::make_stensor<2>({.name = "f_bb_A", .pgridN = grid, .map1 = {0}, .map2 = {1}, .blk_sizes = {b,b}});
 	
-	if (!m_restricted && m_mol.nele_beta() != 0) {
+	if (!m_restricted && m_mol->nele_beta() != 0) {
 		m_k_bb_B = dbcsr::make_stensor<2>(
 			{.name = "k_bb_B", .pgridN = grid, .map1 = {0}, .map2 = {1}, .blk_sizes = {b,b}});
 		m_f_bb_B = dbcsr::make_stensor<2>(
@@ -153,7 +153,7 @@ void fockbuilder::build_j(compute_param&& pms) {
 		dbcsr::pgrid<2> grid2({.comm = m_comm});
 		dbcsr::pgrid<3> grid3({.comm = m_comm});
 		
-		vec<vec<int>> sizes = {m_mol.dims().x(),vec<int>{1}};
+		vec<vec<int>> sizes = {m_mol->dims().x(),vec<int>{1}};
 		
 		dbcsr::tensor<2> c_xY({.name = "c_xY", .pgridN = grid2, .map1 = {0}, .map2 = {1}, .blk_sizes = sizes});
 		dbcsr::tensor<2> d_xY({.name = "d_xY", .pgridN = grid2, .map1 = {0}, .map2 = {1}, .blk_sizes = sizes});
@@ -249,7 +249,7 @@ void fockbuilder::build_k(compute_param&& pms) {
 			
 			vec<int> o = c_bm.blk_size()[1];
 			
-			vec<vec<int>> HTsizes = {m_mol.dims().x(), m_mol.dims().b(), o};
+			vec<vec<int>> HTsizes = {m_mol->dims().x(), m_mol->dims().b(), o};
 			
 			dbcsr::tensor<3> HT({.name = "HT"+x, .pgridN = grid3, .map1 = {0,1}, .map2 = {2}, .blk_sizes = HTsizes});	
 			dbcsr::tensor<3> D({.name = "D"+x, .pgridN = grid3, .map1 = {0}, .map2 = {1,2}, .blk_sizes = HTsizes});
@@ -257,7 +257,7 @@ void fockbuilder::build_k(compute_param&& pms) {
 			// HTa("M,mu,i") = Coa("nu,i") * B("M,mu,nu");
 			if (!SAD_iter) {
 				
-				int nocc = (x == "A") ? m_mol.nocc_alpha() - 1 : m_mol.nocc_beta() - 1;	
+				int nocc = (x == "A") ? m_mol->nocc_alpha() - 1 : m_mol->nocc_beta() - 1;	
 				
 				std::cout << "NOCC: " << nocc << std::endl;
 							

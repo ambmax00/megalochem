@@ -85,6 +85,17 @@ int main(int argc, char** argv) {
 	
 	util::mpi_time time(MPI_COMM_WORLD, "Megalochem");
 	
+	util::mpi_log LOG(MPI_COMM_WORLD,0);
+	
+	std::string s = R"(|  \/  ||  ___|  __ \ / _ \ | |   |  _  /  __ \| | | ||  ___|  \/  |)""\n"
+					R"(| .  . || |__ | |  \// /_\ \| |   | | | | /  \/| |_| || |__ | .  . |)""\n"
+					R"(| |\/| ||  __|| | __ |  _  || |   | | | | |    |  _  ||  __|| |\/| |)""\n"
+					R"(| |  | || |___| |_\ \| | | || |___\ \_/ / \__/\| | | || |___| |  | |)""\n"
+					R"(\_|  |_/\____/ \____/\_| |_/\_____/\___/ \____/\_| |_/\____/\_|  |_/)";
+	
+	
+	LOG.banner(s,90,'*');
+	
 	if (argc < 2) {
 		throw std::runtime_error("Wrong number of command line inputs.");
 	}
@@ -97,10 +108,10 @@ int main(int argc, char** argv) {
 	
 	dbcsr::init();
 	
-	auto mol = filereader.get_mol();
+	auto mol = std::make_shared<desc::molecule>(filereader.get_mol());
 	auto opt = filereader.get_opt(); 
 	
-	auto cbas = mol.c_basis();
+	auto cbas = mol->c_basis();
 	
 	for (int i = 0; i != cbas.size(); ++i) {
 		for (auto s : cbas[i]) {

@@ -3,6 +3,8 @@
 #include "math/linalg/symmetrize.h"
 #include "math/other/scale.h"
 
+#include <algorithm> 
+
 #include <Eigen/Eigenvalues>
 
 namespace hf { 
@@ -27,7 +29,7 @@ void hfmod::diag_fock() {
 		u = 6;
 	}
 	
-	auto diagonalize = [&](dbcsr::tensor<2>& f_bb, dbcsr::tensor<2>& c_bm, std::string x) {
+	auto diagonalize = [&](dbcsr::tensor<2>& f_bb, dbcsr::tensor<2>& c_bm, std::vector<double>& eps, std::string x) {
 		
 		vec<int> blk_sizes;
 		int nele;
@@ -57,6 +59,9 @@ void hfmod::diag_fock() {
 		
 		LOG.os<2>("Eigenvalues: \n");
 		LOG.os<2>(eigval);
+		
+		eps.resize(eigval.size());
+		std::copy(eigval.data(), eigval.data() + eigval.size(), eps.begin());
 		
 		LOG.os<2>("Eigenvectors: \n");
 		LOG.os<2>(eigvec);
@@ -94,8 +99,8 @@ void hfmod::diag_fock() {
 		
 		int limit = 0;
 		
-		if (x == "A") limit = m_mol.nocc_alpha() - 1;
-		if (x == "B") limit = m_mol.nocc_beta() - 1;
+		if (x == "A") limit = m_mol->nocc_alpha() - 1;
+		if (x == "B") limit = m_mol->nocc_beta() - 1;
 		
 		//std::cout << "LIMIT " << limit << std::endl;
 		
@@ -111,21 +116,21 @@ void hfmod::diag_fock() {
 		
 	};
 	
-	diagonalize(*m_f_bb_A, *m_c_bm_A, "A");
+	diagonalize(*m_f_bb_A, *m_c_bm_A, *m_eps_A, "A");
 	if (m_f_bb_B) {
-		diagonalize(*m_f_bb_B, *m_c_bm_B, "B");
+		diagonalize(*m_f_bb_B, *m_c_bm_B, *m_eps_B, "B");
 	}
 	
 	t_diag.finish();
 	
-	auto fraca = m_mol.frac_occ_alpha();
+	auto fraca = m_mol->frac_occ_alpha();
 	if (fraca) {
 		//std::cout << "Scaling!" << std::endl;
 		std::vector<int> b = {0,fraca->size() - 1};
 		math::scale({.t_in = *m_c_bm_A, .v_in = *fraca, .bounds = b});
 	}
 	
-	auto fracb = m_mol.frac_occ_beta();
+	auto fracb = m_mol->frac_occ_beta();
 	if (fracb && m_c_bm_B) {
 		std::vector<int> b = {0,fracb->size() - 1};
 		math::scale({.t_in = *m_c_bm_B, .v_in = *fracb, .bounds = b});

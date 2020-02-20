@@ -1597,32 +1597,64 @@ double dot(tensor<N,double>& t1, tensor<N,double>& t2) {
 	
 	// dot product only for N = 2 at the moment
 	assert(N == 2);
-	
-	iterator<N> it(t1);
-	
+
 	double sum = 0.0;
 	
-	while (it.blocks_left()) {
+	dbcsr::iterator<2> it(t1);
+	
+	int nblks = t1.num_blocks();
+	
+	/*
+	#pragma omp parallel for shared(iter) reduction(+:sum)
+	for (int I = 0; I != nblks; ++I) 
+	{
 		
-		it.next();
+		idx2 iblk;
+		vec<int> blksize;
+		
+		#pragma omp critical 
+		{
+			iter.next();
+			iblk = iter.idx();
+			blksize = iter.sizes();
+		}
 		
 		bool found = false;
-		auto b1 = t1.get_block({.idx = it.idx(), .blk_size = it.sizes(), .found = found});
-		auto b2 = t2.get_block({.idx = it.idx(), .blk_size = it.sizes(), .found = found});
+		auto b1 = t1.get_block({.idx = iblk, .blk_size = blksize, .found = found});
+		auto b2 = t2.get_block({.idx = iblk, .blk_size = blksize, .found = found});
 		
 		if (!found) continue;
 		
-		//std::cout  << std::inner_product(b1.data(), b1.data() + b1.ntot(), b2.data(), T()) << std::endl;
+		double term = std::inner_product(b1.data(), b1.data() + b1.ntot(), b2.data(), 0.0);
 		
-		//std::cout << "ELE: " << std::endl;
-		//for (int i = 0; i != b1.ntot(); ++i) { std::cout << b1(i) << " " << b2(i) << std::endl; }
+		sum += term;
 		
+	}*/
+	
+	
+		while (it.blocks_left()) {
+			
+			it.next();
+			
+			bool found = false;
+			auto b1 = t1.get_block({.idx = it.idx(), .blk_size = it.sizes(), .found = found});
+			auto b2 = t2.get_block({.idx = it.idx(), .blk_size = it.sizes(), .found = found});
+			
+			if (!found) continue;
+			
+			//std::cout  << std::inner_product(b1.data(), b1.data() + b1.ntot(), b2.data(), T()) << std::endl;
+			
+			//std::cout << "ELE: " << std::endl;
+			//for (int i = 0; i != b1.ntot(); ++i) { std::cout << b1(i) << " " << b2(i) << std::endl; }
+			
+			
+			sum += std::inner_product(b1.data(), b1.data() + b1.ntot(), b2.data(), 0.0);
+			
+			//std::cout << "SUM: " << std::inner_product(b1.data(), b1.data() + b1.ntot(), b2.data(), T()) << std::endl;
+			
+		}
 		
-		sum += std::inner_product(b1.data(), b1.data() + b1.ntot(), b2.data(), 0.0);
-		
-		//std::cout << "SUM: " << std::inner_product(b1.data(), b1.data() + b1.ntot(), b2.data(), T()) << std::endl;
-		
-	}
+	
 	
 	double MPIsum = 0.0;
 	
@@ -1630,49 +1662,6 @@ double dot(tensor<N,double>& t1, tensor<N,double>& t2) {
 	
 	return MPIsum;
 		
-}
-
-template <typename T = double>
-T dot_sym (dbcsr::tensor<2,T>& t1, dbcsr::tensor<2,T>& t2) {
-		
-		T result = T();
-		
-		auto offsets = t1.blk_offset();
-		
-		dbcsr::iterator<2> iter(t1);
-		
-		while (iter.blocks_left()) {
-			
-			iter.next();
-			auto idx = iter.idx();
-			auto blksize = iter.sizes();
-			
-			bool found = false;
-			auto blk1 = t1.get_block({.idx = idx, .blk_size = blksize, .found = found});
-			auto blk2 = t2.get_block({.idx = idx, .blk_size = blksize, .found = found});
-			
-			if (!found) continue;
-			
-			int toff1 = offsets[0][idx[0]];
-			int toff2 = offsets[1][idx[1]];
-			
-			T prefac = 1.0;
-			
-			for (int i = 0; i != blksize[0]; ++i) {
-				toff1 += i;
-				for (int j = 0; j != blksize[1]; ++j) {
-					toff2 += j;
-					prefac = (toff1 == toff2) ? 1.0 : 0.25;		
-					result += prefac * blk1(i,j) * blk2(i,j);
-				}
-				toff2 = 0;
-			}
-			toff1 = 0;
-			
-		}
-		
-		return result;
-		          
 }
 
 template <int N, typename T>
