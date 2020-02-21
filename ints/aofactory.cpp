@@ -3,8 +3,10 @@
 #include "ints/aofactory.h"
 #include "ints/integrals.h"
 #include "ints/screening.h"
+#include "ints/registry.h"
 #include "utils/pool.h"
 #include "utils/params.hpp"
+#include "math/linalg/inverse.h"
 #include <libint2.hpp>
 
 #include <iostream>
@@ -17,21 +19,35 @@ dbcsr::stensor<N,double> aofactory::compute(aofac_params&& p) {
 		
 		std::string Op = *p.op;
 		std::string bis = *p.bas;
+		std::string intname;
 		
 		libint2::initialize();
 		
+		// ======= process operator =========== 
 		libint2::Operator libOp = libint2::Operator::invalid;
 		libint2::BraKet libBraKet = libint2::BraKet::invalid;
 		
-		if (Op == "coulomb") libOp = libint2::Operator::coulomb;
-		if (Op == "overlap") libOp = libint2::Operator::overlap;
-		if (Op == "kinetic") libOp = libint2::Operator::kinetic;
-		if (Op == "nuclear") libOp = libint2::Operator::nuclear;
-		if (Op == "erfc_coulomb") libOp = libint2::Operator::erfc_coulomb;
+		if (Op == "coulomb") {
+			libOp = libint2::Operator::coulomb;
+			intname = "i_";
+		} else if (Op == "overlap") {
+			libOp = libint2::Operator::overlap;
+			intname = "s_";
+		} else if (Op == "kinetic") {
+			libOp = libint2::Operator::kinetic;
+			intname = "t_";
+		} else if (Op == "nuclear") {
+			libOp = libint2::Operator::nuclear;
+			intname = "v_";
+		} else if (Op == "erfc_coulomb") {
+			libOp = libint2::Operator::erfc_coulomb;
+			intname = "erfc_";
+		}
 		
 		if (libOp == libint2::Operator::invalid) 
 			throw std::runtime_error("Invalid operator: "+Op);
-		
+			
+		// ======== process basis info =============
 		vec<desc::cluster_basis> basvec;
 		
 		//std::cout << "A1" << std::endl;
@@ -41,7 +57,7 @@ dbcsr::stensor<N,double> aofactory::compute(aofac_params&& p) {
 		
 		//if (x_bas) std::cout << "ITS HERE IN INTS" << std::endl;
 		
-		std::cout << "A3" << std::endl;
+		//std::cout << "A3" << std::endl;
 		
 		if (bis == "bb") { 
 			basvec = {c_bas, c_bas};
@@ -57,6 +73,16 @@ dbcsr::stensor<N,double> aofactory::compute(aofac_params&& p) {
 			libBraKet = libint2::BraKet::xx_xx;
 		} else {
 			throw std::runtime_error("Unsupported basis set specifications: "+bis);
+		}
+		
+		intname += bis;
+		
+		registry INT_REGISTRY;
+		dbcsr::stensor<N> out = INT_REGISTRY.get<N>(m_mol.name(), intname);
+		
+		if (out) {
+			std::cout << "PRESENT: " << m_mol.name() << " " << intname << std::endl;
+			return out;
 		}
 		
 		size_t max_nprim = 0;
@@ -98,15 +124,79 @@ dbcsr::stensor<N,double> aofactory::compute(aofac_params&& p) {
 				
 		//}
 		
+		// ======= porcess extended input ==========
+		
+		/*
+		if (p.ext && N == 4) throw std::runtime_error("Aofactory: no extended input possible for 2e ints.");
+		
+		if (p.ext) {
+			if ((N == 2) && (*p.ext != "^-1" || *p.ext != "^-1/2"))
+				throw std::runtime_error("Aofactory: unknown option for extended input (N = 2)");
+			if ((N == 3) && (*p.ext != "(P|Q)^-1" || *p.ext != "(P|Q)^-1/2"))
+				throw std::runtime_error("Aofactory: unknown option for extended input (N = 2)");
+		}
+		*/
 		//std::cout << "OUT" << std::endl;
-		dbcsr::stensor<N,double> out = integrals<N>({.comm = m_comm, .engine = eng_pool, 
+		out = integrals<N>({.comm = m_comm, .engine = eng_pool, 
 			.basvec = basvec, .bra = m_2e_ints_zmat, .ket = m_2e_ints_zmat, 
-			.name = *p.name, .map1 = *p.map1, .map2 = *p.map2});
+			.name = intname, .map1 = *p.map1, .map2 = *p.map2});
+		
+		/*
+		if (p.ext && N == 2) {
+			
+			if (*p.ext == "^-1") {
+				out = math::eigen_inverse(*out, *p.name);
+			} else {
+				out = math::eigen_sqrt_inverse(*out,*p.name);
+			}
+			
+		} else if (p.ext && N == 3) {
+			
+			if (*p.ext == "(P|Q)^-1") {
+				auto metric = this->compute({.op = p.op, .bas = "xx", .name = "XX", .map1 = {0}, .map2 = {1}y
+				out = math::eigen_inverse(*out, *p.name);
+			} else {
+				out = math::eigen_sqrt_inverse(*out,*p.name);
+			}
+			
+			
+		*/	
+		
+		INT_REGISTRY.insert<N>(m_mol.name(), intname, out);
 		
 		libint2::finalize();
 		
 		return out;
 		
+}
+
+dbcsr::stensor<2> aofactory::invert(dbcsr::stensor<2>& in, int order) {
+	
+	//if (method != 0) throw std::runtime_error("No other method for inverting has been implemented.");
+	if (!(order == 1 || order == 2)) throw std::runtime_error("Wrong order for inverting.");
+	
+	dbcsr::stensor<2> out;
+	
+	std::string intname = in->name();
+	
+	if (order == 1) intname += "^-1";
+	if (order == 2) intname += "^-1/2";
+	
+	registry INT_REGISTRY;
+	out = INT_REGISTRY.get<2>(m_mol.name(), intname);
+	
+	if (out) return out;
+	
+	if (order == 1) {
+		out = math::eigen_inverse(in,intname);
+	} else {
+		out = math::eigen_sqrt_inverse(in,intname);
+	}
+	
+	INT_REGISTRY.insert<2>(m_mol.name(), intname, out);
+	
+	return out;
+	
 }
 
 //forward declarations

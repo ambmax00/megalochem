@@ -81,13 +81,16 @@ public:
 	struct aofac_params {
 		required<std::string,val> 	op;
 		required<std::string,val> 	bas;
-		required<std::string,val>	name;
+		//required<std::string,val>	name;
 		required<vec<int>,val>		map1;
 		required<vec<int>,val>		map2;
+		//optional<std::string>		ext; // extended input
 	};
 	
 	template <int N>
 	dbcsr::stensor<N,double> compute(aofac_params&& p);
+
+	dbcsr::stensor<2> invert(dbcsr::stensor<2>& in, int order);
 	
 	optional<Zmat,val> m_2e_ints_zmat;
 	optional<Zmat,val> m_3c2e_ints_zmat;

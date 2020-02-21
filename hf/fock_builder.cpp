@@ -33,7 +33,7 @@ fockbuilder::fockbuilder(desc::smolecule mol, desc::options opt, MPI_Comm comm, 
 		t_int2ele.start();
 	
 		LOG.os<>("Computing 2e integrals...\n");
-		m_2e_ints = ao.compute<4>({.op = "coulomb",  .bas = "bbbb", .name="i_bbbb", .map1 = {0,1}, .map2 = {2,3}});
+		m_2e_ints = ao.compute<4>({.op = "coulomb",  .bas = "bbbb", .map1 = {0,1}, .map2 = {2,3}});
 		
 		t_int2ele.finish();
 		
@@ -46,7 +46,7 @@ fockbuilder::fockbuilder(desc::smolecule mol, desc::options opt, MPI_Comm comm, 
 		t_int3c2e.start();
 		
 		LOG.os<>("Computing 3c2e integrals...\n");
-		m_3c2e_ints = ao.compute<3>({.op = "coulomb", .bas = "xbb", .name="d_xbb", .map1 = {0}, .map2 = {1,2}});
+		m_3c2e_ints = ao.compute<3>({.op = "coulomb", .bas = "xbb", .map1 = {0}, .map2 = {1,2}});
 		
 		t_int3c2e.finish();
 		
@@ -63,7 +63,7 @@ fockbuilder::fockbuilder(desc::smolecule mol, desc::options opt, MPI_Comm comm, 
 		t_metric.start();
 		
 		LOG.os<>("Computing metric...\n");
-		auto m_xx = ao.compute<2>({.op = "coulomb", .bas = "xx", .name="i_xx", .map1={0}, .map2={1}});
+		auto m_xx = ao.compute<2>({.op = "coulomb", .bas = "xx", .map1={0}, .map2={1}});
 		
 		t_metric.finish();
 		
@@ -76,7 +76,7 @@ fockbuilder::fockbuilder(desc::smolecule mol, desc::options opt, MPI_Comm comm, 
 		t_inv.start();
 		
 		LOG.os<>("Computing inverse...\n");
-		m_inv_xx = math::eigen_inverse(m_xx, "inv_xx");
+		m_inv_xx = ao.invert(m_xx,1);
 		LOG.os<>("Done.\n");
 		
 		t_inv.finish();

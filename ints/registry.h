@@ -8,33 +8,42 @@ namespace ints {
 	
 struct int_params {
 	std::string molname; // e.g. "mol1"
-	std::string bis; // e.g. "bb"
-	std::string op; // e.g. "coulomb"
-	int inv; // 0: not inverted 1: ^-1, 2: ^-1/2
-};
+	std::string intname;
+	
+	bool operator==(const int_params p) const {
+		return molname == p.molname && intname == p.intname;
+	}
+	
+	bool operator<(const int_params p) const {
+		return molname < p.molname || (molname == p.molname && intname < p.intname);
+	}
 
-bool operator<(int_params p1, int_params p2) {
-	return p1.molname < p2.molname;
-}
+};
 
 class registry {
 private:
 
-	std::map<int_params,std::any> m_map;
+	inline static std::map<int_params,std::any> m_map;
 	
 public:
+
+	registry() {}
+	
+	~registry() {}
 	
 	template <int N>
-	void insert(int_params&& p, dbcsr::stensor<N>& t) {
+	void insert(std::string molname, std::string intname, dbcsr::stensor<N>& t) {
 		std::any in = std::any(t);
+		int_params p{.molname = molname, .intname = intname};
 		m_map[p] = in;
 	};
 	
 	template <int N>
-	dbcsr::stensor<N> get(int_params&& p) {
+	dbcsr::stensor<N> get(std::string molname, std::string intname) {
 		dbcsr::stensor<N> out;
+		int_params p{.molname = molname, .intname = intname};
 		if (m_map.find(p) != m_map.end()) 
-			return m_map[p];
+			out = std::any_cast<dbcsr::stensor<N>>(m_map[p]);
 		return out;
 	}
 	
@@ -53,8 +62,6 @@ public:
 		
 		
 };
-
-static registry INT_REGISTRY;
 
 } // end namespace
 

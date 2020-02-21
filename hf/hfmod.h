@@ -92,6 +92,10 @@ public:
 	
 	void compute();	
 	
+	desc::smolecule mol() {
+		return m_mol;
+	}
+	
 	svector<double> eps_A() {
 		return m_eps_A;
 	}

@@ -192,6 +192,10 @@ public:
 	optional<std::vector<double>,val> frac_occ_beta() {
 		return m_frac_occ_beta;
 	}
+	
+	std::string name() {
+		return m_name;
+	}
 
 };
 

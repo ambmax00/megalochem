@@ -46,10 +46,10 @@ hfmod::hfmod(desc::smolecule mol, desc::options opt, MPI_Comm comm)
 	vec<vec<int>> bm_A = {b, mA};
 	vec<vec<int>> bm_B = {b, mB};
 	
-	m_s_bb = dbcsr::make_stensor<2>({.name = "s_bb", .pgridN = grid, .map1 = {0}, .map2 = {1}, .blk_sizes = bb});
-	m_x_bb = dbcsr::make_stensor<2>({.name = "x_bb", .pgridN = grid, .map1 = {0}, .map2 = {1}, .blk_sizes = bb});
-	m_v_bb = dbcsr::make_stensor<2>({.name = "v_bb", .pgridN = grid, .map1 = {0}, .map2 = {1}, .blk_sizes = bb});
-	m_t_bb = dbcsr::make_stensor<2>({.name = "k_bb", .pgridN = grid, .map1 = {0}, .map2 = {1}, .blk_sizes = bb});
+	//m_s_bb = dbcsr::make_stensor<2>({.name = "s_bb", .pgridN = grid, .map1 = {0}, .map2 = {1}, .blk_sizes = bb});
+	//m_x_bb = dbcsr::make_stensor<2>({.name = "x_bb", .pgridN = grid, .map1 = {0}, .map2 = {1}, .blk_sizes = bb});
+	//m_v_bb = dbcsr::make_stensor<2>({.name = "v_bb", .pgridN = grid, .map1 = {0}, .map2 = {1}, .blk_sizes = bb});
+	//m_t_bb = dbcsr::make_stensor<2>({.name = "k_bb", .pgridN = grid, .map1 = {0}, .map2 = {1}, .blk_sizes = bb});
 	m_core_bb = dbcsr::make_stensor<2>({.name = "core_bb", .pgridN = grid, .map1 = {0}, .map2 = {1}, .blk_sizes = bb});
 	
 	m_p_bb_A = dbcsr::make_stensor<2>({.name = "p_bb_A", .pgridN = grid, .map1 = {0}, .map2 = {1}, .blk_sizes = bb});
@@ -112,7 +112,7 @@ void hfmod::one_electron() {
 	// overlap			 
 	m_s_bb = int_engine.compute<2>(
 			{.op = "overlap", .bas = "bb",
-			 .name = "S_bb", .map1 = {0}, .map2 = {1}
+			 .map1 = {0}, .map2 = {1}
 			 });		 
 	
 	//m_s_bb = math::symmetrize(m_s_bb, "m_s_bb");
@@ -120,7 +120,7 @@ void hfmod::one_electron() {
 	//kinetic
 	m_t_bb = int_engine.compute<2>(
 		{.op = "kinetic", .bas = "bb", 
-		 .name = "t_bb", .map1 = {0}, .map2 = {1}
+		 .map1 = {0}, .map2 = {1}
 		});
 	
 	//m_t_bb = math::symmetrize(m_t_bb, "m_t_bb");
@@ -128,7 +128,7 @@ void hfmod::one_electron() {
 	// nuclear
 	m_v_bb = int_engine.compute<2>(
 		{.op = "nuclear", .bas = "bb",
-		 .name = "v_bb", .map1 = {0}, .map2 = {1}
+		 .map1 = {0}, .map2 = {1}
 		});
 		
 	//m_v_bb = math::symmetrize(m_v_bb, "m_v_bb");

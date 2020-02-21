@@ -215,7 +215,8 @@ void hfmod::compute_guess() {
 			
 			locdensitymap[Z] = dbcsr::tensor_to_eigen(*pA);
 			
-			ints::INT_REGISTRY.clear(name);
+			ints::registry INTS_REGISTRY;
+			INTS_REGISTRY.clear(name);
 			
 		}
 		
