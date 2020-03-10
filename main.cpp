@@ -4,6 +4,7 @@
 #include <string>
 #include "input/reader.h"
 #include "hf/hfmod.h"
+#include "adc/adcmod.h"
 #include "utils/mpi_time.h"
 
 /*
@@ -121,9 +122,29 @@ int main(int argc, char** argv) {
 	
 	auto hfopt = opt.subtext("hf");
 	
+	desc::shf_wfn myhfwfn = std::make_shared<desc::hf_wfn>();
 	hf::hfmod myhf(mol,hfopt,MPI_COMM_WORLD);
 	
-	myhf.compute();
+	bool skip_hf = hfopt.get<bool>("skip", false);
+	
+	if (!skip_hf) {
+	
+		myhf.compute();
+		myhfwfn = myhf.wfn();
+		myhfwfn->write_to_file();
+		
+	} else {
+		
+		LOG.os<>("Reading HF info from files...\n");
+		myhfwfn->read_from_file(mol,MPI_COMM_WORLD);
+		
+	}
+	
+	auto adcopt = opt.subtext("adc");
+	
+	adc::adcmod myadc(myhfwfn,adcopt,MPI_COMM_WORLD);
+	
+	myadc.compute();
 	
 	time.finish();
 	

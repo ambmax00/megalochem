@@ -81,7 +81,7 @@ fockbuilder::fockbuilder(desc::smolecule mol, desc::options opt, MPI_Comm comm, 
 		
 		t_inv.finish();
 		
-		m_xx->destroy();
+		//m_xx->destroy();
 		
 	}
 		

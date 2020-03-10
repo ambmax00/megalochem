@@ -204,16 +204,23 @@ void hfmod::compute_guess() {
 			atomic_hf.compute();
 			LOG(myrank).os<1>("Done with Atomic UHF on rank ", myrank, "\n");
 			
-			auto pA = atomic_hf.p_bb_A();
-			auto pB = atomic_hf.p_bb_B();
+			auto at_wfn = atomic_hf.wfn();
+			
+			auto pA = at_wfn->po_bb_A();
+			auto pB = at_wfn->po_bb_B();
 			
 			//std::cout << "PA on rank: " << myrank << std::endl;
 			//dbcsr::print(*pA);
 			
-			dbcsr::copy<2>({.t_in = *pB, .t_out = *pA, .sum = true, .move_data = true});
-			pA->scale(0.5);
+			dbcsr::pgrid<2> grid({.comm = mycomm});
 			
-			locdensitymap[Z] = dbcsr::tensor_to_eigen(*pA);
+			dbcsr::tensor<2> pscaled({.name = at_smol->name() + "_density", .pgridN = grid, .map1 = {0}, .map2 = {1}, .blk_sizes = pA->blk_size()});
+			
+			dbcsr::copy<2>({.t_in = *pA, .t_out = pscaled, .sum = true, .move_data = true});
+			dbcsr::copy<2>({.t_in = *pB, .t_out = pscaled, .sum = true, .move_data = true});
+			pscaled.scale(0.5);
+			
+			locdensitymap[Z] = dbcsr::tensor_to_eigen(pscaled);
 			
 			ints::registry INTS_REGISTRY;
 			INTS_REGISTRY.clear(name);

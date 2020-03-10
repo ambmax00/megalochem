@@ -3,6 +3,8 @@ set(SOURCES
 	molecule.h
 	basis.cpp
 	molecule.cpp
+	io.h
+	io.cpp
 )
 
 add_library(chem_desc ${SOURCES})

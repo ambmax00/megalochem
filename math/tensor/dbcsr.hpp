@@ -47,6 +47,8 @@
 #include <thread>
 #include <unistd.h>
 
+template <typename T>
+using svector = std::shared_ptr<std::vector<T>>;
 
 template <typename T>
 using vec = std::vector<T>;
@@ -71,6 +73,9 @@ class tensor;
 
 template <int N, typename T = double>
 using stensor = std::shared_ptr<tensor<N,T>>;
+
+template <int N, typename T = double>
+using sctensor = std::shared_ptr<const tensor<N,T>>;
 
 template <int N, typename T>
 class iterator;
@@ -437,11 +442,11 @@ public:
 			+ l*m_sizes[0]*m_sizes[1]*m_sizes[2]];
 	}
 	
-	void fill_rand() {
+	void fill_rand(T a, T b) {
 		
 		std::random_device rd; 
 		std::mt19937 gen(rd());
-		std::uniform_real_distribution<> dis(-1.0, 1.0);
+		std::uniform_real_distribution<> dis(a,b);
 		
 		for (int i = 0; i != m_nfull; ++i) {
 			m_data[i] = dis(gen);
@@ -1091,7 +1096,6 @@ public:
 		
 	} 
 		
-	
 };
 
 template <int N, typename T = double>
@@ -1102,6 +1106,8 @@ stensor<N,T> make_stensor(tensor_params<N,T>&& p) {
 	
 }
 
+
+
 template <int N, typename T = double>
 stensor<N,T> make_stensor(tensor_params2<N,T>&& p) {
 	
@@ -1109,6 +1115,17 @@ stensor<N,T> make_stensor(tensor_params2<N,T>&& p) {
 	return out;
 	
 }
+
+template <int N, typename T = double>
+sctensor<N,T> constify(stensor<N,T>& p) {
+	
+	tensor<N,T> const * ptr = new const tensor<N,T>(std::move(*p));
+	
+	sctensor<N,T> out(ptr);
+	
+	return out;
+	
+}	
 
 template <int N, typename T = double>
 tensor<N,T> operator+(const tensor<N,T>& t1, const tensor<N,T>& t2) {

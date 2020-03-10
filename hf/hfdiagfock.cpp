@@ -158,4 +158,49 @@ void hfmod::diag_fock() {
 	
 }
 
+void hfmod::compute_virtual_density() {
+	
+	auto form_density = [&] (dbcsr::stensor<2>& pv_bb, dbcsr::stensor<2>& c_bm, std::string x) {
+		
+		int lobound, upbound;
+		
+		dbcsr::pgrid<2> grid2({.comm = m_comm});
+		
+		pv_bb = dbcsr::make_stensor<2>({.name = "pv_bb_"+x, .pgridN = grid2, 
+				.map1 = {0}, .map2 = {1}, .blk_sizes = {m_mol->dims().b(),m_mol->dims().b()}});
+		
+		if (x == "A") {
+			lobound = m_mol->nocc_alpha();
+			upbound = lobound + m_mol->nvir_alpha() - 1;
+		}
+		if (x == "B") {
+			lobound = m_mol->nocc_beta();
+			upbound = lobound + m_mol->nvir_beta() - 1;
+		}
+		
+		//std::cout << "LIMIT " << limit << std::endl;
+		
+		// make bounds
+		std::vector<std::vector<int>> vir_bounds = {{lobound,upbound}};
+		
+		dbcsr::einsum<2,2,2>({.x = "Mi, Ni -> MN", .t1 = *c_bm, .t2 = *c_bm, .t3 = *pv_bb, .b1 = vir_bounds});
+		
+		pv_bb->filter();
+		
+		if (LOG.global_plev() >= 1) 
+			dbcsr::print(*pv_bb);
+		
+	};
+	
+	if (m_mol->nvir_alpha() != 0) {
+		form_density(m_pv_bb_A, m_c_bm_A, "A");
+	}
+	
+	if (!m_restricted && !m_nobeta) {
+		form_density(m_pv_bb_B, m_c_bm_B, "B");
+	}
+	
+}
+	
+
 } //end namespace

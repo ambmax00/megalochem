@@ -57,17 +57,7 @@ public:
 	fockbuilder(desc::smolecule mol, desc::options opt, MPI_Comm comm, 
 		int print, util::mpi_time& TIME_IN);
 	
-	~fockbuilder() {
-		if (m_3c2e_ints) m_3c2e_ints->destroy();
-		if (m_inv_xx) m_inv_xx->destroy();
-		if (m_sqrtinv_xx) m_sqrtinv_xx->destroy();
-		if (m_2e_ints) m_2e_ints->destroy();
-		m_j_bb->destroy();
-		m_k_bb_A->destroy();
-		m_f_bb_A->destroy();
-		if (m_k_bb_B) m_k_bb_B->destroy();
-		if (m_f_bb_B) m_f_bb_B->destroy();
-	}
+	~fockbuilder() {}
 			
 	void compute(compute_param&& p);
 	

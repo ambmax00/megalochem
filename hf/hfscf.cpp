@@ -275,7 +275,7 @@ void hfmod::compute() {
 		
 		LOG.os<>("UHF@", iter, '\t', m_scf_energy + m_nuc_energy, '\t', old_energy - m_scf_energy, '\t', rms_A, '\t', rms_B, '\n');
 		
-		if (rms_A < m_scf_threshold && rms_B < m_scf_threshold) break;
+		if (rms_A < m_scf_threshold && rms_B < m_scf_threshold && iter > 0) break;
 		if (iter > m_max_iter) break;
 		
 		if (m_diis) {

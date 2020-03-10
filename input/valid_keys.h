@@ -19,7 +19,7 @@ static const json valid_keys =
 		{"symbols", "string"}, // mol elements
 		{"mult", 0}, // multiplicity
 		{"charge", 0} // total charge
-			}},
+	}},
 	{"hf", {
 		{"guess", "core"}, // HF guess
 		{"scf_thresh", 1e-9}, // convergence criteria
@@ -30,8 +30,13 @@ static const json valid_keys =
 		{"diis_start", 0}, // at what iteration to start diis
 		{"diis_beta", true}, // whether to use separate coeficients for beta
 		{"use_df", false}, // whether to use df 
-		{"print", 0} // print level (0, 1 or 2 at the moment, -1 for silent output)
-	}}
+		{"print", 0}, // print level (0, 1 or 2 at the moment, -1 for silent output)
+		{"skip", false} // skip hartree fock and read from files
+	}},
+	{"adc", {
+		{"print", 0},
+		{"nroots", 0}
+	}}	
 };
 
 #endif
