@@ -140,7 +140,11 @@ int main(int argc, char** argv) {
 		
 	}
 	
+	MPI_Barrier(MPI_COMM_WORLD);
+	
 	auto adcopt = opt.subtext("adc");
+	
+	std::cout << adcopt.get<int>("nroots") << std::endl;
 	
 	adc::adcmod myadc(myhfwfn,adcopt,MPI_COMM_WORLD);
 	

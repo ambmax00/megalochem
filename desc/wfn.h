@@ -5,6 +5,9 @@
 #include "desc/io.h"
 #include "math/tensor/dbcsr_conversions.hpp"
 
+#include <string>
+#include <fstream>
+
 namespace hf {
 	class hfmod;
 }
@@ -121,6 +124,26 @@ public:
 		read_2dtensor(m_f_bb_A, m_mol->name(), "f_bb_A", comm, bb);
 		read_2dtensor(m_c_bo_A, m_mol->name(), "c_bo_A", comm, boA);
 		read_2dtensor(m_c_bv_A, m_mol->name(), "c_bv_A", comm, bvA);
+		
+		/*
+		std::ifstream file("coeff.txt");
+		std::string line;
+		
+		Eigen::MatrixXd m(m_mol->c_basis().nbf(),m_mol->nvir_alpha());
+		int i = 0;
+		
+		while (std::getline(file,line)) {
+			m.data()[i++] = std::stod(line);
+		}
+		
+		std::cout << m << std::endl;
+		
+		dbcsr::pgrid<2> grid2({.comm = comm});
+		auto t = dbcsr::eigen_to_tensor(m, "c_bv_A", grid2, vec<int>{0}, vec<int>{1}, vec<vec<int>>{m_mol->dims().b(),m_mol->dims().va()});
+		
+		m_c_bv_A = t.get_stensor();
+		*/
+		
 		read_2dtensor(m_po_bb_A, m_mol->name(), "p_bb_A", comm, bb);
 		read_2dtensor(m_pv_bb_A, m_mol->name(), "pv_bb_A", comm, bb);
 		

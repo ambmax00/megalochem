@@ -107,7 +107,10 @@ void hfmod::diag_fock() {
 		// make bounds
 		std::vector<std::vector<int>> occ_bounds = {{0,limit}};
 		
-		dbcsr::einsum<2,2,2>({.x = "Mi, Ni -> MN", .t1 = c_bm, .t2 = c_bm, .t3 = p_bb, .b1 = occ_bounds});
+		int unit_nr = 6;
+		
+		std::cout << "START" << std::endl;
+		dbcsr::einsum<2,2,2>({.x = "Mi, Ni -> MN", .t1 = c_bm, .t2 = c_bm, .t3 = p_bb, .b1 = occ_bounds, /*.unit_nr = unit_nr, .log = true*/});
 		
 		p_bb.filter();
 		

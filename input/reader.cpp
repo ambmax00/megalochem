@@ -303,13 +303,14 @@ reader::reader(MPI_Comm comm, std::string filename) : m_comm(comm) {
 	std::string name = jmol["name"];
 	
 	desc::molecule mol({.name = name, .atoms = atoms, .charge = charge,
-		.mult = mult, .split = 10, .basis = basis, .dfbasis = dfbasis});
+		.mult = mult, .split = 5, .basis = basis, .dfbasis = dfbasis});
 		
 	mol.print_info(m_comm,1);
 	
 	desc::options opt;
 	
 	unpack(data, opt, "hf");
+	unpack(data, opt, "adc");
 	
 	//std::cout << opt.get<bool>("hf/diis") << std::endl;
 	//std::cout << opt.get<double>("hf/conv") << std::endl;

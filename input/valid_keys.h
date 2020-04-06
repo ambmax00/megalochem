@@ -35,7 +35,10 @@ static const json valid_keys =
 	}},
 	{"adc", {
 		{"print", 0},
-		{"nroots", 0}
+		{"c_os", 1.3},
+		{"c_os_coupling", 1.15},
+		{"nroots", 0},
+		{"method", "SOS-MO"}
 	}}	
 };
 

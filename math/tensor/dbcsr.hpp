@@ -500,6 +500,14 @@ struct tensor_params2 {
 		required<vec<vec<int>>,val>	blk_sizes;
 };
 
+template <int N, typename T>
+struct tensor_params_template {
+		required<tensor<N,T>,ref>	tensor_in;
+		required<std::string,val> 	name;
+		optional<dist<N>,ref>		distN;
+		optional<vec<int>,val>		map1, map2;
+};
+
 template <int N, typename T = double>
 class tensor {
 protected:
@@ -659,8 +667,8 @@ public:
 		
 			const char* name = rhs.name().c_str();
 		
-			c_dbcsr_t_create_template(rhs.m_tensor_ptr, &m_tensor_ptr, name);
-			c_dbcsr_t_copy(rhs.m_tensor_ptr, N, m_tensor_ptr, nullptr, nullptr, nullptr, nullptr);
+			c_dbcsr_t_create_template(rhs.m_tensor_ptr, &m_tensor_ptr, name, nullptr, nullptr, 0, nullptr, 0, 0);
+			c_dbcsr_t_copy(rhs.m_tensor_ptr, N, m_tensor_ptr, nullptr, nullptr, nullptr, nullptr, nullptr);
 	
 			m_comm = rhs.m_comm;
 			
@@ -668,12 +676,21 @@ public:
 		
 	}
 	
-	// construct template only
-	tensor(const tensor<N,T>& rhs, std::string name) : m_tensor_ptr(nullptr), m_comm(rhs.m_comm) {
+	// construct template only		
+	tensor(tensor_params_template<N,T>&& p) : m_tensor_ptr(nullptr) {
 		
-		const char* cname = rhs.name().c_str();
+		m_comm = p.tensor_in->comm();
 		
-		c_dbcsr_t_create_template(rhs.m_tensor_ptr, &m_tensor_ptr, cname);
+		const char* cname = p.name->c_str();
+		
+		void* f_dist = (p.distN) ? p.distN->m_dist_ptr : nullptr;
+		int* f_map1 = (p.map1) ? p.map1->data() : nullptr;
+		int* f_map2 = (p.map2) ? p.map2->data() : nullptr;
+		int map1_size = (p.map1) ? p.map1->size() : 0;
+		int map2_size = (p.map2) ? p.map2->size() : 0;
+		
+		c_dbcsr_t_create_template(p.tensor_in->m_tensor_ptr, &m_tensor_ptr, cname, f_dist, f_map1, map1_size, 
+			f_map2, map2_size, nullptr);
 		
 	}
 		
@@ -796,6 +813,33 @@ public:
 		c_dbcsr_t_reserve_blocks_index(m_tensor_ptr, nzblks[0].size(), 
 			f_blks[0], f_blks[1], f_blks[2], f_blks[3]);
 			
+	}
+	
+	void reserve_all() {
+		
+		auto blks = this->blks_local();
+		vec<vec<int>> res(N);
+		
+		std::function<void(int,int*)> loop;
+		
+		int* arr = new int[N];
+		
+		loop = [&res,&blks,&loop](int depth, int* vals) {
+			for (auto eleN : blks[depth]) {
+				vals[depth] = eleN;
+				if (depth == N-1) {
+					for (int i = 0; i != N; ++i) {
+						res[i].push_back(vals[i]);
+					}
+				} else {
+					loop(depth+1,vals);
+				}
+			}
+		};
+		
+		loop(0,arr);
+		this->reserve(res);
+		
 	}
 	
 	struct tensor_put_block_params {
@@ -935,14 +979,14 @@ public:
 		c_dbcsr_t_set(m_tensor_ptr, alpha);
 	}
 	
-	tensor<N,T>& operator+=(const tensor<N,T>& t) {
+	//tensor<N,T>& operator+=(const tensor<N,T>& t) {
 		
-		bool sum = true;
+	//	bool sum = true;
 		//c_dbcsr_t_create_template(t.m_tensor_ptr, &m_tensor_ptr, nullptr);
-		c_dbcsr_t_copy(t.m_tensor_ptr, N, m_tensor_ptr, nullptr, &sum, nullptr, nullptr);
-		return *this;
+	//	c_dbcsr_t_copy(t.m_tensor_ptr, N, m_tensor_ptr, nullptr, &sum, nullptr, nullptr);
+	//	return *this;
 		
-	}
+	//}
 	
 	tensor<N,T>& operator=(const tensor<N,T>& rhs) {	
 		
@@ -954,10 +998,10 @@ public:
 			m_comm = rhs.m_comm;
 			
 			if (m_tensor_ptr == nullptr) {
-				c_dbcsr_t_create_template(rhs.m_tensor_ptr, &m_tensor_ptr, nullptr); 
+				c_dbcsr_t_create_template(rhs.m_tensor_ptr, &m_tensor_ptr, nullptr, nullptr, nullptr, 0, nullptr, 0, nullptr); 
 			}
 			
-			c_dbcsr_t_copy(rhs.m_tensor_ptr, N, m_tensor_ptr, nullptr, nullptr, nullptr, nullptr);
+			c_dbcsr_t_copy(rhs.m_tensor_ptr, N, m_tensor_ptr, nullptr, nullptr, nullptr, nullptr, nullptr);
 			
 		}
 		
@@ -1106,8 +1150,6 @@ stensor<N,T> make_stensor(tensor_params<N,T>&& p) {
 	
 }
 
-
-
 template <int N, typename T = double>
 stensor<N,T> make_stensor(tensor_params2<N,T>&& p) {
 	
@@ -1117,15 +1159,12 @@ stensor<N,T> make_stensor(tensor_params2<N,T>&& p) {
 }
 
 template <int N, typename T = double>
-sctensor<N,T> constify(stensor<N,T>& p) {
+stensor<N,T> make_stensor(tensor_params_template<N,T>&& p) {
 	
-	tensor<N,T> const * ptr = new const tensor<N,T>(std::move(*p));
-	
-	sctensor<N,T> out(ptr);
-	
+	stensor<N,T> out(new tensor<N,T>(std::forward<tensor_params_template<N,T>>(p)));
 	return out;
 	
-}	
+}
 
 template <int N, typename T = double>
 tensor<N,T> operator+(const tensor<N,T>& t1, const tensor<N,T>& t2) {
@@ -1211,12 +1250,26 @@ public:
 		
 };
 
+template <typename T>
+T* unfold_bounds(vec<vec<T>>& v) {
+			int b_size = v.size();
+			T* f_bounds = new T[2 * b_size];
+			for (int j = 0; j != b_size; ++j) {
+				for (int i = 0; i != 2; ++i) {
+					f_bounds[i + j * 2] = v[j][i];
+				}
+			}
+			return f_bounds;
+}
+
 template <int N, typename T = double>
 struct tensor_copy {
 		required<tensor<N,T>,ref>  	t_in;
 		required<tensor<N,T>,ref>	t_out;
 		optional<vec<int>,val>		order;
-		optional<bool,val>			sum, move_data;
+		optional<bool,val>			sum;
+		optional<vec<vec<int>>,ref>  bounds;
+		optional<bool, val>		    move_data;
 		optional<int,val>			unit_nr;
 };
 template <int N, typename T = double>
@@ -1224,10 +1277,11 @@ void copy(tensor_copy<N,T>&& p) {
 		
 		int* forder = (p.order) ? p.order->data() : nullptr;
 		bool* fsum = (p.sum) ? &*p.sum : nullptr;
+		int* fbounds = (p.bounds) ? unfold_bounds<int>(*p.bounds) : nullptr;
 		bool* fmove = (p.move_data) ? &*p.move_data : nullptr;
 		int* funit = (p.unit_nr) ? &*p.unit_nr : nullptr;
 		
-		c_dbcsr_t_copy(p.t_in->m_tensor_ptr,N,p.t_out->m_tensor_ptr,forder,fsum,fmove,funit);
+		c_dbcsr_t_copy(p.t_in->m_tensor_ptr,N,p.t_out->m_tensor_ptr,forder,fsum,fbounds,fmove,funit);
 	
 }
 
@@ -1245,6 +1299,7 @@ struct contract_param {
 	optional<double, val>		filter;
 	optional<long long int, ref> flop;
 	optional<bool, val>			move;
+	optional<bool, val>			retain_sparsity;
 	optional<int, val>			unit_nr;
 	optional<bool, val>			log;
 };
@@ -1257,28 +1312,16 @@ contract_param(T alpha, tensor<N1,T>& t1, tensor<N2,T>& t2,
 template <int N1, int N2, int N3, typename T  = double>
 void contract(contract_param<T,N1,N2,N3>&& p) {
 	
-	auto unfold_bounds = [](vec<vec<int>>& v) {
-			int b_size = v.size();
-			int* f_bounds = new int[2 * b_size];
-			for (int j = 0; j != b_size; ++j) {
-				for (int i = 0; i != 2; ++i) {
-					f_bounds[i + j * 2] = v[j][i];
-				}
-			}
-			return f_bounds;
-	};
-	
-	int* f_b1 = (p.b1) ? unfold_bounds(*p.b1) : nullptr;
-	int* f_b2 = (p.b2) ? unfold_bounds(*p.b2) : nullptr;
-	int* f_b3 = (p.b3) ? unfold_bounds(*p.b3) : nullptr;
-	
-	//if (p.b2) std::cout << "ITS HERE!!!!" << std::endl;
+	int* f_b1 = (p.b1) ? unfold_bounds<int>(*p.b1) : nullptr;
+	int* f_b2 = (p.b2) ? unfold_bounds<int>(*p.b2) : nullptr;
+	int* f_b3 = (p.b3) ? unfold_bounds<int>(*p.b3) : nullptr;
 	
 	//std::cout << "In here..." << std::endl;
 	
 	double* f_filter = (p.filter) ? &*p.filter : nullptr;
 	long long int* f_flop = (p.flop) ? &*p.flop : nullptr;
 	bool* f_move = (p.move) ? &*p.move : nullptr;
+	bool* f_retain_sparsity = (p.retain_sparsity) ? &*p.retain_sparsity : nullptr;
 	int* f_unit = (p.unit_nr) ? &*p.unit_nr : nullptr;
 	bool* f_log = (p.log) ? &*p.log : nullptr;
 	
@@ -1294,7 +1337,7 @@ void contract(contract_param<T,N1,N2,N3>&& p) {
 						p.con2->data(), p.con2->size(), p.ncon2->data(), p.ncon2->size(),
 						p.map1->data(), p.map1->size(), p.map2->data(), p.map2->size(), 
 						f_b1, f_b2, f_b3, nullptr, nullptr, nullptr, nullptr, f_filter, 
-						f_flop, f_move, f_unit, f_log);
+						f_flop, f_move, f_retain_sparsity, f_unit, f_log);
        
      delete[] f_b1, f_b2, f_b3;               
 	
@@ -1439,6 +1482,7 @@ struct einsum_param {
 	optional<double, val>		filter;
 	optional<long long int, ref> flop;
 	optional<bool, val>			move;
+	optional<bool, val>			retain_sparsity;
 	optional<int, val>			unit_nr;
 	optional<bool, val>			log;
 };
@@ -1603,7 +1647,8 @@ void einsum(einsum_param<T,N1,N2,N3>&& p) {
 	eval(*p.x, c1, c2, nc1, nc2, m1, m2);
 	
 	contract<N1,N2,N3,T>({p.alpha, p.t1, p.t2, p.beta, p.t3, c1, nc1,
-		c2, nc2, m1, m2, p.b1, p.b2, p.b3, p.filter, p.flop, p.move, p.unit_nr, p.log});
+		c2, nc2, m1, m2, p.b1, p.b2, p.b3, p.filter, p.flop, p.move, 
+		p.retain_sparsity, p.unit_nr, p.log});
 		
 	//std::cout << "OUT" << std::endl;
 		
@@ -1680,6 +1725,89 @@ double dot(tensor<N,double>& t1, tensor<N,double>& t2) {
 	return MPIsum;
 		
 }
+
+template <int N, typename T = double>
+void ewmult(tensor<N,T>& t1, tensor<N,T>& t2, tensor<N,T>& tout) {
+	
+	// elementwise multiplication
+	// make sure tensors have same grid and dimensions, caus I sure don't do it here
+	
+	dbcsr::iterator<N> it(t1);
+	
+	while (it.blocks_left()) {
+			
+		it.next();
+		auto idx = it.idx();
+		auto blksize = it.sizes();
+			
+		bool found = false;
+		bool found3 = false;
+		
+		auto b1 = t1.get_block({.idx = idx, .blk_size = blksize, .found = found});
+		auto b2 = t2.get_block({.idx = idx, .blk_size = blksize, .found = found});
+		auto b3 = tout.get_block({.idx = idx, .blk_size = blksize, .found = found3});
+			
+		if (!found) continue;
+		if (!found3) {
+			vec<vec<int>> res(N);
+			for (int i = 0; i != N; ++i) {
+				res[i].push_back(idx[i]);
+			}
+			tout.reserve(res);
+		}
+			
+		std::transform(b1.data(), b1.data() + b1.ntot(), b2.data(), b3.data(), std::multiplies<T>());
+		
+		tout.put_block({.idx = idx, .blk = b3});
+		
+	}
+		
+	tout.filter();
+	
+}
+
+/*
+template <int N>
+void ewmult(tensor<N,double>& t1, tensor<N,double>& t2, tensor<N,double>& t3) {
+	
+	// dot product only for N = 2 at the moment
+	//assert(N == 2);
+
+	double sum = 0.0;
+	
+	dbcsr::iterator<N> it(t1);
+	
+	while (it.blocks_left()) {
+			
+			it.next();
+			
+			bool found = false;
+			auto b1 = t1.get_block({.idx = it.idx(), .blk_size = it.sizes(), .found = found});
+			auto b2 = t2.get_block({.idx = it.idx(), .blk_size = it.sizes(), .found = found});
+			
+			if (!found) continue;
+			
+			//std::cout  << std::inner_product(b1.data(), b1.data() + b1.ntot(), b2.data(), T()) << std::endl;
+			
+			//std::cout << "ELE: " << std::endl;
+			//for (int i = 0; i != b1.ntot(); ++i) { std::cout << b1(i) << " " << b2(i) << std::endl; }
+			
+			
+			sum += std::inner_product(b1.data(), b1.data() + b1.ntot(), b2.data(), 0.0);
+			
+			//std::cout << "SUM: " << std::inner_product(b1.data(), b1.data() + b1.ntot(), b2.data(), T()) << std::endl;
+			
+	}
+		
+	
+	
+	double MPIsum = 0.0;
+	
+	MPI_Allreduce(&sum,&MPIsum,1,MPI_DOUBLE,MPI_SUM,t1.comm());
+	
+	return MPIsum;
+		
+}*/
 
 template <int N, typename T>
 T RMS(tensor<N,T>& t_in) {
