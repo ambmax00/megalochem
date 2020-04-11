@@ -15,7 +15,7 @@ get_target_property(dir Eigen3::Eigen INTERFACE_INCLUDE_DIRECTORIES)
 include_directories(${dir})
 
 find_package(OpenMP REQUIRED)
-find_package(Boost REQUIRED)
+#find_package(Boost REQUIRED)
 find_package(MPI REQUIRED)
 find_package(DBCSR 2.0.0 CONFIG REQUIRED)
 find_package(TBB REQUIRED)
@@ -27,14 +27,15 @@ include_directories(
 	${LIBINT2_INCLUDE_DIRS} ${CMAKE_CURRENT_SOURCE_DIR}
 )
 
-add_subdirectory(math)
-add_subdirectory(desc)
+add_subdirectory(tensor)
+#add_subdirectory(math)
+#add_subdirectory(desc)
 #add_subdirectory(utils)
 #add_subdirectory(mpqc)
-add_subdirectory(input)
-add_subdirectory(ints)
-add_subdirectory(hf)
-add_subdirectory(adc)
+#add_subdirectory(input)
+#add_subdirectory(ints)
+#add_subdirectory(hf)
+#add_subdirectory(adc)
 #add_subdirectory(mp2)
 
 add_executable(
@@ -45,12 +46,11 @@ add_executable(
 target_link_libraries(
 	chem
 	PUBLIC
-	chem_input
-	chem_math_laplace
+	#	chem_input
+	#	chem_math_laplace
 	MPI::MPI_CXX	
-	DBCSR::dbcsr_c
-	Eigen3::Eigen
-	chem_hf
-	chem_desc
-	chem_adc
+	chem_tensor
+	#	chem_hf
+	#	chem_desc
+	#	chem_adc
 )

@@ -95,99 +95,33 @@ void adcmod::compute() {
 		
 		ri_adc1_u1 ri_adc1(m_mo.eps_o, m_mo.eps_v, m_mo.b_xoo, m_mo.b_xov, m_mo.b_xvv); 
 		
-		math::davidson<ri_adc1_u1> dav(ri_adc1, m_mo.d_ov);
+		math::davidson<ri_adc1_u1> dav({.factory = ri_adc1, .diag = m_mo.d_ov});
 		
 		dav.compute(dav_guess, m_nroots);
 		
-		std::ifstream file("sigma.txt");
+		auto rvs = dav.ritz_vectors();
 		
-		std::string line;
-		int im = 0;
-		Eigen::MatrixXd M(nocc,nvir);
-		
-		while(std::getline(file,line)) {
-			std::istringstream iss(line);
-			while (iss) { iss >> M.data()[im++]; }
-		}
-		
-		std::cout << M << std::endl;
-		
-		auto Mten = dbcsr::eigen_to_tensor(M, "guess", grid2, vec<int>{0}, vec<int>{1}, blksizes);
-		
-		dbcsr::print(Mten);
-		
-		std::vector<dbcsr::stensor<2>> g(1);
-		g[0] = Mten.get_stensor(); 
+		auto rn = rvs[m_nroots - 1];
+		double omega = dav.eigval();
 
 		// compute ADC2
 		if (m_method == 0) {
 			
 			ri_adc2_diis_u1 ri_adc2(m_mo.eps_o, m_mo.eps_v, m_mo.b_xoo, m_mo.b_xov, m_mo.b_xvv, m_mo.t_ovov);
 		
-			auto rvs = dav.ritz_vectors();
-		
-			auto rn = rvs[m_nroots - 1];
-			double omega = dav.eigval();
-		
-			auto s = ri_adc2.compute(rn,omega);
-		
-			double e = dbcsr::dot<2>(*rn,*s);
-			
-			for (int i = 0; i != 10; ++i) {
-		
-				std::cout << "MACROITERATION: " << i << std::endl;
-				math::davidson<ri_adc2_diis_u1> davdiis(ri_adc2, m_mo.d_ov, true);
-		
-				davdiis.compute(rvs, m_nroots, omega);
-			
-				omega = davdiis.eigval();
-				rvs = davdiis.ritz_vectors();
-			
-			}
+			math::modified_davidson<ri_adc2_diis_u1> dav({.factory = ri_adc2, .diag = m_mo.d_ov});
+			dav.compute(rvs, m_nroots, omega);
 			
 		} else {
 			
 			std::cout << "SOS" << std::endl;
 			sos_ri_adc2_diis_u1 ri_adc2(m_mo.eps_o, m_mo.eps_v, m_mo.b_xoo, m_mo.b_xov, m_mo.b_xvv, m_mo.t_ovov);
 		
-			auto rvs = dav.ritz_vectors();
-		
-			auto rn = rvs[m_nroots - 1];
-			double omega = dav.eigval();
-		
-			auto s = ri_adc2.compute(rn,omega);
-		
-			double e = dbcsr::dot<2>(*rn,*s);
-			
-			for (int i = 0; i != 10; ++i) {
-		
-				std::cout << "MACROITERATION: " << i << std::endl;
-				math::davidson<sos_ri_adc2_diis_u1> davdiis(ri_adc2, m_mo.d_ov, true);
-		
-				davdiis.compute(rvs, m_nroots, omega);
-			
-				omega = davdiis.eigval();
-				rvs = davdiis.ritz_vectors();
-			
-			}
+			math::modified_davidson<sos_ri_adc2_diis_u1> dav({.factory = ri_adc2, .diag = m_mo.d_ov});
+			dav.compute(rvs, m_nroots, omega);
 			
 		}
 		
-		/*
-		std::cout << e << std::endl;
-		
-		for (int i = 0; i != 10; ++i) {
-		
-			std::cout << "MACROITERATION: " << i << std::endl;
-			math::davidson<ri_adc2_diis_u1> davdiis(ri_adc2, m_mo.d_ov, true);
-		
-			davdiis.compute(rvs, m_nroots, omega);
-			
-			omega = davdiis.eigval();
-			rvs = davdiis.ritz_vectors();
-			
-		}
-		* */
 }
 
 }

@@ -96,13 +96,13 @@ public:
 	friend class attribute_wrapper;
 
 	// delete for required, such that default initilization is disbaled
-	template <attribute0 A0 = a0, 
-		typename std::enable_if<A0 == required_, int>::type = 0>
-	attribute_wrapper() = delete;
+	//template <attribute0 A0 = a0, 
+	//	typename std::enable_if<A0 == required_, int>::type = 0>
+	//attribute_wrapper() = delete;
 	
 	// optional can be default initialized
-	template <attribute0 A0 = a0, 
-		typename = typename std::enable_if<A0 == optional_, int>::type>
+	//template <attribute0 A0 = a0, 
+	//	typename = typename std::enable_if<A0 == optional_, int>::type>
 	attribute_wrapper() : init(false), m_val(nullptr), m_ref(nullptr) { /*std::cout << "D2" << std::endl;*/ }
 	
 	// only enable for a1 = value
@@ -121,9 +121,7 @@ public:
 			
 			//std::cout << "Pointer: " << awrp.m_val << std::endl;
 			
-			this->m_val = new T();
-			
-			*m_val = *(awrp.m_val);
+			this->m_val = new T(*(awrp.m_val));
 			
 			this->m_ref = this->m_val;
 			this->init = true;
@@ -239,7 +237,7 @@ public:
 		
 	}
 	
-	T& operator*() {
+	T& operator*() const {
 		//assert(("Optional parameter not initialized.", init == true));
 		return *m_ref;
 	}
@@ -249,7 +247,7 @@ public:
 		 return m_ref;
 	}
 	
-	operator bool () {
+	operator bool () const {
 		return init;
 	}
 	

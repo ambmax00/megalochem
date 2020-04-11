@@ -2,15 +2,15 @@
 #include <random>
 #include <stdexcept>
 #include <string>
-#include "input/reader.h"
-#include "hf/hfmod.h"
-#include "adc/adcmod.h"
-#include "utils/mpi_time.h"
+#include <dbcsr.hpp>
+//#include "input/reader.h"
+//#include "hf/hfmod.h"
+//#include "adc/adcmod.h"
+//#include "utils/mpi_time.h"
 
-/*
+
 template <int N>
-void fill_random(dbcsr::tensor<N,double>& t_in, vec<vec<int>>& nz) {
-	
+void fill_random(dbcsr::tensor<N,double>& t_in, arrvec<int,N>& nz) {
 	
 	int myrank, mpi_size;
 	
@@ -21,7 +21,7 @@ void fill_random(dbcsr::tensor<N,double>& t_in, vec<vec<int>>& nz) {
 	if (myrank == 0) std::cout << "Dimension: " << N << std::endl;
 	
 	int nblocks = nz[0].size();
-	std::vector<std::vector<int>> mynz(N);
+	arrvec<int,N> mynz;
 	dbcsr::index<N> idx;
 	
 	for (int i = 0; i != nblocks; ++i) {
@@ -29,9 +29,7 @@ void fill_random(dbcsr::tensor<N,double>& t_in, vec<vec<int>>& nz) {
 		// make index out of nzblocks
 		for (int j = 0; j != N; ++j) idx[j] = nz[j][i];
 		
-		int proc = -1;
-		
-		t_in.get_stored_coordinates({.idx = idx, .proc = proc});
+		int proc = t_in.proc(idx);
 		
 		if (proc == myrank) {
 			for (int j = 0; j != N; ++j) 
@@ -59,24 +57,29 @@ void fill_random(dbcsr::tensor<N,double>& t_in, vec<vec<int>>& nz) {
 	}
 	
 	t_in.reserve(mynz);
-    
-    dbcsr::iterator<N,double> iter(t_in);
-    
-    while (iter.blocks_left()) {
-		  
-		iter.next();
+	
+	#pragma omp parallel 
+	{
+		dbcsr::iterator<N,double> iter(t_in);
 		
-		dbcsr::block<N,double> blk(iter.sizes());
-		
-		blk.fill_rand();
-		
-		auto idx = iter.idx();
-		t_in.put_block({.idx = idx, .blk = blk});
+		while (iter.blocks_left()) {
+			  
+			iter.next();
 			
+			dbcsr::block<N,double> blk(iter.size());
+			
+			blk.fill_rand(-1.0,1.0);
+			
+			auto idx = iter.idx();
+			t_in.put_block(idx, blk);
+				
+		}
 	}
 	
+	t_in.finalize();
+
 }
-*/
+
 
 int main(int argc, char** argv) {
 
@@ -84,6 +87,42 @@ int main(int argc, char** argv) {
 	int rank;
 	MPI_Comm_rank(MPI_COMM_WORLD,&rank);
 	
+	//std::cout << "FLOAT: " << dbcsr::dbcsr_type<float>::value << std::endl;
+	
+	/*
+	dbcsr::pgrid<2> grid2 = dbcsr::pgrid<2>::create()
+		.comm(MPI_COMM_WORLD).map1({0}).map2({1});
+
+	vec<int> blk1 = {3, 9, 12, 1};
+    vec<int> blk2 = {4, 2, 3, 1, 9, 2, 32, 10, 5, 8, 7};
+
+	auto dis1 = dbcsr::random_dist(blk1.size(), grid2.dims()[0]);
+	auto dis2 = dbcsr::random_dist(blk2.size(), grid2.dims()[1]);
+	
+	dbcsr::dist<2> dist2 = dbcsr::dist<2>::create()
+		.ngrid(grid2).nd_dists({dis1,dis2});
+		
+	std::array<int,3> v = {2,3,2};
+	dbcsr::block<3,double> blk(v);
+	
+	blk(0,0,0) = 3.52;
+	
+	blk.print();
+		
+	dbcsr::tensor<2> t2 = dbcsr::tensor<2>::create()
+		.name("TEST").ndist(dist2).map1({0}).map2({1}).blk_sizes({blk1,blk2});
+		
+	auto v3 = t2.nblks_local();
+	
+	auto bsizes = t2.blk_sizes();
+	
+	for (auto x : bsizes) {
+		for (auto e : x) {
+			std::cout << e << " ";
+		} std::cout << std::endl;
+	}
+	
+	/*
 	util::mpi_time time(MPI_COMM_WORLD, "Megalochem");
 	
 	util::mpi_log LOG(MPI_COMM_WORLD,0);
@@ -104,6 +143,11 @@ int main(int argc, char** argv) {
 	std::string filename(argv[1]);
 	
 	time.start();
+	* */
+	
+	dbcsr::init();
+	
+	/*
 	
 	reader filereader(MPI_COMM_WORLD, filename);
 	
@@ -159,13 +203,11 @@ int main(int argc, char** argv) {
 	
 	//dbcsr::print(s);
 	
-	/*
-	dbcsr::pgrid<3> pgrid3d({.comm = MPI_COMM_WORLD});
-	dbcsr::pgrid<4> pgrid4d({.comm = MPI_COMM_WORLD});
+	*/
+	
+	dbcsr::pgrid<3> pgrid3d(MPI_COMM_WORLD);
+	dbcsr::pgrid<4> pgrid4d(MPI_COMM_WORLD);
 							 
-	std::cout << "Created!" << std::endl;
-	
-	
 	vec<int> blk1 = {3, 9, 12, 1};
     vec<int> blk2 = {4, 2, 3, 1, 9, 2, 32, 10, 5, 8, 7};
     vec<int> blk3 = {7, 3, 8, 7, 9, 5, 10, 23, 2};
@@ -179,25 +221,23 @@ int main(int argc, char** argv) {
 	vec<int> map31 = {0};
 	vec<int> map32 = {1, 2};
 	
-	vec<vec<int>> sizes1 = {blk1,blk2,blk3}; 
-	vec<vec<int>> sizes2 = {blk1,blk2,blk4,blk5};
-	vec<vec<int>> sizes3 = {blk3,blk4,blk5};
+	arrvec<int,3> sizes1 = {blk1,blk2,blk3}; 
+	arrvec<int,4> sizes2 = {blk1,blk2,blk4,blk5};
+	arrvec<int,3> sizes3 = {blk3,blk4,blk5};
 	
-	dbcsr::tensor<3,double> tensor1({.name = "(13|2)", .pgridN = pgrid3d, .map1 = map11,
-		.map2 = map12, .blk_sizes = sizes1});
+	dbcsr::tensor<3> tensor1 = dbcsr::tensor<3>::create().name("(13|2)")
+		.ngrid(pgrid3d).map1(map11).map2(map12).blk_sizes(sizes1);
+		
+	dbcsr::tensor<4> tensor2 = dbcsr::tensor<4>::create().name("(54|21)")
+		.ngrid(pgrid4d).map1(map21).map2(map22).blk_sizes(sizes2);
+		
+	dbcsr::tensor<3> tensor3 = dbcsr::tensor<3>::create().name("(3|45)")
+		.ngrid(pgrid3d).map1(map31).map2(map32).blk_sizes(sizes3);
 		
 	//dbcsr::tensor<3,double> tensortest({.name="test", .pgridN = pgrid3d, .map1 = map11,
 	//	.map2 = map12, .blk_sizes = sizes1});
 						   
-    dbcsr::tensor<4,double> tensor2({.name = "(54|21)", .pgridN = pgrid4d, .map1 = map21,
-		.map2 = map22, .blk_sizes = sizes2});
-    
-    dbcsr::tensor<3,double> tensor3({.name = "(3|45)", .pgridN = pgrid3d, .map1 = map31,
-		.map2 = map32, .blk_sizes = sizes3});
-	
 	std::cout << "Tensors created." << std::endl;
-	
-	pgrid3d.destroy();
 	
 	vec<int> nz11 = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 
 		    0, 1, 1, 1, 1, 1, 1, 1, 2, 2, 
@@ -231,96 +271,35 @@ int main(int argc, char** argv) {
     vec<int> nz34 = { 2, 1, 0, 0, 2, 1, 3, 4 };
     vec<int> nz35 = { 2, 1, 0, 1, 2, 1, 0, 0 };
    
-    vec<vec<int>> nz1 = {nz11,nz12,nz13};
-    vec<vec<int>> nz2 = {nz21,nz22,nz24,nz25};
-    vec<vec<int>> nz3 = {nz33,nz34,nz35};
+    arrvec<int,3> nz1 = {nz11,nz12,nz13};
+    arrvec<int,4> nz2 = {nz21,nz22,nz24,nz25};
+    arrvec<int,3> nz3 = {nz33,nz34,nz35};
     
-    fill_random(tensor1,nz1);
-    fill_random(tensor2,nz2);
-	fill_random(tensor3,nz3);
+    fill_random<3>(tensor1,nz1);
+    fill_random<4>(tensor2,nz2);
+	fill_random<3>(tensor3,nz3);
 	
 	int unitnr = 0;
+	
 	
 	if (rank == 0) unitnr = 6;
 	
 	std::cout << "NAME: " << std::endl;
 	std::cout << tensor2.name() << std::endl;
 	
+	//dbcsr::contract<3,4,3>().alpha(1.0).t1(tensor1).t2(tensor2).t3(tensor3).beta(1.0)
+	//	.con1({0,1}).ncon1({2}).con2({0,1}).ncon2({2,3}).map1({0}).map2({1,2}).print(true).log(true).perform();
 	
-	/*
-	//dbcsr::contract<3,4,3>({.alpha = 1.0d, .t1 = tensor1, .t2 = tensor2, .beta = 3.0d, 
-	//		.t3 = tensor3, .con1 = {0,1}, .ncon1 = {2}, .con2 = {0,1}, .ncon2 = {2,3},
-	//		.map1 = {0}, .map2 = {1,2}, .unit_nr = unitnr, .log = true });
+	dbcsr::contract(tensor1,tensor2,tensor3).print(true).perform("ijk, ijlm -> klm");
 	
-	//vec<int> c1, c2, nc1, nc2, m1, m2;
-	dbcsr::einsum<3,4,3>({.x = "ijk, ijlm -> klm", .t1 = tensor1, .t2 = tensor2, 
-			.t3 = tensor3, .unit_nr = unitnr, .log = true});
+	//dbcsr::copy(tensor1,tensor3).perform();
 	
-			
 	tensor1.destroy();
 	tensor2.destroy();	
 	tensor3.destroy();
-	//tensortest.destroy();
 	
-	
+	pgrid3d.destroy();
 	pgrid4d.destroy();
-	
-	
-	 /*
-	
-	dbcsr::pgrid<2> pgrid2d({.comm = MPI_COMM_WORLD});
-							 
-	std::cout << "Created!" << std::endl;
-	
-	
-	vec<int> blk1 = {2, 2};
-    vec<int> blk2 = {2, 3};
-	
-	vec<vec<int>> sizes1 = {blk1,blk2}; 
-	
-	auto d1 = dbcsr::random_dist(2, pgrid2d.dims()[0]);
-	auto d2 = dbcsr::random_dist(2, pgrid2d.dims()[1]);
-
-	dbcsr::dist<2> dist2d({.pgridN = pgrid2d, .map1 = {0}, .map2 = {1}, .nd_dists = {d1,d2}});
-	
-	dbcsr::tensor<2,double> tensor1({.name = "(1|2)", .distN = dist2d, .map1 = {0},
-		.map2 = {1}, .blk_sizes = sizes1});
-	
-	std::cout << "Tensors created." << std::endl;
-	
-	vec<int> nz1 = {0, 0, 1};
-	vec<int> nz2 = {0, 1, 1};
-   
-    vec<vec<int>> nz = {nz1,nz2};
-    
-    
-    fill_random(tensor1,nz);
-	
-	
-	
-	auto blks = tensor1.blks_local();
-	
-	auto blks2 = tensor1.blks_local();
-	
-	for (auto blk : blks) {
-		for (auto x : blk) {
-			std::cout << x << std::endl;
-		}
-	}
-	
-	auto mat = tensor_to_eigen(tensor1,1);
-	
-	auto ten2 = eigen_to_tensor(mat, "other", pgrid2d, vec<int>{0}, vec<int>{1}, vec<vec<int>>{blk1,blk2});
-	
-	dbcsr::print(tensor1);
-	dbcsr::print(ten2);
-	
-	tensor1.destroy();
-	ten2.destroy();
-	dist2d.destroy();
-	pgrid2d.destroy();
-
-	*/
 
 	dbcsr::finalize();
 	

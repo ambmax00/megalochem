@@ -16,7 +16,7 @@ class davidson {
 private:
 
 	dbcsr::stensor<2> m_diag; // diagonal of matrix
-	MVFactory m_fac; // Matrix vector product engine
+	MVFactory& m_fac; // Matrix vector product engine
 
 	int m_nroots; // targeted eigenvalue
 	int m_subspace; // current size of subspace
@@ -29,16 +29,26 @@ private:
 	vtensor m_vecs; // b vectors
 	vtensor m_sigmas; // Ab vectors
 	vtensor m_ritzvecs; // ritz vectors at end of computation
-	int m_maxiter = 20;
-		
+	
+	double m_conv;
+	int m_maxiter;
 		
 public:
 	
-	davidson(MVFactory& fac, dbcsr::stensor<2>& diag, bool pseudo = false) :
-		m_fac(fac),
-		m_diag(diag),
+	struct dav_param {
+		required<MVFactory,ref> 		factory;
+		required<dbcsr::stensor<2>,ref>	diag;
+		optional<bool,val>				pseudo;
+		optional<double,val>			conv;
+		optional<int,val>				maxiter;
+	};
+	davidson(dav_param&& p) :
+		m_fac(*p.factory),
+		m_diag(*p.diag),
 		m_eigval(0.0),
-		m_pseudo(pseudo),
+		m_pseudo((p.pseudo) ? *p.pseudo : false),
+		m_maxiter((p.maxiter) ? *p.maxiter : 20),
+		m_conv((p.conv) ? *p.conv : 1e-7),
 		m_converged(false)
 	{}	
 
@@ -272,9 +282,6 @@ public:
 			auto bnewptr = bnew.get_stensor();
 			
 			m_vecs.push_back(bnewptr);
-			
-			int err;
-			std::cin >> err;
 				
 		}
 		
@@ -339,6 +346,78 @@ public:
 	}
 
 }; // end class 
+
+template <class MVFactory>
+class modified_davidson {
+private:
+
+	dbcsr::stensor<2> m_diag; // diagonal of matrix
+	
+	davidson<MVFactory> m_solver;
+
+	bool m_converged; //wether procedure has converged
+	
+	double m_eigval; // targeted eigenvalue
+	
+	vtensor m_ritzvecs; // ritz vectors at end of computation
+	
+	int m_maxiter;
+	double m_conv;
+		
+public:
+	
+	struct moddav_param {
+		required<MVFactory,ref> 		factory;
+		required<dbcsr::stensor<2>,ref>	diag;
+		optional<double,val>			conv;
+		optional<int,val>				maxiter;
+		optional<int,val>				micro_maxiter;
+	};
+	modified_davidson(moddav_param&& p) :
+		m_eigval(0.0),
+		m_converged(false),
+		m_maxiter((p.maxiter) ? *p.maxiter : 10),
+		m_conv((p.conv) ? *p.conv : 1e-7),
+		m_solver({.factory = p.factory, .diag = p.diag, .pseudo = true, .maxiter = p.micro_maxiter})
+	{}	
+
+	void compute(vtensor& guess, int nroots, double omega) {
+		
+		vtensor current_guess = guess;
+		double current_omega = omega;
+		
+		for (int i = 0; i != 5; ++i) {
+			
+			std::cout << " == MACROITERATION: == " << i << std::endl;
+			
+			double old_omega = current_omega;
+			
+			m_solver.compute(current_guess,nroots,current_omega);
+			
+			current_guess = m_solver.ritz_vectors();
+			current_omega = m_solver.eigval();
+			
+			std::cout << "MACRO ITERATION ERROR: " << fabs(current_omega - old_omega) << std::endl;
+			std::cout << "EIGENVALUE: " << current_omega << std::endl;
+			
+		}
+		
+		m_eigval = current_omega;
+		m_ritzvecs = current_guess;
+		
+	}
+	
+	vtensor ritz_vectors() {
+		
+		return m_ritzvecs;
+		
+	}
+	
+	double eigval() {
+		return m_eigval;
+	}
+
+}; // end class
 
 } // end namespace
 
