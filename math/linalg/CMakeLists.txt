@@ -9,6 +9,7 @@ set (sources
 
 add_library(chem_math_linalg ${sources})
 target_link_libraries(
-	chem_math_linalg 
+	chem_math_linalg
+        chem_tensor	
 	Eigen3::Eigen
 )

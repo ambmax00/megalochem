@@ -384,7 +384,6 @@ public:
 		
 		blk_in.m_nfull = 0;
 		blk_in.m_data = nullptr;
-		blk_in.m_size.clear();
 		
 	}
 	
@@ -418,7 +417,6 @@ public:
 		m_size = rhs.m_size;
 		
 		rhs.m_data = nullptr;
-		rhs.m_size.clear();
 		   
 		return *this;
 	}
@@ -516,8 +514,7 @@ public:
 	
 };	
 
-
-static double eps_filter = 1e-16;
+inline double block_threshold = 1e-16;
 
 template <int N, typename T = double, typename>
 class tensor {
@@ -548,8 +545,8 @@ public:
 #:for i in range(0,len(vars))
     #:set var = vars[i]
     
-    vec<int> ${var}$() {
-        vec<int> out(N);
+    arr<int,N> ${var}$() {
+        arr<int,N> out;
         c_dbcsr_t_get_info(m_tensor_ptr, N, 
         #:for n in range(0,i)
         nullptr,
@@ -631,6 +628,7 @@ public:
 		if (p.c_ndist) {
 			
 			dist_ptr = p.c_ndist->m_dist_ptr;
+            m_comm = p.c_ndist->m_comm;
 			
 		} else {
 			
@@ -643,8 +641,9 @@ public:
 			
 			distn = new dist<N>(typename dist<N>::create().ngrid(*p.c_ngrid).nd_dists(distvecs));
 			dist_ptr = distn->m_dist_ptr;
+            m_comm = distn->m_comm;
 		}
-		
+
 		c_dbcsr_t_create_new(&m_tensor_ptr, p.c_name->c_str(), dist_ptr, 
 						p.c_map1->data(), p.c_map1->size(),
 						p.c_map2->data(), p.c_map2->size(), &m_data_type, 
@@ -668,6 +667,8 @@ public:
     ${make_struct(structname='create_template',friend='tensor',params=list)}$
 	
 	tensor(create_template& p) : m_tensor_ptr(nullptr) {
+        
+        m_comm = p.c_tensor_in->m_comm;
 		
 		c_dbcsr_t_create_template(p.c_tensor_in->m_tensor_ptr, m_tensor_ptr, 
             p.c_name->c_str(), (p.c_ndist) ? p.c_ndist->m_dist_ptr : nullptr,
@@ -741,7 +742,7 @@ public:
 		
 	}
 	
-	void put_block(index<N>& idx, block<N,T>& blk, std::optional<bool> sum = std::nullopt, std::optional<double> scale = std::nullopt) {
+	void put_block(const index<N>& idx, block<N,T>& blk, std::optional<bool> sum = std::nullopt, std::optional<double> scale = std::nullopt) {
 		
 		c_dbcsr_t_put_block(m_tensor_ptr, idx.data(), blk.size().data(), 
 			blk.data(), (sum) ? &*sum : nullptr, (scale) ? &*scale : nullptr);
@@ -791,12 +792,18 @@ public:
 		return c_dbcsr_t_get_num_blocks_total(m_tensor_ptr);
 	}
 	
-	void filter(std::optional<T> eps, std::optional<int> method = std::nullopt, std::optional<bool> use_absolute = std::nullopt) {
-		
-		c_dbcsr_t_filter(m_tensor_ptr, (eps) ? *eps : nullptr, 
+	void filter(std::optional<T> ieps = std::nullopt, 
+        std::optional<int> method = std::nullopt, 
+        std::optional<bool> use_absolute = std::nullopt) {
+        
+		c_dbcsr_t_filter(m_tensor_ptr, (ieps) ? *ieps : block_threshold,
             (method) ? &*method : nullptr, (use_absolute) ? &*use_absolute : nullptr);
 		
 	}
+    
+    void scale(T factor) {
+        c_dbcsr_t_scale(m_tensor_ptr, factor);
+    }
     
     void finalize() {
         c_dbcsr_t_finalize(m_tensor_ptr);
@@ -841,11 +848,13 @@ public:
 	}
 	
 	~iterator() {
-		
-		c_dbcsr_t_iterator_stop(&m_iter_ptr);
-		//also empty vectors
-		
+		if (m_iter_ptr != nullptr) stop();
 	}
+    
+    void stop() {
+        c_dbcsr_t_iterator_stop(&m_iter_ptr);
+        m_iter_ptr = nullptr;
+    }
 	
 	void next() {
 		
@@ -1468,7 +1477,7 @@ T RMS(tensor<N,T>& t_in) {
 	return sqrt(prod/ntot);
 	
 }
-
+*/
 template <int N, typename T>
 void print(tensor<N,T>& t_in) {
 	
@@ -1476,8 +1485,6 @@ void print(tensor<N,T>& t_in) {
 	
 	MPI_Comm_rank(t_in.comm(), &myrank); 
 	MPI_Comm_size(t_in.comm(), &mpi_size);
-	
-	auto blkszs = t_in.blk_size();
 	
 	iterator<N,T> iter(t_in);
 	
@@ -1490,30 +1497,28 @@ void print(tensor<N,T>& t_in) {
 				iter.next();
 				bool found = false;
 				auto idx = iter.idx();
+				auto size = iter.size();
 				
-				vec<int> sizes(N);
-				
-				for (int i = 0; i != N; ++i) {
-					sizes[i] = blkszs[i][idx[i]];
-				}
-				
-				auto blk = t_in.get_block({.idx = idx, .blk_size = sizes, .found = found});
-				
-				std::cout << myrank << ": [";
-				for (int s = 0; s != sizes.size(); ++s) {
-					std::cout << sizes[s];
-					if (s != sizes.size() - 1) { std::cout << ","; }
-				}
-				std::cout << "] (";
-				for (int s = 0; s != idx.size(); ++s) {
+				auto blk = t_in.get_block(idx, size, found);
+                
+                std::cout << myrank << ": [";
+                
+				for (int s = 0; s != N; ++s) {
 					std::cout << idx[s];
-					if (s != sizes.size() - 1) { std::cout << ","; }
+					if (s != N - 1) { std::cout << ","; }
+				}
+				
+				std::cout << "] (";
+				
+                for (int s = 0; s != N; ++s) {
+					std::cout << size[s];
+					if (s != N - 1) { std::cout << ","; }
 				}
 				std::cout << ") {";
 				
 				
 				for (int i = 0; i != blk.ntot(); ++i) {
-					std::cout << blk(i) << " ";
+					std::cout << blk[i] << " ";
 				}
 				std::cout << "}" << std::endl;
 					
@@ -1523,7 +1528,7 @@ void print(tensor<N,T>& t_in) {
 		MPI_Barrier(t_in.comm());
 	}
 }
-
+/*
 template <typename T>
 vec<T> diag(tensor<2,T>& t) {
 	

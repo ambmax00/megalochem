@@ -3,7 +3,7 @@
 
 #include <string>
 
-#include "math/tensor/dbcsr.hpp"
+#include "tensor/dbcsr.hpp"
 
 namespace math {
 	

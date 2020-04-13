@@ -1,7 +1,7 @@
 #ifndef MATH_ORTHOGONALIZER_H
 #define MATH_ORTHOGONALIZER_H
 
-#include "math/tensor/dbcsr.hpp"
+#include "tensor/dbcsr.hpp"
 #include <string>
 #include <Eigen/Core>
 

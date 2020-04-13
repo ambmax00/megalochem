@@ -24,16 +24,14 @@ find_package(Libint2 2.6.0 CONFIG REQUIRED)
 get_target_property(DBCSR_INCLUDE_DIRS DBCSR::dbcsr INTERFACE_INCLUDE_DIRECTORIES)
 include_directories(
 	${DBCSR_INCLUDE_DIRS} ${MPI_CXX_HEADER_DIR} ${Boost_INCLUDE_DIRS}
-	${LIBINT2_INCLUDE_DIRS} ${CMAKE_CURRENT_SOURCE_DIR}
+	${LIBINT2_INCLUDE_DIRS} ${CMAKE_CURRENT_BINARY_DIR} ${CMAKE_CURRENT_SOURCE_DIR}
 )
 
 add_subdirectory(tensor)
-#add_subdirectory(math)
-#add_subdirectory(desc)
-#add_subdirectory(utils)
-#add_subdirectory(mpqc)
-#add_subdirectory(input)
-#add_subdirectory(ints)
+add_subdirectory(math)
+add_subdirectory(desc)
+add_subdirectory(input)
+add_subdirectory(ints)
 #add_subdirectory(hf)
 #add_subdirectory(adc)
 #add_subdirectory(mp2)
@@ -46,11 +44,12 @@ add_executable(
 target_link_libraries(
 	chem
 	PUBLIC
-	#	chem_input
+	chem_tensor
+	chem_input
 	#	chem_math_laplace
 	MPI::MPI_CXX	
-	chem_tensor
 	#	chem_hf
-	#	chem_desc
+	chem_desc
+	chem_ints
 	#	chem_adc
 )

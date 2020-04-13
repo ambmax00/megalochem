@@ -2,10 +2,8 @@
 #include <stdexcept>
 #include "ints/aofactory.h"
 #include "ints/integrals.h"
-#include "ints/screening.h"
 #include "ints/registry.h"
 #include "utils/pool.h"
-#include "utils/params.hpp"
 #include "math/linalg/inverse.h"
 #include <libint2.hpp>
 
@@ -15,10 +13,8 @@
 namespace ints {
 
 template <int N>
-dbcsr::stensor<N,double> aofactory::compute(aofac_params&& p) {
+dbcsr::stensor<N,double> aofactory::compute() {
 		
-		std::string Op = *p.op;
-		std::string bis = *p.bas;
 		std::string intname;
 		
 		libint2::initialize();
@@ -27,25 +23,25 @@ dbcsr::stensor<N,double> aofactory::compute(aofac_params&& p) {
 		libint2::Operator libOp = libint2::Operator::invalid;
 		libint2::BraKet libBraKet = libint2::BraKet::invalid;
 		
-		if (Op == "coulomb") {
+		if (*c_op == "coulomb") {
 			libOp = libint2::Operator::coulomb;
 			intname = "i_";
-		} else if (Op == "overlap") {
+		} else if (*c_op == "overlap") {
 			libOp = libint2::Operator::overlap;
 			intname = "s_";
-		} else if (Op == "kinetic") {
+		} else if (*c_op == "kinetic") {
 			libOp = libint2::Operator::kinetic;
 			intname = "t_";
-		} else if (Op == "nuclear") {
+		} else if (*c_op == "nuclear") {
 			libOp = libint2::Operator::nuclear;
 			intname = "v_";
-		} else if (Op == "erfc_coulomb") {
+		} else if (*c_op == "erfc_coulomb") {
 			libOp = libint2::Operator::erfc_coulomb;
 			intname = "erfc_";
 		}
 		
 		if (libOp == libint2::Operator::invalid) 
-			throw std::runtime_error("Invalid operator: "+Op);
+			throw std::runtime_error("Invalid operator: "+*c_op);
 			
 		// ======== process basis info =============
 		vec<desc::cluster_basis> basvec;
@@ -59,23 +55,23 @@ dbcsr::stensor<N,double> aofactory::compute(aofac_params&& p) {
 		
 		//std::cout << "A3" << std::endl;
 		
-		if (bis == "bb") { 
+		if (*c_dim == "bb") { 
 			basvec = {c_bas, c_bas};
-		} else if (bis == "xx") {
+		} else if (*c_dim == "xx") {
 			basvec = {*x_bas, *x_bas};
 			libBraKet = libint2::BraKet::xs_xs;
-		} else if (bis == "xbb") {
+		} else if (*c_dim == "xbb") {
 			basvec = {*x_bas, c_bas, c_bas};
 			libBraKet = libint2::BraKet::xs_xx;
-		} else if (bis == "bbbb") {
+		} else if (*c_dim == "bbbb") {
 			std::cout << "4" << std::endl;
 			basvec = {c_bas, c_bas, c_bas, c_bas};
 			libBraKet = libint2::BraKet::xx_xx;
 		} else {
-			throw std::runtime_error("Unsupported basis set specifications: "+bis);
+			throw std::runtime_error("Unsupported basis set specifications: "+ *c_dim);
 		}
 		
-		intname += bis;
+		intname += *c_dim;
 		
 		registry INT_REGISTRY;
 		dbcsr::stensor<N> out = INT_REGISTRY.get<N>(m_mol.name(), intname);
@@ -102,65 +98,27 @@ dbcsr::stensor<N,double> aofactory::compute(aofac_params&& p) {
 		}
 		
 		// OPTIONS
-		if (Op == "nuclear") {
+		if (*c_op == "nuclear") {
 			eng.set_params(make_point_charges(m_mol.atoms())); 
-		} else if (Op == "erfc_coulomb") {
+		} else if (*c_op == "erfc_coulomb") {
 			double omega = 0.1; //*ctx.get<double>("INT/omega");
 			eng.set_params(omega);
 		}
 			
 		util::ShrPool<libint2::Engine> eng_pool = util::make_pool<libint2::Engine>(eng);
 		
-		//if (Op == "coulomb") {
-				
-			//libint2::Engine screen(libint2::Operator::coulomb, max_nprim, max_l, 0, std::numeric_limits<double>::epsilon());
-			//			screen.set(libint2::BraKet::xx_xx);
-						
-			//util::ShrPool<libint2::Engine> screen_pool = util::make_pool<libint2::Engine>(screen);
-				
-			//m_2e_ints_zmat = Zmat(m_comm, m_mol, screen_pool, "schwarz");
-				
-			//m_2e_ints_zmat->compute();
-				
-		//}
+		dbcsr::pgrid<N> gridN(m_comm);
+		arrvec<int,N> blksizes;
 		
-		// ======= porcess extended input ==========
-		
-		/*
-		if (p.ext && N == 4) throw std::runtime_error("Aofactory: no extended input possible for 2e ints.");
-		
-		if (p.ext) {
-			if ((N == 2) && (*p.ext != "^-1" || *p.ext != "^-1/2"))
-				throw std::runtime_error("Aofactory: unknown option for extended input (N = 2)");
-			if ((N == 3) && (*p.ext != "(P|Q)^-1" || *p.ext != "(P|Q)^-1/2"))
-				throw std::runtime_error("Aofactory: unknown option for extended input (N = 2)");
+		for (int i = 0; i != N; ++i) {
+			blksizes[i] = basvec[i].cluster_sizes();
 		}
-		*/
-		//std::cout << "OUT" << std::endl;
-		out = integrals<N>({.comm = m_comm, .engine = eng_pool, 
-			.basvec = basvec, .bra = m_2e_ints_zmat, .ket = m_2e_ints_zmat, 
-			.name = intname, .map1 = *p.map1, .map2 = *p.map2});
 		
-		/*
-		if (p.ext && N == 2) {
-			
-			if (*p.ext == "^-1") {
-				out = math::eigen_inverse(*out, *p.name);
-			} else {
-				out = math::eigen_sqrt_inverse(*out,*p.name);
-			}
-			
-		} else if (p.ext && N == 3) {
-			
-			if (*p.ext == "(P|Q)^-1") {
-				auto metric = this->compute({.op = p.op, .bas = "xx", .name = "XX", .map1 = {0}, .map2 = {1}y
-				out = math::eigen_inverse(*out, *p.name);
-			} else {
-				out = math::eigen_sqrt_inverse(*out,*p.name);
-			}
-			
-			
-		*/	
+		dbcsr::tensor<N> t_ints = typename dbcsr::tensor<N>::create().name(intname)
+			.ngrid(gridN).map1(*c_map1).map2(*c_map2).blk_sizes(blksizes);
+		
+		calc_ints(t_ints,eng_pool,basvec);
+		out = t_ints.get_stensor();
 		
 		INT_REGISTRY.insert<N>(m_mol.name(), intname, out);
 		
@@ -199,10 +157,8 @@ dbcsr::stensor<2> aofactory::invert(dbcsr::stensor<2>& in, int order) {
 	
 }
 
-//forward declarations
-template dbcsr::stensor<2,double> aofactory::compute(aofac_params&& p);
-template dbcsr::stensor<3,double> aofactory::compute(aofac_params&& p);
-template dbcsr::stensor<4,double> aofactory::compute(aofac_params&& p);
-
+template dbcsr::stensor<2,double> aofactory::compute();
+template dbcsr::stensor<3,double> aofactory::compute();
+template dbcsr::stensor<4,double> aofactory::compute();
 
 } // end namespace ints

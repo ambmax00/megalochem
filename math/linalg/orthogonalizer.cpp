@@ -1,5 +1,5 @@
 #include "math/linalg/orthogonalizer.h"
-#include "math/tensor/dbcsr_conversions.hpp"
+#include "tensor/dbcsr_conversions.h"
 #include "math/linalg/symmetrize.h"
 #include "utils/mpi_log.h"
 
@@ -65,10 +65,10 @@ void orthgon::compute() {
 
 dbcsr::stensor<2,double> orthgon::result(std::string name) {
 	
-	dbcsr::pgrid<2> grid({.comm = m_tensor->comm()});
+	dbcsr::pgrid<2> grid(m_tensor->comm());
 		
 	auto t_out = 
-		dbcsr::eigen_to_tensor(m_out, name, grid, vec<int>{0}, vec<int>{1}, m_tensor->blk_size());
+		dbcsr::eigen_to_tensor(m_out, name, grid, vec<int>{0}, vec<int>{1}, m_tensor->blk_sizes());
 		
 	m_out.resize(0,0);
 		

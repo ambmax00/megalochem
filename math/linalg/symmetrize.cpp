@@ -6,13 +6,14 @@ dbcsr::stensor<2> symmetrize(dbcsr::stensor<2>& t_in, std::string name_in) {
 	
 	std::string name = name_in;
 	
-	dbcsr::pgrid<2> grid({.comm = t_in->comm()});
+	dbcsr::pgrid<2> grid(t_in->comm());
 	
-	dbcsr::tensor<2> t_sym({.name = name, .pgridN = grid, .map1 = {0}, .map2 = {1}, .blk_sizes = t_in->blk_size()});
+	dbcsr::tensor<2> t_sym = dbcsr::tensor<2>::create().name(name).ngrid(grid)
+		.map1({0}).map2({1}).blk_sizes(t_in->blk_sizes());
 
-	dbcsr::copy<2>({.t_in = *t_in, .t_out = t_sym, .order = {1,0}});
+	dbcsr::copy(*t_in, t_sym).order({1,0}).perform();
 	
-	dbcsr::copy<2>({.t_in = *t_in, .t_out = t_sym, .sum = true});
+	dbcsr::copy(*t_in, t_sym).sum(true).perform();
 	
 	t_sym.scale(0.5);
 	

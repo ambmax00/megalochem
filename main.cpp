@@ -3,11 +3,12 @@
 #include <stdexcept>
 #include <string>
 #include <dbcsr.hpp>
-//#include "input/reader.h"
+#include "input/reader.h"
 //#include "hf/hfmod.h"
 //#include "adc/adcmod.h"
-//#include "utils/mpi_time.h"
+#include "utils/mpi_time.h"
 
+#include "ints/aofactory.h"
 
 template <int N>
 void fill_random(dbcsr::tensor<N,double>& t_in, arrvec<int,N>& nz) {
@@ -87,42 +88,10 @@ int main(int argc, char** argv) {
 	int rank;
 	MPI_Comm_rank(MPI_COMM_WORLD,&rank);
 	
-	//std::cout << "FLOAT: " << dbcsr::dbcsr_type<float>::value << std::endl;
-	
-	/*
-	dbcsr::pgrid<2> grid2 = dbcsr::pgrid<2>::create()
-		.comm(MPI_COMM_WORLD).map1({0}).map2({1});
-
-	vec<int> blk1 = {3, 9, 12, 1};
-    vec<int> blk2 = {4, 2, 3, 1, 9, 2, 32, 10, 5, 8, 7};
-
-	auto dis1 = dbcsr::random_dist(blk1.size(), grid2.dims()[0]);
-	auto dis2 = dbcsr::random_dist(blk2.size(), grid2.dims()[1]);
-	
-	dbcsr::dist<2> dist2 = dbcsr::dist<2>::create()
-		.ngrid(grid2).nd_dists({dis1,dis2});
-		
-	std::array<int,3> v = {2,3,2};
-	dbcsr::block<3,double> blk(v);
-	
-	blk(0,0,0) = 3.52;
-	
-	blk.print();
-		
-	dbcsr::tensor<2> t2 = dbcsr::tensor<2>::create()
-		.name("TEST").ndist(dist2).map1({0}).map2({1}).blk_sizes({blk1,blk2});
-		
-	auto v3 = t2.nblks_local();
-	
-	auto bsizes = t2.blk_sizes();
-	
-	for (auto x : bsizes) {
-		for (auto e : x) {
-			std::cout << e << " ";
-		} std::cout << std::endl;
+	if (argc < 2) {
+		throw std::runtime_error("Wrong number of command line inputs.");
 	}
 	
-	/*
 	util::mpi_time time(MPI_COMM_WORLD, "Megalochem");
 	
 	util::mpi_log LOG(MPI_COMM_WORLD,0);
@@ -136,18 +105,11 @@ int main(int argc, char** argv) {
 	
 	LOG.banner(s,90,'*');
 	
-	if (argc < 2) {
-		throw std::runtime_error("Wrong number of command line inputs.");
-	}
-	
 	std::string filename(argv[1]);
 	
 	time.start();
-	* */
 	
 	dbcsr::init();
-	
-	/*
 	
 	reader filereader(MPI_COMM_WORLD, filename);
 	
@@ -164,6 +126,17 @@ int main(int argc, char** argv) {
 		}
 	}
 	
+	ints::aofactory afac(*mol,MPI_COMM_WORLD);
+	
+	dbcsr::stensor<2> tints = afac.op("overlap").dim("bb").map1({0}).map2({1}).compute<2>();
+	auto tints3 = afac.op("coulomb").dim("xbb").map1({0}).map2({1,2}).compute<3>();
+	auto tints4 = afac.op("coulomb").dim("bbbb").map1({0,1}).map2({2,3}).compute<4>();
+	
+	dbcsr::print(*tints4);
+	
+	tints->destroy();
+	
+	/*
 	auto hfopt = opt.subtext("hf");
 	
 	desc::shf_wfn myhfwfn = std::make_shared<desc::hf_wfn>();
@@ -203,7 +176,6 @@ int main(int argc, char** argv) {
 	
 	//dbcsr::print(s);
 	
-	*/
 	
 	dbcsr::pgrid<3> pgrid3d(MPI_COMM_WORLD);
 	dbcsr::pgrid<4> pgrid4d(MPI_COMM_WORLD);
@@ -290,9 +262,20 @@ int main(int argc, char** argv) {
 	//dbcsr::contract<3,4,3>().alpha(1.0).t1(tensor1).t2(tensor2).t3(tensor3).beta(1.0)
 	//	.con1({0,1}).ncon1({2}).con2({0,1}).ncon2({2,3}).map1({0}).map2({1,2}).print(true).log(true).perform();
 	
-	dbcsr::contract(tensor1,tensor2,tensor3).print(true).perform("ijk, ijlm -> klm");
+	//dbcsr::contract(tensor1,tensor2,tensor3).print(true).perform("ijk, ijlm -> klm");
 	
 	//dbcsr::copy(tensor1,tensor3).perform();
+	
+	arrvec<int,2> sizes0 = {blk1,blk2};
+	
+	dbcsr::pgrid<2> grid2(MPI_COMM_WORLD);
+	dbcsr::tensor<2> t2 = dbcsr::tensor<2>::create().name("TEST").ngrid(grid2).map1({0}).map2({1}).blk_sizes(sizes0);
+	
+	arrvec<int,2> nz00 = {nz11,nz12};
+	
+	fill_random<2>(t2,nz00);
+	
+	dbcsr::print(t2);
 	
 	tensor1.destroy();
 	tensor2.destroy();	
@@ -300,6 +283,8 @@ int main(int argc, char** argv) {
 	
 	pgrid3d.destroy();
 	pgrid4d.destroy();
+
+	*/
 
 	dbcsr::finalize();
 	

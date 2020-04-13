@@ -8,4 +8,6 @@ set(SOURCES
 )
 
 add_library(chem_desc ${SOURCES})
-target_link_libraries(chem_desc Libint2::int2)
+target_link_libraries(chem_desc 
+	chem_tensor
+	Libint2::int2)

@@ -1,6 +1,6 @@
 #ifndef MATH_LINALG_INVERSE_H
 #define MATH_LINALG_INVERSE_H
-#include "math/tensor/dbcsr.hpp"
+#include "tensor/dbcsr.hpp"
 #include <string>
 
 
