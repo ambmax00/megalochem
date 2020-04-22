@@ -5,7 +5,7 @@
 	private: \
 		reqopt < type, refval > c_##name; \
 	public: \
-		inline structname & (reqopt < type, refval > i_##name) { \
+		inline structname & name (reqopt < type, refval > i_##name) { \
 			c_##name = i_##name; \
 			return *this; \
 		}

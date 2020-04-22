@@ -1,19 +1,14 @@
 #ifndef MATH_SCALE_H
 #define MATH_SCALE_H
 
-#include "math/tensor/dbcsr.hpp"
-#include "utils/params.hpp"
+#include "tensor/dbcsr.hpp"
 #include <vector>
 
 namespace math {
 
 // do t[ij] = t[ij] * v[j]
-struct scale_params {
-	required<dbcsr::tensor<2>,ref> t_in;
-	required<vec<double>,ref> v_in;
-	optional<vec<int>,val> bounds;
-};
-void scale(scale_params&& p);
+void scale(dbcsr::tensor<2>& t_in, std::vector<double>& v_in, 
+	std::optional<std::vector<int>> bounds = std::nullopt);
 
 }
 

@@ -6,11 +6,11 @@
 #include <cassert>
 #include <Eigen/QR>
 
-#include "math/tensor/dbcsr_conversions.hpp"
+#include "tensor/dbcsr_conversions.h"
 #include "utils/mpi_log.h"
 
 template <int N>
-using tensor = dbcsr::tensor<N,double>;
+using stensor = dbcsr::stensor<N,double>;
 
 namespace math {
 
@@ -19,9 +19,9 @@ class diis_helper {
 
 private: 
 
-	std::deque<tensor<N>> m_delta;
-	std::deque<tensor<N>> m_trialvecs;
-	tensor<N> m_last_ele;
+	std::deque<stensor<N>> m_delta;
+	std::deque<stensor<N>> m_trialvecs;
+	stensor<N> m_last_ele;
 	
 	
 	Eigen::MatrixXd m_B;
@@ -41,7 +41,7 @@ public:
 		LOG(comm, m_print == false ? 0 : 999) {};
 	
 	
-	void compute_extrapolation_parameters(tensor<N>& T, tensor<N>& err, int iter) {
+	void compute_extrapolation_parameters(stensor<N>& T, stensor<N>& err, int iter) {
 		
 		if (iter >= m_start) {
 		
@@ -57,8 +57,8 @@ public:
 			
 			// determine error vector with max RMS
 			auto to_erase = std::max_element(m_delta.begin(), m_delta.end(), 
-				[&] (tensor<N>& e1, tensor<N>& e2) -> bool {
-					return RMS(e1) < RMS(e2);
+				[&] (stensor<N>& e1, stensor<N>& e2) -> bool {
+					return RMS(*e1) < RMS(*e2);
 				});
 			
 			size_t max_pos = to_erase - m_delta.begin();
@@ -67,7 +67,12 @@ public:
 			
 			if (reduce) m_delta.erase(to_erase);
 			
-			m_trialvecs.push_back(T); 
+			// make a copy, put it into trialvecs
+			dbcsr::tensor<2> t_in = dbcsr::tensor<2>::create_template().tensor_in(*T).name("Trial Vec " + iter);
+			dbcsr::copy(*T, t_in).perform();
+			
+			m_trialvecs.push_back(t_in.get_stensor());
+			 
 			if (reduce) m_trialvecs.erase(m_trialvecs.begin() + max_pos); 
 			
 			//std::cout << "Trail vectors stored: " << m_trialvecs.size() << std::endl;
@@ -85,7 +90,7 @@ public:
 				//std::cout << "ei" << std::endl;
 				//std::cout << ei << std::endl;
 				
-				v(i) = dbcsr::dot(ei,efin);
+				v(i) = dbcsr::dot(*ei,*efin);
 			}
 			
 			//std::cout << v << std::endl;
@@ -177,13 +182,13 @@ public:
 		
 	}
 	
-	void extrapolate(tensor<N>& trial, int iter) {
+	void extrapolate(stensor<N>& trial, int iter) {
 		
 		extrapolate(trial, m_coeffs, iter);
 		
 	}
 	
-	void extrapolate(tensor<N>& trial, Eigen::MatrixXd& coeffs, int iter) {
+	void extrapolate(stensor<N>& trial, Eigen::MatrixXd& coeffs, int iter) {
 		
 		static bool first = true;
 		
@@ -200,21 +205,24 @@ public:
 			LOG.os<2>("Extrapolation factors:\n");
 		
 			for (int i = 0; i != m_coeffs.size(); ++i) {
-				LOG.os<>(coeffs(i), " ");
-			} LOG.os<>('\n');
+				LOG.os<2>(coeffs(i), " ");
+			} LOG.os<2>('\n');
 			
-			trial.clear();
+			trial->clear();
 			
 			// do M = c1 * T1 + c2 * T2 + ...
 			for (int i = 0; i != coeffs.size(); ++i) {
 				
-				auto T = m_trialvecs[i];
+				dbcsr::tensor<2> ti = dbcsr::tensor<2>::create_template().tensor_in(*m_trialvecs[i]).name("temp");
+				dbcsr::copy(*m_trialvecs[i],ti).perform();
+				
 				double c = coeffs(i);
 				
-				T.scale(c);
-				
-				dbcsr::copy<N>({.t_in = T, .t_out = trial, .sum = true, .move_data = true});
-				
+				ti.scale(c);
+	
+				//dbcsr::copy<N>({.t_in = T, .t_out = trial, .sum = true, .move_data = true});
+				dbcsr::copy(ti,*trial).move_data(true).sum(true).perform();
+				ti.destroy();
 			}
 			
 			//std::cout << "Extrapolated M" << std::endl;

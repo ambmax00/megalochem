@@ -4,7 +4,7 @@
 #include <string>
 #include <dbcsr.hpp>
 #include "input/reader.h"
-//#include "hf/hfmod.h"
+#include "hf/hfmod.h"
 //#include "adc/adcmod.h"
 #include "utils/mpi_time.h"
 
@@ -118,25 +118,6 @@ int main(int argc, char** argv) {
 	auto mol = std::make_shared<desc::molecule>(filereader.get_mol());
 	auto opt = filereader.get_opt(); 
 	
-	auto cbas = mol->c_basis();
-	
-	for (int i = 0; i != cbas.size(); ++i) {
-		for (auto s : cbas[i]) {
-			std::cout << s << std::endl;
-		}
-	}
-	
-	ints::aofactory afac(*mol,MPI_COMM_WORLD);
-	
-	dbcsr::stensor<2> tints = afac.op("overlap").dim("bb").map1({0}).map2({1}).compute<2>();
-	auto tints3 = afac.op("coulomb").dim("xbb").map1({0}).map2({1,2}).compute<3>();
-	auto tints4 = afac.op("coulomb").dim("bbbb").map1({0,1}).map2({2,3}).compute<4>();
-	
-	dbcsr::print(*tints4);
-	
-	tints->destroy();
-	
-	/*
 	auto hfopt = opt.subtext("hf");
 	
 	desc::shf_wfn myhfwfn = std::make_shared<desc::hf_wfn>();
@@ -170,6 +151,8 @@ int main(int argc, char** argv) {
 	time.finish();
 	
 	time.print_info();
+	
+	/*
 	//ints::aofactory ao(mol, MPI_COMM_WORLD);
 	
 	//auto s = ao.compute<2>({.op = "overlap", .bas = "bb", .name = "S", .map1 = {0}, .map2 = {1}});
@@ -197,15 +180,16 @@ int main(int argc, char** argv) {
 	arrvec<int,4> sizes2 = {blk1,blk2,blk4,blk5};
 	arrvec<int,3> sizes3 = {blk3,blk4,blk5};
 	
-	dbcsr::tensor<3> tensor1 = dbcsr::tensor<3>::create().name("(13|2)")
-		.ngrid(pgrid3d).map1(map11).map2(map12).blk_sizes(sizes1);
+	auto tensor1 = dbcsr::make_stensor<2>(dbcsr::tensor<3>::create().name("(13|2)")
+		.ngrid(pgrid3d).map1(map11).map2(map12).blk_sizes(sizes1).get_stensor());
 		
 	dbcsr::tensor<4> tensor2 = dbcsr::tensor<4>::create().name("(54|21)")
 		.ngrid(pgrid4d).map1(map21).map2(map22).blk_sizes(sizes2);
 		
 	dbcsr::tensor<3> tensor3 = dbcsr::tensor<3>::create().name("(3|45)")
 		.ngrid(pgrid3d).map1(map31).map2(map32).blk_sizes(sizes3);
-		
+	
+	/*
 	//dbcsr::tensor<3,double> tensortest({.name="test", .pgridN = pgrid3d, .map1 = map11,
 	//	.map2 = map12, .blk_sizes = sizes1});
 						   

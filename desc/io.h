@@ -36,7 +36,7 @@ void read_binary_mat(const char* filename, Matrix& matrix){
 
 void write_2dtensor(dbcsr::stensor<2>& t_in, std::string molname);
 
-void read_2dtensor(dbcsr::stensor<2>& t_in, std::string molname, std::string tensorname, MPI_Comm comm, vec<vec<int>> blk_sizes);
+void read_2dtensor(dbcsr::stensor<2>& t_in, std::string molname, std::string tensorname, MPI_Comm comm, arrvec<int,2>& blk_sizes);
 
 void write_vector(svector<double>& v_in, std::string molname, std::string vecname, MPI_Comm comm);
 

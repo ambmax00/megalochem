@@ -11,7 +11,6 @@ add_library(chem_hf ${SOURCES})
 
 target_link_libraries(
 	chem_hf
-	PRIVATE
 	chem_ints
 	chem_desc
 	chem_math_linalg

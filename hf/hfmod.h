@@ -4,8 +4,8 @@
 #include "desc/molecule.h"
 #include "desc/options.h"
 #include "desc/wfn.h"
-#include "math/tensor/dbcsr.hpp"
-#include "math/tensor/dbcsr_conversions.hpp"
+#include "tensor/dbcsr.hpp"
+#include "tensor/dbcsr_conversions.h"
 #include "utils/mpi_time.h"
 
 #include <mpi.h>
@@ -15,10 +15,6 @@
 namespace hf {
 	
 class hfmod {
-	
-	template <int N>
-	using tensor_ptr = std::shared_ptr<dbcsr::tensor<N,double>>;
-	
 private:
 	
 	// descriptors
@@ -59,7 +55,7 @@ private:
 	void one_electron();
 	
 	void compute_guess();
-	dbcsr::tensor<2> compute_errmat(dbcsr::tensor<2>& F, dbcsr::tensor<2>& P, 
+	dbcsr::stensor<2> compute_errmat(dbcsr::tensor<2>& F, dbcsr::tensor<2>& P, 
 		dbcsr::tensor<2>& S, std::string x);
 	void diag_fock();
 	
@@ -118,7 +114,7 @@ public:
 		out->m_pv_bb_A = m_pv_bb_A;
 		out->m_pv_bb_B = m_pv_bb_B;
 		
-		dbcsr::pgrid<2> grid2({.comm = m_comm});
+		dbcsr::pgrid<2> grid2(m_comm);
 		
 		// separate occupied and virtual coefficient matrix
 		auto separate = [&](dbcsr::stensor<2>& in, dbcsr::stensor<2>& out_o, 
@@ -151,14 +147,14 @@ public:
 				std::cout << eigen_cbo << std::endl;
 				std::cout << eigen_cbv << std::endl;
 				
-				auto co = dbcsr::eigen_to_tensor(eigen_cbo, "c_bo_"+x, grid2, vec<int>{0}, vec<int>{1}, vec<vec<int>>{b,o});
-				auto cv = dbcsr::eigen_to_tensor(eigen_cbv, "c_bv_"+x, grid2, vec<int>{0}, vec<int>{1}, vec<vec<int>>{b,v});
+				arrvec<int,2> bo = {b,o};
+				arrvec<int,2> bv = {b,v};
 				
-				dbcsr::print(co);
-				dbcsr::print(cv);
 				
-				out_o = co.get_stensor();
-				out_v = cv.get_stensor();
+				if (nocc != 0)
+					out_o = (dbcsr::eigen_to_tensor(eigen_cbo, "c_bo_"+x, grid2, vec<int>{0}, vec<int>{1}, bo)).get_stensor();
+				if (nvir != 0) 
+					out_v = (dbcsr::eigen_to_tensor(eigen_cbv, "c_bv_"+x, grid2, vec<int>{0}, vec<int>{1}, bv)).get_stensor();
 				
 		};
 		

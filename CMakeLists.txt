@@ -32,7 +32,7 @@ add_subdirectory(math)
 add_subdirectory(desc)
 add_subdirectory(input)
 add_subdirectory(ints)
-#add_subdirectory(hf)
+add_subdirectory(hf)
 #add_subdirectory(adc)
 #add_subdirectory(mp2)
 
@@ -48,7 +48,7 @@ target_link_libraries(
 	chem_input
 	#	chem_math_laplace
 	MPI::MPI_CXX	
-	#	chem_hf
+	chem_hf
 	chem_desc
 	chem_ints
 	#	chem_adc

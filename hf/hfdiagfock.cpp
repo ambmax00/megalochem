@@ -1,6 +1,5 @@
 #include "hf/hfmod.h"
-#include "math/tensor/dbcsr_conversions.hpp"
-#include "math/linalg/symmetrize.h"
+#include "tensor/dbcsr_conversions.h"
 #include "math/other/scale.h"
 
 #include <algorithm> 
@@ -19,29 +18,23 @@ void hfmod::diag_fock() {
 	
 	Eigen::SelfAdjointEigenSolver<Eigen::MatrixXd> es;
 	
-	dbcsr::pgrid<2> grid({.comm = m_comm});
-	
-	bool log = false;
-	int u = 0;
-		
-	if (LOG.global_plev() >= 2) {
-		log = true;
-		u = 6;
-	}
+	dbcsr::pgrid<2> grid(m_comm);
 	
 	auto diagonalize = [&](dbcsr::tensor<2>& f_bb, dbcsr::tensor<2>& c_bm, std::vector<double>& eps, std::string x) {
 		
 		vec<int> blk_sizes;
 		int nele;
 		
-		LOG.os<2>("Orthogonalizing Fock Matrix.");
+		LOG.os<2>("Orthogonalizing Fock Matrix: ", x);
 		
-		dbcsr::tensor<2> FX({.name = "FX", .pgridN = grid, .map1 = {0}, .map2 = {1}, .blk_sizes = m_s_bb->blk_size()});
-		dbcsr::tensor<2> XFX({.name = "XFX", .pgridN = grid, .map1 = {0}, .map2 = {1}, .blk_sizes = m_s_bb->blk_size()});
+		dbcsr::tensor<2> FX = dbcsr::tensor<2>::create_template().tensor_in(*m_s_bb).name("FX");
+		dbcsr::tensor<2> XFX = dbcsr::tensor<2>::create_template().tensor_in(*m_s_bb).name("XFX");
 		
-		dbcsr::einsum<2,2,2>({"IJ, JK -> IK", f_bb, *m_x_bb, FX, .unit_nr = u, .log = log});
+		dbcsr::contract(f_bb, *m_x_bb, FX).perform("IJ, JK -> IK");
+		dbcsr::contract(*m_x_bb, FX, XFX).perform("JI, JK -> IK");
 		
-		dbcsr::einsum<2,2,2>({"JI, JK -> IK", *m_x_bb, FX, XFX, .unit_nr = u, .log = log});
+		//dbcsr::einsum<2,2,2>({"IJ, JK -> IK", f_bb, *m_x_bb, FX, .unit_nr = u, .log = log});
+		//dbcsr::einsum<2,2,2>({"JI, JK -> IK", *m_x_bb, FX, XFX, .unit_nr = u, .log = log});
 		
 		FX.destroy();
 		
@@ -57,27 +50,28 @@ void hfmod::diag_fock() {
 		auto eigval = es.eigenvalues();
 		auto eigvec = es.eigenvectors();
 		
-		LOG.os<2>("Eigenvalues: \n");
-		LOG.os<2>(eigval);
+		LOG.os<3>("Eigenvalues: \n");
+		LOG.os<3>(eigval);
 		
 		eps.resize(eigval.size());
 		std::copy(eigval.data(), eigval.data() + eigval.size(), eps.begin());
 		
-		LOG.os<2>("Eigenvectors: \n");
-		LOG.os<2>(eigvec);
+		LOG.os<3>("Eigenvectors: \n");
+		LOG.os<3>(eigvec);
 		
 		Eigen::MatrixXd eigen_c_bm_x = es.eigenvectors();
 	
 		auto c_bm_x = dbcsr::eigen_to_tensor
-			(eigen_c_bm_x, "c_bm_x_"+x, grid, {0}, {1}, c_bm.blk_size());
+			(eigen_c_bm_x, "c_bm_x_"+x, grid, {0}, {1}, c_bm.blk_sizes());
 		
 		c_bm_x.filter();
 			
-		if (LOG.global_plev() >= 2) 
+		if (LOG.global_plev() >= 3) 
 			dbcsr::print(c_bm_x);
 	
 		//Transform back
-		dbcsr::einsum<2,2,2>({"IJ, Ji -> Ii", *m_x_bb, c_bm_x, c_bm, .unit_nr = u, .log = log});
+		dbcsr::contract(*m_x_bb, c_bm_x, c_bm).perform("IJ, Ji -> Ii");	
+		//dbcsr::einsum<2,2,2>({"IJ, Ji -> Ii", *m_x_bb, c_bm_x, c_bm, .unit_nr = u, .log = log});
 		
 		//debug: eigen
 		//auto xe = dbcsr::tensor_to_eigen(*m_x_bb);
@@ -107,10 +101,8 @@ void hfmod::diag_fock() {
 		// make bounds
 		std::vector<std::vector<int>> occ_bounds = {{0,limit}};
 		
-		int unit_nr = 6;
-		
-		std::cout << "START" << std::endl;
-		dbcsr::einsum<2,2,2>({.x = "Mi, Ni -> MN", .t1 = c_bm, .t2 = c_bm, .t3 = p_bb, .b1 = occ_bounds, /*.unit_nr = unit_nr, .log = true*/});
+		dbcsr::contract(c_bm, c_bm, p_bb).bounds1(occ_bounds).perform("Mi, Ni -> MN");
+		//dbcsr::einsum<2,2,2>({.x = "Mi, Ni -> MN", .t1 = c_bm, .t2 = c_bm, .t3 = p_bb, .b1 = occ_bounds, /*.unit_nr = unit_nr, .log = true*/});
 		
 		p_bb.filter();
 		
@@ -130,13 +122,13 @@ void hfmod::diag_fock() {
 	if (fraca) {
 		//std::cout << "Scaling!" << std::endl;
 		std::vector<int> b = {0,fraca->size() - 1};
-		math::scale({.t_in = *m_c_bm_A, .v_in = *fraca, .bounds = b});
+		math::scale(*m_c_bm_A, *fraca, b);
 	}
 	
 	auto fracb = m_mol->frac_occ_beta();
 	if (fracb && m_c_bm_B) {
 		std::vector<int> b = {0,fracb->size() - 1};
-		math::scale({.t_in = *m_c_bm_B, .v_in = *fracb, .bounds = b});
+		math::scale(*m_c_bm_B, *fracb, b);
 	}
 	
 	auto& t_density = TIME.sub("Form Density Matrix.");
@@ -147,8 +139,7 @@ void hfmod::diag_fock() {
 	if (m_p_bb_B && !m_nobeta) {
 		form_density(*m_p_bb_B, *m_c_bm_B, "B");
 	} else if (!m_restricted && m_nobeta) {
-		m_p_bb_B = dbcsr::make_stensor<2>({.name = "p_bb_B", .pgridN = grid, .map1 = {0}, .map2 = {1}, .blk_sizes = m_p_bb_A->blk_size()});
-		m_p_bb_B->set(0.0);
+		m_p_bb_B = dbcsr::make_stensor<2>(dbcsr::tensor<2>::create_template().tensor_in(*m_p_bb_A).name("p_bb_A"));
 		
 		if (LOG.global_plev() >= 1) 
 			dbcsr::print(*m_p_bb_B);
@@ -167,10 +158,10 @@ void hfmod::compute_virtual_density() {
 		
 		int lobound, upbound;
 		
-		dbcsr::pgrid<2> grid2({.comm = m_comm});
+		dbcsr::pgrid<2> grid2(m_comm);
 		
-		pv_bb = dbcsr::make_stensor<2>({.name = "pv_bb_"+x, .pgridN = grid2, 
-				.map1 = {0}, .map2 = {1}, .blk_sizes = {m_mol->dims().b(),m_mol->dims().b()}});
+		pv_bb = dbcsr::make_stensor<2>(
+			dbcsr::tensor<2>::create_template().tensor_in(*m_p_bb_A).name("pv_bb_"+x));
 		
 		if (x == "A") {
 			lobound = m_mol->nocc_alpha();
@@ -186,21 +177,34 @@ void hfmod::compute_virtual_density() {
 		// make bounds
 		std::vector<std::vector<int>> vir_bounds = {{lobound,upbound}};
 		
-		dbcsr::einsum<2,2,2>({.x = "Mi, Ni -> MN", .t1 = *c_bm, .t2 = *c_bm, .t3 = *pv_bb, .b1 = vir_bounds});
+		dbcsr::contract(*c_bm, *c_bm, *pv_bb).bounds1(vir_bounds).perform("Mi, Ni -> MN");
+		//dbcsr::einsum<2,2,2>({.x = "Mi, Ni -> MN", .t1 = *c_bm, .t2 = *c_bm, .t3 = *pv_bb, .b1 = vir_bounds});
 		
 		pv_bb->filter();
 		
-		if (LOG.global_plev() >= 1) 
+		if (LOG.global_plev() >= 2) 
 			dbcsr::print(*pv_bb);
 		
 	};
 	
 	if (m_mol->nvir_alpha() != 0) {
 		form_density(m_pv_bb_A, m_c_bm_A, "A");
+	} else {
+		m_pv_bb_A = dbcsr::make_stensor<2>(
+			dbcsr::tensor<2>::create_template().tensor_in(*m_p_bb_A).name("pv_bb_A"));
+		m_pv_bb_A->reserve_all();
+		m_pv_bb_A->set(0.0);
+		m_pv_bb_A->filter();
 	}
 	
 	if (!m_restricted && !m_nobeta) {
 		form_density(m_pv_bb_B, m_c_bm_B, "B");
+	} else {
+		m_pv_bb_B = dbcsr::make_stensor<2>(
+			dbcsr::tensor<2>::create_template().tensor_in(*m_p_bb_B).name("pv_bb_B"));
+		m_pv_bb_B->reserve_all();
+		m_pv_bb_B->set(0.0);
+		m_pv_bb_B->filter();
 	}
 	
 }

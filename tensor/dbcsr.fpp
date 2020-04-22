@@ -540,7 +540,7 @@ public:
 	typedef T value_type;
     const static int dim = N;
     
-    // get_info:
+// ======== get_info =======
 #:set vars = ['nblks_total', 'nfull_total', 'nblks_local', 'nfull_local', 'pdims', 'my_ploc']
 #:for i in range(0,len(vars))
     #:set var = vars[i]
@@ -573,14 +573,16 @@ public:
     typename std::enable_if<M == ${idim}$,arrvec<int,N>>::type
     ${var}$() {
         
+        std::cout << "${var}$" << std::endl;
+        
         arrvec<int,N> out;
         vec<int> sizes(N);
     
     #:for n in range(0,idim)
         #:if var == 'blks_local'
-            sizes[${n}$] = c_dbcsr_t_nblks_local(m_tensor_ptr,${n}$);
+        sizes[${n}$] = c_dbcsr_t_nblks_local(m_tensor_ptr,${n}$);
         #:else
-            sizes[${n}$] = c_dbcsr_t_nblks_total(m_tensor_ptr,${n}$);
+        sizes[${n}$] = c_dbcsr_t_nblks_total(m_tensor_ptr,${n}$);
         #:endif
         
         out[${n}$] = vec<int>(sizes[${n}$]);
@@ -606,6 +608,76 @@ public:
     
     #:endfor
 #:endfor
+
+// =========0 end get_info =========
+
+// ========= map info ==========
+
+#:set vars = ['ndim_nd', 'ndim1_2d', 'ndim2_2d']
+#:for i in range(0,len(vars))
+    #:set var = vars[i]
+    
+    int ${var}$() {
+        
+        int c_${var}$;
+        
+        c_dbcsr_t_get_mapping_info(m_tensor_ptr, N, 0, 0, 
+                        ${repeat('nullptr',i,',')}$
+                        &c_${var}$,
+                        ${repeat('nullptr',2-i,',')}$
+                        ${repeat('nullptr',10)}$);
+                        
+        return c_${var}$;
+        
+    }
+    
+#:endfor
+
+#:set vars = ['dims_2d_i8', 'dims_2d', 'dims_nd', 'dims1_2d', 'dims2_2d', 'map1_2d', 'map2_2d', 'map_nd']
+#:for i in range(0,len(vars))
+    #:set var = vars[i]
+    
+    #:if var == 'dims_2d_i8'
+    vec<long long int> ${var}$() {
+    #:else
+    vec<int> ${var}$() {
+    #:endif
+    
+        std::cout << "${var}$" << std::endl;
+        
+        int nd_size = N;
+        int nd_row_size = c_dbcsr_t_ndims_matrix_row(m_tensor_ptr);
+        int nd_col_size = c_dbcsr_t_ndims_matrix_column(m_tensor_ptr);
+        
+        #:if var in ['dims_2d_i8', 'dims_2d']
+        int vsize = 2;
+        #:elif var in ['dims_nd', 'map_nd']
+        int vsize = nd_size;
+        #:elif var in ['dims1_2d', 'map1_2d']
+        int vsize = nd_row_size;
+        #:else
+        int vsize = nd_col_size;
+        #:endif
+        
+        #:if var == 'dims_2d_i8'
+        vec<long long int> out(vsize);
+        #:else 
+        vec<int> out(vsize);
+        #:endif
+        
+        c_dbcsr_t_get_mapping_info(m_tensor_ptr, N, nd_row_size, nd_col_size, nullptr, nullptr, nullptr,
+                        ${repeat('nullptr',i,',')}$
+                        out.data(),
+                        ${repeat('nullptr',len(vars) - i - 1,',')}$
+                        nullptr, nullptr);
+                        
+        return out;
+        
+    }
+    
+#:endfor
+        
+// ======= end map info =========
     
 	tensor() : m_tensor_ptr(nullptr) {}
 	
@@ -670,7 +742,7 @@ public:
         
         m_comm = p.c_tensor_in->m_comm;
 		
-		c_dbcsr_t_create_template(p.c_tensor_in->m_tensor_ptr, m_tensor_ptr, 
+		c_dbcsr_t_create_template(p.c_tensor_in->m_tensor_ptr, &m_tensor_ptr, 
             p.c_name->c_str(), (p.c_ndist) ? p.c_ndist->m_dist_ptr : nullptr,
             (p.c_map1) ? p.c_map1->data() : nullptr,
             (p.c_map1) ? p.c_map1->size() : 0,
@@ -805,6 +877,10 @@ public:
         c_dbcsr_t_scale(m_tensor_ptr, factor);
     }
     
+    void set(T factor) {
+        c_dbcsr_t_set(m_tensor_ptr, factor);
+    }
+    
     void finalize() {
         c_dbcsr_t_finalize(m_tensor_ptr);
     }
@@ -824,6 +900,17 @@ public:
     
 };
 
+template <int N, typename T = double>
+stensor<N,T> make_stensor(typename tensor<N,T>::create& p) {
+    tensor<N,T> t(p);
+    return t.get_stensor();
+}
+
+template <int N, typename T = double>
+stensor<N,T> make_stensor(typename tensor<N,T>::create_template& p) {
+    tensor<N,T> t(p);
+    return t.get_stensor();
+}
 
 template <int N, typename T = double>
 class iterator {
@@ -843,13 +930,13 @@ public:
 	iterator(tensor<N,T>& t_tensor) :
 		m_iter_ptr(nullptr), m_tensor_ptr(t_tensor.m_tensor_ptr),
 		m_blk_n(0), m_blk_p(0)
-	{
-		c_dbcsr_t_iterator_start(&m_iter_ptr, m_tensor_ptr);
-	}
+	{}
 	
-	~iterator() {
-		if (m_iter_ptr != nullptr) stop();
-	}
+	~iterator() {}
+    
+    void start() {
+        c_dbcsr_t_iterator_start(&m_iter_ptr, m_tensor_ptr);
+    }
     
     void stop() {
         c_dbcsr_t_iterator_stop(&m_iter_ptr);
@@ -908,7 +995,7 @@ class copy {
         ['order','vec<int>','optional','val'],&
         ['sum','bool','optional','val'],&
         ['bounds','vec<vec<int>>', 'optional', 'ref'],&
-        ['move','bool','optional','val']]
+        ['move_data','bool','optional','val']]
     ${make_param('copy',list)}$
         
 private:
@@ -927,7 +1014,7 @@ public:
         c_dbcsr_t_copy(c_t_in.m_tensor_ptr, N, c_t_out.m_tensor_ptr,
             (c_order) ? c_order->data() : nullptr, 
             (c_sum) ? &*c_sum : nullptr, fbounds,
-            (c_move) ? &*c_move : nullptr, nullptr);
+            (c_move_data) ? &*c_move_data : nullptr, nullptr);
             
     }
             
@@ -990,7 +1077,7 @@ public:
             c_ncon2->data(), c_ncon2->size(),
             c_map1->data(), c_map1->size(),
             c_map2->data(), c_map2->size(), 
-            f_b2, f_b2, f_b3,
+            f_b1, f_b2, f_b3,
             nullptr, nullptr, nullptr, nullptr, 
             (c_filter) ? &*c_filter : nullptr,
             (c_flop) ? &*c_flop : nullptr,
@@ -1151,84 +1238,75 @@ template <int N1, int N2, int N3, typename T>
 contract(tensor<N1,T>& t1, tensor<N2,T>& t2, tensor<N3,T>& t3) 
 -> contract<tensor<N1,T>::dim,tensor<N2,T>::dim,tensor<N3,T>::dim, T>;
 
-
-/*
 template <int N, typename T = double>
 dbcsr::tensor<N+1,T> add_dummy(tensor<N,T>& t) {
 	
-	//std::cout << "Adding dummy dimension!" << std::endl;
-	
-	// get maps of tensor
-	vec<int> map1, map2; 
-	
-	t.get_mapping_info({.map1_2d = map1, .map2_2d = map2});
+    std::cout << "ADDING ON: " << std::endl;
+    
+	vec<int> map1 = t.map1_2d();
+    vec<int> map2 = t.map2_2d();   
+    
 	
 	vec<int> new_map1 = map1;
 	new_map1.insert(new_map1.end(), map2.begin(), map2.end());
 	
 	vec<int> new_map2 = {N};
 	
-	pgrid<N+1> grid({.comm = t.comm()});
+	pgrid<N+1> grid(t.comm());
 	
-	auto blksizes = t.blk_size();
-	blksizes.push_back({1});
+	arrvec<int,N> blksizes = t.blk_sizes();
+    arrvec<int,N+1> blksizesnew;
+    
+    std::copy(blksizes.begin(),blksizes.end(),blksizesnew.begin());
+    blksizesnew[N] = vec<int>{1};
 	
-	tensor<N+1,T> new_t({.name = t.name(), .pgridN = grid, .map1 = new_map1, .map2 = new_map2,
-		.blk_sizes = blksizes});
+	tensor<N+1,T> new_t = typename tensor<N+1,T>::create().name(t.name() + " dummy").ngrid(grid)
+        .map1(new_map1).map2(new_map2).blk_sizes(blksizesnew);
 	
 	iterator<N> it(t);
-	
-	// parallelize this:
-	
-	//std::cout << "NUMBER OF BLOCKS: " << std::endl;
-	//std::cout << t.num_blocks() << std::endl;
+    index<N+1> newidx;
+    index<N+1> newsize;
+    
+    newidx[N] = 0;
+    newsize[N] = 1;
+    
+    auto locblks = t.blks_local();
+    arrvec<int,N+1> newlocblks;
+    
+    std::copy(locblks.begin(),locblks.end(),newlocblks.begin());
+    newlocblks[N] = vec<int>(locblks[0].size(),0);
+    
+    new_t.reserve(newlocblks);
+    
+    it.start();
 	
 	while (it.blocks_left()) {
 		
 		it.next();
 		
-		index<N> idx = it.idx();
-		index<N+1> new_idx;
-		
-		for (int i = 0; i != N; ++i) {
-			new_idx[i] = idx[i];
-		}
-		
-		new_idx[N] = 0;
-		
-		//std::cout << "INDEX: " << std::endl;
-		//for (auto x  : new_idx) {
-		//	std::cout << x << " ";
-		//} std::cout << std::endl;
-		
-		vec<int> blksz(N);
-		
-		for (int i = 0; i != N; ++i) {
-			blksz[i] = blksizes[i][idx[i]];
-		}
-	
+		auto& idx = it.idx();
+        auto& size = it.size();
+				
+		std::copy(size.begin(),size.end(),newsize.begin());
+		std::copy(idx.begin(),idx.end(),newidx.begin());
+        
 		bool found = false;
-		auto blk = t.get_block({.idx = idx, .blk_size = blksz, .found = found});
-		blksz.push_back(1);
+		auto blk = t.get_block(idx, size, found);
 		
-		block<N+1,T> new_blk(blksz, blk.data());
+		block<N+1,T> newblk(newsize,blk.data());
 		
 		//std::cout << "IDX: " << new_idx.size() << std::endl;
 		//std::cout << "BLK: " << new_blk.sizes().size() << std::endl;
-		
-		vec<vec<int>> res(N+1, vec<int>(1));
-		for (int i = 0; i != N; ++i) {
-			res[i][0] = idx[i];
-		}
-		res[N][0] = 0;
-		
-		new_t.reserve(res); 
 				
-		new_t.put_block({.idx = new_idx, .blk = new_blk});
+		new_t.put_block(newidx, newblk);
 		
 	}
+    
+    it.stop();
 		
 	//print(new_t);
+    t.finalize();
+    new_t.finalize();
 	
 	grid.destroy();
 	
@@ -1237,68 +1315,60 @@ dbcsr::tensor<N+1,T> add_dummy(tensor<N,T>& t) {
 }
 
 template <int N, typename T = double>
-dbcsr::tensor<N-1,T> remove_dummy(tensor<N,T>& t, vec<int> map1, vec<int> map2) {
+dbcsr::tensor<N-1,T> remove_dummy(tensor<N,T>& t, vec<int> map1, vec<int> map2, std::optional<std::string> name = std::nullopt) {
 	
 	//std::cout << "Removing dummy dim." << std::endl;
 	
-	pgrid<N-1> grid({.comm = t.comm()});
+	pgrid<N-1> grid(t.comm());
 	
-	auto blksizes = t.blk_size();
-	blksizes.pop_back();
-	
-	tensor<N-1,T> new_t({.name = t.name(), .pgridN = grid, .map1 = map1, .map2 = map2,
-		.blk_sizes = blksizes});
+	auto blksizes = t.blk_sizes();
+	arrvec<int,N-1> newblksizes;
+    
+    std::copy(blksizes.begin(),blksizes.end()-1,newblksizes.begin());
+	std::string newname = (name) ? *name : t.name();
+    
+	tensor<N-1,T> new_t = typename dbcsr::tensor<N-1,T>::create().name(newname).ngrid(grid).map1(map1).map2(map2)
+		.blk_sizes(newblksizes);
 	
 	iterator<N> it(t);
+    
+    // reserve 
+    auto locblks = t.blks_local();
+    arrvec<int,N-1> newlocblks;
+    
+    std::copy(locblks.begin(),locblks.end()-1,newlocblks.begin());
+    
+    new_t.reserve(newlocblks);
 	
+    it.start();
+    
 	// parallelize this:
 	while (it.blocks_left()) {
 		
 		it.next();
 		
-		index<N> idx = it.idx();
-		index<N-1> new_idx;
-		
-		for (int i = 0; i != N-1; ++i) {
-			new_idx[i] = idx[i];
-		}
-		
-		vec<int> blksz(N);
-		
-		for (int i = 0; i != N-1; ++i) {
-			blksz[i] = blksizes[i][new_idx[i]];
-		}
-		blksz[N-1] = 1;
-		
-		//std::cout << "INDEX: " << std::endl;
-		//for (auto x  : new_idx) {
-		//	std::cout << x << " ";
-		//} std::cout << std::endl;
-	
+		auto& idx = it.idx();
+        auto& size = it.size();
+        
+		index<N-1> newidx;
+        index<N-1> newsize;
+        
+        std::copy(idx.begin(),idx.end()-1,newidx.begin());
+        std::copy(size.begin(),size.end()-1,newsize.begin());
+    
 		bool found = false;
-		auto blk = t.get_block({.idx = idx, .blk_size = blksz, .found = found});
-		auto sizes = blk.sizes();
-		sizes.pop_back();
+		auto blk = t.get_block(idx, size, found);
 		
-		const int M = N - 1;
-		
-		block<M,T> new_blk(sizes, blk.data());
-		
-		//std::cout << "IDX: " << new_idx.size() << std::endl;
-		//std::cout << "BLK: " << new_blk.sizes().size() << std::endl;
-		
-		vec<vec<int>> res(N-1, vec<int>(1));
-		for (int i = 0; i != N-1; ++i) {
-			res[i][0] = idx[i];
-		}
-		
-		new_t.reserve(res); 
+		block<N-1,T> newblk(newsize, blk.data());
 				
-		new_t.put_block({.idx = new_idx, .blk = new_blk});
+		new_t.put_block(newidx, newblk);
 		
 	}
 		
-	//print(new_t);
+	t.finalize();
+    new_t.finalize();
+    
+    it.stop();
 	
 	grid.destroy();
 	
@@ -1308,67 +1378,42 @@ dbcsr::tensor<N-1,T> remove_dummy(tensor<N,T>& t, vec<int> map1, vec<int> map2) 
 
 template <int N>
 double dot(tensor<N,double>& t1, tensor<N,double>& t2) {
-	
-	// dot product only for N = 2 at the moment
-	assert(N == 2);
 
+    // have to have same pgrid!
 	double sum = 0.0;
 	
-	dbcsr::iterator<2> it(t1);
-	
-	int nblks = t1.num_blocks();
-	
-	/*
-	#pragma omp parallel for shared(iter) reduction(+:sum)
-	for (int I = 0; I != nblks; ++I) 
-	{
-		
-		idx2 iblk;
-		vec<int> blksize;
-		
-		#pragma omp critical 
-		{
-			iter.next();
-			iblk = iter.idx();
-			blksize = iter.sizes();
-		}
-		
-		bool found = false;
-		auto b1 = t1.get_block({.idx = iblk, .blk_size = blksize, .found = found});
-		auto b2 = t2.get_block({.idx = iblk, .blk_size = blksize, .found = found});
-		
-		if (!found) continue;
-		
-		double term = std::inner_product(b1.data(), b1.data() + b1.ntot(), b2.data(), 0.0);
-		
-		sum += term;
-		
-	}*/ /*
-	
-	
-		while (it.blocks_left()) {
+    //#pragma omp parallel 
+    //{
+        
+        iterator<2> iter(t1);
+        iter.start();
+        
+		while (iter.blocks_left()) {
 			
-			it.next();
+			iter.next();
+            
+            auto& idx = iter.idx();
+            auto& size = iter.size();
 			
 			bool found = false;
-			auto b1 = t1.get_block({.idx = it.idx(), .blk_size = it.sizes(), .found = found});
-			auto b2 = t2.get_block({.idx = it.idx(), .blk_size = it.sizes(), .found = found});
+            
+			auto b1 = t1.get_block(idx, size, found);
+			auto b2 = t2.get_block(idx, size, found);
 			
 			if (!found) continue;
 			
-			//std::cout  << std::inner_product(b1.data(), b1.data() + b1.ntot(), b2.data(), T()) << std::endl;
-			
-			//std::cout << "ELE: " << std::endl;
-			//for (int i = 0; i != b1.ntot(); ++i) { std::cout << b1(i) << " " << b2(i) << std::endl; }
-			
-			
 			sum += std::inner_product(b1.data(), b1.data() + b1.ntot(), b2.data(), 0.0);
 			
-			//std::cout << "SUM: " << std::inner_product(b1.data(), b1.data() + b1.ntot(), b2.data(), T()) << std::endl;
-			
 		}
+        
+        t1.finalize();
+        t2.finalize();
+        
+        iter.stop();
+        
+    //}
 		
-	
+    
 	
 	double MPIsum = 0.0;
 	
@@ -1378,6 +1423,7 @@ double dot(tensor<N,double>& t1, tensor<N,double>& t2) {
 		
 }
 
+/*
 template <int N, typename T = double>
 void ewmult(tensor<N,T>& t1, tensor<N,T>& t2, tensor<N,T>& tout) {
 	
@@ -1461,13 +1507,14 @@ void ewmult(tensor<N,double>& t1, tensor<N,double>& t2, tensor<N,double>& t3) {
 		
 }*/ /*
 
+*/
 template <int N, typename T>
 T RMS(tensor<N,T>& t_in) {
 	
 	T prod = dot(t_in, t_in);
 	
 	// get total number of elements
-	auto tot = t_in.nfull_tot();
+	auto tot = t_in.nfull_total();
 	
 	size_t ntot = 1.0;
 	for (auto i : tot) {
@@ -1477,7 +1524,7 @@ T RMS(tensor<N,T>& t_in) {
 	return sqrt(prod/ntot);
 	
 }
-*/
+
 template <int N, typename T>
 void print(tensor<N,T>& t_in) {
 	
@@ -1487,13 +1534,17 @@ void print(tensor<N,T>& t_in) {
 	MPI_Comm_size(t_in.comm(), &mpi_size);
 	
 	iterator<N,T> iter(t_in);
+    iter.start();
 	
 	if (myrank == 0) std::cout << "Tensor: " << t_in.name() << std::endl;
     
     for (int p = 0; p != mpi_size; ++p) {
 		if (myrank == p) {
+            int nblk = 0;
 			while (iter.blocks_left()) {
-				  
+                
+                nblk++;
+                
 				iter.next();
 				bool found = false;
 				auto idx = iter.idx();
@@ -1524,9 +1575,16 @@ void print(tensor<N,T>& t_in) {
 					
 				
 			}
+            
+            if (nblk == 0) {
+                std::cout << myrank << ": {empty}" << std::endl;
+            }
+            
 		}
 		MPI_Barrier(t_in.comm());
 	}
+    
+    iter.stop();
 }
 /*
 template <typename T>

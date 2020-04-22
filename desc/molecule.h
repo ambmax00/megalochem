@@ -2,6 +2,7 @@
 #define DESC_MOLECULE
 
 #include "utils/params.hpp"
+#include "utils/ppdirs.h"
 #include "desc/basis.h"
 
 #include <vector>
@@ -10,6 +11,8 @@
 #include <memory>
 
 namespace desc {
+	
+static const int default_split_size = 5;
 
 class molecule {	
 private:
@@ -130,17 +133,25 @@ public:
 
 	molecule() {}
 	
-	struct mol_params {
-		required<std::string,val>					name;
-		required<std::vector<libint2::Atom>,ref>	atoms;
-		required<int,val>							charge;
-		required<int,val>							mult;
-		required<int,val>							split;
-		required<std::vector<libint2::Shell>,ref>	basis;
-		optional<std::vector<libint2::Shell>,ref>	dfbasis;
-		optional<bool,val>							fractional;
+	struct create {
+		
+		make_param(create,name,std::string,required,val)
+		make_param(create,atoms,std::vector<libint2::Atom>,required,ref)
+		make_param(create,basis,std::vector<libint2::Shell>,required,ref)
+		make_param(create,charge,int,required,val)
+		make_param(create,mult,int,required,val)
+		make_param(create,split,int,optional,val)
+		make_param(create,dfbasis,std::vector<libint2::Shell>,optional,ref)
+		make_param(create,fractional,bool,optional,val)
+		
+		public:
+	
+		create() {}
+		friend class molecule;
+		
 	};
-	molecule(mol_params&& p);
+		
+	molecule(create& p);
 
 	~molecule() {}
 	

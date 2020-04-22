@@ -22,23 +22,23 @@ static const std::vector<int> reference_S = {  0,
 
 static const std::vector<int> conf_orb = {0, 2, 10, 18, 36, 54, 86, 118};
 
-molecule::molecule(mol_params&& p) : 
-	m_name(*p.name),
-	m_mult(*p.mult), 
-	m_charge(*p.charge)
+molecule::molecule(molecule::create& p) : 
+	m_name(*p.c_name),
+	m_mult(*p.c_mult), 
+	m_charge(*p.c_charge)
 	{
 	
 	//atoms
-	m_atoms = *p.atoms;
+	m_atoms = *p.c_atoms;
 	
 	// first: form clustered basis sets
-	cluster_basis cbas(*p.basis,1);
+	cluster_basis cbas(*p.c_basis,1);
 	
 	m_cluster_basis = cbas;
 	
-	if (p.dfbasis) {
-		std::cout << "There is a df basis: " << p.dfbasis->size() << std::endl;
-		cluster_basis cdfbas(*p.dfbasis,1);
+	if (p.c_dfbasis) {
+		std::cout << "There is a df basis: " << p.c_dfbasis->size() << std::endl;
+		cluster_basis cdfbas(*p.c_dfbasis,1);
 		
 		for (auto i : cdfbas.cluster_sizes()) {
 			std::cout << i << std::endl;
@@ -50,7 +50,7 @@ molecule::molecule(mol_params&& p) :
 	// secondly: occ/virt info
 	
 	m_frac = false;
-	if (p.fractional) m_frac = *p.fractional;
+	if (p.c_fractional) m_frac = *p.c_fractional;
 	
 	if (m_frac) std::cout << "FRACTIONAL" << std::endl;
 	
@@ -127,7 +127,7 @@ molecule::molecule(mol_params&& p) :
 	
 	}
 	
-	block_sizes blks(*this,*p.split);
+	block_sizes blks(*this,(p.c_split) ? *p.c_split : default_split_size);
 	
 	m_blocks = blks;
 

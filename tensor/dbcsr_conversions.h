@@ -31,6 +31,7 @@ MatrixX<T> tensor_to_eigen(dbcsr::tensor<2,T>& array, int l = 0) {
 	 */
 	 
 	iterator<2,T> iter(array);
+	iter.start();
 	
 	for (int p = 0; p != mpi_size; ++p) {
 		
@@ -74,6 +75,8 @@ MatrixX<T> tensor_to_eigen(dbcsr::tensor<2,T>& array, int l = 0) {
 		
 	}
 	
+	iter.stop();
+	
 	return m_out;
 	
 }
@@ -86,28 +89,32 @@ dbcsr::tensor<2,T> eigen_to_tensor(MatrixX<T>& M, std::string name,
 	dbcsr::tensor<2,T> out = typename dbcsr::tensor<2,T>::create().name(name).ngrid(grid)
 		.map1(map1).map2(map2).blk_sizes(blk_sizes);
 		
-	auto blkloc = out.blks_local();
-	auto blkoff = out.blk_offsets();
-	
 	out.reserve_all();
 	
-	dbcsr::iterator<2> iter(out);
+	#pragma omp parallel 
+	{
+		dbcsr::iterator<2> iter(out);
+		iter.start();
 	
-	while (iter.blocks_left()) {
-		
-		iter.next();
-		
-		auto& idx = iter.idx();
-		auto& size = iter.size();
-		auto& off = iter.offset();
-		
-		MatrixX<T> eigenblk = M.block(off[0],off[1],size[0],size[1]);
+		while (iter.blocks_left()) {
 			
-		dbcsr::block<2> blk(size,eigenblk.data());
+			iter.next();
+			
+			auto& idx = iter.idx();
+			auto& size = iter.size();
+			auto& off = iter.offset();
+			
+			MatrixX<T> eigenblk = M.block(off[0],off[1],size[0],size[1]);
+				
+			dbcsr::block<2> blk(size,eigenblk.data());
+			
+			out.put_block(idx,blk);
+			
+		}
 		
-		out.put_block(idx,blk);
-		
-	}
+		out.finalize();
+		iter.stop();
+	}	
 	
 	return out;
 

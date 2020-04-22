@@ -1,8 +1,7 @@
 #include "hf/hfmod.h"
 #include "ints/registry.h"
 #include "hf/hfdefaults.h"
-#include "math/tensor/dbcsr_conversions.hpp"
-#include "math/linalg/symmetrize.h"
+#include "tensor/dbcsr_conversions.h"
 #include "math/other/scale.h"
 
 #include <Eigen/Core>
@@ -72,22 +71,11 @@ void hfmod::compute_guess() {
 		
 		LOG.os<>("Forming guess from core...\n");
 		
-		//if (m_restricted) std::cout << "ITS RESTRICTED." << std::endl;
-		
 		// form density and coefficients by diagonalizing the core matrix
-		dbcsr::copy<2>({.t_in = *m_core_bb, .t_out = *m_f_bb_A}); 
+		//dbcsr::copy<2>({.t_in = *m_core_bb, .t_out = *m_f_bb_A}); 
+		dbcsr::copy(*m_core_bb, *m_f_bb_A).perform();
 		
-		
-		// HEREEEEE !!!!!!!!!!!!!!
-		
-		
-		//std::cout << "HERE" << std::endl;
-		
-		if (!m_restricted && !m_nobeta) {
-			dbcsr::copy<2>({.t_in = *m_core_bb, .t_out = *m_f_bb_B}); 
-		}
-		
-		//std::cout << "Entering." << std::endl;
+		if (!m_restricted && !m_nobeta) dbcsr::copy(*m_core_bb, *m_f_bb_B).perform();
 		
 		diag_fock();
 	
@@ -191,8 +179,8 @@ void hfmod::compute_guess() {
 			
 			std::string name = "ATOM_rank" + std::to_string(myrank) + "_" + std::to_string(Z);
 			
-			desc::molecule at_mol({.name = name, .atoms = atvec, .charge = charge,
-				.mult = mult, .split = 20, .basis = at_basis, .dfbasis = at_dfbasis, .fractional = true});
+			desc::molecule at_mol = desc::molecule::create().name(name).atoms(atvec).charge(charge)
+				.mult(mult).basis(at_basis).dfbasis(at_dfbasis).fractional(true);
 				
 			auto at_smol = std::make_shared<desc::molecule>(std::move(at_mol));
 				
@@ -212,12 +200,14 @@ void hfmod::compute_guess() {
 			//std::cout << "PA on rank: " << myrank << std::endl;
 			//dbcsr::print(*pA);
 			
-			dbcsr::pgrid<2> grid({.comm = mycomm});
+			dbcsr::tensor<2> pscaled = dbcsr::tensor<2>::create_template().tensor_in(*pA).name(at_smol->name() + "_density");
 			
-			dbcsr::tensor<2> pscaled({.name = at_smol->name() + "_density", .pgridN = grid, .map1 = {0}, .map2 = {1}, .blk_sizes = pA->blk_size()});
 			
-			dbcsr::copy<2>({.t_in = *pA, .t_out = pscaled, .sum = true, .move_data = true});
-			dbcsr::copy<2>({.t_in = *pB, .t_out = pscaled, .sum = true, .move_data = true});
+			//dbcsr::copy<2>({.t_in = *pA, .t_out = pscaled, .sum = true, .move_data = true});
+			//dbcsr::copy<2>({.t_in = *pB, .t_out = pscaled, .sum = true, .move_data = true});
+			dbcsr::copy(*pA, pscaled).sum(true).move_data(true).perform();
+			dbcsr::copy(*pB, pscaled).sum(true).move_data(true).perform();
+			
 			pscaled.scale(0.5);
 			
 			locdensitymap[Z] = dbcsr::tensor_to_eigen(pscaled);
@@ -316,8 +306,8 @@ void hfmod::compute_guess() {
 			
 		}
 		
-		//std::cout << "PTOT: " << nbas << std::endl;
-		//std::cout << ptot << std::endl;
+		std::cout << "PTOT: " << nbas << std::endl;
+		std::cout << ptot << std::endl;
 		
 		Eigen::SelfAdjointEigenSolver<Eigen::MatrixXd> es;
 		es.compute(ptot);
@@ -340,14 +330,14 @@ void hfmod::compute_guess() {
 			x = (x < std::numeric_limits<double>::epsilon()) ? 0 : sqrt(x);
 		}
 		
-		dbcsr::pgrid<2> grid({.comm = m_comm});
+		dbcsr::pgrid<2> grid(m_comm);
 		
-		m_c_bm_A = (dbcsr::eigen_to_tensor(eigvec, "c_bm_A", grid, vec<int>{0}, vec<int>{1}, m_c_bm_A->blk_size())).get_stensor();
-		math::scale({.t_in = *m_c_bm_A, .v_in = v});
+		m_c_bm_A = (dbcsr::eigen_to_tensor(eigvec, "c_bm_A", grid, vec<int>{0}, vec<int>{1}, m_c_bm_A->blk_sizes())).get_stensor();
+		math::scale(*m_c_bm_A, v);
 		
 		if (!m_restricted && !m_nobeta) {
-			m_c_bm_B = (dbcsr::eigen_to_tensor(eigvec, "c_bm_B", grid, vec<int>{0}, vec<int>{1}, m_c_bm_B->blk_size())).get_stensor();
-			math::scale({.t_in = *m_c_bm_B, .v_in = v});
+			m_c_bm_B = (dbcsr::eigen_to_tensor(eigvec, "c_bm_B", grid, vec<int>{0}, vec<int>{1}, m_c_bm_B->blk_sizes())).get_stensor();
+			math::scale(*m_c_bm_B, v);
 		}
 		
 		LOG.os<2>("SAD Coefficient matrices.\n");
@@ -357,13 +347,13 @@ void hfmod::compute_guess() {
 		}
 			
 		m_p_bb_A = (dbcsr::eigen_to_tensor(ptot, "p_bb_A", grid, 
-			vec<int>{0}, vec<int>{1}, m_p_bb_A->blk_size())).get_stensor();
+			vec<int>{0}, vec<int>{1}, m_p_bb_A->blk_sizes())).get_stensor();
 		
-		m_p_bb_A->filter({.use_absolute = true});
+		m_p_bb_A->filter();
 		dbcsr::print(*m_p_bb_A);
 			
 		if (!m_restricted && !m_nobeta) m_p_bb_B = (dbcsr::eigen_to_tensor(ptot, 
-			"p_bb_B", grid, vec<int>{0}, vec<int>{1}, m_p_bb_B->blk_size())).get_stensor();
+			"p_bb_B", grid, vec<int>{0}, vec<int>{1}, m_p_bb_B->blk_sizes())).get_stensor();
 		
 		
 		LOG.os<2>("SAD density matrices.\n");
@@ -371,6 +361,10 @@ void hfmod::compute_guess() {
 			dbcsr::print(*m_p_bb_A);
 			if (m_p_bb_B) dbcsr::print(*m_p_bb_B);
 		}
+		
+		dbcsr::contract(*m_c_bm_A,*m_c_bm_A,*m_p_bb_A).perform("Mi, Ni -> MN");
+		std::cout << "Contracted..." << std::endl;
+		dbcsr::print(*m_p_bb_A);
 		
 		LOG.os<>("Finished with SAD.\n");
 		

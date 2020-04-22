@@ -33,7 +33,7 @@ fockbuilder::fockbuilder(desc::smolecule mol, desc::options opt, MPI_Comm comm, 
 		t_int2ele.start();
 	
 		LOG.os<>("Computing 2e integrals...\n");
-		m_2e_ints = ao.compute<4>({.op = "coulomb",  .bas = "bbbb", .map1 = {0,1}, .map2 = {2,3}});
+		m_2e_ints = ao.op("coulomb").dim("bbbb").map1({0,1}).map2({2,3}).compute<4>();
 		
 		t_int2ele.finish();
 		
@@ -46,13 +46,11 @@ fockbuilder::fockbuilder(desc::smolecule mol, desc::options opt, MPI_Comm comm, 
 		t_int3c2e.start();
 		
 		LOG.os<>("Computing 3c2e integrals...\n");
-		m_3c2e_ints = ao.compute<3>({.op = "coulomb", .bas = "xbb", .map1 = {0}, .map2 = {1,2}});
+		m_3c2e_ints = ao.op("coulomb").dim("xbb").map1({0}).map2({1,2}).compute<3>();
 		
 		t_int3c2e.finish();
 		
 		LOG.os<>("Done with 3c2e integrals...\n");
-		
-		std::cout << "PLEV: " << LOG.global_plev() << std::endl;
 		
 		if (LOG.global_plev() >= 3) {
 			dbcsr::print(*m_3c2e_ints);
@@ -63,7 +61,7 @@ fockbuilder::fockbuilder(desc::smolecule mol, desc::options opt, MPI_Comm comm, 
 		t_metric.start();
 		
 		LOG.os<>("Computing metric...\n");
-		auto m_xx = ao.compute<2>({.op = "coulomb", .bas = "xx", .map1={0}, .map2={1}});
+		auto m_xx = ao.op("coulomb").dim("xx").map1({0}).map2({1}).compute<2>();
 		
 		t_metric.finish();
 		
@@ -84,95 +82,94 @@ fockbuilder::fockbuilder(desc::smolecule mol, desc::options opt, MPI_Comm comm, 
 		//m_xx->destroy();
 		
 	}
-		
-	// set up tensors
-	dbcsr::pgrid<2> grid({.comm = m_comm});
 	
+	dbcsr::pgrid<2> grid2(m_comm);
 	auto b = m_mol->dims().b();
+	arrvec<int,2> bb = {b,b};
 	
-	m_j_bb = dbcsr::make_stensor<2>({.name = "j_bb", .pgridN = grid, .map1 = {0}, .map2 = {1}, .blk_sizes = {b,b}});
-	m_k_bb_A = dbcsr::make_stensor<2>({.name = "k_bb_A", .pgridN = grid, .map1 = {0}, .map2 = {1}, .blk_sizes = {b,b}});
-	m_f_bb_A = dbcsr::make_stensor<2>({.name = "f_bb_A", .pgridN = grid, .map1 = {0}, .map2 = {1}, .blk_sizes = {b,b}});
+	m_j_bb = dbcsr::make_stensor<2>(
+		dbcsr::tensor<2>::create().name("j_bb").ngrid(grid2).map1({0}).map2({1}).blk_sizes(bb));
+		
+	m_k_bb_A = dbcsr::make_stensor<2>(
+		dbcsr::tensor<2>::create_template().tensor_in(*m_j_bb).name("k_bb_A"));
+	
+	m_f_bb_A = dbcsr::make_stensor<2>(
+		dbcsr::tensor<2>::create_template().tensor_in(*m_j_bb).name("f_bb_A"));
 	
 	if (!m_restricted && m_mol->nele_beta() != 0) {
+		
 		m_k_bb_B = dbcsr::make_stensor<2>(
-			{.name = "k_bb_B", .pgridN = grid, .map1 = {0}, .map2 = {1}, .blk_sizes = {b,b}});
+		dbcsr::tensor<2>::create_template().tensor_in(*m_j_bb).name("k_bb_B"));
+	
 		m_f_bb_B = dbcsr::make_stensor<2>(
-			{.name = "f_bb_B", .pgridN = grid, .map1 = {0}, .map2 = {1}, .blk_sizes = {b,b}});	
+			dbcsr::tensor<2>::create_template().tensor_in(*m_j_bb).name("f_bb_B"));	
 	}
 
-	grid.destroy();
+	grid2.destroy();
 
 }
 
-void fockbuilder::build_j(compute_param&& pms) {
+void fockbuilder::build_j() {
 	
 	// build PT = PA + PB
-	dbcsr::pgrid<2> grid({.comm = m_comm});
-	dbcsr::tensor<2> pt({.name = "ptot", .pgridN = grid, .map1 = {0}, .map2 = {1}, .blk_sizes = pms.p_A->blk_size()});
+	dbcsr::tensor<2> pt = dbcsr::tensor<2>::create_template().tensor_in(*m_f_bb_A).name("ptot");
 	
-	dbcsr::copy<2>({.t_in = *pms.p_A, .t_out = pt});
+	//dbcsr::copy<2>({.t_in = *pms.p_A, .t_out = pt});
+	dbcsr::copy(*m_p_A, pt).perform();
 	
-	if (pms.p_B) {
-		std::cout << "Probs here..." << std::endl;
-		dbcsr::copy<2>({.t_in = *pms.p_B, .t_out = pt, .sum = true});
+	if (m_p_B) {
+		dbcsr::copy(*m_p_B, pt).sum(true).perform();
+		//dbcsr::copy<2>({.t_in = *pms.p_B, .t_out = pt, .sum = true});
 	} else {
 		pt.scale(2.0);
 	}
 	
-	grid.destroy();
-	
 	auto& t_j = TIME.sub("Coulomb Term");
-	
 	t_j.start();
 	
 	LOG.os<1>("Computing coulomb term... \n");
-	
-	bool log = false;
-	int u = 0;
-	
-	if (LOG.global_plev() >= 2) {
-		u = 6;
-		log = true;
-	}
 	
 	if (!m_use_df) {
 		
 		auto pt_bbY = dbcsr::add_dummy(pt);
 		auto j_bbY = dbcsr::add_dummy(*m_j_bb);
 	
-		dbcsr::einsum<3,4,3>({.x = "LS_, MNLS -> MN_", .t1 = pt_bbY, .t2 = *m_2e_ints, .t3 = j_bbY, .unit_nr = u, .log = log});
+		dbcsr::contract(pt_bbY, *m_2e_ints, j_bbY).perform("LS_, MNLS -> MN_");
+	
+		//dbcsr::einsum<3,4,3>({.x = "LS_, MNLS -> MN_", .t1 = pt_bbY, .t2 = *m_2e_ints, .t3 = j_bbY, .unit_nr = u, .log = log});
 		
-		*m_j_bb = dbcsr::remove_dummy(j_bbY, vec<int>{0}, vec<int>{1});
+		m_j_bb = (dbcsr::remove_dummy(j_bbY, vec<int>{0}, vec<int>{1}, "j_bb")).get_stensor();
 		
 		pt_bbY.destroy();
 		j_bbY.destroy();
 		
 	} else {
 		
-		dbcsr::pgrid<2> grid2({.comm = m_comm});
-		dbcsr::pgrid<3> grid3({.comm = m_comm});
+		dbcsr::pgrid<2> grid2(m_comm);
+		dbcsr::pgrid<3> grid3(m_comm);
 		
-		vec<vec<int>> sizes = {m_mol->dims().x(),vec<int>{1}};
+		arrvec<int,2> sizes = {m_mol->dims().x(),vec<int>{1}};
 		
-		dbcsr::tensor<2> c_xY({.name = "c_xY", .pgridN = grid2, .map1 = {0}, .map2 = {1}, .blk_sizes = sizes});
-		dbcsr::tensor<2> d_xY({.name = "d_xY", .pgridN = grid2, .map1 = {0}, .map2 = {1}, .blk_sizes = sizes});
+		dbcsr::tensor<2> c_xY = dbcsr::tensor<2>::create().name("c_xY").ngrid(grid2).map1({0}).map2({1}).blk_sizes(sizes);
+		dbcsr::tensor<2> d_xY = dbcsr::tensor<2>::create().name("d_xY").ngrid(grid2).map1({0}).map2({1}).blk_sizes(sizes);
 		
 		auto pt_bbY = dbcsr::add_dummy(pt);
 		auto j_bbY = dbcsr::add_dummy(*m_j_bb);
 		
 		//cX("M") = PT("mu,nu") * B("M,mu,nu");
-		dbcsr::einsum<3,3,2>({.x = "MN_, XMN -> X_", .t1 = pt_bbY, .t2 = *m_3c2e_ints, .t3 = c_xY, .unit_nr = u, .log = log});
+		dbcsr::contract(pt_bbY, *m_3c2e_ints, c_xY).perform("MN_, XMN -> X_");
+		//dbcsr::einsum<3,3,2>({.x = "MN_, XMN -> X_", .t1 = pt_bbY, .t2 = *m_3c2e_ints, .t3 = c_xY, .unit_nr = u, .log = log});
 		
 		//dX("M") = Jinv("M,N") * cX("N");
-		dbcsr::einsum<2,2,2>({.x = "XY, Y_ -> X_", .t1 = *m_inv_xx, .t2 = c_xY, .t3 = d_xY, .unit_nr = u, .log = log});
+		dbcsr::contract(*m_inv_xx, c_xY, d_xY).perform("XY, Y_ -> X_");
+		//dbcsr::einsum<2,2,2>({.x = "XY, Y_ -> X_", .t1 = *m_inv_xx, .t2 = c_xY, .t3 = d_xY, .unit_nr = u, .log = log});
 		
 		//j("mu,nu") = dX("M") * B("M,mu,nu");
-		dbcsr::einsum<2,3,3>({.x = "X_, XMN -> MN_", .t1 = d_xY, .t2 = *m_3c2e_ints, .t3 = j_bbY, .unit_nr = u, .log = log});
-		
-		m_j_bb->filter();
+		dbcsr::contract(d_xY, *m_3c2e_ints, j_bbY).perform("X_, XMN -> MN_");
+		//dbcsr::einsum<2,3,3>({.x = "X_, XMN -> MN_", .t1 = d_xY, .t2 = *m_3c2e_ints, .t3 = j_bbY, .unit_nr = u, .log = log});
 	
-		*m_j_bb = dbcsr::remove_dummy(j_bbY, vec<int>{0}, vec<int>{1});
+		m_j_bb = (dbcsr::remove_dummy(j_bbY, vec<int>{0}, vec<int>{1})).get_stensor();
+		m_j_bb->filter();
 		
 		//m_j_bb = math::symmetrize(m_j_bb, "j_bb");
 	
@@ -195,7 +192,7 @@ void fockbuilder::build_j(compute_param&& pms) {
 	
 }
 
-void fockbuilder::build_k(compute_param&& pms) {
+void fockbuilder::build_k() {
 	
 	bool log = false;
 	int u = 0;
@@ -204,25 +201,21 @@ void fockbuilder::build_k(compute_param&& pms) {
 	
 	t_k.start();
 	
-	if (LOG.global_plev() >= 2) {
-		u = 6;
-		log = true;
-	}
-	
 	if (!m_use_df) {
 		
-		auto make_k = [&](dbcsr::tensor<2,double>& p_bb, dbcsr::tensor<2,double>& k_bb, std::string x) {
+		auto make_k = [&](dbcsr::stensor<2,double>& p_bb, dbcsr::stensor<2,double>& k_bb, std::string x) {
 		
 			LOG.os<1>("Computing exchange term (", x, ") ... \n");
 		
-			auto p_bbY = dbcsr::add_dummy(p_bb);
-			auto k_bbY = dbcsr::add_dummy(k_bb);
+			auto p_bbY = dbcsr::add_dummy(*p_bb);
+			auto k_bbY = dbcsr::add_dummy(*k_bb);
 			
-			dbcsr::einsum<3,4,3>({.x = "LS_, MLSN -> MN_", .t1 = p_bbY, .t2 = *m_2e_ints, .t3 = k_bbY, .alpha = -1.0, .unit_nr = u, .log = log});
+			dbcsr::contract(p_bbY, *m_2e_ints, k_bbY).alpha(-1.0).perform("LS_, MLSN -> MN_");
+			//dbcsr::einsum<3,4,3>({.x = "LS_, MLSN -> MN_", .t1 = p_bbY, .t2 = *m_2e_ints, .t3 = k_bbY, .alpha = -1.0, .unit_nr = u, .log = log});
 		
 			//std::cout << "DONE CONTRACTING..." << std::endl;
 		
-			k_bb = dbcsr::remove_dummy(k_bbY, vec<int>{0}, vec<int>{1});
+			k_bb = (dbcsr::remove_dummy(k_bbY, vec<int>{0}, vec<int>{1}, "k_bb_" + x)).get_stensor();
 			
 			//dbcsr::print(k_bb);
 			
@@ -231,28 +224,32 @@ void fockbuilder::build_k(compute_param&& pms) {
 		
 		};
 		
-		make_k(*pms.p_A, *m_k_bb_A, "A");
+		make_k(m_p_A, m_k_bb_A, "A");
 		
-		if (pms.p_B && pms.c_B) 
-			make_k(*pms.p_B, *m_k_bb_B, "B");
+		if (m_p_B && m_c_B) 
+			make_k(m_p_B, m_k_bb_B, "B");
 			
 		
 		
 	} else {
 		
-		auto make_k = [&](dbcsr::tensor<2,double>& p_bb, dbcsr::tensor<2,double>& c_bm, 
-			dbcsr::tensor<2,double>& k_bb, std::string x, bool SAD_iter) {
+		auto make_k = [&](dbcsr::stensor<2,double>& p_bb, dbcsr::stensor<2,double>& c_bm, 
+			dbcsr::stensor<2,double>& k_bb, std::string x, bool SAD_iter) {
 				
 			LOG.os<1>("Computing exchange term (", x, ") ... \n");
 			
-			dbcsr::pgrid<3> grid3({.comm = m_comm});
+			dbcsr::pgrid<3> grid3(m_comm);
 			
-			vec<int> o = c_bm.blk_size()[1];
+			vec<int> o = c_bm->blk_sizes()[1];
 			
-			vec<vec<int>> HTsizes = {m_mol->dims().x(), m_mol->dims().b(), o};
+			arrvec<int,3> HTsizes = {m_mol->dims().x(), m_mol->dims().b(), o};
 			
-			dbcsr::tensor<3> HT({.name = "HT"+x, .pgridN = grid3, .map1 = {0,1}, .map2 = {2}, .blk_sizes = HTsizes});	
-			dbcsr::tensor<3> D({.name = "D"+x, .pgridN = grid3, .map1 = {0}, .map2 = {1,2}, .blk_sizes = HTsizes});
+			dbcsr::tensor<3> HT = dbcsr::tensor<3>::create().name("HT_"+x).ngrid(grid3)
+				.map1({0,1}).map2({2}).blk_sizes(HTsizes);
+			dbcsr::tensor<3> D = dbcsr::tensor<3>::create().name("D_"+x).ngrid(grid3)
+				.map1({0}).map2({1,2}).blk_sizes(HTsizes);
+			//dbcsr::tensor<3> HT({.name = "HT"+x, .pgridN = grid3, .map1 = {0,1}, .map2 = {2}, .blk_sizes = HTsizes});	
+			//dbcsr::tensor<3> D({.name = "D"+x, .pgridN = grid3, .map1 = {0}, .map2 = {1,2}, .blk_sizes = HTsizes});
 			
 			// HTa("M,mu,i") = Coa("nu,i") * B("M,mu,nu");
 			if (!SAD_iter) {
@@ -263,26 +260,30 @@ void fockbuilder::build_k(compute_param&& pms) {
 							
 				vec<vec<int>> occ_bounds = {{0,nocc}};
 				
-				dbcsr::einsum<2,3,3>({.x = "Ni, XMN -> XMi", .t1 = c_bm, .t2 = *m_3c2e_ints, .t3 = HT, .b2 = occ_bounds, .unit_nr = u, .log = log});
+				dbcsr::contract(*c_bm, *m_3c2e_ints, HT).bounds2(occ_bounds).perform("Ni, XMN -> XMi");
+				//dbcsr::einsum<2,3,3>({.x = "Ni, XMN -> XMi", .t1 = c_bm, .t2 = *m_3c2e_ints, .t3 = HT, .b2 = occ_bounds, .unit_nr = u, .log = log});
 				
 			} else {
 				
-				dbcsr::einsum<2,3,3>({.x = "Ni, XMN -> XMi", .t1 = c_bm, .t2 = *m_3c2e_ints, .t3 = HT, .unit_nr = u, .log = log});
+				dbcsr::contract(*c_bm, *m_3c2e_ints, HT).perform("Ni, XMN -> XMi");
+				//dbcsr::einsum<2,3,3>({.x = "Ni, XMN -> XMi", .t1 = c_bm, .t2 = *m_3c2e_ints, .t3 = HT, .unit_nr = u, .log = log});
 				
 			}
 			
 			HT.filter();
 			
 			//Da("M,mu,i") = HTa("N,mu,i") * Jinv("N,M");
-			dbcsr::einsum<3,2,3>({.x = "XMi, XY -> YMi", .t1 = HT, .t2 = *m_inv_xx, .t3 = D, .unit_nr = u, .log = log});
+			dbcsr::contract(HT, *m_inv_xx, D).perform("XMi, XY -> YMi");
+			//dbcsr::einsum<3,2,3>({.x = "XMi, XY -> YMi", .t1 = HT, .t2 = *m_inv_xx, .t3 = D, .unit_nr = u, .log = log});
 			
 			D.filter();
 			//std::cout << "Stuck here: " << x << " AS" << std::endl;
 			
 			//ka("mu,nu") = HTa("M,mu,i") * Da("M,nu,i");
-			dbcsr::einsum<3,3,2>({.x = "XMi, XNi -> MN", .t1 = HT, .t2 = D, .t3 = k_bb, .alpha = -1.0, .unit_nr = u, .log = log}); //<- REORDERING!!!
+			dbcsr::contract(HT, D, *k_bb).alpha(-1.0).perform("XMi, XNi -> MN");
+			//dbcsr::einsum<3,3,2>({.x = "XMi, XNi -> MN", .t1 = HT, .t2 = D, .t3 = k_bb, .alpha = -1.0, .unit_nr = u, .log = log}); //<- REORDERING!!!
 			
-			k_bb.filter();
+			k_bb->filter();
 			//std::cout << "NOPE." << std::endl;
 			//k_bb = math::symmetrize(k_bb, k_bb.name());
 			
@@ -292,12 +293,10 @@ void fockbuilder::build_k(compute_param&& pms) {
 		
 		};
 		
-		bool SAD_iter = (pms.SAD_iter) ? *pms.SAD_iter : false;
+		make_k(m_p_A, m_c_A, m_k_bb_A, "A", m_SAD_iter);
 		
-		make_k(*pms.p_A, *pms.c_A, *m_k_bb_A, "A", SAD_iter);
-		
-		if (pms.p_B && pms.c_B) 
-			make_k(*pms.p_B, *pms.c_B, *m_k_bb_B, "B", SAD_iter);
+		if (m_p_B && m_c_B) 
+			make_k(m_p_B, m_c_B, m_k_bb_B, "B", m_SAD_iter);
 			
 	}
 	
@@ -305,25 +304,31 @@ void fockbuilder::build_k(compute_param&& pms) {
 	
 	if (LOG.global_plev() >= 2) {
 		dbcsr::print(*m_k_bb_A);
-		if (pms.p_B && pms.c_B) dbcsr::print(*m_k_bb_B);
+		if (m_p_B && m_c_B) dbcsr::print(*m_k_bb_B);
 	}
 	
 	
 }
 
-void fockbuilder::compute(compute_param&& pms) {
+void fockbuilder::compute() {
 	
-	build_j(std::forward<compute_param>(pms));
-	build_k(std::forward<compute_param>(pms));
+	build_j();
+	build_k();
 	
-	dbcsr::copy<2>({.t_in = *pms.core, .t_out = *m_f_bb_A, .sum = false});
+	dbcsr::copy(*m_core, *m_f_bb_A).perform();
+	dbcsr::copy(*m_j_bb, *m_f_bb_A).sum(true).move_data(true).perform();
+	dbcsr::copy(*m_k_bb_A, *m_f_bb_A).sum(true).move_data(true).perform();
+	
+/*	dbcsr::copy<2>({.t_in = *pms.core, .t_out = *m_f_bb_A, .sum = false});
 	dbcsr::copy<2>({.t_in = *m_j_bb, .t_out = *m_f_bb_A, .sum = true, .move_data = false});
-	dbcsr::copy<2>({.t_in = *m_k_bb_A, .t_out = *m_f_bb_A, .sum = true, .move_data = true});
+	dbcsr::copy<2>({.t_in = *m_k_bb_A, .t_out = *m_f_bb_A, .sum = true, .move_data = true});*/
 	
 	if (m_f_bb_B) {
-		dbcsr::copy<2>({.t_in = *pms.core, .t_out = *m_f_bb_B, .sum = false});
-		dbcsr::copy<2>({.t_in = *m_j_bb, .t_out = *m_f_bb_B, .sum = true, .move_data = true});
-		dbcsr::copy<2>({.t_in = *m_k_bb_B, .t_out = *m_f_bb_B, .sum = true, .move_data = true});
+		
+		dbcsr::copy(*m_core, *m_f_bb_B).perform();
+		dbcsr::copy(*m_j_bb, *m_f_bb_B).sum(true).move_data(true).perform();
+		dbcsr::copy(*m_k_bb_B, *m_f_bb_B).sum(true).move_data(true).perform();
+		
 	}
 	
 	LOG.os<2>("Finished Fock Matrix:\n");

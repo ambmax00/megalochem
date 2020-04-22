@@ -30,6 +30,8 @@ void calc_ints(dbcsr::tensor<2>& t_out, util::ShrPool<libint2::Engine>& engine,
 		auto& loc_eng = engine->local();
 		const auto &results = loc_eng.results();
 		
+		iter.start();
+		
 		while (iter.blocks_left()) {	
 						
 			iter.next();
@@ -99,12 +101,11 @@ void calc_ints(dbcsr::tensor<2>& t_out, util::ShrPool<libint2::Engine>& engine,
 				locblkoff1 += sh1.size();
 			}//endfor s1
 						
-			#pragma omp critical
-			{
-				t_out.put_block(idx, blk);
-			}
+			t_out.put_block(idx, blk);
 						
 		}//end BLOCK LOOP
+		
+		t_out.finalize();
 		
 		iter.stop();
 		
@@ -112,7 +113,6 @@ void calc_ints(dbcsr::tensor<2>& t_out, util::ShrPool<libint2::Engine>& engine,
 	
 	//std::cout << "Done." << std::endl;
 	
-	t_out.finalize();
 	t_out.filter();
 	
 	//dbcsr::print(t);
@@ -141,6 +141,8 @@ void calc_ints(dbcsr::tensor<3>& t_out, util::ShrPool<libint2::Engine>& engine,
 		auto& loc_eng = engine->local();
 		const auto &results = loc_eng.results();
 		dbcsr::iterator<3> iter(t_out);
+		
+		iter.start();
 		
 		while (iter.blocks_left()) {
 			
@@ -213,10 +215,13 @@ void calc_ints(dbcsr::tensor<3>& t_out, util::ShrPool<libint2::Engine>& engine,
 			
 			t_out.put_block(idx, blk);
 			
-			}//end BLOCK LOOP
+		}//end BLOCK LOOP
+		
+		t_out.finalize();
+		iter.stop();
+		
 	}//end parallel omp	
 	
-	t_out.finalize();
 	t_out.filter();
 
 }
@@ -243,6 +248,8 @@ void calc_ints(dbcsr::tensor<4>& t_out, util::ShrPool<libint2::Engine>& engine,
 		auto& loc_eng = engine->local();
 		const auto &results = loc_eng.results();
 		dbcsr::iterator<4> iter(t_out);
+		
+		iter.start();
 		
 		while (iter.blocks_left()) {
 			
@@ -339,14 +346,15 @@ void calc_ints(dbcsr::tensor<4>& t_out, util::ShrPool<libint2::Engine>& engine,
 				locblkoff1 += sh1.size();
 			}//endfor s1
 			
-			
 			t_out.put_block(idx, blk);
 			
-			
 		}//end BLOCK LOOP
+		
+		t_out.finalize();
+		iter.stop();
+		
 	}//end parallel omp	
 	
-	t_out.finalize();
 	t_out.filter();
 
 }

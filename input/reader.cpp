@@ -302,15 +302,20 @@ reader::reader(MPI_Comm comm, std::string filename) : m_comm(comm) {
 	int mult = jmol["mult"];
 	std::string name = jmol["name"];
 	
-	desc::molecule mol({.name = name, .atoms = atoms, .charge = charge,
-		.mult = mult, .split = 5, .basis = basis, .dfbasis = dfbasis});
+	desc::molecule mol = desc::molecule::create().name(name).atoms(atoms).charge(charge)
+		.mult(mult).split(5).basis(basis).dfbasis(dfbasis);
 		
 	mol.print_info(m_comm,1);
 	
 	desc::options opt;
 	
 	unpack(data, opt, "hf");
-	unpack(data, opt, "adc");
+	
+	std::cout << "GOOS1" << std::endl;
+	
+	//unpack(data, opt, "adc");
+	
+	std::cout << "GOOS" << std::endl;
 	
 	//std::cout << opt.get<bool>("hf/diis") << std::endl;
 	//std::cout << opt.get<double>("hf/conv") << std::endl;
