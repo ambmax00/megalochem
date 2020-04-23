@@ -5,9 +5,16 @@
 #include <stdexcept>
 #include <optional>
 #include <Eigen/Eigenvalues>
-#include "math/tensor/dbcsr_conversions.hpp"
+#include "utils/ppdirs.h"
+#include "tensor/dbcsr_conversions.h"
 
 namespace math {
+
+template <int N>
+using tensor = dbcsr::tensor<N,double>;
+
+template <int N>
+using stensor = dbcsr::stensor<N,double>;
 
 using vtensor = std::vector<dbcsr::stensor<2>>;
 
@@ -15,7 +22,7 @@ template <class MVFactory>
 class davidson {
 private:
 
-	dbcsr::stensor<2> m_diag; // diagonal of matrix
+	stensor<2> m_diag; // diagonal of matrix
 	MVFactory& m_fac; // Matrix vector product engine
 
 	int m_nroots; // targeted eigenvalue
@@ -35,20 +42,27 @@ private:
 		
 public:
 	
-	struct dav_param {
-		required<MVFactory,ref> 		factory;
-		required<dbcsr::stensor<2>,ref>	diag;
-		optional<bool,val>				pseudo;
-		optional<double,val>			conv;
-		optional<int,val>				maxiter;
+	struct create {
+		make_param(create,factory,MVFactory,required,ref)
+		make_param(create,diag,stensor<2>,required,ref)
+		make_param(create,pseudo,bool,optional,val)
+		make_param(create,conv,double,optional,val)
+		make_param(create,maxiter,int,optional,val)
+		
+		public:
+		
+		create() {}
+		friend class davidson;
+		
 	};
-	davidson(dav_param&& p) :
-		m_fac(*p.factory),
-		m_diag(*p.diag),
+	
+	davidson(create& p) :
+		m_fac(*p.c_factory),
+		m_diag(*p.c_diag),
 		m_eigval(0.0),
-		m_pseudo((p.pseudo) ? *p.pseudo : false),
-		m_maxiter((p.maxiter) ? *p.maxiter : 20),
-		m_conv((p.conv) ? *p.conv : 1e-7),
+		m_pseudo((p.c_pseudo) ? *p.c_pseudo : false),
+		m_maxiter((p.c_maxiter) ? *p.c_maxiter : 20),
+		m_conv((p.c_conv) ? *p.c_conv : 1e-7),
 		m_converged(false)
 	{}	
 
@@ -63,9 +77,9 @@ public:
 		
 		m_nroots = nroots;
 		
-		auto blkoffs = m_vecs[0]->blk_offset();
-		auto blksizes = m_vecs[0]->blk_size();
-		auto nfull = m_vecs[0]->nfull_tot();
+		auto blkoffs = m_vecs[0]->blk_offsets();
+		auto blksizes = m_vecs[0]->blk_sizes();
+		auto nfull = m_vecs[0]->nfull_total();
 		
 		int no = nfull[0];
 		int nv = nfull[1];
@@ -149,25 +163,25 @@ public:
 			
 			// ======= r_k ========
 			
-			dbcsr::tensor<2> r_k({.tensor_in = *m_vecs[0], .name = "r_k"});
-			dbcsr::tensor<2> temp({.tensor_in = *m_vecs[0], .name = "temp"});
+			tensor<2> r_k = tensor<2>::create_template().tensor_in(*m_vecs[0]).name("r_k");
+			tensor<2> temp = tensor<2>::create_template().tensor_in(*m_vecs[0]).name("temp");
 			
 			std::cout << "LOOP" << std::endl;
 			
 			for (int i = 0; i != m_subspace; ++i) {
 				
 				std::cout << "Copy" << std::endl;
-				dbcsr::copy<2>({.t_in = *m_sigmas[i], .t_out = temp});
+				dbcsr::copy(*m_sigmas[i], temp).perform();
 				
 				temp.scale(evecs(i,m_nroots-1));
 				
-				dbcsr::copy<2>({.t_in = temp, .t_out = r_k, .sum = true, .move_data = true});
+				dbcsr::copy(temp, r_k).sum(true).move_data(true);
 				
-				dbcsr::copy<2>({.t_in = *m_vecs[i], .t_out = temp});
+				dbcsr::copy(*m_vecs[i], temp).perform();
 				
 				temp.scale(- evals(m_nroots - 1) * evecs(i,m_nroots-1));
 				
-				dbcsr::copy<2>({.t_in = temp, .t_out = r_k, .sum = true, .move_data = true});
+				dbcsr::copy(temp, r_k).sum(true).move_data(true).perform();
 				
 			}
 			
@@ -193,24 +207,25 @@ public:
 			// Only Diagonal-Preconditioned-Residue for now (DPR)
 			// D_ia = (lamda_k - A_iaia)^-1
 			
-			dbcsr::tensor<2> D({.tensor_in = r_k, .name = "D"});
+			tensor<2> D = tensor<2>::create_template().tensor_in(r_k).name("D");
 			
 			D.reserve_all();
 			
 			dbcsr::iterator<2> d_iter(D);
+			d_iter.start();
 			
 			while (d_iter.blocks_left()) {
 				
 				d_iter.next();
 				
-				auto blksize = d_iter.sizes();
-				auto idx = d_iter.idx();
+				auto& blksize = d_iter.size();
+				auto& idx = d_iter.idx();
 				
 				bool found = false;
 				
 				dbcsr::block<2> d_blk(blksize);
 				dbcsr::block<2> diag_blk = 
-					m_diag->get_block({.idx = idx, .blk_size = blksize, .found = found});
+					m_diag->get_block(idx, blksize, found);
 			
 				if (found) {
 				
@@ -226,7 +241,7 @@ public:
 					
 				}
 					
-				D.put_block({.idx = idx, .blk = d_blk});
+				D.put_block(idx, d_blk);
 				
 			} //end while
 			
@@ -235,7 +250,7 @@ public:
 			dbcsr::print(D);
 			
 			// form new vector
-			dbcsr::tensor<2> d_k({.tensor_in = r_k, .name = "d_k"});
+			tensor<2> d_k = tensor<2>::create_template().tensor_in(r_k).name("d_k");
 			
 			// d(k)_ia = D(k)_ia * q(k)_ia
 			
@@ -252,21 +267,21 @@ public:
 			// b_new = d_k - sum_j proj_bi(d_k)
 			// where proj_b(v) = dot(b,v)/dot(b,b)
 			
-			dbcsr::tensor<2> bnew({.tensor_in = d_k, .name = "b_" + std::to_string(m_subspace)});
-			dbcsr::tensor<2> temp2({.tensor_in = d_k, .name = "temp"});
+			tensor<2> bnew = tensor<2>::create_template().tensor_in(r_k).name("b_" + std::to_string(m_subspace));
+			tensor<2> temp2 = tensor<2>::create_template().tensor_in(r_k).name("temp2");
 			
-			dbcsr::copy<2>({.t_in = d_k, .t_out = bnew});
+			dbcsr::copy(d_k, bnew).perform();
 			
 			for (int i = 0; i != m_vecs.size(); ++i) {
 				
-				dbcsr::copy<2>({.t_in = *m_vecs[i], .t_out = temp2});
+				dbcsr::copy(*m_vecs[i], temp2);
 				double proj = dbcsr::dot(*m_vecs[i], d_k)/dbcsr::dot(*m_vecs[i],*m_vecs[i]);
 				
 				std::cout << proj << std::endl;
 				
 				temp2.scale(-proj);
 				
-				dbcsr::copy<2>({.t_in = temp2, .t_out = bnew, .sum = true});
+				dbcsr::copy(temp2, bnew).sum(true).perform();
 				
 			}
 				
@@ -287,7 +302,7 @@ public:
 		
 		m_eigval = evals(m_nroots-1);
 		
-		dbcsr::tensor<2> temp3({.tensor_in = *m_vecs[0], .name = "temp3"});
+		dbcsr::tensor<2> temp3 = tensor<2>::create_template().tensor_in(*m_vecs[0]).name("temp3");
 		
 		m_ritzvecs.clear();
 		
@@ -311,18 +326,19 @@ public:
 		
 		// x_k = sum_i ^M U_ik * b_i
 		for (int k = 0; k != m_nroots; ++k) {
-			dbcsr::tensor<2> x_k({.tensor_in = *m_vecs[0], .name = "new_guess_"+std::to_string(k)});
+			dbcsr::tensor<2> x_k = tensor<2>::create_template()
+				.tensor_in(*m_vecs[0]).name("new_guess_"+std::to_string(k)); 
 			for (int i = 0; i != m_vecs.size(); ++i) {
 				
 				dbcsr::print(*m_vecs[i]);
 				std::cout << evecs(i,k) << std::endl;
 				
-				dbcsr::copy<2>({.t_in = *m_vecs[i], .t_out = temp3});
+				dbcsr::copy<2>(*m_vecs[i], temp3).perform();
 				temp3.scale(evecs(i,k));
 				
 				dbcsr::print(temp3);
 				
-				dbcsr::copy<2>({.t_in = temp3, .t_out = x_k, .sum = true, .move_data = true});
+				dbcsr::copy(temp3, x_k).sum(true).move_data(true).perform();
 				
 			}
 				
@@ -351,7 +367,7 @@ template <class MVFactory>
 class modified_davidson {
 private:
 
-	dbcsr::stensor<2> m_diag; // diagonal of matrix
+	stensor<2> m_diag; // diagonal of matrix
 	
 	davidson<MVFactory> m_solver;
 
@@ -365,20 +381,29 @@ private:
 	double m_conv;
 		
 public:
-	
-	struct moddav_param {
-		required<MVFactory,ref> 		factory;
-		required<dbcsr::stensor<2>,ref>	diag;
-		optional<double,val>			conv;
-		optional<int,val>				maxiter;
-		optional<int,val>				micro_maxiter;
+
+	struct create {
+		make_param(create,factory,MVFactory,required,ref)
+		make_param(create,diag,stensor<2>,required,ref)
+		make_param(create,conv,double,optional,val)
+		make_param(create,maxiter,int,optional,val)
+		make_param(create,micro_maxiter,int,optional,val)
+		
+		public:
+		
+		create() {}
+		friend class modified_davidson;
+		
 	};
-	modified_davidson(moddav_param&& p) :
+	
+	modified_davidson(create& p) :
 		m_eigval(0.0),
 		m_converged(false),
-		m_maxiter((p.maxiter) ? *p.maxiter : 10),
-		m_conv((p.conv) ? *p.conv : 1e-7),
-		m_solver({.factory = p.factory, .diag = p.diag, .pseudo = true, .maxiter = p.micro_maxiter})
+		m_maxiter((p.c_maxiter) ? *p.c_maxiter : 10),
+		m_conv((p.c_conv) ? *p.c_conv : 1e-7),
+		m_solver(typename davidson<MVFactory>::create()
+			.factory(p.c_factory).diag(p.c_diag).pseudo(true)
+			.maxiter(p.c_micro_maxiter))
 	{}	
 
 	void compute(vtensor& guess, int nroots, double omega) {

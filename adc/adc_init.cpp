@@ -7,29 +7,21 @@ namespace adc {
 	
 void adcmod::mo_load() {
 	
-	dbcsr::pgrid<2> grid2({.comm = m_comm});
+	dbcsr::pgrid<2> grid2(m_comm);
 	
 	auto epso = m_hfwfn->eps_occ_A();
 	auto epsv = m_hfwfn->eps_vir_A();
 	
-	std::cout << "Energy: " << std::endl;
-	for (auto e : *epsv) {
-		std::cout << e << std::endl;
-	}
-	
 	m_mo.eps_o = epso;
 	m_mo.eps_v = epsv;
-	
-	std::cout << "H1" << std::endl;
-	
-	
-	
+
 	ints::aofactory aofac(*m_hfwfn->mol(), m_comm);
 		
 	ints::registry INT_REGISTRY;
 	
-	auto aoints = aofac.compute<3>({.op = "coulomb", .bas = "xbb", .map1 = {0}, .map2 = {1,2}});
-	auto metric = aofac.compute<2>({.op = "coulomb", .bas = "xx", .map1 = {0}, .map2 = {1}});
+	auto aoints = aofac.op("coulomb").dim("xbb").map1({0}).map2({1}).compute<3>(); 
+	//compute<3>({.op = "coulomb", .bas = "xbb", .map1 = {0}, .map2 = {1,2}});
+	auto metric = aofac.op("coulomb").dim("xx").map1({0}).map2({1}).compute<2>();
 	
 	int nocc = m_hfwfn->mol()->nocc_alpha();
 	int nvir = m_hfwfn->mol()->nvir_alpha();
@@ -44,24 +36,28 @@ void adcmod::mo_load() {
 	//dbcsr::print(*aoints);
 	//dbcsr::print(*PQSQRT);
 	
-	// contract X
-	dbcsr::pgrid<3> grid3({.comm = m_comm});
+	dbcsr::pgrid<3> grid3(m_comm);
 	
-	dbcsr::stensor<3> d_xbb = dbcsr::make_stensor<3>({.name = "i_xbb(xx)^-1/2", .pgridN = grid3, 
-			.map1 = {0}, .map2 = {1,2}, .blk_sizes = {m_dims.x, m_dims.b, m_dims.b}});
+	// contract X
+	arrvec<int,3> xbb = {m_dims.x, m_dims.b, m_dims.b};
+	
+	dbcsr::stensor<3> d_xbb = dbcsr::make_stensor<3>(
+		dbcsr::tensor<3>::create().name("i_xbb(xx)^-1/2").ngrid(grid3) 
+			.map1({0}).map2({1,2}).blk_sizes(xbb)); 
 			
-	dbcsr::einsum<3,2,3>({.x = "XMN, XY -> YMN", .t1 = *aoints, .t2 = *PQSQRT, .t3 = *d_xbb, .move = true});
+	//dbcsr::einsum<3,2,3>({.x = "XMN, XY -> YMN", .t1 = *aoints, .t2 = *PQSQRT, .t3 = *d_xbb, .move = true});
+	dbcsr::contract(*aoints, *PQSQRT, *d_xbb).move(true).perform("XMN, XY -> YMN");
 	
 	aoints.reset();
 	
 	dbcsr::print(*c_bo);
 	dbcsr::print(*c_bv);
 	
-	m_mo.b_xoo = ints::transform3({.t_in = *d_xbb, .c_1 = *c_bo, .c_2 = *c_bo, .name = "i_xoo(xx)^-1/2"});
+	m_mo.b_xoo = ints::transform3(d_xbb, c_bo, c_bo, "i_xoo(xx)^-1/2");
 	//dbcsr::print(*d_xoo);
-	m_mo.b_xov = ints::transform3({.t_in = *d_xbb, .c_1 = *c_bo, .c_2 = *c_bv, .name = "i_xov(xx)^-1/2"});
+	m_mo.b_xov = ints::transform3(d_xbb, c_bo, c_bv, "i_xov(xx)^-1/2");
 	//dbcsr::print(*d_xov);
-	m_mo.b_xvv = ints::transform3({.t_in = *d_xbb, .c_1 = *c_bv, .c_2 = *c_bv, .name = "i_xvv(xx)^-1/2"});
+	m_mo.b_xvv = ints::transform3(d_xbb, c_bv, c_bv, "i_xvv(xx)^-1/2");
 	//dbcsr::print(*d_xvv);
 	
 	d_xbb->destroy();

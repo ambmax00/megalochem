@@ -311,11 +311,7 @@ reader::reader(MPI_Comm comm, std::string filename) : m_comm(comm) {
 	
 	unpack(data, opt, "hf");
 	
-	std::cout << "GOOS1" << std::endl;
-	
-	//unpack(data, opt, "adc");
-	
-	std::cout << "GOOS" << std::endl;
+	unpack(data, opt, "adc");
 	
 	//std::cout << opt.get<bool>("hf/diis") << std::endl;
 	//std::cout << opt.get<double>("hf/conv") << std::endl;

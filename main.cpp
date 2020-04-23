@@ -5,7 +5,7 @@
 #include <dbcsr.hpp>
 #include "input/reader.h"
 #include "hf/hfmod.h"
-//#include "adc/adcmod.h"
+#include "adc/adcmod.h"
 #include "utils/mpi_time.h"
 
 #include "ints/aofactory.h"

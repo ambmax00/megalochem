@@ -8,19 +8,23 @@ template <typename T>
 void scale(dbcsr::tensor<4,T>& t, vec<T>& eo, vec<T>& ev, T co = -1.0, T cv = 1.0) {
 	
 	// scale it
-	dbcsr::iterator<4,T> iter4(t);
+#pragma omp parallel 
+{
 	
+	dbcsr::iterator<4,T> iter4(t);
+	iter4.start();
+		
 	while (iter4.blocks_left()) {
 		
 		iter4.next();
 	
 		auto& idx = iter4.idx();
 		auto& off = iter4.offset();
-		auto& blksize = iter4.sizes();
+		auto& blksize = iter4.size();
 		
 		bool found = false;
 		
-		auto blk = t.get_block({.idx = idx, .blk_size = blksize, .found = found});
+		auto blk = t.get_block(idx, blksize, found);
 	
 		if (!found) continue;
 		
@@ -44,9 +48,14 @@ void scale(dbcsr::tensor<4,T>& t, vec<T>& eo, vec<T>& ev, T co = -1.0, T cv = 1.
 			   
 		}}}}
 		
-		t.put_block({.idx = idx, .blk = blk});
+		t.put_block(idx, blk);
 		
 	}
+	
+	t.finalize();
+	iter4.stop();
+	
+} // end omp
 	
 }
 
@@ -57,11 +66,13 @@ void antisym(dbcsr::tensor<4,T>& t, T alpha) {
 	
 	MPI_Comm comm = t.comm();
 	
-	dbcsr::tensor<4,T> ttran({.tensor_in = t, .name = "TRAN"});
-	dbcsr::copy<4>({.t_in = t, .t_out = ttran});
+	dbcsr::tensor<4,T> ttran 
+		= typename dbcsr::tensor<4,T>::create_template()
+		.tensor_in(t).name("TRAN");
+	dbcsr::copy(t, ttran).perform();
 	
-	auto off = t.blk_offset();
-	auto blksizes = t.blk_size();
+	auto off = t.blk_offsets();
+	auto blksizes = t.blk_sizes();
 	
 	auto& s1 = blksizes[0];
 	auto& s2 = blksizes[1];
@@ -95,21 +106,21 @@ void antisym(dbcsr::tensor<4,T>& t, T alpha) {
 			int proc1 = -1;
 			int proc2 = -1;
 			
-			t.get_stored_coordinates({.idx = idx_1, .proc = proc1});
-			ttran.get_stored_coordinates({.idx = idx_2, .proc = proc2});
+			proc1 = t.proc(idx_1);
+			proc2 = ttran.proc(idx_2);
 			
 			bool found1(false), found2(false);
-			vec<int> blk1size, blk2size;
-			blk1size = {b1,b2,b3,b4};
-			blk2size = {b1,b4,b3,b2};
+
+			arr<int,4> blk1size = {b1,b2,b3,b4};
+			arr<int,4> blk2size = {b1,b4,b3,b2};
 			
 			dbcsr::block<4,T> blk1(blk1size), blk2(blk2size);
 			
 			if (myrank == proc1) 
-				blk1 = t.get_block({.idx = idx_1, .blk_size = blk1size, .found = found1});
+				blk1 = t.get_block(idx_1, blk1size, found1);
 			
 			if (myrank == proc2) 
-				blk2 = ttran.get_block({.idx = idx_2, .blk_size = blk2size, .found = found2});
+				blk2 = ttran.get_block(idx_2, blk2size, found2);
 			//} else {
 			//	found2 = found1;
 			//}
@@ -141,9 +152,13 @@ void antisym(dbcsr::tensor<4,T>& t, T alpha) {
 					}
 				}
 				
-				if (found1 == false) t.reserve(vec<vec<int>>{{IX1},{IX2},{IX3},{IX4}});
+				if (found1 == false) {
+					t.reserve(arrvec<int,4>{
+						vec<int>{IX1},vec<int>{IX2},
+						vec<int>{IX3},vec<int>{IX4}});
+				}
 				
-				t.put_block({.idx = idx_1, .blk = blk1});
+				t.put_block(idx_1, blk1);
 				
 			}
 			

@@ -1423,7 +1423,7 @@ double dot(tensor<N,double>& t1, tensor<N,double>& t2) {
 		
 }
 
-/*
+
 template <int N, typename T = double>
 void ewmult(tensor<N,T>& t1, tensor<N,T>& t2, tensor<N,T>& tout) {
 	
@@ -1432,22 +1432,24 @@ void ewmult(tensor<N,T>& t1, tensor<N,T>& t2, tensor<N,T>& tout) {
 	
 	dbcsr::iterator<N> it(t1);
 	
+    it.start();
+    
 	while (it.blocks_left()) {
 			
 		it.next();
-		auto idx = it.idx();
-		auto blksize = it.sizes();
+		auto& idx = it.idx();
+		auto& blksize = it.size();
 			
 		bool found = false;
 		bool found3 = false;
 		
-		auto b1 = t1.get_block({.idx = idx, .blk_size = blksize, .found = found});
-		auto b2 = t2.get_block({.idx = idx, .blk_size = blksize, .found = found});
-		auto b3 = tout.get_block({.idx = idx, .blk_size = blksize, .found = found3});
+		auto b1 = t1.get_block(idx, blksize, found);
+		auto b2 = t2.get_block(idx, blksize, found);
+		auto b3 = tout.get_block(idx, blksize, found3);
 			
 		if (!found) continue;
 		if (!found3) {
-			vec<vec<int>> res(N);
+			arrvec<int,N> res;
 			for (int i = 0; i != N; ++i) {
 				res[i].push_back(idx[i]);
 			}
@@ -1456,9 +1458,11 @@ void ewmult(tensor<N,T>& t1, tensor<N,T>& t2, tensor<N,T>& tout) {
 			
 		std::transform(b1.data(), b1.data() + b1.ntot(), b2.data(), b3.data(), std::multiplies<T>());
 		
-		tout.put_block({.idx = idx, .blk = b3});
+		tout.put_block(idx, b3);
 		
 	}
+    
+    it.stop();
 		
 	tout.filter();
 	

@@ -3,7 +3,7 @@
 
 #include "desc/options.h"
 #include "desc/wfn.h"
-#include "math/tensor/dbcsr.hpp"
+#include "tensor/dbcsr.hpp"
 #include "utils/mpi_time.h"
 #include "adc/adc_defaults.h"
 

@@ -7,12 +7,14 @@ void adcmod::mo_amplitudes() {
 	
 	// form 2e electron integrals
 	
-	dbcsr::pgrid<4> grid4({.comm = m_comm});
+	dbcsr::pgrid<4> grid4(m_comm);
+	arrvec<int,4> blksizes = {m_dims.o, m_dims.v, m_dims.o, m_dims.v};
 	
-	dbcsr::tensor<4> mo_ints({.name = "t_ovov", .pgridN = grid4,
-		.map1 = {0,1}, .map2 = {2,3}, .blk_sizes = {m_dims.o, m_dims.v, m_dims.o, m_dims.v}});
+	dbcsr::tensor<4> mo_ints = dbcsr::tensor<4>::create().name("t_ovov").ngrid(grid4)
+		.map1({0,1}).map2({2,3}).blk_sizes(blksizes);
 		
-	dbcsr::einsum<3,3,4>({.x = "Xia, Xjb -> iajb", .t1 = *m_mo.b_xov, .t2 = *m_mo.b_xov, .t3 = mo_ints});
+	//dbcsr::einsum<3,3,4>({.x = "Xia, Xjb -> iajb", .t1 = *m_mo.b_xov, .t2 = *m_mo.b_xov, .t3 = mo_ints});
+	dbcsr::contract(*m_mo.b_xov, *m_mo.b_xov, mo_ints).perform("Xia, Xjb -> iajb");
 	
 	dbcsr::print(mo_ints);
 	

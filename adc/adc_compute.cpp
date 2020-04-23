@@ -1,6 +1,6 @@
 #include "adc/adcmod.h"
 #include "adc/adc_ri_u1.h"
-#include "math/tensor/dbcsr_conversions.hpp"
+#include "tensor/dbcsr_conversions.h"
 #include "math/solvers/davidson.h"
 
 #include <algorithm>
@@ -26,20 +26,10 @@ void adcmod::compute() {
 		
 		// compute amplitudes, if applicable
 		
-		dbcsr::pgrid<2> grid2({.comm = m_comm});
-		vec<vec<int>> resblks(2);
+		dbcsr::pgrid<2> grid2(m_comm);
 		
 		int nocc = m_hfwfn->mol()->nocc_alpha();
 		int nvir = m_hfwfn->mol()->nvir_alpha();
-		
-		// set up ADC0 expression
-		
-		// set up davidson, pass it sigma construction function
-		
-		// make diagonal d_ia
-		
-			
-		// make sum_P B_iiP B_aaP
 		
 		std::cout << "BEGIN" << std::endl;
 		
@@ -72,7 +62,7 @@ void adcmod::compute() {
 		
 		vec<int> map1 = {0};
 		vec<int> map2 = {1};
-		vec<vec<int>> blksizes = {m_dims.o, m_dims.v};
+		arrvec<int,2> blksizes = {m_dims.o, m_dims.v};
 		
 		for (int i = 0; i != m_nroots; ++i) {
 			
@@ -95,7 +85,8 @@ void adcmod::compute() {
 		
 		ri_adc1_u1 ri_adc1(m_mo.eps_o, m_mo.eps_v, m_mo.b_xoo, m_mo.b_xov, m_mo.b_xvv); 
 		
-		math::davidson<ri_adc1_u1> dav({.factory = ri_adc1, .diag = m_mo.d_ov});
+		math::davidson<ri_adc1_u1> dav = math::davidson<ri_adc1_u1>::create()
+			.factory(ri_adc1).diag(m_mo.d_ov);
 		
 		dav.compute(dav_guess, m_nroots);
 		
@@ -109,16 +100,19 @@ void adcmod::compute() {
 			
 			ri_adc2_diis_u1 ri_adc2(m_mo.eps_o, m_mo.eps_v, m_mo.b_xoo, m_mo.b_xov, m_mo.b_xvv, m_mo.t_ovov);
 		
-			math::modified_davidson<ri_adc2_diis_u1> dav({.factory = ri_adc2, .diag = m_mo.d_ov});
+			math::modified_davidson<ri_adc2_diis_u1> dav
+				= math::modified_davidson<ri_adc2_diis_u1>::create()
+				.factory(ri_adc2).diag(m_mo.d_ov);
+				
 			dav.compute(rvs, m_nroots, omega);
 			
 		} else {
 			
 			std::cout << "SOS" << std::endl;
-			sos_ri_adc2_diis_u1 ri_adc2(m_mo.eps_o, m_mo.eps_v, m_mo.b_xoo, m_mo.b_xov, m_mo.b_xvv, m_mo.t_ovov);
+			//sos_ri_adc2_diis_u1 ri_adc2(m_mo.eps_o, m_mo.eps_v, m_mo.b_xoo, m_mo.b_xov, m_mo.b_xvv, m_mo.t_ovov);
 		
-			math::modified_davidson<sos_ri_adc2_diis_u1> dav({.factory = ri_adc2, .diag = m_mo.d_ov});
-			dav.compute(rvs, m_nroots, omega);
+			//math::modified_davidson<sos_ri_adc2_diis_u1> dav({.factory = ri_adc2, .diag = m_mo.d_ov});
+			//dav.compute(rvs, m_nroots, omega);
 			
 		}
 		

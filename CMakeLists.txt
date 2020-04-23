@@ -33,7 +33,7 @@ add_subdirectory(desc)
 add_subdirectory(input)
 add_subdirectory(ints)
 add_subdirectory(hf)
-#add_subdirectory(adc)
+add_subdirectory(adc)
 #add_subdirectory(mp2)
 
 add_executable(
@@ -51,5 +51,5 @@ target_link_libraries(
 	chem_hf
 	chem_desc
 	chem_ints
-	#	chem_adc
+	chem_adc
 )
