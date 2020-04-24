@@ -553,28 +553,56 @@ public:
 		pdims_p = 			reserve(p.pdims);
 		my_ploc_p = 		reserve(p.my_ploc);
 		
-		vec<int**> blks_local_v(MAXDIM,nullptr), proc_dist_v(MAXDIM,nullptr),
-			blk_size_v(MAXDIM,nullptr), blk_offset_v(MAXDIM,nullptr);
+		std::vector<int> nblksloc(4,0);
+		std::vector<int> nblkstot(4,0);
 		
-		vec<int*> blks_local_v_size(MAXDIM,nullptr), proc_dist_v_size(MAXDIM,nullptr),
-			blk_size_v_size(MAXDIM,nullptr), blk_offset_v_size(MAXDIM,nullptr);
-	
-		auto reserve_vec = [] (vec<int**>& v, vec<int*>& vsize) {
+		for (int i = 0; i != N; ++i) {
+			nblksloc[i] = c_dbcsr_t_nblks_local(m_tensor_ptr,i);
+			nblkstot[i] = c_dbcsr_t_nblks_total(m_tensor_ptr,i);
+		}
+				
+        if (p.blks_local) {
 			for (int i = 0; i != N; ++i) {
-				v[i] = new int*;
-				vsize[i] = new int;
+				p.blks_local->at(i) = vec<int>(nblksloc[i]);
 			}
-		};
+		}
 		
-		if (p.blks_local) { reserve_vec(blks_local_v, blks_local_v_size);}
-		if (p.proc_dist) { reserve_vec(proc_dist_v, proc_dist_v_size); }
-		if (p.blk_size) { reserve_vec(blk_size_v, blk_size_v_size); }
-		if (p.blk_offset) { reserve_vec(blk_offset_v, blk_offset_v_size); }
+		if (p.proc_dist) {
+			for (int i = 0; i != N; ++i) {
+				p.proc_dist->at(i) = vec<int>(nblkstot[i]);
+			}
+		}
+		
+		if (p.blk_size) {
+			for (int i = 0; i != N; ++i) {
+				p.blk_size->at(i) = vec<int>(nblkstot[i]);
+			}
+		}
+		
+		if (p.blk_offset) {
+			for (int i = 0; i != N; ++i) {
+				p.blk_offset->at(i) = vec<int>(nblkstot[i]);
+			}
+		} 
+		
+		
 	
 		char* name = nullptr;
 		int name_size = 0;
 		
 		//std::cout << "IN HERE" << std::endl;
+		
+		std::vector<int*> bloc(4,nullptr);
+		std::vector<int*> proc(4,nullptr);
+		std::vector<int*> bsize(4,nullptr);
+		std::vector<int*> boff(4,nullptr);
+		
+		for (int i = 0; i != N; ++i) {
+			if (p.blks_local) bloc[i] = p.blks_local->at(i).data();
+			if (p.proc_dist) proc[i] = p.proc_dist->at(i).data();
+			if (p.blk_size) bsize[i] = p.blk_size->at(i).data();
+			if (p.blk_offset) boff[i] = p.blk_offset->at(i).data();
+		}
 	
 	    c_dbcsr_t_get_info(m_tensor_ptr, N, 
 							   nblks_total_p,
@@ -582,12 +610,16 @@ public:
                                nblks_local_p,
                                nfull_local_p,
                                pdims_p, my_ploc_p, 
-                               REPEAT(VARANDSIZE,blks_local_v,MAXDIM,(,),0),
-                               REPEAT(VARANDSIZE,proc_dist_v,MAXDIM,(,),0),
-                               REPEAT(VARANDSIZE,blk_size_v,MAXDIM,(,),0),
-                               REPEAT(VARANDSIZE,blk_offset_v,MAXDIM,(,),0),
-                               nullptr, &name, &name_size,
-                               nullptr);
+                               nblksloc[0], nblksloc[1],nblksloc[2],nblksloc[3],
+                               nblkstot[0], nblkstot[1],nblkstot[2],nblkstot[3],
+                               bloc[0],bloc[1],bloc[2],bloc[3],
+                               proc[0],proc[1],proc[2],proc[3],
+                               bsize[0],bsize[1],bsize[2],bsize[3],
+                               boff[0],boff[1],boff[2],boff[3],
+                               nullptr, &name, nullptr);
+                               
+         
+  
 		
 		auto printvec = [](std::string msg, vec<int>& v) {
 			std::cout << msg;
@@ -597,6 +629,10 @@ public:
 			std::cout << std::endl;
 		};
 		
+		if (p.name) {
+			*p.name = name;
+        }
+		
 		//std::cout << "OUT" << std::endl;
 		
 		//if(p.nblks_total) printvec("Total number of blocks:\n",*p.nblks_total);
@@ -604,53 +640,7 @@ public:
 		//if(p.nblks_local) printvec("Total number of local blocks:\n",*p.nblks_local);
 		//if(p.nfull_local) printvec("Total number of local elements:\n",*p.nfull_local);
 		
-		auto makevec = [](vec<int**>& v, vec<int*>& vsize) {
-			vec<vec<int>> out(N);
-			for (int i = 0; i != N; ++i) {
-				vec<int> veci(*vsize[i]);
-				
-				for (int j = 0; j != *vsize[i]; ++j) {
-					veci[j] = (*(v[i]))[j];
-				}
-				
-				free(*(v[i]));
-				delete v[i];
-				delete vsize[i];
-				
-				out[i] = veci;
-			}
-			
-			return out;
-			
-		};
-				
-        if (p.blks_local) {
-			//std::cout << "Local block indices:" << std::endl;
-			*p.blks_local = makevec(blks_local_v, blks_local_v_size);
-			//for (int i = 0; i != N; ++i) printvec("", out[i]);
-		}
 		
-		if (p.proc_dist) {
-			//std::cout << "Distribution vectors:" << std::endl;
-			*p.proc_dist = makevec(proc_dist_v, proc_dist_v_size);
-			//for (int i = 0; i != N; ++i) printvec("", out[i]);
-		}
-		
-		if (p.blk_size) {
-			//std::cout << "Block sizes:" << std::endl;
-			*p.blk_size = makevec(blk_size_v, blk_size_v_size);
-			//for (int i = 0; i != N; ++i) printvec("", out[i]);
-		}
-		
-		if (p.blk_offset) {
-			//std::cout << "Block offsets:" << std::endl;
-			*p.blk_offset = makevec(blk_offset_v, blk_offset_v_size);
-			//for (int i = 0; i != N; ++i) printvec("", out[i]);
-		} 
-		
-		if (p.name) {
-			*p.name = name;
-        }
         
         free(name); 
          
@@ -913,34 +903,31 @@ private:
 		long long int* c_dims_2d_i8 = (p.dims_2d_i8) ? p.dims_2d_i8->data() : nullptr;
 		int* c_dims_2d = (p.dims_2d) ? p.dims_2d->data() : nullptr;
 
-#define set_array(name) \
-	int** c_##name = (p.name) ? new int*() : nullptr; \
-	int* name##_size = (p.name) ? new int() : nullptr;
-
-		set_array(dims_nd)
-		set_array(dims1_2d)
-		set_array(dims2_2d)
-		set_array(map1_2d)
-		set_array(map2_2d)
-		set_array(map_nd)
-		
 		int nd_size = N;
         int nd_row_size = c_dbcsr_t_ndims_matrix_row(m_tensor_ptr);
         int nd_col_size = c_dbcsr_t_ndims_matrix_column(m_tensor_ptr);
+
+#define set_array(name,size) \
+	if (p.name) *p.name = vec<int>(size); \
+	int* c_##name = (p.name) ? p.name->data() : nullptr; 
+
+		set_array(dims_nd,nd_size)
+		set_array(dims1_2d,nd_row_size)
+		set_array(dims2_2d,nd_col_size)
+		set_array(map1_2d,nd_row_size)
+		set_array(map2_2d,nd_col_size)
+		set_array(map_nd,nd_size)
+		
+		
 		
 		int* c_base = (p.base) ? &*p.base : nullptr;
 		bool* c_col_major = (p.col_major) ? &*p.col_major : nullptr;
 		
-		int nd_size = N;
-        int nd_row_size = c_dbcsr_t_ndims_matrix_row(m_tensor_ptr);
-        int nd_col_size = c_dbcsr_t_ndims_matrix_column(m_tensor_ptr);
-		
-		c_dbcsr_t_get_mapping_info(nd_size, nd_row_size, nd_col_size, c_ndim_nd, c_ndim1_2d, c_ndim2_2d, 
-                        c_dims_2d_i8, c_dims_2d, c_dims_nd, dims_nd_size, 
-                        c_dims1_2d, dims1_2d_size, c_dims2_2d, dims2_2d_size, 
-                        c_map1_2d, map1_2d_size, c_map2_2d, map2_2d_size, 
-                        c_map_nd, map_nd_size, c_base, c_col_major);
-		
+		c_dbcsr_t_get_mapping_info(m_tensor_ptr, nd_size, nd_row_size, nd_col_size, c_ndim_nd, c_ndim1_2d, c_ndim2_2d, 
+                        c_dims_2d_i8, c_dims_2d, c_dims_nd, 
+                        c_dims1_2d, c_dims2_2d, 
+                        c_map1_2d, c_map2_2d, 
+                        c_map_nd, c_base, c_col_major);
 		
 	}
 		
@@ -948,15 +935,11 @@ private:
 public:	
 
 	void get_mapping_info(tensor_mapping_info&& p) {	
-		void* nd = nullptr;
-		c_dbcsr_t_get_nd_index(m_tensor_ptr, &nd);
-		get_mapping_info_base(nd, std::forward<tensor_mapping_info>(p));	
+		get_mapping_info_base(m_tensor_ptr, std::forward<tensor_mapping_info>(p));	
 	}
 	
 	void get_blk_mapping_info(tensor_mapping_info&& p) {
-		void* nd = nullptr;
-		c_dbcsr_t_get_nd_index_blk(m_tensor_ptr, &nd);
-		get_mapping_info_base(nd, std::forward<tensor_mapping_info>(p));
+		get_mapping_info_base(m_tensor_ptr, std::forward<tensor_mapping_info>(p));
 	}
 	
 	void scale(T alpha) {
@@ -1069,25 +1052,25 @@ public:
 	}
 	
 	vec<vec<int>> blks_local() const {
-		vec<vec<int>> out;
+		vec<vec<int>> out(N);
 		get_info({.blks_local=out});
 		return out;
 	}
 	
 	vec<vec<int>> proc_dist() const {
-		vec<vec<int>> out;
+		vec<vec<int>> out(N);
 		get_info({.proc_dist=out});
 		return out;
 	}
 	
 	vec<vec<int>> blk_size() const {
-		vec<vec<int>> out;
+		vec<vec<int>> out(N);
 		get_info({.blk_size=out});
 		return out;
 	}
 	
 	vec<vec<int>> blk_offset() const {
-		vec<vec<int>> out;
+		vec<vec<int>> out(N);
 		get_info({.blk_offset=out});
 		return out;
 	}
