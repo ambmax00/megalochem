@@ -924,35 +924,23 @@ private:
 		set_array(map2_2d)
 		set_array(map_nd)
 		
+		int nd_size = N;
+        int nd_row_size = c_dbcsr_t_ndims_matrix_row(m_tensor_ptr);
+        int nd_col_size = c_dbcsr_t_ndims_matrix_column(m_tensor_ptr);
+		
 		int* c_base = (p.base) ? &*p.base : nullptr;
 		bool* c_col_major = (p.col_major) ? &*p.col_major : nullptr;
 		
-		c_dbcsr_t_get_mapping_info(nd, c_ndim_nd, c_ndim1_2d, c_ndim2_2d, 
+		int nd_size = N;
+        int nd_row_size = c_dbcsr_t_ndims_matrix_row(m_tensor_ptr);
+        int nd_col_size = c_dbcsr_t_ndims_matrix_column(m_tensor_ptr);
+		
+		c_dbcsr_t_get_mapping_info(nd_size, nd_row_size, nd_col_size, c_ndim_nd, c_ndim1_2d, c_ndim2_2d, 
                         c_dims_2d_i8, c_dims_2d, c_dims_nd, dims_nd_size, 
                         c_dims1_2d, dims1_2d_size, c_dims2_2d, dims2_2d_size, 
                         c_map1_2d, map1_2d_size, c_map2_2d, map2_2d_size, 
                         c_map_nd, map_nd_size, c_base, c_col_major);
 		
-		
-		auto make_vector = [](int** arr, int* size) 
-		{
-			vec<int> out(arr[0], arr[0] + *size); 
-			return out;
-		};
-		
-#define set_arg(name) if (p.name) {  \
-		*p.name = make_vector(c_##name, name##_size); \
-		free(c_##name[0]); \
-		delete c_##name; \
-		delete name##_size; \
-		}
-	  
-		set_arg(dims_nd)
-		set_arg(dims1_2d)
-		set_arg(dims2_2d)
-		set_arg(map1_2d)
-		set_arg(map2_2d)
-		set_arg(map_nd)
 		
 	}
 		
