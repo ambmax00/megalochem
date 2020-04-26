@@ -112,6 +112,8 @@ dbcsr::stensor<N,double> aofactory::compute() {
 		
 		for (int i = 0; i != N; ++i) {
 			blksizes[i] = basvec[i].cluster_sizes();
+			for (auto x : blksizes[i]) std::cout << x << " ";
+			std::cout << std::endl;
 		}
 		
 		dbcsr::tensor<N> t_ints = typename dbcsr::tensor<N>::create().name(intname)

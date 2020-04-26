@@ -12,33 +12,22 @@ namespace adc {
 
 void adcmod::compute() {
 
-		// test MO values
-		
-		/*
-		dbcsr::pgrid<4> grid4a({.comm = m_comm});
-		vec<vec<int>> m_sizes = {osizes[1],osizes[1],vsizes[1],vsizes[1]};
-		dbcsr::stensor<4> mmmm = dbcsr::make_stensor<4>({.name = "mmmm", .pgridN = grid4a, .map1 = {0,1}, .map2 = {2,3}, .blk_sizes = m_sizes});
-		
-		dbcsr::einsum<3,3,4>({.x = "Xij, Xkl -> ijkl", .t1 = *d_xoo, .t2 = *d_xvv, .t3 = *mmmm});
-		
-		dbcsr::print(*mmmm);*/
-		
-		
-		// compute amplitudes, if applicable
+		LOG.os<>("--- Starting Computation ---\n\n");
 		
 		dbcsr::pgrid<2> grid2(m_comm);
 		
 		int nocc = m_hfwfn->mol()->nocc_alpha();
 		int nvir = m_hfwfn->mol()->nvir_alpha();
 		
-		std::cout << "BEGIN" << std::endl;
-		
+		LOG.os<>("Computing MO amplitudes...\n\n");
 		mo_amplitudes();
 		
 		//exit(0);
 		
+		LOG.os<>("Computing Diagonal for Davidson Conditioning...\n\n");
 		mo_compute_diag();
 		
+		LOG.os<>("Conputing guess vectors...\n\n");
 		// now order it : there is probably a better way to do it
 		auto eigen_ia = dbcsr::tensor_to_eigen(*m_mo.d_ov);
 		
@@ -88,6 +77,7 @@ void adcmod::compute() {
 		math::davidson<ri_adc1_u1> dav = math::davidson<ri_adc1_u1>::create()
 			.factory(ri_adc1).diag(m_mo.d_ov);
 		
+		LOG.os<>("Running ADC(1) davidson...\n\n");
 		dav.compute(dav_guess, m_nroots);
 		
 		auto rvs = dav.ritz_vectors();
@@ -103,7 +93,8 @@ void adcmod::compute() {
 			math::modified_davidson<ri_adc2_diis_u1> dav
 				= math::modified_davidson<ri_adc2_diis_u1>::create()
 				.factory(ri_adc2).diag(m_mo.d_ov);
-				
+			
+			LOG.os<>("Running RI-ADC(2)...\n\n");
 			dav.compute(rvs, m_nroots, omega);
 			
 		} else {

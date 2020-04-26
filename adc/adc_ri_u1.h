@@ -152,11 +152,12 @@ protected:
 		//dbcsr::einsum<3,2,3>({.x = "Xia, XD -> iaD", .t1 = *m_b_xov, .t2 = *m_c_x, .t3 = sig_1_d, .alpha = 2.0});
 		dbcsr::contract(*m_b_xov, *m_c_x, sig_1_d).alpha(2.0).perform("Xia, XD -> iaD");
 			
-		stensor<2> sig_1 = std::make_shared<tensor<2>>(
-			dbcsr::remove_dummy<3>(sig_1_d, vec<int>{0}, vec<int>{1},"sig_1"));
+		stensor<2> sig_1 = (dbcsr::remove_dummy<3>(sig_1_d, vec<int>{0}, vec<int>{1},"sig_1")).get_stensor();
 			
 		sig_1_d.destroy();
-			
+		
+		dbcsr::print(*sig_1);
+		
 		// ==== sig_1 += - (X|ij) c_xja 
 			
 		compute_cxov(u1);

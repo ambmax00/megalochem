@@ -149,7 +149,7 @@ public:
 		}
 		
 		std::cout << "Done Reading" << std::endl;
-
+		dbcsr::print(*m_c_bo_A);
 		
 	}
 };

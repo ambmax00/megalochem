@@ -21,7 +21,7 @@ dbcsr::stensor<3> transform3(dbcsr::stensor<3>& d_xab, dbcsr::stensor<2>& ca, db
 	//dbcsr::einsum<3,2,3>({.x = "XMN, Mi -> XiN", .t1 = *p.t_in, .t2 = *p.c_1, .t3 = HTI});
 	dbcsr::contract(*d_xab, *ca, HTI).perform("XMN, Mi -> XiN");
 	
-	arrvec<int,3> blksizes_full = {insizes[0],casizes[1],cbsizes[2]};
+	arrvec<int,3> blksizes_full = {insizes[0],casizes[1],cbsizes[1]};
 	dbcsr::stensor<3> out = dbcsr::make_stensor<3>(
 		dbcsr::tensor<3>::create().name(name).ngrid(grid3)
 		.map1({0}).map2({1,2}).blk_sizes(blksizes_full));

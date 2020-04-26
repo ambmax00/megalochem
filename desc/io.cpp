@@ -37,8 +37,11 @@ void read_2dtensor(dbcsr::stensor<2>& t_in, std::string molname, std::string ten
 	
 	read_binary_mat(file_name.c_str(), eigen_mat);
 	
+	std::cout << tensorname << std::endl;
+	std::cout << eigen_mat << std::endl;
+	
 	dbcsr::pgrid<2> grid2(comm);
-	t_in = std::make_shared<dbcsr::tensor<2>>(eigen_to_tensor(eigen_mat, tensorname, grid2, vec<int>{0}, vec<int>{1}, blk_sizes));
+	t_in = (dbcsr::eigen_to_tensor(eigen_mat, tensorname, grid2, vec<int>{0}, vec<int>{1}, blk_sizes)).get_stensor();
 	
 }
 

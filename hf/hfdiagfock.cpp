@@ -201,11 +201,13 @@ void hfmod::compute_virtual_density() {
 		form_density(m_pv_bb_B, m_c_bm_B, "B");
 	} else {
 		m_pv_bb_B = dbcsr::make_stensor<2>(
-			dbcsr::tensor<2>::create_template().tensor_in(*m_p_bb_B).name("pv_bb_B"));
+			dbcsr::tensor<2>::create_template().tensor_in(*m_p_bb_A).name("pv_bb_B"));
 		m_pv_bb_B->reserve_all();
 		m_pv_bb_B->set(0.0);
 		m_pv_bb_B->filter();
 	}
+	
+	std::cout << "Done with density." << std::endl;
 	
 }
 	

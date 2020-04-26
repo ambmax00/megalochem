@@ -7,6 +7,8 @@ namespace adc {
 	
 void adcmod::mo_load() {
 	
+	LOG.os<>("Constructing MO integrals...\n");
+	
 	dbcsr::pgrid<2> grid2(m_comm);
 	
 	auto epso = m_hfwfn->eps_occ_A();
@@ -19,8 +21,11 @@ void adcmod::mo_load() {
 		
 	ints::registry INT_REGISTRY;
 	
-	auto aoints = aofac.op("coulomb").dim("xbb").map1({0}).map2({1}).compute<3>(); 
+	LOG.os<>("-- Loading 3c2e AO integrals\n"); 
+	auto aoints = aofac.op("coulomb").dim("xbb").map1({0}).map2({1,2}).compute<3>(); 
 	//compute<3>({.op = "coulomb", .bas = "xbb", .map1 = {0}, .map2 = {1,2}});
+	
+	LOG.os<>("-- Loading df overlap integrals\n");
 	auto metric = aofac.op("coulomb").dim("xx").map1({0}).map2({1}).compute<2>();
 	
 	int nocc = m_hfwfn->mol()->nocc_alpha();
@@ -31,6 +36,7 @@ void adcmod::mo_load() {
 	
 	vec<int> d = {1};
 	
+	LOG.os<>("-- Inverting metric matrix and contracting...\n");
 	auto PQSQRT = aofac.invert(metric,2);
 	
 	//dbcsr::print(*aoints);
@@ -53,6 +59,8 @@ void adcmod::mo_load() {
 	dbcsr::print(*c_bo);
 	dbcsr::print(*c_bv);
 	
+	LOG.os<>("-- AO -> MO transformation...\n");
+	
 	m_mo.b_xoo = ints::transform3(d_xbb, c_bo, c_bo, "i_xoo(xx)^-1/2");
 	//dbcsr::print(*d_xoo);
 	m_mo.b_xov = ints::transform3(d_xbb, c_bo, c_bv, "i_xov(xx)^-1/2");
@@ -61,6 +69,8 @@ void adcmod::mo_load() {
 	//dbcsr::print(*d_xvv);
 	
 	d_xbb->destroy();
+	
+	LOG.os<>("Finished computing MO quantities.\n\n");
 		
 }
 
@@ -71,10 +81,12 @@ adcmod::adcmod(desc::shf_wfn hfref, desc::options& opt, MPI_Comm comm) :
 	m_nroots(m_opt.get<int>("nroots", ADC_NROOTS)),
 	m_c_os(m_opt.get<double>("c_os", ADC_C_OS)),
 	m_c_osc(m_opt.get<double>("c_os_coupling", ADC_C_OS_COUPLING)),
-	LOG(comm, ADC_PRINT_LEVEL),
+	LOG(comm, m_opt.get<int>("print", ADC_PRINT_LEVEL)),
 	TIME(comm, "ADC Module", LOG.global_plev())
 {
-		
+	
+	LOG.banner("ADC MODULE",50,'*');	
+	
 	// prepare integrals
 	auto method = m_opt.get<std::string>("method", ADC_METHOD);
 	
@@ -95,6 +107,8 @@ adcmod::adcmod(desc::shf_wfn hfref, desc::options& opt, MPI_Comm comm) :
 	} else { 
 		throw std::runtime_error("Unknown Method.");
 	}
+	
+	LOG.os<>("--- Ready for launching computation. --- \n\n");
 	
 }
 

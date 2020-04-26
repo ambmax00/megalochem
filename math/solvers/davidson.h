@@ -138,6 +138,7 @@ public:
 			evals = es.eigenvalues();
 			evecs = es.eigenvectors();
 			
+			
 			for (int i = 0; i != m_subspace; ++i) {
 				// get min and max coeff
 				double minc = evecs.col(i).minCoeff();
@@ -175,7 +176,7 @@ public:
 				
 				temp.scale(evecs(i,m_nroots-1));
 				
-				dbcsr::copy(temp, r_k).sum(true).move_data(true);
+				dbcsr::copy(temp, r_k).sum(true).move_data(true).perform();
 				
 				dbcsr::copy(*m_vecs[i], temp).perform();
 				
@@ -267,14 +268,22 @@ public:
 			// b_new = d_k - sum_j proj_bi(d_k)
 			// where proj_b(v) = dot(b,v)/dot(b,b)
 			
-			tensor<2> bnew = tensor<2>::create_template().tensor_in(r_k).name("b_" + std::to_string(m_subspace));
-			tensor<2> temp2 = tensor<2>::create_template().tensor_in(r_k).name("temp2");
+			tensor<2> bnew = tensor<2>::create_template().tensor_in(d_k).name("b_" + std::to_string(m_subspace));
+			tensor<2> temp2 = tensor<2>::create_template().tensor_in(d_k).name("temp2");
 			
 			dbcsr::copy(d_k, bnew).perform();
 			
+			
+			std::cout << "LOOP" << std::endl;
 			for (int i = 0; i != m_vecs.size(); ++i) {
 				
-				dbcsr::copy(*m_vecs[i], temp2);
+				std::cout << "STEP " << i << std::endl;
+				
+				dbcsr::copy(*m_vecs[i], temp2).perform();
+				
+				dbcsr::print(*m_vecs[i]);
+				dbcsr::print(temp2);
+				
 				double proj = dbcsr::dot(*m_vecs[i], d_k)/dbcsr::dot(*m_vecs[i],*m_vecs[i]);
 				
 				std::cout << proj << std::endl;
@@ -283,12 +292,16 @@ public:
 				
 				dbcsr::copy(temp2, bnew).sum(true).perform();
 				
+				dbcsr::print(bnew);
+				
 			}
 				
 			temp2.destroy();
 			
 			// normalize
 			double bnorm = sqrt(dbcsr::dot(bnew,bnew));
+			
+			dbcsr::print(bnew);
 			
 			bnew.scale(1/bnorm);
 			
