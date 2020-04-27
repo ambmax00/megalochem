@@ -100,10 +100,14 @@ void adcmod::compute() {
 		} else {
 			
 			std::cout << "SOS" << std::endl;
-			//sos_ri_adc2_diis_u1 ri_adc2(m_mo.eps_o, m_mo.eps_v, m_mo.b_xoo, m_mo.b_xov, m_mo.b_xvv, m_mo.t_ovov);
+			sos_ri_adc2_diis_u1 ri_adc2(m_mo.eps_o, m_mo.eps_v, m_mo.b_xoo, m_mo.b_xov, m_mo.b_xvv, m_mo.t_ovov);
 		
-			//math::modified_davidson<sos_ri_adc2_diis_u1> dav({.factory = ri_adc2, .diag = m_mo.d_ov});
-			//dav.compute(rvs, m_nroots, omega);
+			math::modified_davidson<sos_ri_adc2_diis_u1> dav 
+				= math::modified_davidson<sos_ri_adc2_diis_u1>::create()
+				.factory(ri_adc2).diag(m_mo.d_ov);
+			
+			LOG.os<>("Running SOS-RI-ADC(2)...\n\n");
+			dav.compute(rvs, m_nroots, omega);
 			
 		}
 		
