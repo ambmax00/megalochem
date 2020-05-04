@@ -27,7 +27,7 @@ void scale_huckel(dbcsr::tensor<2>& t, std::vector<double>& v) {
 	
 	//does t[ij] = (v[i] + v[j])*t[ij]
 	
-	dbcsr::iterator<2> iter(t);
+	dbcsr::iterator_t<2> iter(t);
 	
 	auto blkoff = t.blk_offset();
 	

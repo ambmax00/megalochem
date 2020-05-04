@@ -183,7 +183,7 @@ void adcmod::mo_compute_diag() {
 		
 		eps_ia.reserve_all();
 		
-		dbcsr::iterator iter2(eps_ia);
+		dbcsr::iterator_t iter2(eps_ia);
 		iter2.start();
 		
 		auto epso = m_hfwfn->eps_occ_A();

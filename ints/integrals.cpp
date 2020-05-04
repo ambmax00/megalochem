@@ -25,7 +25,7 @@ void calc_ints(dbcsr::tensor<2>& t_out, util::ShrPool<libint2::Engine>& engine,
 	#pragma omp parallel 
 	{	
 		
-		dbcsr::iterator<2> iter(t_out);
+		dbcsr::iterator_t<2> iter(t_out);
 		
 		auto& loc_eng = engine->local();
 		const auto &results = loc_eng.results();
@@ -140,7 +140,7 @@ void calc_ints(dbcsr::tensor<3>& t_out, util::ShrPool<libint2::Engine>& engine,
 	
 		auto& loc_eng = engine->local();
 		const auto &results = loc_eng.results();
-		dbcsr::iterator<3> iter(t_out);
+		dbcsr::iterator_t<3> iter(t_out);
 		
 		iter.start();
 		
@@ -247,7 +247,7 @@ void calc_ints(dbcsr::tensor<4>& t_out, util::ShrPool<libint2::Engine>& engine,
 		
 		auto& loc_eng = engine->local();
 		const auto &results = loc_eng.results();
-		dbcsr::iterator<4> iter(t_out);
+		dbcsr::iterator_t<4> iter(t_out);
 		
 		iter.start();
 		

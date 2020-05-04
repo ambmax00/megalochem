@@ -61,7 +61,7 @@ void fill_random(dbcsr::tensor<N,double>& t_in, arrvec<int,N>& nz) {
 	
 	#pragma omp parallel 
 	{
-		dbcsr::iterator<N,double> iter(t_in);
+		dbcsr::iterator_t<N,double> iter(t_in);
 		
 		while (iter.blocks_left()) {
 			  

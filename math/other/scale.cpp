@@ -41,7 +41,7 @@ void scale(dbcsr::tensor<2>& t_in, std::vector<double>& v_in, std::optional<std:
 	
 	#pragma omp parallel 
 	{
-		dbcsr::iterator<2> iter(t);
+		dbcsr::iterator_t<2> iter(t);
 		iter.start();
 	
 		while (iter.blocks_left()) {

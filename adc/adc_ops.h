@@ -11,7 +11,7 @@ void scale(dbcsr::tensor<4,T>& t, vec<T>& eo, vec<T>& ev, T co = -1.0, T cv = 1.
 #pragma omp parallel 
 {
 	
-	dbcsr::iterator<4,T> iter4(t);
+	dbcsr::iterator_t<4,T> iter4(t);
 	iter4.start();
 		
 	while (iter4.blocks_left()) {

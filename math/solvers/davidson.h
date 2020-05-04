@@ -212,7 +212,7 @@ public:
 			
 			D.reserve_all();
 			
-			dbcsr::iterator<2> d_iter(D);
+			dbcsr::iterator_t<2> d_iter(D);
 			d_iter.start();
 			
 			while (d_iter.blocks_left()) {

@@ -30,7 +30,7 @@ MatrixX<T> tensor_to_eigen(dbcsr::tensor<2,T>& array, int l = 0) {
 	 * each local block to all the other processes 
 	 */
 	 
-	iterator<2,T> iter(array);
+	iterator_t<2,T> iter(array);
 	iter.start();
 	
 	for (int p = 0; p != mpi_size; ++p) {
@@ -93,7 +93,7 @@ dbcsr::tensor<2,T> eigen_to_tensor(MatrixX<T>& M, std::string name,
 	
 	#pragma omp parallel 
 	{
-		dbcsr::iterator<2> iter(out);
+		dbcsr::iterator_t<2> iter(out);
 		iter.start();
 	
 		while (iter.blocks_left()) {

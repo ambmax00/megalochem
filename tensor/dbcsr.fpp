@@ -124,8 +124,8 @@ class tensor;
 template <int N, typename T = double>
 using stensor = std::shared_ptr<tensor<N,T>>;
 
-template <int N, typename T>
-class iterator;
+template <int N, typename T = double>
+class iterator_t;
 
 template <int N1, int N2, int N3, typename T = double>
 class contract;
@@ -529,7 +529,7 @@ protected:
 	
 public:
 
-    friend class iterator<N,T>;
+    friend class iterator_t<N,T>;
     
 	template <int N1, int N2, int N3, typename D>
     friend class contract;
@@ -912,8 +912,8 @@ stensor<N,T> make_stensor(typename tensor<N,T>::create_template& p) {
     return t.get_stensor();
 }
 
-template <int N, typename T = double>
-class iterator {
+template <int N, typename T>
+class iterator_t {
 private:
 
 	void* m_iter_ptr;
@@ -927,12 +927,12 @@ private:
 	
 public:
 
-	iterator(tensor<N,T>& t_tensor) :
+	iterator_t(tensor<N,T>& t_tensor) :
 		m_iter_ptr(nullptr), m_tensor_ptr(t_tensor.m_tensor_ptr),
 		m_blk_n(0), m_blk_p(0)
 	{}
 	
-	~iterator() {}
+	~iterator_t() {}
     
     void start() {
         c_dbcsr_t_iterator_start(&m_iter_ptr, m_tensor_ptr);
@@ -1263,7 +1263,7 @@ dbcsr::tensor<N+1,T> add_dummy(tensor<N,T>& t) {
 	tensor<N+1,T> new_t = typename tensor<N+1,T>::create().name(t.name() + " dummy").ngrid(grid)
         .map1(new_map1).map2(new_map2).blk_sizes(blksizesnew);
 	
-	iterator<N> it(t);
+	iterator_t<N> it(t);
     index<N+1> newidx;
     index<N+1> newsize;
     
@@ -1330,7 +1330,7 @@ dbcsr::tensor<N-1,T> remove_dummy(tensor<N,T>& t, vec<int> map1, vec<int> map2, 
 	tensor<N-1,T> new_t = typename dbcsr::tensor<N-1,T>::create().name(newname).ngrid(grid).map1(map1).map2(map2)
 		.blk_sizes(newblksizes);
 	
-	iterator<N> it(t);
+	iterator_t<N> it(t);
     
     // reserve 
     auto locblks = t.blks_local();
@@ -1385,7 +1385,7 @@ double dot(tensor<N,double>& t1, tensor<N,double>& t2) {
     //#pragma omp parallel 
     //{
         
-        iterator<2> iter(t1);
+        iterator_t<2> iter(t1);
         iter.start();
         
 		while (iter.blocks_left()) {
@@ -1430,7 +1430,7 @@ void ewmult(tensor<N,T>& t1, tensor<N,T>& t2, tensor<N,T>& tout) {
 	// elementwise multiplication
 	// make sure tensors have same grid and dimensions, caus I sure don't do it here
 	
-	dbcsr::iterator<N> it(t1);
+	dbcsr::iterator_t<N> it(t1);
 	
     it.start();
     
@@ -1477,7 +1477,7 @@ void ewmult(tensor<N,double>& t1, tensor<N,double>& t2, tensor<N,double>& t3) {
 
 	double sum = 0.0;
 	
-	dbcsr::iterator<N> it(t1);
+	dbcsr::iterator_t<N> it(t1);
 	
 	while (it.blocks_left()) {
 			
@@ -1537,7 +1537,7 @@ void print(tensor<N,T>& t_in) {
 	MPI_Comm_rank(t_in.comm(), &myrank); 
 	MPI_Comm_size(t_in.comm(), &mpi_size);
 	
-	iterator<N,T> iter(t_in);
+	iterator_t<N,T> iter(t_in);
     iter.start();
 	
 	if (myrank == 0) std::cout << "Tensor: " << t_in.name() << std::endl;

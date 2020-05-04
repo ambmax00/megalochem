@@ -127,7 +127,7 @@ void Zmat::compute_schwarz() {
 	
 	//LOG.os<0,-1>("HERE\n");
 	// new para: get norm and index
-	dbcsr::iterator<2> iter(Ztensor);
+	dbcsr::iterator_t<2> iter(Ztensor);
 	int loc_nzblks = Ztensor.num_blocks();
 	int off = cbas.size();
 	
