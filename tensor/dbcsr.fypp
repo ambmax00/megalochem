@@ -1,0 +1,62 @@
+#:mute
+
+#:set MAXDIM = 4
+
+#:def make_param(structname, params)
+    private:
+    #:for name,type,ro,rv in params
+        ${ro}$<${type}$,${rv}$> c_${name}$; 
+    #:endfor
+    public:
+    #:for name,type,ro,rv in params
+        inline ${structname}$& ${name}$(${ro}$<${type}$,${rv}$> i_${name}$)
+        {
+            c_${name}$ = std::move(i_${name}$);
+            return *this;
+        }
+    #:endfor
+#:enddef
+
+#:def make_struct(structname, friend, params)
+struct ${structname}$ {
+    
+    ${make_param(structname,params)}$
+    
+    ${structname}$() = default;
+    friend class ${friend}$;
+};
+#:enddef 
+
+#:def datasize(name, nmin, nmax)
+#!    expand into list of elements "name[0].data(), name[0].size(), ...
+$:    ", ".join([name + "[" + str(i) + "].data(), " + name + "[" + str(i) + "].size()" for i in range(nmin, nmax)])
+#:enddef
+
+#:def datasizeptr(name, nmin, nmax)
+#!    expand into list of elements "name->at(0).data(), name->at(0).size(), ...
+$:    ", ".join([name + "->at(" + str(i) + ").data(), " + name + "->at(" + str(i) + ").size()" for i in range(nmin, nmax)])
+#:enddef
+
+#:def datasize0(nmax)
+#!    repeat nullptr, 0, ...
+$:    ", ".join(["nullptr, 0" for i in range(0, nmax)])
+#:enddef
+
+#:def repeat(name,nmax,end='')
+#! repeat name, name, ...
+#:if nmax > 0
+$:     ", ".join([name for i in range(0,nmax)]) + end
+#:endif
+#:enddef
+
+#:def repeatvar(name,nmin,nmax,suffix,end='')
+#! repeat name0, name1, ...
+#:if nmax != nmin
+$:    ", ".join([name + str(i) + suffix for i in range(nmin, nmax+1)]) + end
+#:endif
+#:enddef  
+
+#:set typelist = ['double', 'float', 'double _Complex', 'float _Complex']
+#:set typesuffix = ['d', 'f', 'c', 'z']
+
+#:endmute

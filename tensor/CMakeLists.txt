@@ -1,10 +1,31 @@
-add_custom_command(
-    OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/dbcsr.hpp
-    COMMAND fypp -F ${CMAKE_CURRENT_SOURCE_DIR}/dbcsr.fpp ${CMAKE_CURRENT_BINARY_DIR}/dbcsr.hpp
-    DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/dbcsr.fpp
-)
+set(FYPP_SOURCES
+       dbcsr_common.tpp
+       dbcsr_matrix.tpp
+       dbcsr_tensor.tpp
+       dbcsr_matrix_ops.tpp
+       dbcsr_tensor_ops.tpp
+)       
 
-add_custom_target(fypped ALL DEPENDS ${CMAKE_CURRENT_BINARY_DIR}/dbcsr.hpp)
+set(FYPP_OUT)
+
+foreach (file ${FYPP_SOURCES})	
+
+	get_filename_component(file "${file}" ABSOLUTE)
+	get_filename_component(rootname "${file}" NAME_WE)
+
+	set(of "${CMAKE_CURRENT_BINARY_DIR}/${rootname}.hpp")
+
+	add_custom_command(
+	    OUTPUT ${of}
+	    COMMAND fypp -F "${file}" "${of}"
+	    DEPENDS "${file}"
+	)
+
+	list(APPEND FYPP_OUT "${of}")
+
+endforeach()
+
+add_custom_target(fypped ALL DEPENDS ${FYPP_OUT})
 
 add_library(chem_tensor INTERFACE)
 add_dependencies(chem_tensor fypped)
