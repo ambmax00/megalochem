@@ -107,6 +107,11 @@ void laplace::compute() {
 	
 	LOG.os<>("Error: ", (xfrac - xlap).norm() / nquad, '\n');
 	
+	for (int i = 0; i != m_omega.size(); ++i) {
+		m_omega_db[i] = (double)m_omega[i];
+		m_alpha_db[i] = (double)m_alpha[i];
+	}
+	
 }
 
 } // end namespace

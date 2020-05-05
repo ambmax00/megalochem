@@ -34,6 +34,9 @@ private:
 	double m_limit;
 	VectorX128 m_omega, m_alpha, m_xi;
 	
+	std::vector<double> m_omega_db;
+	std::vector<double> m_alpha_db;
+	
 	void minmax_read();
 	void minmax_root();
 	void minmax_newton();
@@ -55,7 +58,16 @@ public:
 		m_k(t_k), m_emin(t_emin), m_ehomo(t_ehomo),
 		m_elumo(t_elumo), m_emax(t_emax),
 		m_omega(t_k), m_alpha(t_k), m_xi(2*t_k + 1),
+		m_omega_db(t_k), m_alpha_db(t_k),
 		LOG(MPI_COMM_WORLD, 1), m_limit(std::numeric_limits<double>::epsilon()) {};
+	
+	std::vector<double> omega() {
+		return m_omega_db;
+	}
+	
+	std::vector<double> alpha() {
+		return m_alpha_db;
+	}
 	
 	~laplace() {}
 	

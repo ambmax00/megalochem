@@ -15,7 +15,7 @@ get_target_property(dir Eigen3::Eigen INTERFACE_INCLUDE_DIRECTORIES)
 include_directories(${dir})
 
 find_package(OpenMP REQUIRED)
-#find_package(Boost REQUIRED)
+find_package(Boost REQUIRED)
 find_package(MPI REQUIRED)
 find_package(DBCSR 2.0.0 CONFIG REQUIRED)
 find_package(TBB REQUIRED)

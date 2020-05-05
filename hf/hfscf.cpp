@@ -233,8 +233,6 @@ void hfmod::compute() {
 	
 	math::diis_helper<2> diis_A(m_comm,dstart, dmin, dmax, (LOG.global_plev() >= 2) ? true : false );
 	math::diis_helper<2> diis_B(m_comm,dstart, dmin, dmax, (LOG.global_plev() >= 2) ? true : false );
-
-	m_max_iter = 10;
 	
 	// ERROR MATRICES
 	dbcsr::stensor<2> e_A;

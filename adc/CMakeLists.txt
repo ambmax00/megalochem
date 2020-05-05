@@ -13,4 +13,5 @@ target_link_libraries(
 	PRIVATE
 	chem_ints
 	chem_desc
+	chem_math_laplace
 )
