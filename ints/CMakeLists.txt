@@ -3,8 +3,8 @@ set(SOURCES
 	aofactory.cpp
 	integrals.h
 	integrals.cpp
-	gentran.h
-	gentran.cpp
+	#gentran.h
+	#gentran.cpp
 	#screening.h
 	#screening.cpp
 )
@@ -22,7 +22,7 @@ target_link_libraries(
 	chem_ints
 	chem_desc
 	chem_tensor
-	chem_math_linalg
+	#chem_math_linalg
 	OpenMP::OpenMP_CXX
 	Libint2::cxx
 	${TBB_LIBRARIES}

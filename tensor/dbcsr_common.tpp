@@ -1,8 +1,9 @@
-#ifndef DBCSR_FWD_HPP
-#define DBCSR_FWD_HPP
+#ifndef DBCSR_COMMON_HPP
+#define DBCSR_COMMON_HPP
 
 #:include "dbcsr.fypp"
 
+#include <dbcsr.h>
 #include <vector>
 #include <array>
 #include <utility>
@@ -72,12 +73,13 @@ struct dbcsr_type {
 //                     forward declarations (matrix) 
 // ---------------------------------------------------------------------
 
-class group;
 class dist;
 template <typename T = double>
 class iterator;
 template <typename T, typename = typename std::enable_if<is_valid_type<T>::value>::type>
 class matrix;
+template <typename T>
+using smatrix = std::shared_ptr<matrix<T>>;
 
 template <typename T = double>
 class multiply;
@@ -152,6 +154,64 @@ inline void finalize() {
 inline void print_statistics(const bool print_timers = false) {
 	c_dbcsr_print_statistics(&print_timers, nullptr);
 }
+
+class world {
+private:
+
+    MPI_Comm m_comm;
+    MPI_Comm m_group;
+    int m_rank;
+    int m_size;
+    std::array<int,2> m_dims;
+    std::array<int,2> m_coord;
+    
+    friend class dist;
+    
+public:
+
+    world(MPI_Comm comm) : m_comm(comm), m_group(MPI_COMM_NULL) {
+        
+        MPI_Comm_rank(m_comm, &m_rank);
+        MPI_Comm_size(m_comm, &m_size);
+        int dims[2] = {0};
+        MPI_Dims_create(m_size, 2, dims);
+        int periods[2] = {1};
+        int reorder = 0;
+        MPI_Cart_create(m_comm, 2, dims, periods, reorder, &m_group);
+        
+        int coord[2];
+        MPI_Cart_coords(m_group, m_rank, 2, coord);
+        
+        m_dims[0] = dims[0];
+        m_dims[1] = dims[1];
+        m_coord[0] = coord[0];
+        m_coord[1] = coord[1];
+        
+    }
+    
+    world(const world& w) :
+		m_comm(w.m_comm), m_group(w.m_group),
+		m_rank(w.m_rank), m_size(w.m_size),
+		m_dims(w.m_dims), m_coord(w.m_coord) {}
+    
+    void destroy(bool keep_comm = false) {
+        if (m_group != MPI_COMM_NULL && !keep_comm) 
+            MPI_Comm_free(&m_group);
+        m_comm = MPI_COMM_NULL;
+    }
+    
+    ~world() { destroy(true); }
+    
+    MPI_Comm comm() { return m_comm; }
+    MPI_Comm group() { return m_group; }
+    
+    int rank() { return m_rank; }
+    int size() { return m_size; }
+    
+    std::array<int,2> dims() { return m_dims; }
+    std::array<int,2> coord() { return m_coord; }
+    
+};
 
 /* ---------------------------------------------------------------------
 /					BLOCK: multi-dimensional array (wrapper) class

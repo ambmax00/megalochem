@@ -2,15 +2,173 @@
 #define DBCSR_CONVERSIONS_HPP
 
 #include <Eigen/Core>
-#include "tensor/dbcsr.hpp"
-#include "utils/mpi_log.h"
-
+#include "extern/scalapack.h"
+#include <dbcsr_matrix.hpp>
+#include <dbcsr_tensor.hpp>
 #include <limits>
 
 template <class T>
 using MatrixX = Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic>;
 
 namespace dbcsr {
+
+template <typename T = double>
+MatrixX<T> matrix_to_eigen(dbcsr::matrix<T>& mat) {
+	int row = mat.nfullrows_total();
+	int col = mat.nfullcols_total();
+	
+	mat.replicate_all();
+	
+	MatrixX<T> eigenmat(row,col);
+	
+	iterator<T> iter(mat);
+	
+	iter.start();
+	
+	while (iter.blocks_left()) {
+		
+		iter.next_block();
+		for (int j = 0; j != iter.col_size(); ++j) {
+			for (int i = 0; i != iter.row_size(); ++i) {
+				eigenmat(i + iter.row_offset(), j + iter.col_offset())
+					= iter(i,j);
+			}
+		}
+	
+	}
+	
+	iter.stop();
+	
+	mat.distribute();
+	
+	return eigenmat;
+	
+}
+
+template <typename T = double>
+matrix<T> eigen_to_matrix(MatrixX<T>& mat, world& w, std::string name, vec<int>& row_blk_sizes, 
+	vec<int>& col_blk_sizes, char type) {
+	
+	matrix<T> out = typename matrix<T>::create().name(name).set_world(w).row_blk_sizes(row_blk_sizes)
+		.col_blk_sizes(col_blk_sizes).type(type);
+	
+	out.reserve_all();
+	
+	iterator<T> iter(out);
+	
+	iter.start();
+	
+	while (iter.blocks_left()) {
+		
+		iter.next_block();
+		
+		for (int j = 0; j != iter.col_size(); ++j) {
+			for (int i = 0; i != iter.row_size(); ++i) {
+				iter(i,j) = mat(i + iter.row_offset(), j + iter.col_offset());
+			}
+		}
+	}
+	
+	iter.stop();
+	out.finalize();
+	return out;
+	
+}
+
+#ifdef USE_SCALAPACK
+
+template <typename T = double>
+scalapack::distmat<T> matrix_to_scalapack(matrix<T>& mat_in, std::string nameint, 
+										scalapack::grid& igrid, int nsplitrow, int nsplitcol) {
+	
+	world mworld = mat_in.get_world();	
+	
+	int nrows = mat_in.nfullrows_total();
+	int ncols = mat_in.nfullcols_total();		
+	
+	auto split_range = [](int n, int split) {
+	
+				// number of intervals
+				int nblock = n%split == 0 ? n/split : n/split + 1;
+				bool even = n%split == 0 ? true : false;
+				
+				if (even) {
+					std::vector<int> out(nblock,split);
+					return out;
+				} else {
+					std::vector<int> out(nblock,split);
+					out[nblock-1] = n%split;
+					return out;
+				}
+	};
+	
+	// make distvecs
+	vec<int> rowsizes = split_range(nrows, nsplitrow);
+	vec<int> colsizes = split_range(ncols, nsplitcol);
+	
+	auto cyclic_dist = [](int dist_size, int nbins) {
+  
+		std::vector<int> distv(dist_size);
+		for(int i=0; i < dist_size; i++)
+			distv[i] = i % nbins;
+
+		return distv;
+	};
+	
+	vec<int> rowdist = cyclic_dist(rowsizes.size(),mworld.dims()[0]);
+	vec<int> coldist = cyclic_dist(colsizes.size(),mworld.dims()[1]);
+	
+	dist scaldist = dist::create().set_world(mworld).row_dist(rowdist).col_dist(coldist);
+	
+	matrix<T> mat_out = typename matrix<T>::create().name(mat_in.name() + " redist.").set_dist(scaldist)
+		.row_blk_sizes(rowsizes).col_blk_sizes(colsizes).type(dbcsr_type_no_symmetry);
+
+	if (mat_in.has_symmetry()) {
+		matrix<T> mat_in_nosym = mat_in.desymmetrize();
+		mat_out.redistribute(mat_in_nosym, false);
+		mat_in_nosym.release();
+	} else {
+		mat_out.redistribute(mat_in,false);
+	}
+	
+	dbcsr::print(mat_out);
+	
+	scalapack::distmat<double> scamat(igrid,nrows,ncols,nsplitrow,nsplitcol);
+	
+	dbcsr::iterator iter(mat_out);
+
+#pragma omp parallel
+{
+	iter.start();
+	
+	while (iter.blocks_left()) {
+		
+		iter.next_block();
+		
+		int ioff = iter.row_offset();
+		int joff = iter.col_offset();
+		
+		for (int j = 0; j != iter.col_size(); ++j) {
+			for (int i = 0; i != iter.row_size(); ++i) {
+				// use global indices for scamat
+				scamat.global_access(i + ioff, j + joff) = iter(i,j);
+			}
+		}
+		
+	}
+	
+	iter.stop();
+	mat_out.finalize();
+}	
+	mat_out.release();
+	
+	scamat.print();
+	
+	return scamat;
+	
+}
+
+#endif
 
 template <typename T = double>
 MatrixX<T> tensor_to_eigen(dbcsr::tensor<2,T>& array, int l = 0) {
@@ -28,7 +186,7 @@ MatrixX<T> tensor_to_eigen(dbcsr::tensor<2,T>& array, int l = 0) {
 	
 	/* we loop over each process, from which we broadcast
 	 * each local block to all the other processes 
-	 */
+	 */ 
 	 
 	iterator_t<2,T> iter(array);
 	iter.start();

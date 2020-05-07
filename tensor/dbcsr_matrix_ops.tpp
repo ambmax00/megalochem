@@ -4,6 +4,8 @@
 #:include "dbcsr.fypp"
 #include <dbcsr_matrix.hpp>
 
+namespace dbcsr {
+
 template <typename T>
 class multiply {
 
@@ -58,3 +60,7 @@ public:
 
 template <typename T>
 multiply(char transa, char transb, matrix<T>& A, matrix<T>& B, matrix<T>& C) -> multiply<typename matrix<T>::value_type>;
+
+
+
+}
