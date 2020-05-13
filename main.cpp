@@ -4,13 +4,14 @@
 #include <string>
 #include <dbcsr_matrix.hpp>
 #include <dbcsr_conversions.hpp>
+#include <dbcsr_matrix_ops.hpp>
 #include "input/reader.h"
-//#include "hf/hfmod.h"
+#include "hf/hfmod.h"
 //#include "adc/adcmod.h"
 #include "utils/mpi_time.h"
 
-#include "ints/aofactory.h"
-#include "math/solvers/hermitian_eigen_solver.h"
+//#include "ints/aofactory.h"
+//#include "math/solvers/hermitian_eigen_solver.h"
 
 template <int N>
 void fill_random(dbcsr::tensor<N,double>& t_in, arrvec<int,N>& nz) {
@@ -118,35 +119,10 @@ int main(int argc, char** argv) {
 	auto mol = std::make_shared<desc::molecule>(filereader.get_mol());
 	auto opt = filereader.get_opt();
 	
-	 ints::aofactory ao(*mol, wrd);
-	 
-	 auto mints = ao.op("overlap").dim("bb").compute();
-	 //auto tints = ao.op("overlap").dim("bb").compute_2(vec<int>{0},vec<int>{1});
-	 
-	 
-	 
-	 dbcsr::print(*mints);
-	 //dbcsr::print(*tints);
-	
-	math::hermitian_eigen_solver solver(mints, 'V');
-	
-	solver.compute();
-	
-	auto& evals = solver.eigvals();
-	
-	LOG.os<>("Eigenvalues:\n");
-	for (auto e : evals) {
-		LOG.os<>(e, " ");
-	} LOG.os<>("\n");
-	
-	wrd.destroy();
-	
-	
-	/*
 	auto hfopt = opt.subtext("hf");
 	
 	desc::shf_wfn myhfwfn = std::make_shared<desc::hf_wfn>();
-	hf::hfmod myhf(mol,hfopt,MPI_COMM_WORLD);
+	hf::hfmod myhf(mol,hfopt,wrd);
 	
 	bool skip_hf = hfopt.get<bool>("skip", false);
 	
@@ -159,11 +135,13 @@ int main(int argc, char** argv) {
 	} else {
 		
 		LOG.os<>("Reading HF info from files...\n");
-		myhfwfn->read_from_file(mol,MPI_COMM_WORLD);
+		myhfwfn->read_from_file(mol,wrd);
 		
 	}
 	
 	MPI_Barrier(MPI_COMM_WORLD);
+	
+	/*
 	
 	auto adcopt = opt.subtext("adc");
 	

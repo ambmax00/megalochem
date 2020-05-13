@@ -4,13 +4,15 @@
 #include "desc/molecule.h"
 #include "desc/options.h"
 #include "desc/wfn.h"
-#include "tensor/dbcsr.hpp"
-#include "tensor/dbcsr_conversions.h"
+#include <dbcsr_conversions.hpp>
 #include "utils/mpi_time.h"
 
 #include <mpi.h>
 #include <memory>
 #include <iostream>
+
+using mat_d = dbcsr::mat_d;
+using smat_d = dbcsr::smat_d;
 
 namespace hf {
 	
@@ -20,7 +22,7 @@ private:
 	// descriptors
 	desc::smolecule m_mol;
 	desc::options m_opt;
-	MPI_Comm m_comm;
+	dbcsr::world m_world;
 	util::mpi_log LOG;
 	util::mpi_time TIME;
 	
@@ -37,17 +39,17 @@ private:
 	double m_nuc_energy;
 	double m_scf_energy;
 	
-	dbcsr::stensor<2> m_s_bb, //overlap
-				  m_v_bb, // nuclear reulsion
-				  m_t_bb, // kinetic
-				  m_core_bb, // core hamiltonian
-				  m_x_bb, // orthogonalizing matrix
-				  m_f_bb_A, // alpha fock mat
-				  m_p_bb_A, // alpha/beta density matrix
-				  m_pv_bb_A,
-				  m_c_bm_A; // alpha/beta coefficient matrix	  
+	smat_d m_s_bb, //overlap
+		  m_v_bb, // nuclear reulsion
+		  m_t_bb, // kinetic
+		  m_core_bb, // core hamiltonian
+		  m_x_bb, // orthogonalizing matrix
+		  m_f_bb_A, // alpha fock mat
+		  m_p_bb_A, // alpha/beta density matrix
+		  m_pv_bb_A,
+		  m_c_bm_A; // alpha/beta coefficient matrix	  
 				  
-	dbcsr::stensor<2> m_f_bb_B, m_p_bb_B, m_pv_bb_B, m_c_bm_B;
+	smat_d m_f_bb_B, m_p_bb_B, m_pv_bb_B, m_c_bm_B;
 	
 	svector<double> m_eps_A, m_eps_B;
 	
@@ -55,8 +57,7 @@ private:
 	void one_electron();
 	
 	void compute_guess();
-	dbcsr::stensor<2> compute_errmat(dbcsr::tensor<2>& F, dbcsr::tensor<2>& P, 
-		dbcsr::tensor<2>& S, std::string x);
+	smat_d compute_errmat(smat_d& F, smat_d& P, smat_d& S, std::string x);
 	void diag_fock();
 	
 	void compute_scf_energy();
@@ -65,7 +66,7 @@ private:
 
 public:
 
-	hfmod(desc::smolecule mol, desc::options opt, MPI_Comm comm);
+	hfmod(desc::smolecule mol, desc::options opt, dbcsr::world& wrd);
 	
 	hfmod() = delete;
 	hfmod(hfmod& hfmod_in) = delete;
@@ -114,11 +115,8 @@ public:
 		out->m_pv_bb_A = m_pv_bb_A;
 		out->m_pv_bb_B = m_pv_bb_B;
 		
-		dbcsr::pgrid<2> grid2(m_comm);
-		
 		// separate occupied and virtual coefficient matrix
-		auto separate = [&](dbcsr::stensor<2>& in, dbcsr::stensor<2>& out_o, 
-			dbcsr::stensor<2>& out_v, std::string x) {
+		auto separate = [&](smat_d& in, smat_d& out_o, smat_d& out_v, std::string x) {
 				
 				vec<int> o, v, b;
 				int noblks, nvblks;
@@ -139,7 +137,7 @@ public:
 				b = m_mol->dims().b();
 				int nbas = m_mol->c_basis().nbf();
 				
-				auto eigen_cbm = dbcsr::tensor_to_eigen(*in);
+				auto eigen_cbm = dbcsr::matrix_to_eigen(*in);
 				
 				Eigen::MatrixXd eigen_cbo = eigen_cbm.block(0,0,nbas,nocc);
 				Eigen::MatrixXd eigen_cbv = eigen_cbm.block(0,nocc,nbas,nvir);
@@ -147,21 +145,12 @@ public:
 				std::cout << eigen_cbo << std::endl;
 				std::cout << eigen_cbv << std::endl;
 				
-				arrvec<int,2> bo = {b,o};
-				arrvec<int,2> bv = {b,v};
-				
-				
 				if (nocc != 0)
-					out_o = (dbcsr::eigen_to_tensor(eigen_cbo, "c_bo_"+x, grid2, vec<int>{0}, vec<int>{1}, bo)).get_stensor();
+					out_o = (dbcsr::eigen_to_matrix(eigen_cbo, m_world, "c_bo_"+x, b, o, dbcsr_type_no_symmetry)).get_smatrix();
 				if (nvir != 0) 
-					out_v = (dbcsr::eigen_to_tensor(eigen_cbv, "c_bv_"+x, grid2, vec<int>{0}, vec<int>{1}, bv)).get_stensor();
+					out_v = (dbcsr::eigen_to_matrix(eigen_cbv, m_world, "c_bv_"+x, b, v, dbcsr_type_no_symmetry)).get_smatrix();
 				
 		};
-		
-		//std::cout << "HERE IS ENERGY: " << std::endl;
-		//for (auto e : *m_eps_A) {
-		//	std::cout << e << std::endl;
-		//}
 		
 		out->m_eps_occ_A = std::make_shared<std::vector<double>>(m_eps_A->begin(), m_eps_A->begin() + m_mol->nocc_alpha());
 		if (m_eps_B) 
@@ -175,7 +164,7 @@ public:
 		//	std::cout << e << std::endl;
 		//}
 		
-		dbcsr::stensor<2> cboA, cboB, cbvA, cbvB;
+		smat_d cboA, cboB, cbvA, cbvB;
 		separate(m_c_bm_A, cboA, cbvA, "A");
 		
 		if (m_c_bm_B) separate(m_c_bm_B, cboB, cbvB, "B");

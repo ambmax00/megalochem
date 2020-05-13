@@ -1,25 +1,26 @@
 #include "hf/fock_builder.h"
 #include "hf/hfdefaults.h"
 #include "ints/aofactory.h"
-#include "math/linalg/symmetrize.h"
-#include "math/linalg/inverse.h"
+#include "math/solvers/hermitian_eigen_solver.h"
+#include <dbcsr_conversions.hpp>
+#include <dbcsr_tensor_ops.hpp>
 
 #include <utility>
 #include <iomanip>
 
 namespace hf {
 	
-fockbuilder::fockbuilder(desc::smolecule mol, desc::options opt, MPI_Comm comm, int print,
+fockbuilder::fockbuilder(desc::smolecule mol, desc::options opt, dbcsr::world& w, int print,
 	util::mpi_time& TIME_IN) :
 	m_mol(mol), 
 	m_opt(opt), 
-	m_comm(comm),
-	LOG(comm,print),
+	m_world(w),
+	LOG(m_world.comm(),print),
 	TIME(TIME_IN),
 	m_use_df(opt.get<bool>("use_df", HF_USE_DF)) {
 
 	// build the integrals 
-	ints::aofactory ao(*m_mol, m_comm);
+	ints::aofactory ao(*m_mol, m_world);
 	
 	m_restricted = (m_mol->nele_alpha() == m_mol->nele_beta()) ? true : false;
 	
@@ -33,7 +34,7 @@ fockbuilder::fockbuilder(desc::smolecule mol, desc::options opt, MPI_Comm comm, 
 		t_int2ele.start();
 	
 		LOG.os<>("Computing 2e integrals...\n");
-		m_2e_ints = ao.op("coulomb").dim("bbbb").map1({0,1}).map2({2,3}).compute<4>();
+		m_2e_ints = ao.op("coulomb").dim("bbbb").compute_4(vec<int>{0,1}, vec<int>{2,3});
 		
 		t_int2ele.finish();
 		
@@ -46,14 +47,14 @@ fockbuilder::fockbuilder(desc::smolecule mol, desc::options opt, MPI_Comm comm, 
 		t_int3c2e.start();
 		
 		LOG.os<>("Computing 3c2e integrals...\n");
-		m_3c2e_ints = ao.op("coulomb").dim("xbb").map1({0}).map2({1,2}).compute<3>();
+		m_3c2e_ints = ao.op("coulomb").dim("xbb").compute_3(vec<int>{0},vec<int>{1,2});
 		
 		t_int3c2e.finish();
 		
 		LOG.os<>("Done with 3c2e integrals...\n");
 		
 		if (LOG.global_plev() >= 3) {
-			dbcsr::print(*m_3c2e_ints);
+			//dbcsr::print(*m_3c2e_ints);
 		}
 		
 		auto& t_metric = TIME.sub("Metric Matrix");
@@ -61,7 +62,7 @@ fockbuilder::fockbuilder(desc::smolecule mol, desc::options opt, MPI_Comm comm, 
 		t_metric.start();
 		
 		LOG.os<>("Computing metric...\n");
-		auto m_xx = ao.op("coulomb").dim("xx").map1({0}).map2({1}).compute<2>();
+		auto metric_xx = ao.op("coulomb").dim("xx").compute();
 		
 		t_metric.finish();
 		
@@ -74,55 +75,63 @@ fockbuilder::fockbuilder(desc::smolecule mol, desc::options opt, MPI_Comm comm, 
 		t_inv.start();
 		
 		LOG.os<>("Computing inverse...\n");
-		m_inv_xx = ao.invert(m_xx,1);
+		
+		math::hermitian_eigen_solver solver(metric_xx, 'V');
+		
+		solver.compute();
+		
+		auto inv_xx = solver.inverse();
+		
+		auto x = m_mol->dims().x();
+		arrvec<int,2> xx = {x,x};
+		
+		dbcsr::pgrid<2> grid2(m_world.comm());
+		
+		m_inv_xx = dbcsr::make_stensor<2>(
+			dbcsr::tensor<2>::create().name("metric inverse").ngrid(grid2)
+				.map1({0}).map2({1}).blk_sizes(xx));
+				
+		dbcsr::copy_matrix_to_tensor(*inv_xx,*m_inv_xx);
+		
+		inv_xx->release();
+		
 		LOG.os<>("Done.\n");
 		
 		t_inv.finish();
+		grid2.destroy();
 		
 		//m_xx->destroy();
 		
 	}
 	
-	dbcsr::pgrid<2> grid2(m_comm);
 	auto b = m_mol->dims().b();
-	arrvec<int,2> bb = {b,b};
-	
-	m_j_bb = dbcsr::make_stensor<2>(
-		dbcsr::tensor<2>::create().name("j_bb").ngrid(grid2).map1({0}).map2({1}).blk_sizes(bb));
+	mat f_bb_A = mat::create().name("f_bb_A").set_world(m_world)
+		.row_blk_sizes(b).col_blk_sizes(b).type(dbcsr_type_hermitian);
 		
-	m_k_bb_A = dbcsr::make_stensor<2>(
-		dbcsr::tensor<2>::create_template().tensor_in(*m_j_bb).name("k_bb_A"));
+	m_f_bb_A = f_bb_A.get_smatrix();
 	
-	m_f_bb_A = dbcsr::make_stensor<2>(
-		dbcsr::tensor<2>::create_template().tensor_in(*m_j_bb).name("f_bb_A"));
-	
-	if (!m_restricted && m_mol->nele_beta() != 0) {
-		
-		m_k_bb_B = dbcsr::make_stensor<2>(
-		dbcsr::tensor<2>::create_template().tensor_in(*m_j_bb).name("k_bb_B"));
-	
-		m_f_bb_B = dbcsr::make_stensor<2>(
-			dbcsr::tensor<2>::create_template().tensor_in(*m_j_bb).name("f_bb_B"));	
+	if (!m_restricted) {
+		mat f_bb_B = mat::create_template(*m_f_bb_A).name("f_bb_B");
+		m_f_bb_B = f_bb_B.get_smatrix();
+	} else {
+		m_f_bb_B = nullptr;
 	}
-
-	grid2.destroy();
 
 }
 
-void fockbuilder::build_j() {
+void fockbuilder::build_j(stensor<2>& p_A, stensor<2>& p_B) {
 	
 	// build PT = PA + PB
-	dbcsr::tensor<2> pt = dbcsr::tensor<2>::create_template().tensor_in(*m_f_bb_A).name("ptot");
+	dbcsr::tensor<2> pt = dbcsr::tensor<2>::create_template().tensor_in(*p_A).name("ptot");
+	dbcsr::copy(*p_A, pt).perform();
 	
-	//dbcsr::copy<2>({.t_in = *pms.p_A, .t_out = pt});
-	dbcsr::copy(*m_p_A, pt).perform();
-	
-	if (m_p_B) {
-		dbcsr::copy(*m_p_B, pt).sum(true).perform();
-		//dbcsr::copy<2>({.t_in = *pms.p_B, .t_out = pt, .sum = true});
+	if (p_B) {
+		dbcsr::copy(*p_B, pt).sum(true).perform();
 	} else {
 		pt.scale(2.0);
 	}
+	
+	if (LOG.global_plev() >= 2) dbcsr::print(pt);
 	
 	auto& t_j = TIME.sub("Coulomb Term");
 	t_j.start();
@@ -132,11 +141,12 @@ void fockbuilder::build_j() {
 	if (!m_use_df) {
 		
 		auto pt_bbY = dbcsr::add_dummy(pt);
-		auto j_bbY = dbcsr::add_dummy(*m_j_bb);
+		
+		dbcsr::pgrid<3> grid3(m_world.comm());
+		arrvec<int,3> bbD = {m_mol->dims().b(),m_mol->dims().b(),vec<int>{1}};
+		dbcsr::tensor<3> j_bbY = dbcsr::tensor<3>::create().name("j dummy").ngrid(grid3).map1({0,1}).map2({2}).blk_sizes(bbD);
 	
 		dbcsr::contract(pt_bbY, *m_2e_ints, j_bbY).perform("LS_, MNLS -> MN_");
-	
-		//dbcsr::einsum<3,4,3>({.x = "LS_, MNLS -> MN_", .t1 = pt_bbY, .t2 = *m_2e_ints, .t3 = j_bbY, .unit_nr = u, .log = log});
 		
 		m_j_bb = (dbcsr::remove_dummy(j_bbY, vec<int>{0}, vec<int>{1}, "j_bb")).get_stensor();
 		
@@ -145,38 +155,33 @@ void fockbuilder::build_j() {
 		
 	} else {
 		
-		dbcsr::pgrid<2> grid2(m_comm);
-		dbcsr::pgrid<3> grid3(m_comm);
+		dbcsr::pgrid<2> grid2(m_world.comm());
+		dbcsr::pgrid<3> grid3(m_world.comm());
 		
-		arrvec<int,2> sizes = {m_mol->dims().x(),vec<int>{1}};
+		arrvec<int,2> xD = {m_mol->dims().x(),vec<int>{1}};
+		arrvec<int,3> bbD = {m_mol->dims().b(),m_mol->dims().b(),vec<int>{1}};
 		
-		dbcsr::tensor<2> c_xY = dbcsr::tensor<2>::create().name("c_xY").ngrid(grid2).map1({0}).map2({1}).blk_sizes(sizes);
-		dbcsr::tensor<2> d_xY = dbcsr::tensor<2>::create().name("d_xY").ngrid(grid2).map1({0}).map2({1}).blk_sizes(sizes);
+		dbcsr::tensor<2> c_xD = dbcsr::tensor<2>::create().name("c_xD").ngrid(grid2).map1({0}).map2({1}).blk_sizes(xD);
+		dbcsr::tensor<2> d_xD = dbcsr::tensor<2>::create().name("d_xD").ngrid(grid2).map1({0}).map2({1}).blk_sizes(xD);
 		
-		auto pt_bbY = dbcsr::add_dummy(pt);
-		auto j_bbY = dbcsr::add_dummy(*m_j_bb);
+		auto pt_bbD = dbcsr::add_dummy(pt);
+		dbcsr::tensor<3> j_bbD = dbcsr::tensor<3>::create().name("j dummy").ngrid(grid3).map1({0,1}).map2({2}).blk_sizes(bbD);
 		
 		//cX("M") = PT("mu,nu") * B("M,mu,nu");
-		dbcsr::contract(pt_bbY, *m_3c2e_ints, c_xY).perform("MN_, XMN -> X_");
-		//dbcsr::einsum<3,3,2>({.x = "MN_, XMN -> X_", .t1 = pt_bbY, .t2 = *m_3c2e_ints, .t3 = c_xY, .unit_nr = u, .log = log});
+		dbcsr::contract(pt_bbD, *m_3c2e_ints, c_xD).perform("MN_, XMN -> X_");
 		
 		//dX("M") = Jinv("M,N") * cX("N");
-		dbcsr::contract(*m_inv_xx, c_xY, d_xY).perform("XY, Y_ -> X_");
-		//dbcsr::einsum<2,2,2>({.x = "XY, Y_ -> X_", .t1 = *m_inv_xx, .t2 = c_xY, .t3 = d_xY, .unit_nr = u, .log = log});
+		dbcsr::contract(*m_inv_xx, c_xD, d_xD).perform("XY, Y_ -> X_");
 		
 		//j("mu,nu") = dX("M") * B("M,mu,nu");
-		dbcsr::contract(d_xY, *m_3c2e_ints, j_bbY).perform("X_, XMN -> MN_");
-		//dbcsr::einsum<2,3,3>({.x = "X_, XMN -> MN_", .t1 = d_xY, .t2 = *m_3c2e_ints, .t3 = j_bbY, .unit_nr = u, .log = log});
-	
-		m_j_bb = (dbcsr::remove_dummy(j_bbY, vec<int>{0}, vec<int>{1})).get_stensor();
-		m_j_bb->filter();
+		dbcsr::contract(d_xD, *m_3c2e_ints, j_bbD).perform("X_, XMN -> MN_");
 		
-		//m_j_bb = math::symmetrize(m_j_bb, "j_bb");
+		m_j_bb = (dbcsr::remove_dummy(j_bbD, vec<int>{0}, vec<int>{1}, "j_bb")).get_stensor();
 	
-		c_xY.destroy();
-		d_xY.destroy();
-		j_bbY.destroy();
-		pt_bbY.destroy();
+		c_xD.destroy();
+		d_xD.destroy();
+		j_bbD.destroy();
+		pt_bbD.destroy();
 		grid2.destroy();
 		grid3.destroy();
 	
@@ -192,12 +197,14 @@ void fockbuilder::build_j() {
 	
 }
 
-void fockbuilder::build_k() {
+void fockbuilder::build_k(stensor<2>& p_A, stensor<2>& p_B, stensor<2>& c_A, stensor<2>& c_B, bool SAD) {
 	
 	bool log = false;
 	int u = 0;
 	
 	auto& t_k = TIME.sub("Exchange Term");
+	
+	dbcsr::pgrid<3> grid3(m_world.comm());
 	
 	t_k.start();
 	
@@ -208,26 +215,23 @@ void fockbuilder::build_k() {
 			LOG.os<1>("Computing exchange term (", x, ") ... \n");
 		
 			auto p_bbY = dbcsr::add_dummy(*p_bb);
-			auto k_bbY = dbcsr::add_dummy(*k_bb);
+			arrvec<int,3> bbD = {m_mol->dims().b(),m_mol->dims().b(),vec<int>{1}};
+		
+			tensor<3> k_bbY = tensor<3>::create().name("k dummy").ngrid(grid3).map1({0,1}).map2({2}).blk_sizes(bbD);
 			
 			dbcsr::contract(p_bbY, *m_2e_ints, k_bbY).alpha(-1.0).perform("LS_, MLSN -> MN_");
-			//dbcsr::einsum<3,4,3>({.x = "LS_, MLSN -> MN_", .t1 = p_bbY, .t2 = *m_2e_ints, .t3 = k_bbY, .alpha = -1.0, .unit_nr = u, .log = log});
-		
-			//std::cout << "DONE CONTRACTING..." << std::endl;
 		
 			k_bb = (dbcsr::remove_dummy(k_bbY, vec<int>{0}, vec<int>{1}, "k_bb_" + x)).get_stensor();
-			
-			//dbcsr::print(k_bb);
 			
 			p_bbY.destroy();
 			k_bbY.destroy();
 		
 		};
 		
-		make_k(m_p_A, m_k_bb_A, "A");
+		make_k(p_A, m_k_bb_A, "A");
 		
-		if (m_p_B && m_c_B) 
-			make_k(m_p_B, m_k_bb_B, "B");
+		if (p_B && c_B) 
+			make_k(p_B, m_k_bb_B, "B");
 			
 		
 		
@@ -238,7 +242,10 @@ void fockbuilder::build_k() {
 				
 			LOG.os<1>("Computing exchange term (", x, ") ... \n");
 			
-			dbcsr::pgrid<3> grid3(m_comm);
+			if (!k_bb) {
+				k_bb = dbcsr::make_stensor<2>(
+				tensor<2>::create_template().tensor_in(*p_bb).name("k_bb_"+x));
+			}
 			
 			vec<int> o = c_bm->blk_sizes()[1];
 			
@@ -248,8 +255,6 @@ void fockbuilder::build_k() {
 				.map1({0,1}).map2({2}).blk_sizes(HTsizes);
 			dbcsr::tensor<3> D = dbcsr::tensor<3>::create().name("D_"+x).ngrid(grid3)
 				.map1({0}).map2({1,2}).blk_sizes(HTsizes);
-			//dbcsr::tensor<3> HT({.name = "HT"+x, .pgridN = grid3, .map1 = {0,1}, .map2 = {2}, .blk_sizes = HTsizes});	
-			//dbcsr::tensor<3> D({.name = "D"+x, .pgridN = grid3, .map1 = {0}, .map2 = {1,2}, .blk_sizes = HTsizes});
 			
 			// HTa("M,mu,i") = Coa("nu,i") * B("M,mu,nu");
 			if (!SAD_iter) {
@@ -261,12 +266,10 @@ void fockbuilder::build_k() {
 				vec<vec<int>> occ_bounds = {{0,nocc}};
 				
 				dbcsr::contract(*c_bm, *m_3c2e_ints, HT).bounds2(occ_bounds).perform("Ni, XMN -> XMi");
-				//dbcsr::einsum<2,3,3>({.x = "Ni, XMN -> XMi", .t1 = c_bm, .t2 = *m_3c2e_ints, .t3 = HT, .b2 = occ_bounds, .unit_nr = u, .log = log});
 				
 			} else {
 				
 				dbcsr::contract(*c_bm, *m_3c2e_ints, HT).perform("Ni, XMN -> XMi");
-				//dbcsr::einsum<2,3,3>({.x = "Ni, XMN -> XMi", .t1 = c_bm, .t2 = *m_3c2e_ints, .t3 = HT, .unit_nr = u, .log = log});
 				
 			}
 			
@@ -274,29 +277,22 @@ void fockbuilder::build_k() {
 			
 			//Da("M,mu,i") = HTa("N,mu,i") * Jinv("N,M");
 			dbcsr::contract(HT, *m_inv_xx, D).perform("XMi, XY -> YMi");
-			//dbcsr::einsum<3,2,3>({.x = "XMi, XY -> YMi", .t1 = HT, .t2 = *m_inv_xx, .t3 = D, .unit_nr = u, .log = log});
 			
 			D.filter();
-			//std::cout << "Stuck here: " << x << " AS" << std::endl;
 			
 			//ka("mu,nu") = HTa("M,mu,i") * Da("M,nu,i");
 			dbcsr::contract(HT, D, *k_bb).alpha(-1.0).perform("XMi, XNi -> MN");
-			//dbcsr::einsum<3,3,2>({.x = "XMi, XNi -> MN", .t1 = HT, .t2 = D, .t3 = k_bb, .alpha = -1.0, .unit_nr = u, .log = log}); //<- REORDERING!!!
-			
-			k_bb->filter();
-			//std::cout << "NOPE." << std::endl;
-			//k_bb = math::symmetrize(k_bb, k_bb.name());
-			
+						
 			HT.destroy();
 			D.destroy();
 			grid3.destroy();
 		
 		};
 		
-		make_k(m_p_A, m_c_A, m_k_bb_A, "A", m_SAD_iter);
+		make_k(p_A, c_A, m_k_bb_A, "A", SAD);
 		
-		if (m_p_B && m_c_B) 
-			make_k(m_p_B, m_c_B, m_k_bb_B, "B", m_SAD_iter);
+		if (p_B && c_B) 
+			make_k(p_B, c_B, m_k_bb_B, "B", SAD);
 			
 	}
 	
@@ -304,32 +300,71 @@ void fockbuilder::build_k() {
 	
 	if (LOG.global_plev() >= 2) {
 		dbcsr::print(*m_k_bb_A);
-		if (m_p_B && m_c_B) dbcsr::print(*m_k_bb_B);
+		if (p_B && c_B) dbcsr::print(*m_k_bb_B);
 	}
 	
 	
 }
 
-void fockbuilder::compute() {
+void fockbuilder::compute(smat& core, smat& p_A, smat& c_A, smat& p_B, smat& c_B, bool SAD) {
 	
-	build_j();
-	build_k();
+	dbcsr::pgrid<2> grid2(m_world.comm());
 	
-	dbcsr::copy(*m_core, *m_f_bb_A).perform();
-	dbcsr::copy(*m_j_bb, *m_f_bb_A).sum(true).move_data(true).perform();
-	dbcsr::copy(*m_k_bb_A, *m_f_bb_A).sum(true).move_data(true).perform();
+	auto b = c_A->row_blk_sizes();
+	auto m = c_A->col_blk_sizes();
 	
-/*	dbcsr::copy<2>({.t_in = *pms.core, .t_out = *m_f_bb_A, .sum = false});
-	dbcsr::copy<2>({.t_in = *m_j_bb, .t_out = *m_f_bb_A, .sum = true, .move_data = false});
-	dbcsr::copy<2>({.t_in = *m_k_bb_A, .t_out = *m_f_bb_A, .sum = true, .move_data = true});*/
+	arrvec<int,2> bb = {b,b};
+	arrvec<int,2> bm = {b,m};
+	
+	std::cout << "Creating tensors." << std::endl;
+	
+	stensor<2> t_p_A = dbcsr::make_stensor<2>(
+		tensor<2>::create().name("pA tensor").ngrid(grid2).map1({0}).map2({1}).blk_sizes(bb));
+		
+	stensor<2> t_c_A = dbcsr::make_stensor<2>(
+		tensor<2>::create().name("cA tensor").ngrid(grid2).map1({0}).map2({1}).blk_sizes(bm));
+		
+	std::cout << "Copy in tensors." << std::endl;
+	
+	dbcsr::copy_matrix_to_tensor(*p_A, *t_p_A);
+	dbcsr::copy_matrix_to_tensor(*c_A, *t_c_A);
+		
+	stensor<2> t_p_B = nullptr;
+	stensor<2> t_c_B = nullptr;
+	
+	std::cout << "Done with copy." << std::endl;
+	
+	if (p_B) {
+		
+		auto mB = c_B->col_blk_sizes();
+		arrvec<int,2> bmB = {b,mB};
+		
+		t_p_B = dbcsr::make_stensor<2>(
+			tensor<2>::create_template().tensor_in(*t_p_A).name("pB tensor"));
+		t_c_A = dbcsr::make_stensor<2>(
+			tensor<2>::create().name("cB tensor").ngrid(grid2).map1({0}).map2({1}).blk_sizes(bmB));
+		dbcsr::copy_matrix_to_tensor(*p_B, *t_p_B);
+		dbcsr::copy_matrix_to_tensor(*c_B, *t_c_B);
+	}
+	
+	build_j(t_p_A, t_p_B);
+	build_k(t_p_A, t_p_B, t_c_A, t_c_B, SAD);
+	
+	m_f_bb_A->copy_in(*core);
+	dbcsr::copy_tensor_to_matrix(*m_j_bb, *m_f_bb_A, true);
+	dbcsr::copy_tensor_to_matrix(*m_k_bb_A, *m_f_bb_A, true);
+	
+	m_k_bb_A->clear();
 	
 	if (m_f_bb_B) {
 		
-		dbcsr::copy(*m_core, *m_f_bb_B).perform();
-		dbcsr::copy(*m_j_bb, *m_f_bb_B).sum(true).move_data(true).perform();
-		dbcsr::copy(*m_k_bb_B, *m_f_bb_B).sum(true).move_data(true).perform();
-		
+		m_f_bb_B->copy_in(*core);
+		dbcsr::copy_tensor_to_matrix(*m_j_bb, *m_f_bb_B, true);
+		dbcsr::copy_tensor_to_matrix(*m_k_bb_B, *m_f_bb_B, true);
+		m_k_bb_B->clear();
 	}
+	
+	m_j_bb->clear();
 	
 	LOG.os<2>("Finished Fock Matrix:\n");
 	if (LOG.global_plev() >= 2) {

@@ -1,4 +1,5 @@
 #include "desc/io.h"
+#include <Eigen/Core>
 
 namespace desc {
 
@@ -6,7 +7,7 @@ bool fexists(const std::string& filename) {
 		std::ifstream ifile(filename.c_str());
 		return (bool)ifile;
 }
-
+/*
 void write_2dtensor(dbcsr::stensor<2>& t_in, std::string molname) {
 		
 		std::ofstream file;
@@ -44,7 +45,7 @@ void read_2dtensor(dbcsr::stensor<2>& t_in, std::string molname, std::string ten
 	t_in = (dbcsr::eigen_to_tensor(eigen_mat, tensorname, grid2, vec<int>{0}, vec<int>{1}, blk_sizes)).get_stensor();
 	
 }
-
+*/
 void write_vector(svector<double>& v_in, std::string molname, std::string vecname, MPI_Comm comm) {
 	
 		std::ofstream file;

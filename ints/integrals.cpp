@@ -8,7 +8,7 @@
 
 namespace ints {
 
-void calc_ints(dbcsr::matrix_d& m_out, util::ShrPool<libint2::Engine>& engine,
+void calc_ints(dbcsr::mat_d& m_out, util::ShrPool<libint2::Engine>& engine,
 	std::vector<desc::cluster_basis>& basvec) {
 
 	auto my_world = m_out.get_world();

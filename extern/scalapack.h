@@ -105,6 +105,8 @@ private:
 
 public:
 
+	grid() {}
+
 	grid(int nprow, int npcol, char layout = 'R') {
 
 		// determine rank and size of processor set
@@ -121,6 +123,8 @@ public:
 		c_blacs_gridinfo(m_ctxt, &m_nprow, &m_npcol, &m_myprow, &m_mypcol);
 		
 	}
+	
+	grid(grid& g_in) = default;
 	
 	~grid() {}
 	
@@ -153,9 +157,11 @@ private:
 	
 	grid m_grid;
 	
-	int m_desc[9]; // matrix descriptor
+	std::array<int,9> m_desc; // matrix descriptor
 	
 public:
+
+	distmat() : m_data(nullptr) {}
 
 	distmat(grid& igrid, int nrows, int ncols, int rowblksize, int colblksize) :
 		m_grid(igrid), m_nrowstot(nrows), m_ncolstot(ncols), 
@@ -191,8 +197,24 @@ public:
 		return c_indxl2g(jloc,m_colblk_size,m_grid.mypcol(),0,m_grid.npcol());
 	}
 	
-	~distmat() {
-		if (m_data != nullptr) delete [] m_data;
+	distmat(distmat& d) = delete;
+	
+	distmat(distmat&& d) :
+		m_data(d.m_data), m_nrowstot(d.m_nrowstot), m_grid(d.m_grid), 
+		m_ncolstot(d.m_ncolstot), m_nrowsloc(d.m_nrowsloc),
+		m_ncolsloc(d.m_ncolsloc), m_rowblk_size(d.m_rowblk_size),
+		m_colblk_size(d.m_colblk_size), m_desc(d.m_desc)
+	{
+		d.m_data = nullptr;
+	}
+	
+	~distmat() { release(); }
+	
+	void release() {
+		if (m_data != nullptr) {
+			delete [] m_data;
+		}
+		m_data = nullptr;
 	}
 	
 	int nfull_loc() {
@@ -201,7 +223,7 @@ public:
 	
 	T* data() { return m_data; }
 	
-	int* desc() { return &m_desc[0]; }
+	std::array<int,9> desc() { return m_desc; }
 	
 	void print() {
 		for (int p = 0; p != m_grid.nprocs(); ++p) {
@@ -216,6 +238,9 @@ public:
 			c_blacs_barrier(m_grid.ctx(),'A');
 		}
 	}
+	
+	int rowblk_size() { return m_rowblk_size; }
+	int colblk_size() { return m_colblk_size; }
 	
 };
 

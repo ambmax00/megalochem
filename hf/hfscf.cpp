@@ -3,18 +3,16 @@
 #include "hf/hfdefaults.h"
 #include "ints/aofactory.h"
 #include "math/linalg/orthogonalizer.h"
-#include "math/linalg/symmetrize.h"
 #include "math/solvers/diis.h"
-#include "tensor/dbcsr_conversions.h"
 
 namespace hf {
 	
-hfmod::hfmod(desc::smolecule mol, desc::options opt, MPI_Comm comm) 
+hfmod::hfmod(desc::smolecule mol, desc::options opt, dbcsr::world& w) 
 	: m_mol(mol), 
 	  m_opt(opt), 
-	  m_comm(comm),
-	  LOG(m_comm,m_opt.get<int>("print", HF_PRINT_LEVEL)),
-	  TIME(comm, "Hartree Fock", LOG.global_plev()),
+	  m_world(w),
+	  LOG(m_world.comm(),m_opt.get<int>("print", HF_PRINT_LEVEL)),
+	  TIME(m_world.comm(), "Hartree Fock", LOG.global_plev()),
 	  m_guess(m_opt.get<std::string>("guess", HF_GUESS)),
 	  m_max_iter(m_opt.get<int>("max_iter", HF_MAX_ITER)),
 	  m_scf_threshold(m_opt.get<double>("scf_thresh", HF_SCF_THRESH)),
@@ -27,8 +25,6 @@ hfmod::hfmod(desc::smolecule mol, desc::options opt, MPI_Comm comm)
 	m_restricted = (m_mol->nele_alpha() == m_mol->nele_beta()) ? true : false; 
 	
 	if (m_mol->nele_beta() == 0) m_nobeta = true;
-	
-	dbcsr::pgrid<2> grid2(m_comm);
 	
 	auto b = m_mol->dims().b();
 	auto oA = m_mol->dims().oa();
@@ -47,30 +43,36 @@ hfmod::hfmod(desc::smolecule mol, desc::options opt, MPI_Comm comm)
 	arrvec<int,2> bm_B = {b, mB};
 	
 	// create non-integral tensors
-	m_core_bb = dbcsr::make_stensor<2>(
-		dbcsr::tensor<2>::create().name("core_bb").ngrid(grid2)
-			.map1({0}).map2({1}).blk_sizes(bb));
+	
+	// alpha
+	
+	mat_d core_bb = mat_d::create().set_world(m_world).name("core_bb")
+		.row_blk_sizes(b).col_blk_sizes(b).type(dbcsr_type_symmetric);
+	
+	mat_d p_bb_A = mat_d::create_template(core_bb).name("p_bb_A");
+	mat_d f_bb_A = mat_d::create_template(core_bb).name("f_bb_A");
+	
+	mat_d c_bm_A = mat_d::create().set_world(m_world).name("c_bm_A")
+		.row_blk_sizes(b).col_blk_sizes(mA).type(dbcsr_type_no_symmetry);
 		
-	m_p_bb_A = dbcsr::make_stensor<2>(
-		dbcsr::tensor<2>::create_template().tensor_in(*m_core_bb).name("p_bb_A"));
+	m_core_bb = core_bb.get_smatrix();
+	m_p_bb_A = p_bb_A.get_smatrix();
+	m_f_bb_A = f_bb_A.get_smatrix();
+	m_c_bm_A = c_bm_A.get_smatrix();
 		
-	m_f_bb_A = dbcsr::make_stensor<2>(
-		dbcsr::tensor<2>::create_template().tensor_in(*m_core_bb).name("f_bb_A"));
+	if (!m_restricted && !m_nobeta) {
 		
-	m_c_bm_A = dbcsr::make_stensor<2>(
-		dbcsr::tensor<2>::create().name("c_bm_A").ngrid(grid2).map1({0}).map2({1}).blk_sizes(bb));
+		mat_d p_bb_B = mat_d::create_template(core_bb).name("p_bb_B");
+		mat_d f_bb_B = mat_d::create_template(core_bb).name("f_bb_B");
+	
+		mat_d c_bm_B = mat_d::create().set_world(m_world).name("c_bm_B")
+			.row_blk_sizes(b).col_blk_sizes(mB).type(dbcsr_type_no_symmetry);
 		
-	if (!m_restricted && !m_nobeta)  
-		m_p_bb_B = dbcsr::make_stensor<2>(
-			dbcsr::tensor<2>::create_template().tensor_in(*m_core_bb).name("p_bb_B"));
-		
-	if (m_p_bb_B) 
-		m_f_bb_B = dbcsr::make_stensor<2>(
-			dbcsr::tensor<2>::create_template().tensor_in(*m_core_bb).name("f_bb_B"));
-		
-	if (m_p_bb_B) 
-		m_c_bm_B = dbcsr::make_stensor<2>(
-			dbcsr::tensor<2>::create().name("c_bm_B").ngrid(grid2).map1({0}).map2({1}).blk_sizes(bb));
+		m_p_bb_B = p_bb_B.get_smatrix();
+		m_f_bb_B = f_bb_B.get_smatrix();
+		m_c_bm_B = c_bm_B.get_smatrix();
+		 
+	}
 		
 	m_eps_A = std::make_shared<std::vector<double>>(std::vector<double>(0));
 	if (m_p_bb_B) m_eps_B = std::make_shared<std::vector<double>>(std::vector<double>(0));
@@ -110,42 +112,34 @@ void hfmod::compute_nucrep() {
 
 void hfmod::one_electron() {
 	
-	LOG.os<>("Forming one-electron integrals...");
+	LOG.os<>("Forming one-electron integrals...\n");
 	auto& TIME_1e = TIME.sub("One-Electron Integrals");
 	
 	TIME_1e.start();
 	
-	ints::aofactory int_engine(*m_mol, m_comm);
+	ints::aofactory int_engine(*m_mol, m_world);
 	
 	// overlap			 
-	m_s_bb = int_engine.op("overlap").dim("bb").map1({0}).map2({1}).compute<2>();		 
+	m_s_bb = int_engine.op("overlap").dim("bb").compute();		 
 	
 	//kinetic
-	m_t_bb = int_engine.op("kinetic").dim("bb").map1({0}).map2({1}).compute<2>();
+	m_t_bb = int_engine.op("kinetic").dim("bb").compute();
 	
 	// nuclear
-	m_v_bb = int_engine.op("nuclear").dim("bb").map1({0}).map2({1}).compute<2>();
-		
-	//m_v_bb = math::symmetrize(m_v_bb, "m_v_bb");
+	m_v_bb = int_engine.op("nuclear").dim("bb").compute();
 	
 	// get X
-	math::orthgon og(m_s_bb);
+	math::orthogonalizer og(m_s_bb);
 	og.compute();
-	m_x_bb = og.result("x_bb");
+	m_x_bb = og.result();
 	
 	//std::cout << "H1" << std::endl;
-	dbcsr::copy(*m_v_bb, *m_core_bb).perform();
-	
-	//std::cout << "H2" << std::endl;
-	dbcsr::copy(*m_t_bb, *m_core_bb).sum(true).perform();
-	
-	//std::cout << "H3" << std::endl;
+	m_core_bb->add(*m_v_bb);
+	m_core_bb->add(*m_t_bb);
 	
 	TIME_1e.finish();
 	
 	if (LOG.global_plev() >= 2) {
-		dbcsr::print(*m_x_bb);
-		LOG.os<>('\n');
 		dbcsr::print(*m_s_bb);
 		LOG.os<>('\n');
 		dbcsr::print(*m_t_bb);
@@ -153,6 +147,9 @@ void hfmod::one_electron() {
 		dbcsr::print(*m_v_bb);
 		LOG.os<>('\n');
 		dbcsr::print(*m_core_bb);
+		LOG.os<>('\n');
+		dbcsr::print(*m_x_bb);
+		LOG.os<>('\n');
 	}
 	
 	LOG.os<>("Done with 1 electron integrals.");
@@ -163,12 +160,12 @@ void hfmod::compute_scf_energy() {
 	
 	double e1A, e2A, e1B = 0.0, e2B = 0.0;
 	
-	e1A = dbcsr::dot(*m_core_bb, *m_p_bb_A);
-	e2A = dbcsr::dot(*m_f_bb_A, *m_p_bb_A);
+	e1A = m_core_bb->dot(*m_p_bb_A);
+	e2A = m_f_bb_A->dot(*m_p_bb_A);
 	
 	if (!m_restricted && !m_nobeta) {
-		e1B = dbcsr::dot(*m_core_bb, *m_p_bb_B);
-		e2B = dbcsr::dot(*m_f_bb_B, *m_p_bb_B);
+		e1B = m_core_bb->dot(*m_p_bb_B);
+		e2B = m_f_bb_B->dot(*m_p_bb_B);
 	} 
 	
 	if (m_restricted) {
@@ -179,30 +176,21 @@ void hfmod::compute_scf_energy() {
 	
 }
 
-dbcsr::stensor<2> hfmod::compute_errmat(dbcsr::tensor<2>& F_x, dbcsr::tensor<2>& P_x, dbcsr::tensor<2>& S, std::string x) {
+smat_d hfmod::compute_errmat(smat_d& F_x, smat_d& P_x, smat_d& S, std::string x) {
 	
-	//create
-	dbcsr::pgrid<2> grid(m_comm);
-	
-	dbcsr::tensor<2> e_1 = dbcsr::tensor<2>::create_template().tensor_in(F_x).name("e_1_"+x);
-	dbcsr::tensor<2> e_2 = dbcsr::tensor<2>::create_template().tensor_in(F_x).name("e_2_"+x);
+	mat_d e_1 = mat_d::create_template(*F_x).name("e_1_"+x);
+	mat_d e_2 = mat_d::create_template(*F_x).name("e_2_"+x);
 	
 	//DO E = FPS - SPF
 	
-	dbcsr::contract(F_x, P_x, e_1).perform("ij, jk -> ik");
-	dbcsr::contract(e_1, S, e_1).perform("ij, jk -> ik");
-	dbcsr::contract(S, P_x, e_2).alpha(-1.0).perform("ij, jk -> ik");
-	dbcsr::contract(e_2, F_x, e_1).beta(1.0).perform("ij, jk -> ik");
+	dbcsr::multiply('N','N',*F_x,*P_x,e_1).perform();
+	dbcsr::multiply('N','N',e_1,*S,e_1).perform();
+	dbcsr::multiply('N','N',*S,*P_x,e_2).alpha(-1.0).perform();
+	dbcsr::multiply('N','N',e_2,*F_x,e_1).beta(1.0).perform();
 	
-/*	dbcsr::einsum<2,2,2>({.x = "ij, jk -> ik", .t1 = F_x, .t2 = P_x, .t3 = e_1}); // e1 = F * P
-	dbcsr::einsum<2,2,2>({.x = "ij, jk -> ik", .t1 = e_1, .t2 = S, .t3 = e_1}); // e1 = e1 * S
-	dbcsr::einsum<2,2,2>({.x = "ij, jk -> ik", .t1 = S, .t2 = P_x, .t3 = e_2, .alpha = -1.0}); // e2 =  - S *P
-	dbcsr::einsum<2,2,2>({.x = "ij, jk -> ik", .t1 = e_2, .t2 = F_x, .t3 = e_1, .beta = 1.0}); // e1 = e1 + e2 * F
-*/	
-	e_2.destroy();
-	grid.destroy();
+	e_2.release();
 	
-	return e_1.get_stensor();
+	return e_1.get_smatrix();
 	
 }
 
@@ -229,17 +217,17 @@ void hfmod::compute() {
 	int dmin = m_opt.get<int>("diis_min_vecs", HF_DIIS_MIN_VECS);
 	int dstart = m_opt.get<int>("diis_start", HF_DIIS_START);
 	
-	fockbuilder fbuilder(m_mol, m_opt, m_comm, LOG.global_plev(), TIME);
+	fockbuilder fbuilder(m_mol, m_opt, m_world, LOG.global_plev(), TIME);
 	
-	math::diis_helper<2> diis_A(m_comm,dstart, dmin, dmax, (LOG.global_plev() >= 2) ? true : false );
-	math::diis_helper<2> diis_B(m_comm,dstart, dmin, dmax, (LOG.global_plev() >= 2) ? true : false );
+	math::diis_helper<2> diis_A(m_world.comm(),dstart, dmin, dmax, (LOG.global_plev() >= 2) ? true : false );
+	math::diis_helper<2> diis_B(m_world.comm(),dstart, dmin, dmax, (LOG.global_plev() >= 2) ? true : false );
 	
 	// ERROR MATRICES
-	dbcsr::stensor<2> e_A;
-	dbcsr::stensor<2> e_B;
+	smat_d e_A;
+	smat_d e_B;
 	
-	double rms_A = 10;
-	double rms_B = 10;
+	double norm_A = 10;
+	double norm_B = 10;
 	
 	// ---------> print info here <-------
 	
@@ -251,31 +239,31 @@ void hfmod::compute() {
 		
 		bool SAD_iter = ((iter == 0) && (m_guess == "SAD")) ? true : false;
 		
-		fbuilder.core(m_core_bb).c_A(m_c_bm_A).p_A(m_p_bb_A)
-			.c_B(m_c_bm_B).p_B(m_p_bb_B).compute();
+		fbuilder.compute(m_core_bb, m_p_bb_A, m_c_bm_A, m_p_bb_B, m_c_bm_B, SAD_iter);;
 		
 		m_f_bb_A = fbuilder.fock_alpha();
 		m_f_bb_B = fbuilder.fock_beta();
 		
 		// compute error, do diis, compute energy
 		
-		e_A = compute_errmat(*m_f_bb_A, *m_p_bb_A, *m_s_bb, "A");
+		e_A = compute_errmat(m_f_bb_A, m_p_bb_A, m_s_bb, "A");
 		if (!m_restricted && !m_nobeta)
-			e_B = compute_errmat(*m_f_bb_B, *m_p_bb_B, *m_s_bb, "B");
+			e_B = compute_errmat(m_f_bb_B, m_p_bb_B, m_s_bb, "B");
 		
 		double old_energy = m_scf_energy;
 		compute_scf_energy();
 		
-		rms_A = dbcsr::RMS(*e_A);
+		norm_A = e_A->norm(dbcsr_norm_frobenius);
 		if (m_restricted || m_nobeta) {
-			rms_B = rms_A;
+			norm_B = norm_A;
 		} else {
-			rms_B = dbcsr::RMS(*e_B);
+			norm_B = e_B->norm(dbcsr_norm_frobenius);
 		}
 		
-		LOG.os<>("UHF@", iter, '\t', m_scf_energy + m_nuc_energy, '\t', old_energy - m_scf_energy, '\t', rms_A, '\t', rms_B, '\n');
+		LOG.os<>("UHF@", iter, '\t', m_scf_energy + m_nuc_energy, '\t', old_energy - m_scf_energy, 
+			'\t', norm_A, '\t', norm_B, '\n');
 		
-		if (rms_A < m_scf_threshold && rms_B < m_scf_threshold && iter > 0) break;
+		if (norm_A < m_scf_threshold && norm_B < m_scf_threshold && iter > 0) break;
 		if (iter > m_max_iter) break;
 		
 		if (m_diis) {
@@ -308,16 +296,16 @@ void hfmod::compute() {
 		
 	} // end while
 	
-	e_A->destroy();
-	if (e_B) e_B->destroy();
+	e_A->release();
+	if (e_B) e_B->release();
 	
 	if (iter > m_max_iter) throw std::runtime_error("HF did not converge.");
 	
 	if (m_nobeta) {
 		// take care of densit
 		//m_p_bb_B = dbcsr::make_stensor<2>({.name = "p_bb_B", .pgridN = grid, .map1 = {0}, .map2 = {1}, .blk_sizes = m_p_bb_A->blk_size()});
-		m_p_bb_B = dbcsr::make_stensor<2>(
-			dbcsr::tensor<2>::create_template().tensor_in(*m_p_bb_A).name("p_bb_B"));
+		mat_d p_bb_B = mat_d::create_template(*m_p_bb_A).name("p_bb_B");
+		m_p_bb_B = p_bb_B.get_smatrix();
 		m_p_bb_B->set(0.0);
 	}
 	

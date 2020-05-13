@@ -166,6 +166,12 @@ public:
     
     template <int M, typename D>
 	friend class copy;
+	
+	template <typename D>
+	friend void copy_tensor_to_matrix(tensor<2,D>& t_in, matrix<D>& m_out, std::optional<bool> summation);
+
+	template <typename D>
+	friend void copy_matrix_to_tensor(matrix<D>& m_in, tensor<2,D>& t_out, std::optional<bool> summation);
 
 	typedef T value_type;
     const static int dim = N;

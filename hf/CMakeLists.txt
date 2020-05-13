@@ -14,5 +14,5 @@ target_link_libraries(
 	chem_ints
 	chem_desc
 	chem_math_linalg
-	chem_math_other
+	chem_math_solvers
 )

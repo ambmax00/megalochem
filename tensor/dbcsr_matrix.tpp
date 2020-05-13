@@ -14,6 +14,15 @@ private:
     
 public:
 
+	dist() {}
+	
+	dist(const dist& d) = delete;
+	
+	dist(dist&& d) : m_dist_ptr(d.m_dist_ptr), m_world(d.m_world) 
+	{
+		d.m_dist_ptr = nullptr;
+	}
+
     #:set list = [ &
         ['set_world', 'world', 'required', 'ref'],&
         ['row_dist', 'vec<int>', 'required', 'ref'],&
@@ -21,16 +30,17 @@ public:
     ${make_struct(structname='create',friend='dist',params=list)}$
 
     dist(const create& p) : m_world(*p.c_set_world) {
-        c_dbcsr_distribution_new(&m_dist_ptr, p.c_set_world->m_group, 
+        c_dbcsr_distribution_new(&m_dist_ptr, p.c_set_world->group(), 
             p.c_row_dist->data(), p.c_row_dist->size(),
             p.c_col_dist->data(), p.c_col_dist->size());
     }
     
     void release() {
-        c_dbcsr_distribution_release(&m_dist_ptr);
+		if (m_dist_ptr != nullptr) 
+			c_dbcsr_distribution_release(&m_dist_ptr);
     }
     
-    ~dist() { release(); }
+    ~dist() {}
     
     template <typename T, typename>
 	friend class matrix;
@@ -51,12 +61,25 @@ private:
 public:
 
     matrix() : m_matrix_ptr(nullptr) {}
+    
+    matrix(const matrix& m) = delete;
+    
+    matrix(matrix&& m) : m_matrix_ptr(m.m_matrix_ptr), m_world(m.m_world)
+	{
+		m.m_matrix_ptr = nullptr;
+	}
 
     typedef T value_type;
     
     template <typename D>
     friend class multiply;
+    
+	template <typename D>
+	friend void copy_tensor_to_matrix(tensor<2,D>& t_in, matrix<D>& m_out, std::optional<bool> summation);
 
+	template <typename D>
+	friend void copy_matrix_to_tensor(matrix<D>& m_in, tensor<2,D>& t_out, std::optional<bool> summation);
+    
     #:set list = [ &
         ['name', 'std::string', 'required', 'val'], &
         ['set_world', 'world', 'optional', 'ref'],&
@@ -108,14 +131,14 @@ public:
     #:set list = [ &
         ['name', 'std::string', 'required', 'val'], &
         ['set_dist', 'dist', 'optional', 'ref'],&
-        ['type', 'char', 'optional', 'val'],&
+        ['type', 'const char', 'optional', 'val'],&
         ['row_blk_sizes', 'vec<int>', 'optional', 'ref'],&
         ['col_blk_sizes', 'vec<int>', 'optional', 'ref'],&
         ['nze', 'int', 'optional', 'val'],&
-        ['reuse', 'bool', 'optional', 'val'],&
-        ['reuse_arrays', 'bool', 'optional', 'val'],&
-        ['mutable_work', 'bool', 'optional', 'val'],&
-        ['replication_type', 'char', 'optional', 'val']]
+        ['reuse', 'const bool', 'optional', 'val'],&
+        ['reuse_arrays', 'const bool', 'optional', 'val'],&
+        ['mutable_work', 'const bool', 'optional', 'val'],&
+        ['replication_type', 'const char', 'optional', 'val']]
     struct create_template {
         ${make_param(structname='create_template',params=list)}$
         private:
@@ -131,14 +154,13 @@ public:
     matrix(create_template& p) : m_matrix_ptr(nullptr), m_world(p.c_template->get_world()) {
  
         c_dbcsr_create_template(&m_matrix_ptr, p.c_name->c_str(), p.c_template->m_matrix_ptr, 
-                                   (p.c_dist) ? p.c_dist->m_dist_ptr : nullptr, 
-                                   (p.c_type) ? *p.c_type : nullptr, 
+                                   (p.c_set_dist) ? p.c_set_dist->m_dist_ptr : nullptr, 
+                                   (p.c_type) ? &*p.c_type : nullptr, 
                                    (p.c_row_blk_sizes) ? p.c_row_blk_sizes->data() : nullptr,
                                    (p.c_row_blk_sizes) ? p.c_row_blk_sizes->size() : 0,
                                    (p.c_col_blk_sizes) ? p.c_col_blk_sizes->data() : nullptr,
                                    (p.c_col_blk_sizes) ? p.c_col_blk_sizes->size() : 0,
                                    (p.c_nze) ? &*p.c_nze : nullptr, &m_data_type, 
-                                   (p.c_reuse) ? &*p.c_reuse : nullptr,
                                    (p.c_reuse_arrays) ? &*p.c_reuse_arrays : nullptr, 
                                    (p.c_mutable_work) ? &*p.c_mutable_work : nullptr, 
                                    (p.c_replication_type) ? &*p.c_replication_type : nullptr);
@@ -149,8 +171,8 @@ public:
         c_dbcsr_set(m_matrix_ptr, alpha);
     }
    
-    void add(const matrix& matrix_a, const T alpha = (T)1.0, const T beta = T()) {
-        c_dbcsr_add(matrix_a.m_matrix_ptr, this->matrix_ptr, alpha, beta);
+    void add(const matrix& matrix_a, const T alpha = (T)1.0, const T beta = (T)1.0) {
+        c_dbcsr_add(this->m_matrix_ptr, matrix_a.m_matrix_ptr, alpha, beta);
     }
 
     void scale(T alpha, std::optional<int> last_column = std::nullopt) {
@@ -179,7 +201,7 @@ public:
     
     T dot(const matrix& b) const {
         T out;
-        c_dbcsr_dot(m_matrix_ptr, b.m_matrix_ptr, out);
+        c_dbcsr_dot(m_matrix_ptr, b.m_matrix_ptr, &out);
         return out;
     }
     
@@ -220,22 +242,23 @@ public:
     }
    
 #:set list = [ &
-	['matrix_in', 'matrix', 'required', 'ref'],&
     ['shallow_copy', 'bool', 'optional', 'val'],&
     ['transpose_data', 'bool', 'optional', 'val'],& 
     ['transpose_dist', 'bool', 'optional', 'val'],& 
     ['use_dist', 'bool', 'optional', 'val']]
     struct transpose {
         ${make_param('transpose', list)}$
+        private:
+			matrix& c_in;
         public:
-            transpose() {}
+            transpose(matrix& m_in) : c_in(m_in) {}
             friend class matrix;
     };
     
-    matrix(transpose& p) {
+    matrix(const transpose& p) {
         
-        m_world = p.c_in->m_world;
-        c_dbcsr_transposed(&m_matrix_ptr, p.c_in->m_matrix_ptr, 
+        m_world = p.c_in.m_world;
+        c_dbcsr_transposed(&m_matrix_ptr, p.c_in.m_matrix_ptr, 
                             (p.c_shallow_copy) ? &*p.c_shallow_copy : nullptr,
                             (p.c_transpose_data) ? &*p.c_transpose_data : nullptr, 
                             (p.c_transpose_distribution) ? &*p.c_transpose_distribution : nullptr, 
@@ -247,7 +270,8 @@ public:
     ['name', 'std::string', 'optional', 'val'],&
     ['keep_sparsity', 'bool', 'optional', 'val'],&
     ['shallow_data', 'bool', 'optional', 'val'],&
-    ['keep_imaginary', 'bool', 'optional', 'val']]
+    ['keep_imaginary', 'bool', 'optional', 'val'],&
+    ['type', 'char', 'optional', 'val']]
     
     template <typename D>
     struct copy {
@@ -260,19 +284,28 @@ public:
     };
     
     template <typename D>
-    matrix(copy<D>& p) {
+    matrix(const copy<D>& p) : m_matrix_ptr(nullptr) {
         
-        m_world = p.c_in->m_world;
-        c_dbcsr_copy(&m_matrix_ptr, p.c_in->m_matrix_ptr, (p.c_name) ? p.c_name->c_str() : nullptr, 
+        m_world = p.c_in.m_world;
+        c_dbcsr_copy(&m_matrix_ptr, p.c_in.m_matrix_ptr, (p.c_name) ? p.c_name->c_str() : nullptr, 
                       (p.c_keep_sparsity) ? &*p.c_keep_sparsity : nullptr, 
                       (p.c_shallow_data) ? &*p.c_shallow_data : nullptr, 
                       (p.c_keep_imaginary) ? &*p.c_keep_imaginary : nullptr, 
-                      &m_data_type);
+                      (p.c_type) ? &*p.c_type : nullptr);
                       
     }
     
-    void copy_in(matrix& in) {
-        c_dbcsr_copy_into_existing(m_matrix_ptr, in.m_matrix_ptr);
+    void copy_in(const matrix& in, std::optional<bool> keep_sp = std::nullopt,
+		std::optional<bool> shallow = std::nullopt,
+		std::optional<bool> keep_im = std::nullopt,
+		std::optional<char> type = std::nullopt) 
+	{
+		std::string name = this->name();
+        c_dbcsr_copy(&m_matrix_ptr, in.m_matrix_ptr, name.c_str(), 
+                      (keep_sp) ? &*keep_sp : nullptr, 
+                      (shallow) ? &*shallow : nullptr, 
+                      (keep_im) ? &*keep_im : nullptr, 
+                      (type) ? &*type : nullptr);
     }
     
     matrix<T> desymmetrize() {
@@ -340,11 +373,11 @@ public:
     }
 
     void release() {
-        m_world.destroy(true);
         if (m_matrix_ptr != nullptr) c_dbcsr_release(&m_matrix_ptr);
+        m_matrix_ptr = nullptr;
     }
     
-    ~matrix() {}
+    ~matrix() { release(); }
     
     world get_world() const {
 		return m_world;
@@ -366,12 +399,15 @@ public:
        return c_dbcsr_nblkcols_local(m_matrix_ptr);
     }
 
-#:set vars = ['local_rows', 'local_cols', 'proc_row_dist', 'c_proc_col_dist', &
-                'row_blk_sizes', 'col_blk_sizes', 'row_blk_offsets', 'col_blk_offsets']
+#:set vars = ['local_rows', 'local_cols', 'proc_row_dist', 'proc_col_dist', &
+                'row_blk_size', 'col_blk_size', 'row_blk_offset', 'col_blk_offset']
 #:for i in range(0,len(vars))
 #:set var = vars[i]
-
-    std::vector<int> ${var}$() const {
+#:set name = var
+#:if var in ['row_blk_size', 'col_blk_size', 'row_blk_offset', 'col_blk_offset']
+#:set name = var + 's'
+#:endif
+    std::vector<int> ${name}$() const {
 #:set rowcol = 'rows'
 #:set loctot = 'total'
 #:if 'local' in var
@@ -380,14 +416,10 @@ public:
 #:if i % 2 != 0
     #:set rowcol = 'cols'
 #:endif
-        std::vector<int> out(this->nblk${rowcol}$_${loctot}$());
+        std::vector<int> out(this->nblk${rowcol}$_${loctot}$(),0);
         std::cout << out.size() << std::endl;
         
-        c_dbcsr_get_info(m_matrix_ptr, ${repeat('nullptr',10)}$, 
-                             ${repeat('nullptr',i,',')}$
-                             out.data(),
-                             ${repeat('nullptr',len(vars) - i -1,',')}$
-                             ${repeat('nullptr',5)}$);
+        c_dbcsr_get_${var}$(m_matrix_ptr, out.data());
                              
         return out;
         
@@ -463,7 +495,7 @@ public:
     matrix(read& p) {
         m_world = *p.c_set_world;
         c_dbcsr_binary_read(p.c_filepath->c_str(), p.c_distribution->m_dist_ptr, 
-        p.c_set_world->comm(), m_matrix_ptr);
+        p.c_set_world->comm(), &m_matrix_ptr);
     }
     
     double norm(const int method) const {
@@ -570,9 +602,13 @@ void print(matrix<T>& mat) {
 	
 	for (int irank = 0; irank != w.size(); ++irank) {
 		
+		int nblk = 0;
+		
 		if (irank == w.rank()) {
 	
 			while (iter.blocks_left()) {
+				
+				++nblk;
 				
 				iter.next_block();
 				
@@ -585,6 +621,10 @@ void print(matrix<T>& mat) {
 				} std::cout << "}" << std::endl;
 				
 			}
+		}
+		
+		if (nblk == 0) {
+			std::cout << "Rank: " << irank << " " << "{empty}" << std::endl;
 		}
 		
 		MPI_Barrier(w.comm());
@@ -601,9 +641,9 @@ void print(matrix<T>& mat) {
 #:set type = typelist[i]
 #:set suffix = typesuffix[i]
 typedef block<2,${type}$> block_${suffix}$;
-typedef matrix<${type}$> matrix_${suffix}$;
-typedef smatrix<${type}$> smatrix_${suffix}$;
-typedef iterator<${type}$> iterator_${suffix}$;
+typedef matrix<${type}$> mat_${suffix}$;
+typedef smatrix<${type}$> smat_${suffix}$;
+typedef iterator<${type}$> iter_${suffix}$;
 #:endfor
 
 
