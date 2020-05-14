@@ -31,19 +31,14 @@ static const json valid_keys =
 		{"diis_beta", true}, // whether to use separate coeficients for beta
 		{"use_df", false}, // whether to use df 
 		{"print", 0}, // print level (0, 1 or 2 at the moment, -1 for silent output)
-		{"skip", false}, // skip hartree fock and read from files
-		{"max_iter", 10} 
+		{"skip", false} // skip hartree fock and read from files
 	}},
 	{"adc", {
 		{"print", 0},
 		{"c_os", 1.3},
 		{"c_os_coupling", 1.15},
 		{"nroots", 0},
-		{"order", 0}, // wether to do ADC(0), ADC(1), ...
-		{"use_ao", false}, // use AO basis formulation
-		{"use_sos", false}, // use SOS approximation
-		{"use_lp", false}, // use laplace transform
-		{"diag_order", 0} // at which order to compute the ADC diagonal
+		{"method", "SOS-MO"}
 	}}	
 };
 

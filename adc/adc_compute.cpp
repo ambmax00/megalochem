@@ -19,6 +19,9 @@ void adcmod::compute() {
 		int nocc = m_hfwfn->mol()->nocc_alpha();
 		int nvir = m_hfwfn->mol()->nvir_alpha();
 		
+		LOG.os<>("Computing MO amplitudes...\n\n");
+		mo_amplitudes();
+		
 		//exit(0);
 		
 		LOG.os<>("Computing Diagonal for Davidson Conditioning...\n\n");
@@ -83,7 +86,7 @@ void adcmod::compute() {
 		double omega = dav.eigval();
 
 		// compute ADC2
-		if (!m_use_sos) {
+		if (m_method == 0) {
 			
 			ri_adc2_diis_u1 ri_adc2(m_mo.eps_o, m_mo.eps_v, m_mo.b_xoo, m_mo.b_xov, m_mo.b_xvv, m_mo.t_ovov);
 		
@@ -97,14 +100,14 @@ void adcmod::compute() {
 		} else {
 			
 			std::cout << "SOS" << std::endl;
-			lp_ri_adc2_diis_u1 ri_adc2(m_mo.eps_o, m_mo.eps_v, m_mo.b_xoo, m_mo.b_xov, m_mo.b_xvv);
+			sos_ri_adc2_diis_u1 ri_adc2(m_mo.eps_o, m_mo.eps_v, m_mo.b_xoo, m_mo.b_xov, m_mo.b_xvv, m_mo.t_ovov);
 		
-			//math::modified_davidson<lp_ri_adc2_diis_u1> dav 
-			//	= math::modified_davidson<lp_ri_adc2_diis_u1>::create()
-			//	.factory(ri_adc2).diag(m_mo.d_ov);
+			math::modified_davidson<sos_ri_adc2_diis_u1> dav 
+				= math::modified_davidson<sos_ri_adc2_diis_u1>::create()
+				.factory(ri_adc2).diag(m_mo.d_ov);
 			
 			LOG.os<>("Running SOS-RI-ADC(2)...\n\n");
-			//dav.compute(rvs, m_nroots, omega);
+			dav.compute(rvs, m_nroots, omega);
 			
 		}
 		

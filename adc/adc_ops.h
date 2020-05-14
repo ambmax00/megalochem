@@ -1,8 +1,6 @@
 #ifndef ADC_ADC_OPS_H
 #define ADC_ADC_OPS_H
 
-#include <omp.h>
-
 namespace adc {
 
 // do t_iajb /= eo(i) + eo(j) - ev(a) - ev(b)
@@ -15,8 +13,6 @@ void scale(dbcsr::tensor<4,T>& t, vec<T>& eo, vec<T>& ev, T co = -1.0, T cv = 1.
 	
 	dbcsr::iterator_t<4,T> iter4(t);
 	iter4.start();
-	int nthread = omp_get_thread_num();
-	int nblk = 0;
 		
 	while (iter4.blocks_left()) {
 		
@@ -37,6 +33,8 @@ void scale(dbcsr::tensor<4,T>& t, vec<T>& eo, vec<T>& ev, T co = -1.0, T cv = 1.
 		int offj = off[2];
 		int offb = off[3];
 		
+		std::cout << offi << " " << offa << " " << offj << " " << offb << std::endl;
+		
 		for (int i = 0; i != blksize[0]; ++i) {
 		 T epsi = co * eo[offi+i];
 		 for (int a = 0; a != blksize[1]; ++a) {
@@ -56,7 +54,6 @@ void scale(dbcsr::tensor<4,T>& t, vec<T>& eo, vec<T>& ev, T co = -1.0, T cv = 1.
 	
 	t.finalize();
 	iter4.stop();
-	
 	
 } // end omp
 	

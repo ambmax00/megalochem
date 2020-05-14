@@ -92,14 +92,6 @@ int main(int argc, char** argv) {
 		throw std::runtime_error("Wrong number of command line inputs.");
 	}
 	
-	dbcsr::pgroup grp(MPI_COMM_WORLD);
-	
-	vec<int> blksizes = {3,3,3};
-	
-	dbcsr::matrix<> mat = dbcsr::matrix<>::create().name("TEST").group(grp).row_blk_sizes(blksizes)
-		.col_blk_sizes(blksizes).type(dbcsr_type_no_symmetry);
-	
-	/*
 	util::mpi_time time(MPI_COMM_WORLD, "Megalochem");
 	
 	util::mpi_log LOG(MPI_COMM_WORLD,0);

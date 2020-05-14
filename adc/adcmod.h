@@ -40,11 +40,7 @@ private:
 	dims m_dims;
 	moctx m_mo;
 	
-	int m_order;
-	bool m_use_ao;
-	bool m_use_sos;
-	bool m_use_lp;
-	int m_diag_order;
+	int m_method; // 0: MO-RI-ADC, 1: AO-RI-ADC
 	
 	int m_nroots; 
 	
@@ -53,8 +49,6 @@ private:
 	
 	void mo_load();
 	
-	void mo_compute_diag_0();
-	void mo_compute_diag_1();
 	void mo_compute_diag();
 	
 	void mo_amplitudes();
