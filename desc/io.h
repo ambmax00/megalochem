@@ -1,7 +1,7 @@
 #ifndef DESC_IO_H
 #define DESC_IO_H
 
-#include <dbcsr_conversions.hpp>
+#include "tensor/dbcsr_conversions.h"
 #include <fstream>
 #include <cstdio>
 #include <vector>

@@ -42,6 +42,5 @@ target_include_directories(
 	chem_tensor
 	INTERFACE 
 	${CMAKE_CURRENT_BINARY_DIR}
-	${CMAKE_CURRENT_SOURCE_DIR}
 )
 

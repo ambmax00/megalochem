@@ -3,7 +3,6 @@
 
 #:include "dbcsr.fypp"
 #include <dbcsr_common.hpp>
-#include <dbcsr_tensor.h>
 
 namespace dbcsr {
 
@@ -602,68 +601,6 @@ public:
 		
 };
 
-template <int N, typename T>
-void print(tensor<N,T>& t_in) {
-	
-	int myrank, mpi_size;
-	
-	MPI_Comm_rank(t_in.comm(), &myrank); 
-	MPI_Comm_size(t_in.comm(), &mpi_size);
-	
-	iterator_t<N,T> iter(t_in);
-    iter.start();
-	
-	if (myrank == 0) std::cout << "Tensor: " << t_in.name() << std::endl;
-    
-    for (int p = 0; p != mpi_size; ++p) {
-		if (myrank == p) {
-            int nblk = 0;
-			while (iter.blocks_left()) {
-                
-                nblk++;
-                
-				iter.next();
-				bool found = false;
-				auto idx = iter.idx();
-				auto size = iter.size();
-				
-				auto blk = t_in.get_block(idx, size, found);
-                
-                std::cout << myrank << ": [";
-                
-				for (int s = 0; s != N; ++s) {
-					std::cout << idx[s];
-					if (s != N - 1) { std::cout << ","; }
-				}
-				
-				std::cout << "] (";
-				
-                for (int s = 0; s != N; ++s) {
-					std::cout << size[s];
-					if (s != N - 1) { std::cout << ","; }
-				}
-				std::cout << ") {";
-				
-				
-				for (int i = 0; i != blk.ntot(); ++i) {
-					std::cout << blk[i] << " ";
-				}
-				std::cout << "}" << std::endl;
-					
-				
-			}
-            
-            if (nblk == 0) {
-                std::cout << myrank << ": {empty}" << std::endl;
-            }
-            
-		}
-		MPI_Barrier(t_in.comm());
-	}
-    
-    iter.stop();
-}
-
 // typedefs
 #:for idim in range(2,MAXDIM+1)
 #:for i in range(0,4)
@@ -671,7 +608,7 @@ void print(tensor<N,T>& t_in) {
 #:set suffix = typesuffix[i]
 typedef tensor<${idim}$,${type}$> tensor${idim}$_${suffix}$;
 typedef iterator_t<${idim}$,${type}$> iterator_t${idim}$_${suffix}$;
-typedef block<${idim}$,${type}$> block${idim}$_${suffix}$;
+typedef block<${idim}$,${type}$> block${idim}$_${suffix}$
 typedef stensor<${idim}$,${type}$> stensor${idim}$_${suffix}$;
 #:endfor
 #:endfor

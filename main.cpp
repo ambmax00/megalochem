@@ -2,15 +2,13 @@
 #include <random>
 #include <stdexcept>
 #include <string>
-#include <dbcsr_matrix.hpp>
-#include <dbcsr_conversions.hpp>
+#include <dbcsr.hpp>
 #include "input/reader.h"
-//#include "hf/hfmod.h"
-//#include "adc/adcmod.h"
+#include "hf/hfmod.h"
+#include "adc/adcmod.h"
 #include "utils/mpi_time.h"
 
 #include "ints/aofactory.h"
-#include "math/solvers/hermitian_eigen_solver.h"
 
 template <int N>
 void fill_random(dbcsr::tensor<N,double>& t_in, arrvec<int,N>& nz) {
@@ -87,11 +85,21 @@ void fill_random(dbcsr::tensor<N,double>& t_in, arrvec<int,N>& nz) {
 int main(int argc, char** argv) {
 
 	MPI_Init(&argc, &argv);
+	int rank;
+	MPI_Comm_rank(MPI_COMM_WORLD,&rank);
 	
 	if (argc < 2) {
 		throw std::runtime_error("Wrong number of command line inputs.");
 	}
 	
+	dbcsr::pgroup grp(MPI_COMM_WORLD);
+	
+	vec<int> blksizes = {3,3,3};
+	
+	dbcsr::matrix<> mat = dbcsr::matrix<>::create().name("TEST").group(grp).row_blk_sizes(blksizes)
+		.col_blk_sizes(blksizes).type(dbcsr_type_no_symmetry);
+	
+	/*
 	util::mpi_time time(MPI_COMM_WORLD, "Megalochem");
 	
 	util::mpi_log LOG(MPI_COMM_WORLD,0);
@@ -111,38 +119,13 @@ int main(int argc, char** argv) {
 	
 	dbcsr::init();
 	
-	dbcsr::world wrd(MPI_COMM_WORLD);
-	
 	reader filereader(MPI_COMM_WORLD, filename);
 	
+	dbcsr::init();
+	
 	auto mol = std::make_shared<desc::molecule>(filereader.get_mol());
-	auto opt = filereader.get_opt();
+	auto opt = filereader.get_opt(); 
 	
-	 ints::aofactory ao(*mol, wrd);
-	 
-	 auto mints = ao.op("overlap").dim("bb").compute();
-	 //auto tints = ao.op("overlap").dim("bb").compute_2(vec<int>{0},vec<int>{1});
-	 
-	 
-	 
-	 dbcsr::print(*mints);
-	 //dbcsr::print(*tints);
-	
-	math::hermitian_eigen_solver solver(mints, 'V');
-	
-	solver.compute();
-	
-	auto& evals = solver.eigvals();
-	
-	LOG.os<>("Eigenvalues:\n");
-	for (auto e : evals) {
-		LOG.os<>(e, " ");
-	} LOG.os<>("\n");
-	
-	wrd.destroy();
-	
-	
-	/*
 	auto hfopt = opt.subtext("hf");
 	
 	desc::shf_wfn myhfwfn = std::make_shared<desc::hf_wfn>();
@@ -176,7 +159,7 @@ int main(int argc, char** argv) {
 	time.finish();
 	
 	time.print_info();
-	*/
+	
 	/*
 	//ints::aofactory ao(mol, MPI_COMM_WORLD);
 	
