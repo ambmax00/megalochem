@@ -62,8 +62,8 @@ hfmod::hfmod(desc::smolecule mol, desc::options opt, dbcsr::world& w)
 		
 	if (!m_restricted && !m_nobeta) {
 		
-		mat_d p_bb_B = mat_d::create_template(core_bb).name("p_bb_B");
-		mat_d f_bb_B = mat_d::create_template(core_bb).name("f_bb_B");
+		mat_d p_bb_B = mat_d::create_template(*m_core_bb).name("p_bb_B");
+		mat_d f_bb_B = mat_d::create_template(*m_core_bb).name("f_bb_B");
 	
 		mat_d c_bm_B = mat_d::create().set_world(m_world).name("c_bm_B")
 			.row_blk_sizes(b).col_blk_sizes(mB).type(dbcsr_type_no_symmetry);
@@ -178,8 +178,8 @@ void hfmod::compute_scf_energy() {
 
 smat_d hfmod::compute_errmat(smat_d& F_x, smat_d& P_x, smat_d& S, std::string x) {
 	
-	mat_d e_1 = mat_d::create_template(*F_x).name("e_1_"+x);
-	mat_d e_2 = mat_d::create_template(*F_x).name("e_2_"+x);
+	mat_d e_1 = mat_d::create_template(*F_x).name("e_1_"+x).type(dbcsr_type_no_symmetry);
+	mat_d e_2 = mat_d::create_template(*F_x).name("e_2_"+x).type(dbcsr_type_no_symmetry);
 	
 	//DO E = FPS - SPF
 	
@@ -226,12 +226,19 @@ void hfmod::compute() {
 	smat_d e_A;
 	smat_d e_B;
 	
+	size_t nbas = m_mol->c_basis().nbf();
+	
 	double norm_A = 10;
 	double norm_B = 10;
 	
 	// ---------> print info here <-------
 	
 	LOG.os<>("Iteration Nr\t", "Energy (Ht)\t", "Error (Ht)\t", "RMS alpha(Ht)\t", "RMS beta(Ht)\n");
+	
+	auto RMS = [&](smat_d& m) {
+		double prod = m->dot(*m);
+		return sqrt(prod/(nbas*nbas));
+	};
 
 	while (true) {
 		
@@ -253,11 +260,11 @@ void hfmod::compute() {
 		double old_energy = m_scf_energy;
 		compute_scf_energy();
 		
-		norm_A = e_A->norm(dbcsr_norm_frobenius);
+		norm_A = RMS(e_A);
 		if (m_restricted || m_nobeta) {
 			norm_B = norm_A;
 		} else {
-			norm_B = e_B->norm(dbcsr_norm_frobenius);
+			norm_B = RMS(e_B);
 		}
 		
 		LOG.os<>("UHF@", iter, '\t', m_scf_energy + m_nuc_energy, '\t', old_energy - m_scf_energy, 

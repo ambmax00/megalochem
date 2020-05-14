@@ -110,7 +110,7 @@ fockbuilder::fockbuilder(desc::smolecule mol, desc::options opt, dbcsr::world& w
 		
 	m_f_bb_A = f_bb_A.get_smatrix();
 	
-	if (!m_restricted) {
+	if (!m_restricted && m_mol->nele_beta() != 0) {
 		mat f_bb_B = mat::create_template(*m_f_bb_A).name("f_bb_B");
 		m_f_bb_B = f_bb_B.get_smatrix();
 	} else {
@@ -285,7 +285,6 @@ void fockbuilder::build_k(stensor<2>& p_A, stensor<2>& p_B, stensor<2>& c_A, ste
 						
 			HT.destroy();
 			D.destroy();
-			grid3.destroy();
 		
 		};
 		
@@ -302,6 +301,8 @@ void fockbuilder::build_k(stensor<2>& p_A, stensor<2>& p_B, stensor<2>& c_A, ste
 		dbcsr::print(*m_k_bb_A);
 		if (p_B && c_B) dbcsr::print(*m_k_bb_B);
 	}
+	
+	grid3.destroy();
 	
 	
 }
@@ -334,14 +335,14 @@ void fockbuilder::compute(smat& core, smat& p_A, smat& c_A, smat& p_B, smat& c_B
 	
 	std::cout << "Done with copy." << std::endl;
 	
-	if (p_B) {
+	if (p_B && c_B) {
 		
 		auto mB = c_B->col_blk_sizes();
 		arrvec<int,2> bmB = {b,mB};
 		
 		t_p_B = dbcsr::make_stensor<2>(
 			tensor<2>::create_template().tensor_in(*t_p_A).name("pB tensor"));
-		t_c_A = dbcsr::make_stensor<2>(
+		t_c_B = dbcsr::make_stensor<2>(
 			tensor<2>::create().name("cB tensor").ngrid(grid2).map1({0}).map2({1}).blk_sizes(bmB));
 		dbcsr::copy_matrix_to_tensor(*p_B, *t_p_B);
 		dbcsr::copy_matrix_to_tensor(*c_B, *t_c_B);

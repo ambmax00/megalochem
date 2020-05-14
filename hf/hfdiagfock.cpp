@@ -18,7 +18,7 @@ void hfmod::diag_fock() {
 		
 		LOG.os<2>("Orthogonalizing Fock Matrix: ", x, '\n');
 		
-		mat_d FX = mat_d::create_template(*f_bb).name("FX");
+		mat_d FX = mat_d::create_template(*f_bb).name("FX").type(dbcsr_type_no_symmetry);
 		mat_d XFX = mat_d::create_template(*f_bb).name("XFX");
 		
 		dbcsr::multiply('N','N',*f_bb,*m_x_bb,FX).perform();
@@ -148,7 +148,9 @@ void hfmod::compute_virtual_density() {
 			upbound = lobound + m_mol->nvir_beta() - 1;
 		}
 		
-		dbcsr::multiply('N','T',*c_bm,*c_bm,*pv_bb).first_k(upbound).last_k(lobound).perform();
+		std::cout << "GOOD" << lobound << " " << upbound << std::endl;
+		dbcsr::multiply('N','T',*c_bm,*c_bm,*pv_bb).first_k(lobound).last_k(upbound).perform();
+		std::cout << "OUT" << std::endl;
 		
 		if (LOG.global_plev() >= 2) 
 			dbcsr::print(*pv_bb);
@@ -166,7 +168,7 @@ void hfmod::compute_virtual_density() {
 		//m_pv_bb_A->filter();
 	}
 	
-	if (!m_restricted && !m_nobeta) {
+	if (!m_restricted && m_mol->nvir_beta() != 0) {
 		form_density(m_pv_bb_B, m_c_bm_B, "B");
 	} else {
 		mat_d p = mat_d::create_template(*m_p_bb_A).name("pv_bb_B");

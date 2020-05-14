@@ -39,18 +39,34 @@ void hermitian_eigen_solver::compute(int scalapack_blksize) {
 	
 	LOG.os<>("-- Converting input matrix to SCALAPACK format.\n");
 	
-	scalapack::grid mygrid(nprow,npcol,'R');
+	std::cout << "Set up grid." << std::endl;
+	
+	int ori_proc = m_mat_in->proc(0,0);
+	int ori_coord[2];
+	
+	if (m_mat_in->get_world().rank() == ori_proc) {
+		ori_coord[0] = scalapack::global_grid.myprow();
+		ori_coord[1] = scalapack::global_grid.mypcol();
+	}
+	
+	MPI_Bcast(&ori_coord[0],2,MPI_INT,ori_proc,m_mat_in->get_world().comm());
+	
+	std::cout << "ORI: " << ori_proc << " ROW " << ori_coord[0] << " COL " << ori_coord[1] << std::endl;
 	
 	scalapack::distmat<double> sca_mat_in = dbcsr::matrix_to_scalapack(*m_mat_in, 
-		m_mat_in->name() + "_scalapack", mygrid, nb, nb);
+		m_mat_in->name() + "_scalapack", nb, nb, ori_coord[0], ori_coord[1]);
+	
+	std::cout << "set up mat." << std::endl;
 	
 	std::optional<scalapack::distmat<double>> sca_eigvec_opt;
 	
 	if (m_jobz == 'V') {
-		sca_eigvec_opt.emplace(mygrid, n, n, nb, nb);
+		sca_eigvec_opt.emplace(n, n, nb, nb, ori_coord[0], ori_coord[1]);
 	} else {
 		sca_eigvec_opt = std::nullopt;
 	}
+	
+	std::cout << "set up vec." << std::endl;
 	
 	m_eigval.resize(n);
 	
@@ -84,8 +100,6 @@ void hermitian_eigen_solver::compute(int scalapack_blksize) {
 		sca_eigvec_opt->release();
 		
 	}
-	
-	mygrid.release();
 		
 	return;
 }

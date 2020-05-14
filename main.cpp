@@ -10,6 +10,10 @@
 //#include "adc/adcmod.h"
 #include "utils/mpi_time.h"
 
+#ifdef USE_SCALAPACK
+#include "extern/scalapack.h"
+#endif
+
 //#include "ints/aofactory.h"
 //#include "math/solvers/hermitian_eigen_solver.h"
 
@@ -113,6 +117,15 @@ int main(int argc, char** argv) {
 	dbcsr::init();
 	
 	dbcsr::world wrd(MPI_COMM_WORLD);
+	
+#ifdef USE_SCALAPACK
+	int sysctxt = -1;
+	c_blacs_get(0, 0, &sysctxt);
+	int gridctxt = sysctxt;
+	c_blacs_gridinit(&gridctxt, 'R', wrd.nprow(), wrd.npcol());
+	std::cout << "HEREEE: " << wrd.nprow() << " " << wrd.npcol() << std::endl;
+	scalapack::global_grid.set(gridctxt);
+#endif
 	
 	reader filereader(MPI_COMM_WORLD, filename);
 	
@@ -272,9 +285,13 @@ int main(int argc, char** argv) {
 	pgrid4d.destroy();
 
 	*/
+	
+#ifdef USE_SCALAPACK
+	scalapack::global_grid.free();
+	c_blacs_exit(0);
+#endif
 
 	dbcsr::finalize();
-	
 
 	MPI_Finalize();
 

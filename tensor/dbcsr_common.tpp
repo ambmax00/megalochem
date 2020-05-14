@@ -267,6 +267,11 @@ public:
     int rank() { return m_rank; }
     int size() { return m_size; }
     
+    int myprow() { return m_coord[0]; }
+    int mypcol() { return m_coord[1]; }
+    int nprow() { return m_dims[0]; }
+    int npcol() { return m_dims[1]; }
+    
     std::array<int,2> dims() { return m_dims; }
     std::array<int,2> coord() { return m_coord; }
     

@@ -5,6 +5,10 @@
 #include <dbcsr_conversions.hpp>
 #include <limits>
 
+#ifdef USE_SCALAPACK
+#include "extern/scalapack.h"
+#endif
+
 namespace hf {
 
 // Taken from PSI4
@@ -138,6 +142,28 @@ void hfmod::compute_guess() {
 		
 		MPI_Comm_split(m_world.comm(), m_world.rank(), m_world.rank(), &mycomm);
 		
+		// set up new scalapack grid
+#ifdef USE_SCALAPACK
+		int sysctxt = -1;
+		c_blacs_get(0, 0, &sysctxt);
+		
+		std::vector<int> contexts(m_world.size(),0);
+		int prevctxt = scalapack::global_grid.ctx();
+		
+		for (int r = 0; r != m_world.size(); ++r) {
+			contexts[r] = sysctxt;
+			int usermap[1] = {r};
+			c_blacs_gridmap(&contexts[r], &usermap[0], 1, 1, 1);
+		}
+		
+		scalapack::global_grid.set(contexts[m_world.rank()]);
+		
+#endif
+		
+		//for (int r = 0; r != m_world.size(); ++r) {
+			
+		//if (r == m_world.rank()) {
+		
 		for (int I = 0; I != my_atypes.size(); ++I) {
 			
 			auto atom = my_atypes[I];
@@ -186,7 +212,7 @@ void hfmod::compute_guess() {
 			
 			LOG(m_world.rank()).os<1>("Starting Atomic UHF for atom nr. ", I, " on rank ", m_world.rank(), '\n');
 			atomic_hf.compute();
-			LOG(m_world.rank()).os<1>("Done with Atomic UHF on rank ", m_world.rank(), "\n");
+			LOG(m_world.rank()).os<1>("Done with Atomic UHF for atom nr. ", I, " on rank ", m_world.rank(), "\n");
 			
 			auto at_wfn = atomic_hf.wfn();
 			
@@ -207,6 +233,19 @@ void hfmod::compute_guess() {
 			INTS_REGISTRY.clear(name);
 			
 		}
+		
+		//}
+		
+		//MPI_Barrier(m_world.comm());
+		
+		//}
+		
+		MPI_Barrier(m_world.comm());
+		
+#ifdef USE_SCALAPACK
+		scalapack::global_grid.free();
+		scalapack::global_grid.set(prevctxt);
+#endif
 		
 		MPI_Barrier(m_world.comm());
 		
@@ -301,7 +340,7 @@ void hfmod::compute_guess() {
 		std::cout << ptot_eigen << std::endl;
 		
 		auto b = m_mol->dims().b();
-		mat_d ptot = dbcsr::eigen_to_matrix(ptot_eigen, m_world, "p_bb_A", b, b, dbcsr_type_hermitian);
+		mat_d ptot = dbcsr::eigen_to_matrix(ptot_eigen, m_world, "p_bb_A", b, b, dbcsr_type_symmetric);
 		
 		m_p_bb_A = ptot.get_smatrix();
 		

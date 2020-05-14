@@ -128,13 +128,12 @@ matrix<T> eigen_to_matrix(MatrixX<T>& mat, world& w, std::string name, vec<int>&
 #ifdef USE_SCALAPACK
 
 template <typename T = double>
-scalapack::distmat<T> matrix_to_scalapack(matrix<T>& mat_in, std::string nameint, 
-										scalapack::grid& igrid, int nsplitrow, int nsplitcol) {
+scalapack::distmat<T> matrix_to_scalapack(matrix<T>& mat_in, std::string nameint, int nsplitrow, int nsplitcol, int ori_row, int ori_col) {
 	
 	world mworld = mat_in.get_world();	
 	
 	int nrows = mat_in.nfullrows_total();
-	int ncols = mat_in.nfullcols_total();		
+	int ncols = mat_in.nfullcols_total();	
 	
 	// make distvecs
 	vec<int> rowsizes = split_range(nrows, nsplitrow);
@@ -157,8 +156,7 @@ scalapack::distmat<T> matrix_to_scalapack(matrix<T>& mat_in, std::string nameint
 	}
 	
 	//dbcsr::print(mat_out);
-	
-	scalapack::distmat<double> scamat(igrid,nrows,ncols,nsplitrow,nsplitcol);
+	scalapack::distmat<double> scamat(nrows,ncols,nsplitrow,nsplitcol,ori_row,ori_col);
 	
 	dbcsr::iterator iter(mat_out);
 

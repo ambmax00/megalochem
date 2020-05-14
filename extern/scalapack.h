@@ -2,12 +2,14 @@
 #define EXTERN_SCALAPACK_H
 
 #include <iostream>
+#include <stdexcept>
 
 extern "C" {
 	
 	void blacs_pinfo_(int* mypnum, int* nprocs);
 	void blacs_get_(int* icontxt, int* what, int* val);
 	void blacs_gridinit_(int* icontxt, char* layout, int* nprow, int* npcol);
+	void blacs_gridmap_(int* icontxt, int* usermap, int* ldumap, int* nprow, int* npcol);
 	void blacs_barrier_(int* icontxt, char* scope);
 	void blacs_gridinfo_(int* icontxt, int* nprow, int* npcol, int* myprow, int* mypcol);
 	void blacs_gridexit_(int* ctxt);
@@ -34,9 +36,13 @@ inline void c_blacs_get(int icontxt, int what, int* val)
 {
 	blacs_get_(&icontxt, &what, val);
 };
-inline void c_blacs_gridinit(int icontxt, char layout, int nprow, int npcol) 
+inline void c_blacs_gridinit(int* icontxt, char layout, int nprow, int npcol) 
 {
-	blacs_gridinit_(&icontxt, &layout, &nprow, &npcol);
+	blacs_gridinit_(icontxt, &layout, &nprow, &npcol);
+};
+inline void c_blacs_gridmap(int* icontxt, int* usermap, int ldumap, int nprow, int npcol)
+{
+	blacs_gridmap_(icontxt, usermap, &ldumap, &nprow, &npcol);
 };
 inline void c_blacs_barrier(int icontxt, char scope) 
 {
@@ -97,40 +103,38 @@ namespace scalapack {
 class grid {
 private: 
 
-	int m_ctxt;
-	int m_nprow, m_npcol;
-	int m_myprow, m_mypcol;
-	int m_mypnum;
-	int m_nprocs;
+	inline static int m_ctxt = -1;
+	inline static int m_nprow, m_npcol;
+	inline static int m_myprow, m_mypcol;
+	inline static int m_nprocs = -1;
+	inline static int m_mypnum = -1;
 
 public:
 
-	grid() {}
-
-	grid(int nprow, int npcol, char layout = 'R') {
-
-		// determine rank and size of processor set
+	void set(int ictxt) {
+		
+		m_ctxt = ictxt;
 		c_blacs_pinfo(&m_mypnum, &m_nprocs);
-		
-		// get the internal defualt context
-		c_blacs_get(0, 0, &m_ctxt);
-		
-		// set up a proc grid for the proc set
-		c_blacs_gridinit(m_ctxt,layout,nprow,npcol);
-		
-		c_blacs_barrier(m_ctxt,'A');
-		
 		c_blacs_gridinfo(m_ctxt, &m_nprow, &m_npcol, &m_myprow, &m_mypcol);
 		
+		std::cout << m_nprow << " " << m_npcol << std::endl;
+		
 	}
 	
-	grid(grid& g_in) = default;
+	void free() {
+		
+		if (m_ctxt != -1) {
+			c_blacs_gridexit(m_ctxt);
+		}
+		m_ctxt = -1;
+		
+	}
+
+	grid() {}
+	
+	grid(grid& g_in) = delete;
 	
 	~grid() {}
-	
-	void release() {
-		c_blacs_gridexit(m_ctxt);
-	}
 	
 	int ctx() { return m_ctxt; }
 	int nprow() { return m_nprow; }
@@ -142,6 +146,8 @@ public:
 	
 };
 
+inline static grid global_grid;
+
 template <typename T>
 class distmat {
 private:
@@ -151,11 +157,10 @@ private:
 	int m_ncolstot;
 	int m_nrowsloc;
 	int m_ncolsloc;
+	int m_rsrc, m_csrc;
 	
 	int m_rowblk_size;
 	int m_colblk_size;
-	
-	grid m_grid;
 	
 	std::array<int,9> m_desc; // matrix descriptor
 	
@@ -163,17 +168,18 @@ public:
 
 	distmat() : m_data(nullptr) {}
 
-	distmat(grid& igrid, int nrows, int ncols, int rowblksize, int colblksize) :
-		m_grid(igrid), m_nrowstot(nrows), m_ncolstot(ncols), 
-		m_rowblk_size(rowblksize), m_colblk_size(colblksize) 
+	distmat(int nrows, int ncols, int rowblksize, int colblksize, int irsrc, int icsrc) :
+		m_nrowstot(nrows), m_ncolstot(ncols), 
+		m_rowblk_size(rowblksize), m_colblk_size(colblksize),
+		m_rsrc(irsrc), m_csrc(icsrc)
 	{
 		
-		m_nrowsloc = c_numroc(m_nrowstot, m_rowblk_size, m_grid.myprow(), 0, m_grid.nprow());
-		m_ncolsloc = c_numroc(m_ncolstot, m_colblk_size, m_grid.mypcol(), 0, m_grid.npcol());
+		m_nrowsloc = c_numroc(m_nrowstot, m_rowblk_size, global_grid.myprow(), irsrc, global_grid.nprow());
+		m_ncolsloc = c_numroc(m_ncolstot, m_colblk_size, global_grid.mypcol(), icsrc, global_grid.npcol());
 		
 		int info = 0;
 		c_descinit(&m_desc[0],m_nrowstot,m_ncolstot,m_rowblk_size,
-					m_colblk_size,0,0,m_grid.ctx(),m_nrowsloc,&info);
+					m_colblk_size,irsrc,icsrc,global_grid.ctx(),m_nrowsloc,&info);
 					
 		m_data = new T[m_nrowsloc*m_ncolsloc];
 		
@@ -184,26 +190,27 @@ public:
 	}
 	
 	inline T& global_access(int iglob, int jglob) {
-		int iloc = c_indxg2l(iglob, m_rowblk_size, 0, 0, m_grid.nprow());
-		int jloc = c_indxg2l(jglob, m_colblk_size, 0, 0, m_grid.npcol());
+		int iloc = c_indxg2l(iglob, m_rowblk_size, 0, 0, global_grid.nprow());
+		int jloc = c_indxg2l(jglob, m_colblk_size, 0, 0, global_grid.npcol());
 		return m_data[iloc + m_nrowsloc*jloc];
 	}
 	
 	int iglob(int iloc) {
-		return c_indxl2g(iloc,m_rowblk_size,m_grid.myprow(),0,m_grid.nprow());
+		return c_indxl2g(iloc,m_rowblk_size,global_grid.myprow(),m_rsrc,global_grid.nprow());
 	}
 	
 	int jglob(int jloc) {
-		return c_indxl2g(jloc,m_colblk_size,m_grid.mypcol(),0,m_grid.npcol());
+		return c_indxl2g(jloc,m_colblk_size,global_grid.mypcol(),m_csrc,global_grid.npcol());
 	}
 	
 	distmat(distmat& d) = delete;
 	
 	distmat(distmat&& d) :
-		m_data(d.m_data), m_nrowstot(d.m_nrowstot), m_grid(d.m_grid), 
+		m_data(d.m_data), m_nrowstot(d.m_nrowstot), 
 		m_ncolstot(d.m_ncolstot), m_nrowsloc(d.m_nrowsloc),
 		m_ncolsloc(d.m_ncolsloc), m_rowblk_size(d.m_rowblk_size),
-		m_colblk_size(d.m_colblk_size), m_desc(d.m_desc)
+		m_colblk_size(d.m_colblk_size), m_desc(d.m_desc),
+		m_rsrc(d.m_rsrc), m_csrc(d.m_csrc)
 	{
 		d.m_data = nullptr;
 	}
@@ -226,16 +233,20 @@ public:
 	std::array<int,9> desc() { return m_desc; }
 	
 	void print() {
-		for (int p = 0; p != m_grid.nprocs(); ++p) {
-			if (m_grid.mypnum() == p) {
-				std::cout << "RANK: " << p << std::endl;
-				for (int i = 0; i != m_nrowsloc; ++i) {
-					for (int j = 0; j != m_ncolsloc; ++j) {
-						std::cout << local_access(i,j) << " ";
-					} std::cout << std::endl;
+		for (int pi = 0; pi != global_grid.nprow(); ++pi) {
+			for (int pj = 0; pj != global_grid.npcol(); ++pj) {
+				
+				if (pi == global_grid.myprow() && pj == global_grid.mypcol()) {
+					
+					std::cout << "PROW/PCOL: " << pi << " " << pj << std::endl;
+					for (int i = 0; i != m_nrowsloc; ++i) {
+						for (int j = 0; j != m_ncolsloc; ++j) {
+							std::cout << local_access(i,j) << " ";
+						} std::cout << std::endl;
+					}
 				}
+				c_blacs_barrier(global_grid.ctx(),'A');
 			}
-			c_blacs_barrier(m_grid.ctx(),'A');
 		}
 	}
 	
