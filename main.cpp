@@ -2,13 +2,20 @@
 #include <random>
 #include <stdexcept>
 #include <string>
-#include <dbcsr.hpp>
+#include <dbcsr_matrix.hpp>
+#include <dbcsr_conversions.hpp>
+#include <dbcsr_matrix_ops.hpp>
 #include "input/reader.h"
 #include "hf/hfmod.h"
-#include "adc/adcmod.h"
+//#include "adc/adcmod.h"
 #include "utils/mpi_time.h"
 
-#include "ints/aofactory.h"
+#ifdef USE_SCALAPACK
+#include "extern/scalapack.h"
+#endif
+
+//#include "ints/aofactory.h"
+//#include "math/solvers/hermitian_eigen_solver.h"
 
 template <int N>
 void fill_random(dbcsr::tensor<N,double>& t_in, arrvec<int,N>& nz) {
@@ -85,8 +92,6 @@ void fill_random(dbcsr::tensor<N,double>& t_in, arrvec<int,N>& nz) {
 int main(int argc, char** argv) {
 
 	MPI_Init(&argc, &argv);
-	int rank;
-	MPI_Comm_rank(MPI_COMM_WORLD,&rank);
 	
 	if (argc < 2) {
 		throw std::runtime_error("Wrong number of command line inputs.");
@@ -111,17 +116,26 @@ int main(int argc, char** argv) {
 	
 	dbcsr::init();
 	
+	dbcsr::world wrd(MPI_COMM_WORLD);
+	
+#ifdef USE_SCALAPACK
+	int sysctxt = -1;
+	c_blacs_get(0, 0, &sysctxt);
+	int gridctxt = sysctxt;
+	c_blacs_gridinit(&gridctxt, 'R', wrd.nprow(), wrd.npcol());
+	std::cout << "HEREEE: " << wrd.nprow() << " " << wrd.npcol() << std::endl;
+	scalapack::global_grid.set(gridctxt);
+#endif
+	
 	reader filereader(MPI_COMM_WORLD, filename);
 	
-	dbcsr::init();
-	
 	auto mol = std::make_shared<desc::molecule>(filereader.get_mol());
-	auto opt = filereader.get_opt(); 
+	auto opt = filereader.get_opt();
 	
 	auto hfopt = opt.subtext("hf");
 	
 	desc::shf_wfn myhfwfn = std::make_shared<desc::hf_wfn>();
-	hf::hfmod myhf(mol,hfopt,MPI_COMM_WORLD);
+	hf::hfmod myhf(mol,hfopt,wrd);
 	
 	bool skip_hf = hfopt.get<bool>("skip", false);
 	
@@ -134,11 +148,13 @@ int main(int argc, char** argv) {
 	} else {
 		
 		LOG.os<>("Reading HF info from files...\n");
-		myhfwfn->read_from_file(mol,MPI_COMM_WORLD);
+		myhfwfn->read_from_file(mol,wrd);
 		
 	}
 	
 	MPI_Barrier(MPI_COMM_WORLD);
+	
+	/*
 	
 	auto adcopt = opt.subtext("adc");
 	
@@ -151,7 +167,7 @@ int main(int argc, char** argv) {
 	time.finish();
 	
 	time.print_info();
-	
+	*/
 	/*
 	//ints::aofactory ao(mol, MPI_COMM_WORLD);
 	
@@ -269,9 +285,13 @@ int main(int argc, char** argv) {
 	pgrid4d.destroy();
 
 	*/
+	
+#ifdef USE_SCALAPACK
+	scalapack::global_grid.free();
+	c_blacs_exit(0);
+#endif
 
 	dbcsr::finalize();
-	
 
 	MPI_Finalize();
 

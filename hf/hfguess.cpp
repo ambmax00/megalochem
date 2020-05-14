@@ -1,12 +1,13 @@
 #include "hf/hfmod.h"
 #include "ints/registry.h"
 #include "hf/hfdefaults.h"
-#include "tensor/dbcsr_conversions.h"
-#include "math/other/scale.h"
-
-#include <Eigen/Core>
-#include <Eigen/Eigenvalues>
+#include "math/solvers/hermitian_eigen_solver.h"
+#include <dbcsr_conversions.hpp>
 #include <limits>
+
+#ifdef USE_SCALAPACK
+#include "extern/scalapack.h"
+#endif
 
 namespace hf {
 
@@ -73,9 +74,12 @@ void hfmod::compute_guess() {
 		
 		// form density and coefficients by diagonalizing the core matrix
 		//dbcsr::copy<2>({.t_in = *m_core_bb, .t_out = *m_f_bb_A}); 
-		dbcsr::copy(*m_core_bb, *m_f_bb_A).perform();
+		m_f_bb_A->copy_in(*m_core_bb);
 		
-		if (!m_restricted && !m_nobeta) dbcsr::copy(*m_core_bb, *m_f_bb_B).perform();
+		dbcsr::print(*m_core_bb);
+		dbcsr::print(*m_f_bb_A);
+		
+		if (!m_restricted && !m_nobeta) m_f_bb_B->copy_in(*m_core_bb);
 		
 		diag_fock();
 	
@@ -117,32 +121,48 @@ void hfmod::compute_guess() {
 		std::map<int,Eigen::MatrixXd> locdensitymap;
 		std::map<int,Eigen::MatrixXd> densitymap;
 		
-		int myrank = -1;
-		int commsize = -1;
-		
-		MPI_Comm_rank(m_comm, &myrank);
-		MPI_Comm_size(m_comm, &commsize);
-		
 		// divide it up
 		std::vector<libint2::Atom> my_atypes;
 		
 		for (int I = 0; I != atypes.size(); ++I) {
-			if (myrank == I % commsize) my_atypes.push_back(atypes[I]);
+			if (m_world.rank() == I % m_world.size()) my_atypes.push_back(atypes[I]);
 		}
 		
-		for (int i = 0; i != commsize; ++i) {
-			if (myrank == i) {
-				std::cout << "Rank " << myrank << std::endl;
+		for (int i = 0; i != m_world.size(); ++i) {
+			if (m_world.rank() == i) {
+				std::cout << "Rank " << m_world.rank() << std::endl;
 				for (auto e : my_atypes) {
 					std::cout << e.atomic_number << " ";
 				} std::cout << std::endl;
 			}
-			MPI_Barrier(m_comm);
+			MPI_Barrier(m_world.comm());
 		}
 		
 		MPI_Comm mycomm;
 		
-		MPI_Comm_split(m_comm, myrank, myrank, &mycomm);
+		MPI_Comm_split(m_world.comm(), m_world.rank(), m_world.rank(), &mycomm);
+		
+		// set up new scalapack grid
+#ifdef USE_SCALAPACK
+		int sysctxt = -1;
+		c_blacs_get(0, 0, &sysctxt);
+		
+		std::vector<int> contexts(m_world.size(),0);
+		int prevctxt = scalapack::global_grid.ctx();
+		
+		for (int r = 0; r != m_world.size(); ++r) {
+			contexts[r] = sysctxt;
+			int usermap[1] = {r};
+			c_blacs_gridmap(&contexts[r], &usermap[0], 1, 1, 1);
+		}
+		
+		scalapack::global_grid.set(contexts[m_world.rank()]);
+		
+#endif
+		
+		//for (int r = 0; r != m_world.size(); ++r) {
+			
+		//if (r == m_world.rank()) {
 		
 		for (int I = 0; I != my_atypes.size(); ++I) {
 			
@@ -177,7 +197,7 @@ void hfmod::compute_guess() {
 				}
 			}
 			
-			std::string name = "ATOM_rank" + std::to_string(myrank) + "_" + std::to_string(Z);
+			std::string name = "ATOM_rank" + std::to_string(m_world.rank()) + "_" + std::to_string(Z);
 			
 			desc::molecule at_mol = desc::molecule::create().name(name).atoms(atvec).charge(charge)
 				.mult(mult).basis(at_basis).dfbasis(at_dfbasis).fractional(true);
@@ -186,11 +206,13 @@ void hfmod::compute_guess() {
 				
 			at_smol->print_info(mycomm,LOG.global_plev());
 			
-			hf::hfmod atomic_hf(at_smol,at_opt,mycomm);
+			dbcsr::world at_world(mycomm);
 			
-			LOG(myrank).os<1>("Starting Atomic UHF for atom nr. ", I, " on rank ", myrank, '\n');
+			hf::hfmod atomic_hf(at_smol,at_opt,at_world);
+			
+			LOG(m_world.rank()).os<1>("Starting Atomic UHF for atom nr. ", I, " on rank ", m_world.rank(), '\n');
 			atomic_hf.compute();
-			LOG(myrank).os<1>("Done with Atomic UHF on rank ", myrank, "\n");
+			LOG(m_world.rank()).os<1>("Done with Atomic UHF for atom nr. ", I, " on rank ", m_world.rank(), "\n");
 			
 			auto at_wfn = atomic_hf.wfn();
 			
@@ -200,39 +222,47 @@ void hfmod::compute_guess() {
 			//std::cout << "PA on rank: " << myrank << std::endl;
 			//dbcsr::print(*pA);
 			
-			dbcsr::tensor<2> pscaled = dbcsr::tensor<2>::create_template().tensor_in(*pA).name(at_smol->name() + "_density");
-			
-			
-			//dbcsr::copy<2>({.t_in = *pA, .t_out = pscaled, .sum = true, .move_data = true});
-			//dbcsr::copy<2>({.t_in = *pB, .t_out = pscaled, .sum = true, .move_data = true});
-			dbcsr::copy(*pA, pscaled).sum(true).move_data(true).perform();
-			dbcsr::copy(*pB, pscaled).sum(true).move_data(true).perform();
+			mat_d pscaled = mat_d::copy<double>(*pA).name(at_smol->name() + "_density");
+			pscaled.add(*pB);
 			
 			pscaled.scale(0.5);
 			
-			locdensitymap[Z] = dbcsr::tensor_to_eigen(pscaled);
+			locdensitymap[Z] = dbcsr::matrix_to_eigen(pscaled);
 			
 			ints::registry INTS_REGISTRY;
 			INTS_REGISTRY.clear(name);
 			
 		}
 		
-		MPI_Barrier(m_comm);
+		//}
+		
+		//MPI_Barrier(m_world.comm());
+		
+		//}
+		
+		MPI_Barrier(m_world.comm());
+		
+#ifdef USE_SCALAPACK
+		scalapack::global_grid.free();
+		scalapack::global_grid.set(prevctxt);
+#endif
+		
+		MPI_Barrier(m_world.comm());
 		
 		//std::cout << "DISTRIBUTING" << std::endl;
 		
 		// distribute to other nodes
-		for (int i = 0; i != commsize; ++i) {
+		for (int i = 0; i != m_world.size(); ++i) {
 			
 			std::cout << "LOOP: " << i << std::endl;
 			
-			if (i == myrank) {
+			if (i == m_world.rank()) {
 				
 				int n = locdensitymap.size();
 				
 				//std::cout << "N: " << n << std::endl;
 				
-				MPI_Bcast(&n,1,MPI_INT,i,m_comm);
+				MPI_Bcast(&n,1,MPI_INT,i,m_world.comm());
 				
 				for (auto& den : locdensitymap) {
 					
@@ -240,18 +270,18 @@ void hfmod::compute_guess() {
 					size_t size = den.second.size();
 					
 					//std::cout << "B1 " << Z << std::endl;
-					MPI_Bcast(&Z,1,MPI_INT,i,m_comm);
+					MPI_Bcast(&Z,1,MPI_INT,i,m_world.comm());
 					//std::cout << "B2 " << size << std::endl;
-					MPI_Bcast(&size,1,MPI_UNSIGNED,i,m_comm);
+					MPI_Bcast(&size,1,MPI_UNSIGNED,i,m_world.comm());
 					
 					auto& mat = den.second;
 					
 					//std::cout << "B3" << std::endl;
-					MPI_Bcast(mat.data(),size,MPI_DOUBLE,i,m_comm);
+					MPI_Bcast(mat.data(),size,MPI_DOUBLE,i,m_world.comm());
 					
 					densitymap[Z] = mat;
 					
-					MPI_Barrier(m_comm);
+					MPI_Barrier(m_world.comm());
 					
 				 }
 				
@@ -259,38 +289,38 @@ void hfmod::compute_guess() {
 				
 				int n = -1;
 				
-				MPI_Bcast(&n,1,MPI_INT,i,m_comm);
+				MPI_Bcast(&n,1,MPI_INT,i,m_world.comm());
 				
 				for (int ni = 0; ni != n; ++ni) {
 					
 					size_t size = 0;
 					int Z = 0;
 					
-					MPI_Bcast(&Z,1,MPI_INT,i,m_comm);
-					MPI_Bcast(&size,1,MPI_UNSIGNED,i,m_comm);
+					MPI_Bcast(&Z,1,MPI_INT,i,m_world.comm());
+					MPI_Bcast(&size,1,MPI_UNSIGNED,i,m_world.comm());
 					
 					//std::cout << "Other rank: " << Z << " " << size << std::endl;
 					
 					Eigen::MatrixXd mat((int)sqrt(size),(int)sqrt(size));
 					
-					MPI_Bcast(mat.data(),size,MPI_DOUBLE,i,m_comm);
+					MPI_Bcast(mat.data(),size,MPI_DOUBLE,i,m_world.comm());
 					
 					densitymap[Z] = mat;
 					
-					MPI_Barrier(m_comm);
+					MPI_Barrier(m_world.comm());
 					
 				}
 				
 			}
 			
-			MPI_Barrier(m_comm);
+			MPI_Barrier(m_world.comm());
 			
 		}
 			
 		
 		size_t nbas = m_mol->c_basis().nbf();
 		
-		Eigen::MatrixXd ptot = Eigen::MatrixXd::Zero(nbas,nbas);
+		Eigen::MatrixXd ptot_eigen = Eigen::MatrixXd::Zero(nbas,nbas);
 		auto csizes = m_mol->dims().b();
 		int off = 0;
 		int size = 0;
@@ -300,71 +330,46 @@ void hfmod::compute_guess() {
 			int Z = m_mol->atoms()[i].atomic_number;
 			size = csizes[i];
 			
-			ptot.block(off,off,size,size) = densitymap[Z];
+			ptot_eigen.block(off,off,size,size) = densitymap[Z];
 			
 			off += size;
 			
 		}
 		
 		std::cout << "PTOT: " << nbas << std::endl;
-		std::cout << ptot << std::endl;
+		std::cout << ptot_eigen << std::endl;
 		
-		Eigen::SelfAdjointEigenSolver<Eigen::MatrixXd> es;
-		es.compute(ptot);
+		auto b = m_mol->dims().b();
+		mat_d ptot = dbcsr::eigen_to_matrix(ptot_eigen, m_world, "p_bb_A", b, b, dbcsr_type_symmetric);
 		
-		if (es.info() != Eigen::Success) 
-			throw std::runtime_error("Eigen hermitian eigensolver failed.");
+		m_p_bb_A = ptot.get_smatrix();
 		
-		Eigen::VectorXd eigval = es.eigenvalues();
-		Eigen::MatrixXd eigvec = es.eigenvectors();
+		math::hermitian_eigen_solver solver(m_p_bb_A, 'V');
 		
-		//std::cout << "Eigenvalues: " << std::endl;
-		//std::cout << eigval << std::endl;
+		solver.compute();
 		
-		//std::cout << "Eigenvectors: " << std::endl;
-		//std::cout << eigvec << std::endl;
+		auto eigvals = solver.eigvals();
+		m_c_bm_A = solver.eigvecs();
 		
-		std::vector<double> v(eigval.data(), eigval.data() + eigval.size());
+		std::for_each(eigvals.begin(),eigvals.end(),
+			[](double& d) 
+			{ 
+				d = (d < std::numeric_limits<double>::epsilon())
+					? 0 : sqrt(d); 
+		});
 		
-		for (auto& x : v) {
-			x = (x < std::numeric_limits<double>::epsilon()) ? 0 : sqrt(x);
-		}
-		
-		dbcsr::pgrid<2> grid(m_comm);
-		
-		m_c_bm_A = (dbcsr::eigen_to_tensor(eigvec, "c_bm_A", grid, vec<int>{0}, vec<int>{1}, m_c_bm_A->blk_sizes())).get_stensor();
-		math::scale(*m_c_bm_A, v);
-		
+		m_c_bm_A->scale(eigvals, "right");
+			
 		if (!m_restricted && !m_nobeta) {
-			m_c_bm_B = (dbcsr::eigen_to_tensor(eigvec, "c_bm_B", grid, vec<int>{0}, vec<int>{1}, m_c_bm_B->blk_sizes())).get_stensor();
-			math::scale(*m_c_bm_B, v);
+			m_c_bm_B->copy_in(*m_c_bm_A);
+			m_p_bb_B->copy_in(*m_p_bb_A);
 		}
-		
-		LOG.os<2>("SAD Coefficient matrices.\n");
-		if (LOG.global_plev() >= 2) {
-			dbcsr::print(*m_c_bm_A);
-			if (m_c_bm_B) dbcsr::print(*m_c_bm_B);
-		}
-			
-		m_p_bb_A = (dbcsr::eigen_to_tensor(ptot, "p_bb_A", grid, 
-			vec<int>{0}, vec<int>{1}, m_p_bb_A->blk_sizes())).get_stensor();
-		
-		m_p_bb_A->filter();
-		dbcsr::print(*m_p_bb_A);
-			
-		if (!m_restricted && !m_nobeta) m_p_bb_B = (dbcsr::eigen_to_tensor(ptot, 
-			"p_bb_B", grid, vec<int>{0}, vec<int>{1}, m_p_bb_B->blk_sizes())).get_stensor();
-		
 		
 		LOG.os<2>("SAD density matrices.\n");
 		if (LOG.global_plev() >= 2) {
 			dbcsr::print(*m_p_bb_A);
 			if (m_p_bb_B) dbcsr::print(*m_p_bb_B);
 		}
-		
-		dbcsr::contract(*m_c_bm_A,*m_c_bm_A,*m_p_bb_A).perform("Mi, Ni -> MN");
-		std::cout << "Contracted..." << std::endl;
-		dbcsr::print(*m_p_bb_A);
 		
 		LOG.os<>("Finished with SAD.\n");
 		
