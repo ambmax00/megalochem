@@ -28,12 +28,12 @@ include_directories(
 )
 
 add_subdirectory(tensor)
-#add_subdirectory(math)
-#add_subdirectory(desc)
-#add_subdirectory(input)
-#add_subdirectory(ints)
-#add_subdirectory(hf)
-#add_subdirectory(adc)
+add_subdirectory(math)
+add_subdirectory(desc)
+add_subdirectory(input)
+add_subdirectory(ints)
+add_subdirectory(hf)
+add_subdirectory(adc)
 #add_subdirectory(mp2)
 
 add_executable(
@@ -45,11 +45,11 @@ target_link_libraries(
 	chem
 	PUBLIC
 	chem_tensor
-	#	chem_input
+	chem_input
 	#	chem_math_laplace
 	MPI::MPI_CXX	
-	#chem_hf
-	#chem_desc
-	#chem_ints
-	#chem_adc
+	chem_hf
+	chem_desc
+	chem_ints
+	chem_adc
 )
