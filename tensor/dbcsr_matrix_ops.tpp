@@ -44,7 +44,7 @@ public:
                         (c_alpha) ? *c_alpha : (T)1.0, 
                         m_A.m_matrix_ptr, m_B.m_matrix_ptr,
                         (c_beta) ? *c_beta : T(),
-                        m_C.m_matrix_ptr,
+                        m_C.matrix_ptr,
                         (c_first_row) ? &*c_first_row : nullptr,
                         (c_last_row) ? &*c_last_row : nullptr,
                         (c_first_col) ? &*c_first_col : nullptr,
@@ -61,6 +61,6 @@ public:
 template <typename T>
 multiply(char transa, char transb, matrix<T>& A, matrix<T>& B, matrix<T>& C) -> multiply<typename matrix<T>::value_type>;
 
-} // end nmespace
 
-#endif
+
+}

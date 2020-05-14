@@ -7,8 +7,8 @@
 
 namespace math {
 
-using smatrix = dbcsr::smat_d;
-using matrix = dbcsr::mat_d;
+using smatrix = dbcsr::smatrix_d;
+using matrix = dbcsr::matrix_d;
 
 class hermitian_eigen_solver {
 private:
@@ -19,43 +19,30 @@ private:
 	dbcsr::world m_world;
 	util::mpi_log LOG;
 
+	int m_blksize;
 	char m_jobz;
 	
-	std::optional<vec<int>> m_rowblksizes_out 
+	std::optional<vec<int>> m_blksizes_out 
 			= std::nullopt; //block sizes for eigenvector matrix
-	std::optional<vec<int>> m_colblksizes_out
-			= std::nullopt;
 	
 public:
 
-	inline hermitian_eigen_solver& eigvec_rowblks(vec<int>& blksizes) {
-		m_rowblksizes_out = std::make_optional<vec<int>>(blksizes);
-		return *this;
-	}
-	
-	inline hermitian_eigen_solver& eigvec_colblks(vec<int>& blksizes) {
-		m_colblksizes_out = std::make_optional<vec<int>>(blksizes);
+	inline hermitian_eigen_solver& set_blksizes(vec<int>& blksizes) {
+		m_blksizes_out = std::make_optional<vec<int>>(blksizes);
 		return *this;
 	}
 
 	hermitian_eigen_solver(smatrix& mat_in, char jobz, int print = 0) :
 		m_mat_in(mat_in), m_world(mat_in->get_world()),
-		LOG(m_world.comm(), print),
+		m_blksize(4), LOG(m_world.comm(), print),
 		m_jobz(jobz) {}
 
-	void compute(int scalapack_blksize = 10);
+	void compute();
 	
 	vec<double>& eigvals() {
 		return m_eigval;
 	}
 	
-	smatrix eigvecs() {
-		return m_eigvec;
-	}
-	
-	smatrix inverse();
-	
-	smatrix inverse_sqrt();
 	
 };
 

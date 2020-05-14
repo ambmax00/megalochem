@@ -2,10 +2,7 @@
 #define DBCSR_CONVERSIONS_HPP
 
 #include <Eigen/Core>
-
-#ifdef USE_SCALAPACK
 #include "extern/scalapack.h"
-#endif
 #include <dbcsr_matrix.hpp>
 #include <dbcsr_tensor.hpp>
 #include <limits>
@@ -16,26 +13,15 @@ using MatrixX = Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic>;
 namespace dbcsr {
 
 template <typename T = double>
-MatrixX<T> matrix_to_eigen(dbcsr::matrix<T>& mat_in) {
-	int row = mat_in.nfullrows_total();
-	int col = mat_in.nfullcols_total();
+MatrixX<T> matrix_to_eigen(dbcsr::matrix<T>& mat) {
+	int row = mat.nfullrows_total();
+	int col = mat.nfullcols_total();
 	
-	dbcsr::matrix<T>* mat_desym;
-	
-	if (mat_in.has_symmetry()) {
-		mat_desym = new dbcsr::matrix<T>(mat_in.desymmetrize());
-	} else {
-		mat_desym = &mat_in;
-	}
-	
-	mat_desym->replicate_all();
+	mat.replicate_all();
 	
 	MatrixX<T> eigenmat(row,col);
-
-#pragma omp parallel 
-{
-
-	iterator<T> iter(*mat_desym);
+	
+	iterator<T> iter(mat);
 	
 	iter.start();
 	
@@ -52,16 +38,8 @@ MatrixX<T> matrix_to_eigen(dbcsr::matrix<T>& mat_in) {
 	}
 	
 	iter.stop();
-	mat_desym->finalize();	
 	
-}
-
-	if (mat_in.has_symmetry()) {
-		mat_desym->release();
-		delete mat_desym;
-	} else {
-		mat_in.distribute();
-	}
+	mat.distribute();
 	
 	return eigenmat;
 	
@@ -74,32 +52,7 @@ matrix<T> eigen_to_matrix(MatrixX<T>& mat, world& w, std::string name, vec<int>&
 	matrix<T> out = typename matrix<T>::create().name(name).set_world(w).row_blk_sizes(row_blk_sizes)
 		.col_blk_sizes(col_blk_sizes).type(type);
 	
-	if (out.has_symmetry()) {
-		//reserve upper diagonal blocks
-		int nrows, ncols;
-		nrows = out.nblkrows_total();
-		ncols = out.nblkcols_total();
-		vec<int> resrows, rescols;
-	
-		for (int i = 0; i != nrows; ++i) {
-			for (int j = 0; j != ncols; ++j) {
-				if (out.proc(i,j) == w.rank() && i <= j) {
-					resrows.push_back(i);
-					rescols.push_back(j);
-				}
-			}
-		}
-	
-		out.reserve_blocks(resrows,rescols);
-		
-	} else {
-		
-		out.reserve_all();
-		
-	}
-	
-#pragma omp parallel 
-{
+	out.reserve_all();
 	
 	iterator<T> iter(out);
 	
@@ -118,9 +71,6 @@ matrix<T> eigen_to_matrix(MatrixX<T>& mat, world& w, std::string name, vec<int>&
 	
 	iter.stop();
 	out.finalize();
-	
-}
-
 	return out;
 	
 }
@@ -136,9 +86,34 @@ scalapack::distmat<T> matrix_to_scalapack(matrix<T>& mat_in, std::string nameint
 	int nrows = mat_in.nfullrows_total();
 	int ncols = mat_in.nfullcols_total();		
 	
+	auto split_range = [](int n, int split) {
+	
+				// number of intervals
+				int nblock = n%split == 0 ? n/split : n/split + 1;
+				bool even = n%split == 0 ? true : false;
+				
+				if (even) {
+					std::vector<int> out(nblock,split);
+					return out;
+				} else {
+					std::vector<int> out(nblock,split);
+					out[nblock-1] = n%split;
+					return out;
+				}
+	};
+	
 	// make distvecs
 	vec<int> rowsizes = split_range(nrows, nsplitrow);
 	vec<int> colsizes = split_range(ncols, nsplitcol);
+	
+	auto cyclic_dist = [](int dist_size, int nbins) {
+  
+		std::vector<int> distv(dist_size);
+		for(int i=0; i < dist_size; i++)
+			distv[i] = i % nbins;
+
+		return distv;
+	};
 	
 	vec<int> rowdist = cyclic_dist(rowsizes.size(),mworld.dims()[0]);
 	vec<int> coldist = cyclic_dist(colsizes.size(),mworld.dims()[1]);
@@ -151,12 +126,12 @@ scalapack::distmat<T> matrix_to_scalapack(matrix<T>& mat_in, std::string nameint
 	if (mat_in.has_symmetry()) {
 		matrix<T> mat_in_nosym = mat_in.desymmetrize();
 		mat_out.redistribute(mat_in_nosym, false);
-		//mat_in_nosym.release();
+		mat_in_nosym.release();
 	} else {
 		mat_out.redistribute(mat_in,false);
 	}
 	
-	//dbcsr::print(mat_out);
+	dbcsr::print(mat_out);
 	
 	scalapack::distmat<double> scamat(igrid,nrows,ncols,nsplitrow,nsplitcol);
 	
@@ -186,78 +161,14 @@ scalapack::distmat<T> matrix_to_scalapack(matrix<T>& mat_in, std::string nameint
 	mat_out.finalize();
 }	
 	mat_out.release();
-	scaldist.release();
 	
-	//scamat.print();
+	scamat.print();
 	
 	return scamat;
 	
 }
 
-template <typename T = double>
-matrix<T> scalapack_to_matrix(scalapack::distmat<T>& sca_mat_in, std::string nameint, 
-								world& world_in, vec<int>& rowblksizes, vec<int>& colblksizes) 
-{
-	// form block-cyclic distribution
-	
-	int nfullrow = std::accumulate(rowblksizes.begin(),rowblksizes.end(),0,std::plus<int>());
-	int nfullcol = std::accumulate(colblksizes.begin(),colblksizes.end(),0,std::plus<int>());
-	
-	// make distvecs
-	vec<int> rowcycsizes = split_range(nfullrow, sca_mat_in.rowblk_size());
-	vec<int> colcycsizes = split_range(nfullcol, sca_mat_in.colblk_size());
-	
-	vec<int> rowdist = cyclic_dist(rowcycsizes.size(),world_in.dims()[0]);
-	vec<int> coldist = cyclic_dist(colcycsizes.size(),world_in.dims()[1]);
-	
-	dist cycdist = dist::create().set_world(world_in).row_dist(rowdist).col_dist(coldist);
-	
-	matrix<T> mat_cyclic = typename matrix<T>::create().name(nameint + "cyclic")
-		.set_dist(cycdist).row_blk_sizes(rowcycsizes).col_blk_sizes(colcycsizes)
-		.type(dbcsr_type_no_symmetry);
-	
-	mat_cyclic.reserve_all();
-	
-	dbcsr::iterator iter(mat_cyclic);
-
-#pragma omp parallel
-{
-	iter.start();
-	
-	while (iter.blocks_left()) {
-		
-		iter.next_block();
-		
-		int ioff = iter.row_offset();
-		int joff = iter.col_offset();
-		
-		for (int j = 0; j != iter.col_size(); ++j) {
-			for (int i = 0; i != iter.row_size(); ++i) {
-				// use global indices for scamat
-				iter(i,j) = sca_mat_in.global_access(i + ioff, j + joff);
-			}
-		}
-		
-	}
-	
-	iter.stop();
-	mat_cyclic.finalize();
-}	
-	
-	// make new matrix
-	matrix<T> mat_out = typename matrix<T>::create().name(nameint).set_world(world_in)
-		.row_blk_sizes(rowblksizes).col_blk_sizes(colblksizes)
-		.type(dbcsr_type_no_symmetry);
-		
-	mat_out.redistribute(mat_cyclic);
-	mat_cyclic.release();
-	cycdist.release();
-	
-	return mat_out;
-	
-}
-
-#endif // USE_SCALAPACK
+#endif
 
 template <typename T = double>
 MatrixX<T> tensor_to_eigen(dbcsr::tensor<2,T>& array, int l = 0) {
@@ -366,23 +277,6 @@ dbcsr::tensor<2,T> eigen_to_tensor(MatrixX<T>& M, std::string name,
 	return out;
 
 }
-
-template <typename T>
-void copy_tensor_to_matrix(tensor<2,T>& t_in, matrix<T>& m_out, std::optional<bool> summation) {
-	
-	c_dbcsr_t_copy_tensor_to_matrix(t_in.m_tensor_ptr, m_out.m_matrix_ptr,(summation) ? &*summation : nullptr);
-	return;
-	
-}
-
-template <typename T>
-void copy_matrix_to_tensor(matrix<T>& m_in, tensor<2,T>& t_out, std::optional<bool> summation) {
-	
-	c_dbcsr_t_copy_matrix_to_tensor(m_in.m_matrix_ptr, t_out.m_tensor_ptr,(summation) ? &*summation : nullptr);
-	return;
-	
-}
-
 	
 }
 	

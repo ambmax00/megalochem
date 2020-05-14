@@ -1,11 +1,11 @@
 #ifndef DESC_IO_H
 #define DESC_IO_H
 
+#include <dbcsr_conversions.hpp>
 #include <fstream>
 #include <cstdio>
 #include <vector>
 #include <memory>
-#include <mpi.h>
 
 namespace desc {
 
@@ -34,11 +34,9 @@ void read_binary_mat(const char* filename, Matrix& matrix){
     in.close();
 }
 
-/*
 void write_2dtensor(dbcsr::stensor<2>& t_in, std::string molname);
 
 void read_2dtensor(dbcsr::stensor<2>& t_in, std::string molname, std::string tensorname, MPI_Comm comm, arrvec<int,2>& blk_sizes);
-*/
 
 void write_vector(svector<double>& v_in, std::string molname, std::string vecname, MPI_Comm comm);
 

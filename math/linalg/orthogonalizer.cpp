@@ -1,38 +1,78 @@
 #include "math/linalg/orthogonalizer.h"
-#include "math/solvers/hermitian_eigen_solver.h"
-#include <dbcsr_matrix_ops.hpp>
+#include "tensor/dbcsr_conversions.h"
+#include "math/linalg/symmetrize.h"
 #include "utils/mpi_log.h"
+
+#include <Eigen/Eigenvalues>
 
 #include <stdexcept>
 
 namespace math {
 	
-int threshold = 1e-6;
+void orthgon::compute() {
 	
-void orthogonalizer::compute() {
+	//auto t = symmetrize(m_tensor, "SYM");
+	util::mpi_log LOG(m_tensor->comm(), m_plev);
 	
-	util::mpi_log LOG(m_mat_in->get_world().comm(), m_plev);
+	//dbcsr::print(*m_tensor);
 	
-	hermitian_eigen_solver solver(m_mat_in, 'V');
+	auto mat = dbcsr::tensor_to_eigen(*m_tensor);
 	
-	solver.compute();
+	Eigen::SelfAdjointEigenSolver<Eigen::MatrixXd> es;
 	
-	auto eigvecs = solver.eigvecs();
-	auto eigvals = solver.eigvals();
+	es.compute(mat);
 	
-	std::for_each(eigvals.begin(),eigvals.end(),[](double& d) { d = (d < threshold) ? 0 : 1/sqrt(d); });
+	//std::cout << "MAT" << std::endl;
+	//std::cout << mat << std::endl;
 	
-	dbcsr::mat_d eigvec_copy = dbcsr::mat_d::copy<double>(*eigvecs);
+	auto eigval = es.eigenvalues();
+	/*
+	m_out = es.eigenvectors();
 	
-	eigvec_copy.scale(eigvals, "right");
+	std::cout << m_out << std::endl;
+	*/
+	LOG.os<2>("Eigenvalues: ");
+	LOG.os<2>(eigval);
 	
-	dbcsr::mat_d out = dbcsr::mat_d::create_template(*m_mat_in).name(m_mat_in->name() + " orthogonalized")
-		.type(dbcsr_type_symmetric);
+	if (es.info() != Eigen::Success) throw std::runtime_error("Eigen hermitian eigensolver failed.");
+	
+	// for now, we dont throw any away.
+	
+	//for (int i = 0; i != m_out.rows(); ++i) {
+	//	for (int j = 0; j != m_out.cols(); ++j) {
+	//		m_out(i,j) /= sqrt(eigval(j));
+	//	}
+	//}
+	
+	/*		auto X = m_out;
+	auto S = mat;
+	
+	auto XSX = X.transpose() * S * X;
+	
+	std::cout << XSX << std::endl;
+	exit(0);*/
+	
+	auto eigvec = es.eigenvectors();
+	
+	for (int i = 0; i != eigval.size(); ++i) {
+		eigval(i) = 1/sqrt(eigval(i));
+	}
+	
+	m_out = eigvec * eigval.asDiagonal() * eigvec.transpose();
+
+}
+
+
+dbcsr::stensor<2,double> orthgon::result(std::string name) {
+	
+	dbcsr::pgrid<2> grid(m_tensor->comm());
 		
-	dbcsr::multiply('N', 'T', eigvec_copy, *eigvecs, out).perform(); 
+	auto t_out = 
+		dbcsr::eigen_to_tensor(m_out, name, grid, vec<int>{0}, vec<int>{1}, m_tensor->blk_sizes());
 		
-	m_mat_out = out.get_smatrix();
-	
+	m_out.resize(0,0);
+		
+	return t_out.get_stensor();
 }
 	
 }

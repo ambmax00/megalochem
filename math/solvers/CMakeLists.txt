@@ -7,8 +7,5 @@ add_library(chem_math_solvers ${sources})
 target_link_libraries(
 	chem_math_solvers
         chem_tensor	
+	${SCALAPACK_LIB}
 )
-
-if (SCALAPACK_LIB) 
-	target_link_libraries(chem_math_solvers ${SCALAPACK_LIB})
-endif()

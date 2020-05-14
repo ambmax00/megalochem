@@ -100,8 +100,6 @@ public:
 			double omega = 0.1; //*ctx.get<double>("INT/omega");
 			eng.set_params(omega);
 		}
-		
-		eng.set(m_BraKet);
 			
 		m_eng_pool = util::make_pool<libint2::Engine>(eng);
 		
@@ -116,7 +114,7 @@ public:
 		auto rowsizes = m_basvec[0].cluster_sizes();
 		auto colsizes = m_basvec[1].cluster_sizes();
 		
-		dbcsr::mat_d m_ints = dbcsr::mat_d::create()
+		dbcsr::matrix_d m_ints = dbcsr::matrix_d::create()
 			.name(m_intname)
 			.set_world(m_world)
 			.row_blk_sizes(rowsizes).col_blk_sizes(colsizes)

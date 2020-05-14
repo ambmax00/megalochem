@@ -38,10 +38,6 @@ target_link_libraries(
         DBCSR::dbcsr_c
 )
 
-if (SCALAPACK_LIB)
-	target_link_libraries(chem_tensor INTERFACE ${SCALAPACK_LIB})
-endif()
-
 target_include_directories(
 	chem_tensor
 	INTERFACE 

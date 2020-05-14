@@ -105,14 +105,6 @@ class contract;
 template <int N1, typename T = double>
 class copy;
 
-// other 
-
-template <typename T>
-void copy_tensor_to_matrix(tensor<2,T>& t_in, matrix<T>& m_out, std::optional<bool> summation = std::nullopt);
-
-template <typename T>
-void copy_matrix_to_tensor(matrix<T>& m_in, tensor<2,T>& t_out, std::optional<bool> summation = std::nullopt);
-
 inline double block_threshold = 1e-16;
 
 static auto default_dist = 
@@ -147,32 +139,6 @@ static auto default_dist =
 		
 };
 
-auto split_range = [](int n, int split) {
-	
-	// number of intervals
-	int nblock = n%split == 0 ? n/split : n/split + 1;
-	bool even = n%split == 0 ? true : false;
-	
-	if (even) {
-		std::vector<int> out(nblock,split);
-		return out;
-	} else {
-		std::vector<int> out(nblock,split);
-		out[nblock-1] = n%split;
-		return out;
-	}
-	
-};
-	
-auto cyclic_dist = [](int dist_size, int nbins) {
-  
-	std::vector<int> distv(dist_size);
-	for(int i=0; i < dist_size; i++)
-		distv[i] = i % nbins;
-
-	return distv;
-};
-
 // ---------------------------------------------------------------------
 //                library functions              
 // ---------------------------------------------------------------------
@@ -192,8 +158,8 @@ inline void print_statistics(const bool print_timers = false) {
 class world {
 private:
 
-    std::shared_ptr<MPI_Comm> m_comm_ptr;
-    std::shared_ptr<MPI_Comm> m_group_ptr;
+    MPI_Comm m_comm;
+    MPI_Comm m_group;
     int m_rank;
     int m_size;
     std::array<int,2> m_dims;
@@ -203,21 +169,18 @@ private:
     
 public:
 
-    world(MPI_Comm comm) {
-		
-		m_comm_ptr = std::make_shared<MPI_Comm>(comm);
-		m_group_ptr = std::make_shared<MPI_Comm>(); 
+    world(MPI_Comm comm) : m_comm(comm), m_group(MPI_COMM_NULL) {
         
-        MPI_Comm_rank(*m_comm_ptr, &m_rank);
-        MPI_Comm_size(*m_comm_ptr, &m_size);
+        MPI_Comm_rank(m_comm, &m_rank);
+        MPI_Comm_size(m_comm, &m_size);
         int dims[2] = {0};
         MPI_Dims_create(m_size, 2, dims);
         int periods[2] = {1};
         int reorder = 0;
-        MPI_Cart_create(*m_comm_ptr, 2, dims, periods, reorder, &*m_group_ptr);
+        MPI_Cart_create(m_comm, 2, dims, periods, reorder, &m_group);
         
         int coord[2];
-        MPI_Cart_coords(*m_group_ptr, m_rank, 2, coord);
+        MPI_Cart_coords(m_group, m_rank, 2, coord);
         
         m_dims[0] = dims[0];
         m_dims[1] = dims[1];
@@ -226,43 +189,21 @@ public:
         
     }
     
-    world(MPI_Comm comm, MPI_Comm group) {
-		
-		m_comm_ptr = std::make_shared<MPI_Comm>(comm);
-		m_group_ptr = std::make_shared<MPI_Comm>(group); 
-        
-        MPI_Comm_rank(*m_comm_ptr, &m_rank);
-        MPI_Comm_size(*m_comm_ptr, &m_size);
-        
-        int dims[2] = {0};
-        MPI_Dims_create(m_size, 2, dims);
-        
-        int coord[2];
-        MPI_Cart_coords(*m_group_ptr, m_rank, 2, coord);
-        
-        m_dims[0] = dims[0];
-        m_dims[1] = dims[1];
-        m_coord[0] = coord[0];
-        m_coord[1] = coord[1];
-         
-	}
-    
-    world() {}
-    
     world(const world& w) :
-		m_comm_ptr(w.m_comm_ptr), m_group_ptr(w.m_group_ptr),
+		m_comm(w.m_comm), m_group(w.m_group),
 		m_rank(w.m_rank), m_size(w.m_size),
 		m_dims(w.m_dims), m_coord(w.m_coord) {}
     
-    void free() {
-        if (*m_group_ptr != MPI_COMM_NULL) MPI_Comm_free(&*m_group_ptr);
-        //if (*m_comm_ptr != MPI_COMM_NULL) MPI_Comm_free(&*m_comm_ptr);
+    void destroy(bool keep_comm = false) {
+        if (m_group != MPI_COMM_NULL && !keep_comm) 
+            MPI_Comm_free(&m_group);
+        m_comm = MPI_COMM_NULL;
     }
     
-    ~world() {}
+    ~world() { destroy(true); }
     
-    MPI_Comm comm() { return *m_comm_ptr; }
-    MPI_Comm group() { return *m_group_ptr; }
+    MPI_Comm comm() { return m_comm; }
+    MPI_Comm group() { return m_group; }
     
     int rank() { return m_rank; }
     int size() { return m_size; }

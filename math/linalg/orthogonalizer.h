@@ -1,26 +1,26 @@
 #ifndef MATH_ORTHOGONALIZER_H
 #define MATH_ORTHOGONALIZER_H
 
-#include <dbcsr_matrix.hpp>
+#include "tensor/dbcsr.hpp"
 #include <string>
 #include <Eigen/Core>
 
 namespace math {
 	
-class orthogonalizer {
+class orthgon {
 private:
 
-	dbcsr::smatrix<double> m_mat_in;
-	dbcsr::smatrix<double> m_mat_out;
+	dbcsr::stensor<2,double>& m_tensor;
+	Eigen::MatrixXd m_out;
 	int m_plev;
 
 public:
 
-	orthogonalizer(dbcsr::smatrix<double>& m) : m_mat_in(m), m_plev(0) {};
+	orthgon(dbcsr::stensor<2,double>& t) : m_tensor(t), m_plev(0) {};
 	
 	void compute();
 
-	dbcsr::smatrix<double> result() { return m_mat_out; }
+	dbcsr::stensor<2,double> result(std::string name);
 	
 };
 
