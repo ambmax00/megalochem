@@ -170,9 +170,10 @@ public:
     void set(const T alpha) {
         c_dbcsr_set(m_matrix_ptr, alpha);
     }
-   
-    void add(const matrix& matrix_a, const T alpha = (T)1.0, const T beta = (T)1.0) {
-        c_dbcsr_add(this->m_matrix_ptr, matrix_a.m_matrix_ptr, alpha, beta);
+    
+    // this = alpha * this + beta * mat 
+    void add(const T alpha, const T beta, const matrix& matrix_in) {
+        c_dbcsr_add(this->m_matrix_ptr, matrix_in.m_matrix_ptr, alpha, beta);
     }
 
     void scale(T alpha, std::optional<int> last_column = std::nullopt) {

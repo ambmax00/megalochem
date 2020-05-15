@@ -38,9 +38,7 @@ void hermitian_eigen_solver::compute(int scalapack_blksize) {
 	// convert array
 	
 	LOG.os<>("-- Converting input matrix to SCALAPACK format.\n");
-	
-	std::cout << "Set up grid." << std::endl;
-	
+		
 	int ori_proc = m_mat_in->proc(0,0);
 	int ori_coord[2];
 	
@@ -50,13 +48,9 @@ void hermitian_eigen_solver::compute(int scalapack_blksize) {
 	}
 	
 	MPI_Bcast(&ori_coord[0],2,MPI_INT,ori_proc,m_mat_in->get_world().comm());
-	
-	std::cout << "ORI: " << ori_proc << " ROW " << ori_coord[0] << " COL " << ori_coord[1] << std::endl;
-	
+		
 	scalapack::distmat<double> sca_mat_in = dbcsr::matrix_to_scalapack(*m_mat_in, 
 		m_mat_in->name() + "_scalapack", nb, nb, ori_coord[0], ori_coord[1]);
-	
-	std::cout << "set up mat." << std::endl;
 	
 	std::optional<scalapack::distmat<double>> sca_eigvec_opt;
 	
@@ -65,8 +59,6 @@ void hermitian_eigen_solver::compute(int scalapack_blksize) {
 	} else {
 		sca_eigvec_opt = std::nullopt;
 	}
-	
-	std::cout << "set up vec." << std::endl;
 	
 	m_eigval.resize(n);
 	
@@ -91,6 +83,8 @@ void hermitian_eigen_solver::compute(int scalapack_blksize) {
 			
 		std::vector<int> colblksizes = (m_colblksizes_out) 
 			? *m_colblksizes_out : m_mat_in->col_blk_sizes();
+			
+		sca_eigvec_opt->print();
 		
 		matrix dbcsr_eigvec = dbcsr::scalapack_to_matrix(*sca_eigvec_opt, 
 			"eigenvectors", m_world, rowblksizes, colblksizes); 
@@ -115,6 +109,8 @@ void hermitian_eigen_solver::compute(int scalapack_blksize) {
 	LOG.os<>("-- Converting dbcsr matrix to eigen matrix.\n");
 	
 	auto eigenmat_in = dbcsr::matrix_to_eigen<double>(*m_mat_in);
+	
+	std::cout << eigenmat_in << std::endl;
 	
 	LOG.os<>("-- Starting solver.\n");
 	

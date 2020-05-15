@@ -134,8 +134,8 @@ void hfmod::one_electron() {
 	m_x_bb = og.result();
 	
 	//std::cout << "H1" << std::endl;
-	m_core_bb->add(*m_v_bb);
-	m_core_bb->add(*m_t_bb);
+	m_core_bb->add(0.0, 1.0, *m_v_bb);
+	m_core_bb->add(1.0, 1.0, *m_t_bb);
 	
 	TIME_1e.finish();
 	

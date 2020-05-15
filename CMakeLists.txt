@@ -21,7 +21,7 @@ find_package(DBCSR 2.0.0 CONFIG REQUIRED)
 find_package(TBB REQUIRED)
 find_package(Libint2 2.6.0 CONFIG REQUIRED)
 
-find_library(SCALAPACK_LIB NAMES libmkl_scalapack_ilp64.a libscalapack.a PATHS ${SCALAPACK_DIR})
+#find_library(SCALAPACK_LIB NAMES libmkl_scalapack_ilp64.a libscalapack.a PATHS ${SCALAPACK_DIR})
 if (SCALAPACK_LIB)
 	message("-- Found ScaLAPACK implementation: ${SCALAPACK_LIB}")
         add_definitions(-DUSE_SCALAPACK)	

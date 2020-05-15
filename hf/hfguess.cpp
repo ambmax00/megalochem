@@ -223,9 +223,9 @@ void hfmod::compute_guess() {
 			//dbcsr::print(*pA);
 			
 			mat_d pscaled = mat_d::copy<double>(*pA).name(at_smol->name() + "_density");
-			pscaled.add(*pB);
+			pscaled.add(0.5, 0.5, *pB);
 			
-			pscaled.scale(0.5);
+			//pscaled.scale(0.5);
 			
 			locdensitymap[Z] = dbcsr::matrix_to_eigen(pscaled);
 			

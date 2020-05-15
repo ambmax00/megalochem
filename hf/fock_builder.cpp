@@ -317,40 +317,39 @@ void fockbuilder::compute(smat& core, smat& p_A, smat& c_A, smat& p_B, smat& c_B
 	arrvec<int,2> bb = {b,b};
 	arrvec<int,2> bm = {b,m};
 	
-	std::cout << "Creating tensors." << std::endl;
-	
 	stensor<2> t_p_A = dbcsr::make_stensor<2>(
 		tensor<2>::create().name("pA tensor").ngrid(grid2).map1({0}).map2({1}).blk_sizes(bb));
 		
 	stensor<2> t_c_A = dbcsr::make_stensor<2>(
 		tensor<2>::create().name("cA tensor").ngrid(grid2).map1({0}).map2({1}).blk_sizes(bm));
 		
-	std::cout << "Copy in tensors." << std::endl;
-	
 	dbcsr::copy_matrix_to_tensor(*p_A, *t_p_A);
 	dbcsr::copy_matrix_to_tensor(*c_A, *t_c_A);
 		
 	stensor<2> t_p_B = nullptr;
 	stensor<2> t_c_B = nullptr;
 	
-	std::cout << "Done with copy." << std::endl;
+	if (p_B) {
+		t_p_B = dbcsr::make_stensor<2>(
+			tensor<2>::create_template().tensor_in(*t_p_A).name("pB tensor"));
+		dbcsr::copy_matrix_to_tensor(*p_B, *t_p_B);
+	}
 	
-	if (p_B && c_B) {
+	if (c_B) {
 		
 		auto mB = c_B->col_blk_sizes();
 		arrvec<int,2> bmB = {b,mB};
 		
-		t_p_B = dbcsr::make_stensor<2>(
-			tensor<2>::create_template().tensor_in(*t_p_A).name("pB tensor"));
 		t_c_B = dbcsr::make_stensor<2>(
 			tensor<2>::create().name("cB tensor").ngrid(grid2).map1({0}).map2({1}).blk_sizes(bmB));
-		dbcsr::copy_matrix_to_tensor(*p_B, *t_p_B);
+
 		dbcsr::copy_matrix_to_tensor(*c_B, *t_c_B);
 	}
 	
 	build_j(t_p_A, t_p_B);
 	build_k(t_p_A, t_p_B, t_c_A, t_c_B, SAD);
 	
+	m_f_bb_A->clear();
 	m_f_bb_A->copy_in(*core);
 	dbcsr::copy_tensor_to_matrix(*m_j_bb, *m_f_bb_A, true);
 	dbcsr::copy_tensor_to_matrix(*m_k_bb_A, *m_f_bb_A, true);
@@ -358,7 +357,7 @@ void fockbuilder::compute(smat& core, smat& p_A, smat& c_A, smat& p_B, smat& c_B
 	m_k_bb_A->clear();
 	
 	if (m_f_bb_B) {
-		
+		m_f_bb_B->clear();
 		m_f_bb_B->copy_in(*core);
 		dbcsr::copy_tensor_to_matrix(*m_j_bb, *m_f_bb_B, true);
 		dbcsr::copy_tensor_to_matrix(*m_k_bb_B, *m_f_bb_B, true);
