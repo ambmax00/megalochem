@@ -12,11 +12,11 @@ private:
 
 	dbcsr::smatrix<double> m_mat_in;
 	dbcsr::smatrix<double> m_mat_out;
-	int m_plev;
+	bool m_print;
 
 public:
 
-	orthogonalizer(dbcsr::smatrix<double>& m) : m_mat_in(m), m_plev(0) {};
+	orthogonalizer(dbcsr::smatrix<double>& m, bool print = false) : m_mat_in(m), m_print(print) {};
 	
 	void compute();
 

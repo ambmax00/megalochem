@@ -76,8 +76,8 @@ void hfmod::compute_guess() {
 		//dbcsr::copy<2>({.t_in = *m_core_bb, .t_out = *m_f_bb_A}); 
 		m_f_bb_A->copy_in(*m_core_bb);
 		
-		dbcsr::print(*m_core_bb);
-		dbcsr::print(*m_f_bb_A);
+		//dbcsr::print(*m_core_bb);
+		//dbcsr::print(*m_f_bb_A);
 		
 		if (!m_restricted && !m_nobeta) m_f_bb_B->copy_in(*m_core_bb);
 		
@@ -128,14 +128,17 @@ void hfmod::compute_guess() {
 			if (m_world.rank() == I % m_world.size()) my_atypes.push_back(atypes[I]);
 		}
 		
-		for (int i = 0; i != m_world.size(); ++i) {
-			if (m_world.rank() == i) {
-				std::cout << "Rank " << m_world.rank() << std::endl;
-				for (auto e : my_atypes) {
-					std::cout << e.atomic_number << " ";
-				} std::cout << std::endl;
+		if (LOG.global_plev() >= 2) {
+			LOG.os<>("Distribution of atom types along processors:\n");
+			for (int i = 0; i != m_world.size(); ++i) {
+				if (m_world.rank() == i) {
+					std::cout << "Rank " << m_world.rank() << std::endl;
+					for (auto e : my_atypes) {
+						std::cout << e.atomic_number << " ";
+					} std::cout << std::endl;
+				}
+				MPI_Barrier(m_world.comm());
 			}
-			MPI_Barrier(m_world.comm());
 		}
 		
 		MPI_Comm mycomm;
@@ -204,7 +207,9 @@ void hfmod::compute_guess() {
 				
 			auto at_smol = std::make_shared<desc::molecule>(std::move(at_mol));
 				
-			at_smol->print_info(mycomm,LOG.global_plev());
+			if (LOG.global_plev() >= 2) {
+				at_smol->print_info(mycomm,LOG.global_plev());
+			}
 			
 			dbcsr::world at_world(mycomm);
 			
@@ -254,7 +259,7 @@ void hfmod::compute_guess() {
 		// distribute to other nodes
 		for (int i = 0; i != m_world.size(); ++i) {
 			
-			std::cout << "LOOP: " << i << std::endl;
+			//std::cout << "LOOP: " << i << std::endl;
 			
 			if (i == m_world.rank()) {
 				
@@ -336,15 +341,15 @@ void hfmod::compute_guess() {
 			
 		}
 		
-		std::cout << "PTOT: " << nbas << std::endl;
-		std::cout << ptot_eigen << std::endl;
+		//std::cout << "PTOT: " << nbas << std::endl;
+		//std::cout << ptot_eigen << std::endl;
 		
 		auto b = m_mol->dims().b();
 		mat_d ptot = dbcsr::eigen_to_matrix(ptot_eigen, m_world, "p_bb_A", b, b, dbcsr_type_symmetric);
 		
 		m_p_bb_A = ptot.get_smatrix();
 		
-		math::hermitian_eigen_solver solver(m_p_bb_A, 'V');
+		math::hermitian_eigen_solver solver(m_p_bb_A, 'V', (LOG.global_plev() >= 2) ? true : false);
 		
 		solver.compute();
 		

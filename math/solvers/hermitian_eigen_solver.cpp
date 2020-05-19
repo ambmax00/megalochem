@@ -84,7 +84,7 @@ void hermitian_eigen_solver::compute(int scalapack_blksize) {
 		std::vector<int> colblksizes = (m_colblksizes_out) 
 			? *m_colblksizes_out : m_mat_in->col_blk_sizes();
 			
-		sca_eigvec_opt->print();
+		//sca_eigvec_opt->print();
 		
 		matrix dbcsr_eigvec = dbcsr::scalapack_to_matrix(*sca_eigvec_opt, 
 			"eigenvectors", m_world, rowblksizes, colblksizes); 
@@ -110,7 +110,10 @@ void hermitian_eigen_solver::compute(int scalapack_blksize) {
 	
 	auto eigenmat_in = dbcsr::matrix_to_eigen<double>(*m_mat_in);
 	
-	std::cout << eigenmat_in << std::endl;
+	//std::cout << "THIS " << std::endl;
+	//for (size_t i = 0; i != eigenmat_in.size(); ++i) {
+	//	std::cout << eigenmat_in.data()[i] << " ";
+	//}
 	
 	LOG.os<>("-- Starting solver.\n");
 	

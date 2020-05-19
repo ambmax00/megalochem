@@ -129,7 +129,7 @@ void hfmod::one_electron() {
 	m_v_bb = int_engine.op("nuclear").dim("bb").compute();
 	
 	// get X
-	math::orthogonalizer og(m_s_bb);
+	math::orthogonalizer og(m_s_bb, (LOG.global_plev() >= 2) ? true : false);
 	og.compute();
 	m_x_bb = og.result();
 	
@@ -152,7 +152,7 @@ void hfmod::one_electron() {
 		LOG.os<>('\n');
 	}
 	
-	LOG.os<>("Done with 1 electron integrals.");
+	LOG.os<>("Done with 1 electron integrals.\n");
 	
 }
 	
@@ -232,8 +232,15 @@ void hfmod::compute() {
 	double norm_B = 10;
 	
 	// ---------> print info here <-------
-	
-	LOG.os<>("Iteration Nr\t", "Energy (Ht)\t", "Error (Ht)\t", "RMS alpha(Ht)\t", "RMS beta(Ht)\n");
+	int width = 18;
+	LOG.left();
+	LOG.setw(width).os<>("Iteration Nr")
+		.setw(width).os<>("Energy (Ht)")
+		.setw(width).os<>("Error (Ht)")
+		.setw(width).os<>("RMS alpha(Ht)")
+		.setw(width).os<>("RMS beta(Ht)").os<>('\n');
+		
+	LOG.os<>("--------------------------------------------------------------------------------\n");
 	
 	auto RMS = [&](smat_d& m) {
 		double prod = m->dot(*m);
@@ -267,8 +274,14 @@ void hfmod::compute() {
 			norm_B = RMS(e_B);
 		}
 		
-		LOG.os<>("UHF@", iter, '\t', m_scf_energy + m_nuc_energy, '\t', old_energy - m_scf_energy, 
-			'\t', norm_A, '\t', norm_B, '\n');
+		LOG.left();
+		LOG.setw(width).os<>("UHF@"+std::to_string(iter));
+		LOG.scientific();
+		LOG.setw(width).os<>(m_scf_energy + m_nuc_energy)
+			.setw(width).os<>(old_energy - m_scf_energy)
+			.setw(width).os<>(norm_A)
+			.setw(width).os<>(norm_B).os<>('\n');
+		LOG.reset();
 		
 		if (norm_A < m_scf_threshold && norm_B < m_scf_threshold && iter > 0) break;
 		if (iter > m_max_iter) break;
@@ -317,8 +330,10 @@ void hfmod::compute() {
 	}
 	
 	LOG.os<>("Done with SCF cycle. Took ", iter, " iterations.\n");
+	LOG.scientific();
 	LOG.os<>("Final SCF energy: ", m_scf_energy, '\n');
 	LOG.os<>("Total energy: ", m_scf_energy + m_nuc_energy, '\n');
+	LOG.reset();
 	
 	TIME.finish();
 	TIME.print_info();

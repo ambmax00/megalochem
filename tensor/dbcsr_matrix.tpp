@@ -418,7 +418,7 @@ public:
     #:set rowcol = 'cols'
 #:endif
         std::vector<int> out(this->nblk${rowcol}$_${loctot}$(),0);
-        std::cout << out.size() << std::endl;
+        //std::cout << out.size() << std::endl;
         
         c_dbcsr_get_${var}$(m_matrix_ptr, out.data());
                              

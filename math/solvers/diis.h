@@ -214,7 +214,7 @@ public:
 			
 			// do M = c1 * T1 + c2 * T2 + ...
 			for (int i = 0; i != coeffs.size(); ++i) {
-				dbcsr::print(*m_trialvecs[i]);
+				//dbcsr::print(*m_trialvecs[i]);
 				trial->add(1.0, coeffs(i), *m_trialvecs[i]);
 			}
 			

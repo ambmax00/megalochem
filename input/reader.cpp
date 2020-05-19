@@ -17,10 +17,11 @@
 
 #include <libint2/basis.h>
 
+
+
 void validate(const json& j, const json& compare) {
 	
 	for (auto it = j.begin(); it != j.end(); ++it) {
-		std::cout << it.key() << std::endl;
 		if (compare.find(it.key()) == compare.end()){
 			throw std::runtime_error("Invalid keyword: "+it.key());
 		}
@@ -73,7 +74,6 @@ std::vector<libint2::Atom> get_geometry(const json& j) {
 			
 			if (nline > 1) {
 				std::stringstream ss(line);
-				std::cout << line << std::endl;
 				
 				libint2::Atom atom;
 				atom.x = x;
@@ -107,7 +107,7 @@ std::vector<libint2::Atom> get_geometry(const json& j) {
 		a.y /= factor;
 		a.z /= factor;
 		
-		std::cout << a.x << " " << a.y << " " << a.z << std::endl;
+		//std::cout << a.x << " " << a.y << " " << a.z << std::endl;
 		
 	}
 	
@@ -209,9 +209,9 @@ std::vector<libint2::Shell> read_basis(const json &jbas, std::vector<libint2::At
 		tot_basis.insert(tot_basis.end(), ele_basis.begin(), ele_basis.end());
 	}
 	
-	for (auto b : tot_basis) {
-		std::cout << b << std::endl;
-	}
+	//for (auto b : tot_basis) {
+		//std::cout << b << std::endl;
+	//}
 	
 	return tot_basis;
 	
@@ -243,7 +243,7 @@ void unpack(const json& j_in, desc::options& opt, std::string root) {
 	}
 }	
 
-reader::reader(MPI_Comm comm, std::string filename) : m_comm(comm) {
+reader::reader(MPI_Comm comm, std::string filename, int print) : m_comm(comm), LOG(m_comm, print) {
 	
 	std::ifstream in;
 	in.open(filename + ".json");
@@ -251,6 +251,8 @@ reader::reader(MPI_Comm comm, std::string filename) : m_comm(comm) {
 	if (!in) {
 		throw std::runtime_error("Input file not found.");
 	}
+	
+	LOG.os<>("Reading input file...\n\n");
 	
 	json data;
 	
@@ -260,6 +262,7 @@ reader::reader(MPI_Comm comm, std::string filename) : m_comm(comm) {
 	
 	json& jmol = data["molecule"];
 	
+	LOG.os<>("Processing atomic coordinates...\n");
 	auto atoms = get_geometry(jmol);
 	
 	bool reorder = (jmol.find("reorder") != jmol.end()) 
@@ -267,6 +270,7 @@ reader::reader(MPI_Comm comm, std::string filename) : m_comm(comm) {
 		: true;
 	
 	if (reorder) {
+		LOG.os<>("Reordering atoms...\n");
 		
 		math::rcm<libint2::Atom> sorter(atoms,3.0,
 			[](libint2::Atom a1, libint2::Atom a2) -> double {
@@ -277,6 +281,11 @@ reader::reader(MPI_Comm comm, std::string filename) : m_comm(comm) {
 				});
 				
 		sorter.compute();
+		
+		LOG.os<>("Reordered Atom Indices:\n");
+		for (auto i : sorter.reordered_idx()) {
+			LOG.os<>(i, " ");
+		} LOG.os<>("\n\n");
 	
 		sorter.reorder(atoms);
 	
@@ -296,16 +305,35 @@ reader::reader(MPI_Comm comm, std::string filename) : m_comm(comm) {
 		dfbasis = optional<std::vector<libint2::Shell>,val>(std::move(b));
 	}
 	
-	if (dfbasis) std::cout << "DFBASIS IS HERE." << std::endl;
+	//if (dfbasis) std::cout << "DFBASIS IS HERE." << std::endl;
 	
 	int charge = jmol["charge"];
 	int mult = jmol["mult"];
 	std::string name = jmol["name"];
 	
+	LOG.os<>("Molecule: \n");
+	int w = 10;
+	LOG.setprecision(6);
+	LOG.left();
+	LOG.setw(w).os<>("Atom Nr.").setw(w).os<>("X").setw(w)
+		.os<>("Y").setw(w).os<>("Z").os<>('\n');
+	LOG.right();
+	LOG.os<>("----------------------------------------------------------\n");
+	LOG.left();
+	for (auto& a : atoms) {
+		LOG.setw(w).os<>(a.atomic_number).setw(w).os<>(a.x).setw(w)
+			.os<>(a.y).setw(w).os<>(a.z, '\n');
+	}
+	LOG.right();
+	LOG.os<>("----------------------------------------------------------\n\n");
+	
+	LOG.reset();
+	
 	desc::molecule mol = desc::molecule::create().name(name).atoms(atoms).charge(charge)
 		.mult(mult).split(5).basis(basis).dfbasis(dfbasis);
 		
 	mol.print_info(m_comm,1);
+	LOG.os<>('\n');
 	
 	desc::options opt;
 	

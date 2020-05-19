@@ -149,6 +149,7 @@ int main(int argc, char** argv) {
 		
 		LOG.os<>("Reading HF info from files...\n");
 		myhfwfn->read_from_file(mol,wrd);
+		LOG.os<>("Done.\n");
 		
 	}
 	

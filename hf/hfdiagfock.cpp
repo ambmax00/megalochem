@@ -23,9 +23,9 @@ void hfmod::diag_fock() {
 		
 		dbcsr::multiply('N','N',*f_bb,*m_x_bb,FX).perform();
 		
-		dbcsr::print(*f_bb);
+		//dbcsr::print(*f_bb);
 		
-		dbcsr::print(FX);
+		//dbcsr::print(FX);
 		
 		dbcsr::multiply('T','N',*m_x_bb,FX,XFX).perform(); 
 		
@@ -36,7 +36,7 @@ void hfmod::diag_fock() {
 		
 		auto XFXs = XFX.get_smatrix();
 		
-		math::hermitian_eigen_solver solver(XFXs, 'V');
+		math::hermitian_eigen_solver solver(XFXs, 'V', (LOG.global_plev() >= 2) ? true : false);
 		
 		auto m = c_bm->col_blk_sizes();
 		solver.eigvec_colblks(m).compute();
@@ -148,9 +148,9 @@ void hfmod::compute_virtual_density() {
 			upbound = lobound + m_mol->nvir_beta() - 1;
 		}
 		
-		std::cout << "GOOD" << lobound << " " << upbound << std::endl;
+		//std::cout << "GOOD" << lobound << " " << upbound << std::endl;
 		dbcsr::multiply('N','T',*c_bm,*c_bm,*pv_bb).first_k(lobound).last_k(upbound).perform();
-		std::cout << "OUT" << std::endl;
+		//std::cout << "OUT" << std::endl;
 		
 		if (LOG.global_plev() >= 2) 
 			dbcsr::print(*pv_bb);
@@ -178,7 +178,7 @@ void hfmod::compute_virtual_density() {
 		//m_pv_bb_B->filter();
 	}
 	
-	std::cout << "Done with density." << std::endl;
+	//std::cout << "Done with density." << std::endl;
 	
 }
 	

@@ -57,7 +57,7 @@ private:
 			 
 		}}	
 	
-		print(m_distmat);
+		//print(m_distmat);
 	
 	}
 	
@@ -129,8 +129,8 @@ public:
 		compute_distmat();
 		compute_conmat();
 		
-		print(m_distmat);
-		print(m_conmat);
+		//print(m_distmat);
+		//print(m_conmat);
 		
 		int P = start_node();
 		//std::cout << "Best node to start: " << P << std::endl;
@@ -202,9 +202,9 @@ public:
 				std::sort(Q.begin()+offset, Q.end(), sortdeg);
 			
 				//std::cout << "NEW Q: " << std::endl;
-				for (int i = 0; i != Q.size(); ++i) {
-					std::cout << Q[i] << " ";
-				}
+				//for (int i = 0; i != Q.size(); ++i) {
+				//	std::cout << Q[i] << " ";
+				//}
 				//std::cout << std::endl;
 			
 			
@@ -232,9 +232,9 @@ public:
 		} // END WHILE
 	
 		//std::cout << "Here is R " << std::endl;
-		for (int i = 0; i != R.size(); ++i) {
-			std::cout << R[i] << " ";
-		}
+		//for (int i = 0; i != R.size(); ++i) {
+		//	std::cout << R[i] << " ";
+		//}
 		//std::cout << std::endl;
 		
 		if (R.size() != m_dim) throw std::runtime_error("Error reordering atoms.");
@@ -256,18 +256,22 @@ public:
 		
 		m_conmat = std::move(CMAT2);
 		
-		std::cout << "REORDERED CON MAT" << std::endl;
-		print(m_conmat);
+		//std::cout << "REORDERED CON MAT" << std::endl;
+		//print(m_conmat);
 		
 		m_index = R;
 	
-		std::cout << "Reordered atoms: " << std::endl;
-		for (int i = 0; i != m_dim; ++i) {
-			std::cout << m_index[i] << " ";
-		}
+		//std::cout << "Reordered atoms: " << std::endl;
+		//for (int i = 0; i != m_dim; ++i) {
+		//	std::cout << m_index[i] << " ";
+		//}
 	
-		std::cout << std::endl;
+		//std::cout << std::endl;
 	
+	}
+	
+	std::vector<int> reordered_idx() {
+		return m_index;
 	}
 	
 	template <typename T>

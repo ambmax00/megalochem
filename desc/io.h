@@ -6,6 +6,7 @@
 #include <vector>
 #include <memory>
 #include <mpi.h>
+#include <dbcsr_conversions.hpp>
 
 namespace desc {
 
@@ -34,11 +35,10 @@ void read_binary_mat(const char* filename, Matrix& matrix){
     in.close();
 }
 
-/*
-void write_2dtensor(dbcsr::stensor<2>& t_in, std::string molname);
+void write_matrix(dbcsr::smatrix<double>& m_in, std::string molname);
 
-void read_2dtensor(dbcsr::stensor<2>& t_in, std::string molname, std::string tensorname, MPI_Comm comm, arrvec<int,2>& blk_sizes);
-*/
+dbcsr::smatrix<double> read_matrix(std::string molname, std::string matname, 
+	dbcsr::world wrld, vec<int> rowblksizes, vec<int> colblksizes, char type);
 
 void write_vector(svector<double>& v_in, std::string molname, std::string vecname, MPI_Comm comm);
 

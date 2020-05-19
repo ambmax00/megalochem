@@ -117,7 +117,7 @@ public:
 		c_blacs_pinfo(&m_mypnum, &m_nprocs);
 		c_blacs_gridinfo(m_ctxt, &m_nprow, &m_npcol, &m_myprow, &m_mypcol);
 		
-		std::cout << m_nprow << " " << m_npcol << std::endl;
+		//std::cout << m_nprow << " " << m_npcol << std::endl;
 		
 	}
 	

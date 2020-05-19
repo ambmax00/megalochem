@@ -27,11 +27,35 @@ public:
     mpi_log(MPI_Comm comm, int glb) 
 		: global_plev_(glb), m_comm(comm) {};
     
-    ~mpi_log() {}
+    ~mpi_log() { reset(); }
+    
+    void reset() { std::cout.copyfmt(std::ios(NULL)); }
     
     int global_plev() { return global_plev_; }
     
     void flush() {std::cout << std::flush; }
+    
+    mpi_log& setprecision(int n) {
+		std::cout << std::setprecision(n);
+		return *this;
+	}
+	
+	mpi_log& setw(int n) {
+		std::cout << std::setw(n);
+		return *this;
+	}
+	
+#define modifier(str) \
+	void str () { \
+		std::cout << std::str; \
+	}
+	
+	modifier(fixed)
+	modifier(scientific)
+	modifier(hexfloat)
+	modifier(defaultfloat)
+	modifier(right)
+	modifier(left)
     
 	void print_() { std::cout << std::flush; }
     
@@ -42,7 +66,7 @@ public:
 	}
     
     template <int nprint = 0, typename T, typename... Args>
-    void os(T in, Args ... args) {
+    mpi_log& os(T in, Args ... args) {
 		
 		if (nprint <= global_plev_) {
 			int rank_;
@@ -67,6 +91,8 @@ public:
 			} //end ifelse	
 			
 		}//endif nprint
+		
+		return *this;
 		
 	} //end os
 	

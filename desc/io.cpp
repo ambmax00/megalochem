@@ -7,30 +7,27 @@ bool fexists(const std::string& filename) {
 		std::ifstream ifile(filename.c_str());
 		return (bool)ifile;
 }
-/*
-void write_2dtensor(dbcsr::stensor<2>& t_in, std::string molname) {
+
+void write_matrix(dbcsr::smatrix<double>& m_in, std::string molname) {
 		
 		std::ofstream file;
-		
-		int myrank = -1;
-		
-		MPI_Comm_rank(t_in->comm(), &myrank);
 				
-		std::string file_name = molname + "_" + t_in->name() + ".dat";
+		std::string file_name = molname + "_" + m_in->name() + ".dat";
 		
-		if (fexists(file_name) && myrank == 0) std::remove(file_name.c_str());
+		if (fexists(file_name) && m_in->get_world().rank() == 0) std::remove(file_name.c_str());
 		
-		auto eigen_mat = dbcsr::tensor_to_eigen(*t_in);
+		auto eigen_mat = dbcsr::matrix_to_eigen(*m_in);
 		
-		if (myrank == 0) write_binary_mat(file_name.c_str(), eigen_mat);
+		if (m_in->get_world().rank() == 0) write_binary_mat(file_name.c_str(), eigen_mat);
 		
 }
 
-void read_2dtensor(dbcsr::stensor<2>& t_in, std::string molname, std::string tensorname, MPI_Comm comm, arrvec<int,2>& blk_sizes) {
+dbcsr::smatrix<double> read_matrix(std::string molname, std::string matname, 
+	dbcsr::world wrld, vec<int> rowblksizes, vec<int> colblksizes, char type) {
 	
 	std::ifstream file;
 	
-	std::string file_name = molname + "_" + tensorname + ".dat";
+	std::string file_name = molname + "_" + matname + ".dat";
 	
 	if (!fexists(file_name)) throw std::runtime_error("File " + file_name + " does not exist.");
 	
@@ -38,14 +35,14 @@ void read_2dtensor(dbcsr::stensor<2>& t_in, std::string molname, std::string ten
 	
 	read_binary_mat(file_name.c_str(), eigen_mat);
 	
-	std::cout << tensorname << std::endl;
-	std::cout << eigen_mat << std::endl;
+	//std::cout << tensorname << std::endl;
+	//std::cout << eigen_mat << std::endl;
 	
-	dbcsr::pgrid<2> grid2(comm);
-	t_in = (dbcsr::eigen_to_tensor(eigen_mat, tensorname, grid2, vec<int>{0}, vec<int>{1}, blk_sizes)).get_stensor();
+	//dbcsr::pgrid<2> grid2(comm);
+	return (dbcsr::eigen_to_matrix(eigen_mat, wrld, matname, rowblksizes, colblksizes, type)).get_smatrix();
 	
 }
-*/
+
 void write_vector(svector<double>& v_in, std::string molname, std::string vecname, MPI_Comm comm) {
 	
 		std::ofstream file;

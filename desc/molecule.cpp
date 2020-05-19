@@ -37,12 +37,12 @@ molecule::molecule(molecule::create& p) :
 	m_cluster_basis = cbas;
 	
 	if (p.c_dfbasis) {
-		std::cout << "There is a df basis: " << p.c_dfbasis->size() << std::endl;
+		//std::cout << "There is a df basis: " << p.c_dfbasis->size() << std::endl;
 		cluster_basis cdfbas(*p.c_dfbasis,1);
 		
-		for (auto i : cdfbas.cluster_sizes()) {
-			std::cout << i << std::endl;
-		}
+		//for (auto i : cdfbas.cluster_sizes()) {
+		//	std::cout << i << std::endl;
+		//}
 		
 		m_cluster_dfbasis = optional<cluster_basis,val>(cdfbas);
 	}
@@ -52,7 +52,7 @@ molecule::molecule(molecule::create& p) :
 	m_frac = false;
 	if (p.c_fractional) m_frac = *p.c_fractional;
 	
-	if (m_frac) std::cout << "FRACTIONAL" << std::endl;
+	//if (m_frac) std::cout << "FRACTIONAL" << std::endl;
 	
 	if (m_frac) {
 		

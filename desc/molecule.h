@@ -63,8 +63,8 @@ private:
 				int nblock = n%split == 0 ? n/split : n/split + 1;
 				bool even = n%split == 0 ? true : false;
 				
-				std::cout << "NBLOCK: " << nblock << std::endl;
-				std::cout << "NSPLIT: " << split << std::endl;
+				//std::cout << "NBLOCK: " << nblock << std::endl;
+				//std::cout << "NSPLIT: " << split << std::endl;
 				
 				if (even) {
 					std::vector<int> out(nblock,split);

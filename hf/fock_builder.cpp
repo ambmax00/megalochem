@@ -24,8 +24,8 @@ fockbuilder::fockbuilder(desc::smolecule mol, desc::options opt, dbcsr::world& w
 	
 	m_restricted = (m_mol->nele_alpha() == m_mol->nele_beta()) ? true : false;
 	
-	std::cout << std::scientific;
-	std::cout << std::setprecision(12);
+	//std::cout << std::scientific;
+	//std::cout << std::setprecision(12);
 	
 	if (!m_use_df) {
 		
@@ -76,7 +76,7 @@ fockbuilder::fockbuilder(desc::smolecule mol, desc::options opt, dbcsr::world& w
 		
 		LOG.os<>("Computing inverse...\n");
 		
-		math::hermitian_eigen_solver solver(metric_xx, 'V');
+		math::hermitian_eigen_solver solver(metric_xx, 'V', (LOG.global_plev() >= 2) ? true : false);
 		
 		solver.compute();
 		
@@ -261,7 +261,7 @@ void fockbuilder::build_k(stensor<2>& p_A, stensor<2>& p_B, stensor<2>& c_A, ste
 				
 				int nocc = (x == "A") ? m_mol->nocc_alpha() - 1 : m_mol->nocc_beta() - 1;	
 				
-				std::cout << "NOCC: " << nocc << std::endl;
+				//std::cout << "NOCC: " << nocc << std::endl;
 							
 				vec<vec<int>> occ_bounds = {{0,nocc}};
 				

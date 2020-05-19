@@ -38,9 +38,9 @@ public:
 		return *this;
 	}
 
-	hermitian_eigen_solver(smatrix& mat_in, char jobz, int print = 0) :
+	hermitian_eigen_solver(smatrix& mat_in, char jobz, bool print = false) :
 		m_mat_in(mat_in), m_world(mat_in->get_world()),
-		LOG(m_world.comm(), print),
+		LOG(m_world.comm(), (print) ? 0 : -1),
 		m_jobz(jobz) {}
 
 	void compute(int scalapack_blksize = 10);
