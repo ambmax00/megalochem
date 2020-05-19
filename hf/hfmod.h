@@ -142,8 +142,8 @@ public:
 				Eigen::MatrixXd eigen_cbo = eigen_cbm.block(0,0,nbas,nocc);
 				Eigen::MatrixXd eigen_cbv = eigen_cbm.block(0,nocc,nbas,nvir);
 				
-				std::cout << eigen_cbo << std::endl;
-				std::cout << eigen_cbv << std::endl;
+				//std::cout << eigen_cbo << std::endl;
+				//std::cout << eigen_cbv << std::endl;
 				
 				if (nocc != 0)
 					out_o = (dbcsr::eigen_to_matrix(eigen_cbo, m_world, "c_bo_"+x, b, o, dbcsr_type_no_symmetry)).get_smatrix();

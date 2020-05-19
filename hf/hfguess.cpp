@@ -178,6 +178,8 @@ void hfmod::compute_guess() {
 			int atprint = LOG.global_plev() - 1;
 			at_opt.set<int>("print", atprint);
 			at_opt.set<std::string>("guess", "core");
+			at_opt.set<bool>("diis", false);
+			at_opt.set<double>("scf_thresh",1e-4);
 			
 			int charge = 0;
 			int mult = 0; // will be overwritten

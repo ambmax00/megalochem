@@ -168,7 +168,7 @@ void hfmod::compute_virtual_density() {
 		//m_pv_bb_A->filter();
 	}
 	
-	if (!m_restricted && m_mol->nvir_beta() != 0) {
+	if (!m_restricted && m_mol->nele_beta() != 0) {
 		form_density(m_pv_bb_B, m_c_bm_B, "B");
 	} else {
 		mat_d p = mat_d::create_template(*m_p_bb_A).name("pv_bb_B");

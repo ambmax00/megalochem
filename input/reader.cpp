@@ -76,9 +76,9 @@ std::vector<libint2::Atom> get_geometry(const json& j) {
 				std::stringstream ss(line);
 				
 				libint2::Atom atom;
-				atom.x = x;
-				atom.y = y;
-				atom.z = z;
+				ss >> ele_name;
+				ss >> atom.x >> atom.y >> atom.z;
+				
 				atom.atomic_number = util::ele_to_int[ele_name];
 				
 				out.push_back(atom);
