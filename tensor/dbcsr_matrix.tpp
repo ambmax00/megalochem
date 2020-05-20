@@ -228,11 +228,12 @@ public:
             
     }
     
-    void filter(double eps, std::optional<int> method = std::nullopt, 
+    void filter(std::optional<double> eps = std::nullopt, 
+				std::optional<int> method = std::nullopt, 
                 std::optional<bool> use_absolute = std::nullopt, 
                 std::optional<bool> filter_diag = std::nullopt) {
-        c_dbcsr_filter(m_matrix_ptr, &eps, (method) ? &*method : nullptr, 
-                        (use_absolute) ? &*use_absolute : nullptr, 
+        c_dbcsr_filter(m_matrix_ptr, (eps) ? &*eps : &filter_eps, (method) ? &*method : nullptr, 
+                        (use_absolute) ? &*use_absolute : &filter_use_absolute, 
                         (filter_diag) ? &*filter_diag : nullptr);
     }
 

@@ -329,7 +329,7 @@ MatrixX<T> tensor_to_eigen(dbcsr::tensor<2,T>& array, int l = 0) {
 
 template <typename T = double>
 dbcsr::tensor<2,T> eigen_to_tensor(MatrixX<T>& M, std::string name, 
-	dbcsr::pgrid<2>& grid, vec<int> map1, vec<int> map2, arrvec<int,2> blk_sizes, double eps = block_threshold) {
+	dbcsr::pgrid<2>& grid, vec<int> map1, vec<int> map2, arrvec<int,2> blk_sizes, double eps = filter_eps) {
 	
 	dbcsr::tensor<2,T> out = typename dbcsr::tensor<2,T>::create().name(name).ngrid(grid)
 		.map1(map1).map2(map2).blk_sizes(blk_sizes);

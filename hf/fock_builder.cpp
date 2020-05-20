@@ -49,6 +49,11 @@ fockbuilder::fockbuilder(desc::smolecule mol, desc::options opt, dbcsr::world& w
 		LOG.os<>("Computing 3c2e integrals...\n");
 		m_3c2e_ints = ao.op("coulomb").dim("xbb").compute_3(vec<int>{0},vec<int>{1,2});
 		
+		if (LOG.global_plev() >= 1) {
+			double sp = m_3c2e_ints->occupation();
+			LOG.os<1>("3c2e integrals sparsity: ", sp*100, "%\n");
+		}
+			
 		t_int3c2e.finish();
 		
 		LOG.os<>("Done with 3c2e integrals...\n");
@@ -81,6 +86,7 @@ fockbuilder::fockbuilder(desc::smolecule mol, desc::options opt, dbcsr::world& w
 		solver.compute();
 		
 		auto inv_xx = solver.inverse();
+		inv_xx->filter();
 		
 		auto x = m_mol->dims().x();
 		arrvec<int,2> xx = {x,x};
@@ -95,6 +101,11 @@ fockbuilder::fockbuilder(desc::smolecule mol, desc::options opt, dbcsr::world& w
 		
 		inv_xx->release();
 		
+		if (LOG.global_plev() >= 1) {
+			double sp = m_inv_xx->occupation();
+			LOG.os<1>("Metric sparsity: ", sp*100, "%\n");
+		}
+		
 		LOG.os<>("Done.\n");
 		
 		t_inv.finish();
@@ -103,10 +114,13 @@ fockbuilder::fockbuilder(desc::smolecule mol, desc::options opt, dbcsr::world& w
 		if (LOG.global_plev() >= 1) {
 			LOG.os<1>("Block Distribution of 3c2e tensor: ");
 			auto nblk = m_3c2e_ints->nblks_local();
-			LOG.os<1>(nblk[0], " ", nblk[1], " ", nblk[2]);
-			LOG.os<1>("Sparsity: ", m_3c2e_ints->occupation());
+			
+			for (int i = 0; i != m_world.size(); ++i) {
+				LOG(i).os<1>(nblk[0], " ", nblk[1], " ", nblk[2], '\n');
+			}
 		}
 		
+		LOG.os<>('\n');
 		//m_xx->destroy();
 		
 	}
@@ -184,6 +198,13 @@ void fockbuilder::build_j(stensor<2>& p_A, stensor<2>& p_B) {
 		dbcsr::contract(d_xD, *m_3c2e_ints, j_bbD).perform("X_, XMN -> MN_");
 		
 		m_j_bb = (dbcsr::remove_dummy(j_bbD, vec<int>{0}, vec<int>{1}, "j_bb")).get_stensor();
+		
+		m_j_bb->filter();
+		
+		if (LOG.global_plev() >= 1) {
+			double sp = m_j_bb->occupation();
+			LOG.os<1>("Coulomb matrix sparsity: ", sp*100, "%\n");
+		}
 	
 		c_xD.destroy();
 		d_xD.destroy();
@@ -289,6 +310,13 @@ void fockbuilder::build_k(stensor<2>& p_A, stensor<2>& p_B, stensor<2>& c_A, ste
 			
 			//ka("mu,nu") = HTa("M,mu,i") * Da("M,nu,i");
 			dbcsr::contract(HT, D, *k_bb).alpha(-1.0).perform("XMi, XNi -> MN");
+			
+			k_bb->filter();
+			
+			if (LOG.global_plev() >= 1) {
+				double sp = k_bb->occupation();
+				LOG.os<1>("Exchange (", x, ") matrix sparsity: ", sp*100, "%\n");
+			}
 						
 			HT.destroy();
 			D.destroy();

@@ -496,12 +496,26 @@ public:
 		return c_dbcsr_t_get_num_blocks_total(m_tensor_ptr);
 	}
 	
+	long long int num_nze_total() const {
+		return c_dbcsr_t_get_nze_total(m_tensor_ptr);
+	}
+	
 	void filter(std::optional<T> ieps = std::nullopt, 
         std::optional<int> method = std::nullopt, 
         std::optional<bool> use_absolute = std::nullopt) {
         
-		c_dbcsr_t_filter(m_tensor_ptr, (ieps) ? *ieps : block_threshold,
-            (method) ? &*method : nullptr, (use_absolute) ? &*use_absolute : nullptr);
+		c_dbcsr_t_filter(m_tensor_ptr, (ieps) ? *ieps : filter_eps,
+            (method) ? &*method : nullptr, (use_absolute) ? &*use_absolute : &filter_use_absolute);
+		
+	}
+	
+	double occupation() {
+		
+		auto nfull = this->nfull_total();
+		long long int tote = std::accumulate(nfull.begin(), nfull.end(), 1, std::multiplies<long long int>());
+		long long int nze = this->num_nze_total();
+		
+		return (double)nze/(double)tote;
 		
 	}
     

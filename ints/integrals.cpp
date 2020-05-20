@@ -112,7 +112,7 @@ void calc_ints(dbcsr::mat_d& m_out, util::ShrPool<libint2::Engine>& engine,
 	
 	//std::cout << "Done." << std::endl;
 	
-	m_out.filter(1e-16, std::nullopt, true);
+	m_out.filter();
 	
 	//dbcsr::print(t);
 		
