@@ -100,6 +100,13 @@ fockbuilder::fockbuilder(desc::smolecule mol, desc::options opt, dbcsr::world& w
 		t_inv.finish();
 		grid2.destroy();
 		
+		if (LOG.global_plev() >= 1) {
+			LOG.os<1>("Block Distribution of 3c2e tensor: ");
+			auto nblk = m_3c2e_ints->nblks_local();
+			LOG.os<1>(nblk[0], " ", nblk[1], " ", nblk[2]);
+			LOG.os<1>("Sparsity: ", m_3c2e_ints->occupation());
+		}
+		
 		//m_xx->destroy();
 		
 	}
@@ -348,6 +355,8 @@ void fockbuilder::compute(smat& core, smat& p_A, smat& c_A, smat& p_B, smat& c_B
 	
 	build_j(t_p_A, t_p_B);
 	build_k(t_p_A, t_p_B, t_c_A, t_c_B, SAD);
+	
+	//dbcsr::print(*m_f_bb_A);
 	
 	m_f_bb_A->clear();
 	m_f_bb_A->copy_in(*core);

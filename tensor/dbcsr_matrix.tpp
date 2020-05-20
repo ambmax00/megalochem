@@ -316,7 +316,7 @@ public:
     }
     
     void clear() {
-        c_dbcsr_clear(m_matrix_ptr);
+        c_dbcsr_clear(&m_matrix_ptr);
     }
     
     void reserve_diag_blocks() {
