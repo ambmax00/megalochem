@@ -32,13 +32,13 @@ molecule::molecule(molecule::create& p) :
 	m_atoms = *p.c_atoms;
 	
 	// first: form clustered basis sets
-	cluster_basis cbas(*p.c_basis,1);
+	cluster_basis cbas(*p.c_basis,*p.c_atom_split);
 	
 	m_cluster_basis = cbas;
 	
 	if (p.c_dfbasis) {
 		//std::cout << "There is a df basis: " << p.c_dfbasis->size() << std::endl;
-		cluster_basis cdfbas(*p.c_dfbasis,1);
+		cluster_basis cdfbas(*p.c_dfbasis,*p.c_atom_split);
 		
 		//for (auto i : cdfbas.cluster_sizes()) {
 		//	std::cout << i << std::endl;
@@ -69,8 +69,16 @@ molecule::molecule(molecule::create& p) :
 		
 		m_mult = reference_S[Z]; // mult is overwritten
 		
-		m_nele_alpha = 0.5 * (m_nele + m_mult);
-		m_nele_beta = 0.5 * (m_nele - m_mult);
+		if ((p.c_spin_average) ? *p.c_spin_average : true) {
+			
+			m_nele_alpha = m_nele_beta = 0.5 * m_nele;
+			
+		} else {
+			
+			m_nele_alpha = 0.5 * (m_nele + m_mult);
+			m_nele_beta = 0.5 * (m_nele - m_mult);
+		
+		}
 		
 		auto nlimit = std::lower_bound(conf_orb.begin(), conf_orb.end(), Z);
 		
@@ -127,7 +135,7 @@ molecule::molecule(molecule::create& p) :
 	
 	}
 	
-	block_sizes blks(*this,(p.c_split) ? *p.c_split : default_split_size);
+	block_sizes blks(*this, *p.c_mo_split);
 	
 	m_blocks = blks;
 

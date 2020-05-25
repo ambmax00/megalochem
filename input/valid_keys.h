@@ -18,7 +18,9 @@ static const json valid_keys =
 		{"geometry", {0,0,0}}, // mol xyz
 		{"symbols", "string"}, // mol elements
 		{"mult", 0}, // multiplicity
-		{"charge", 0} // total charge
+		{"charge", 0}, // total charge
+		{"mo_split", 10},
+		{"atom_split", 1}
 	}},
 	{"hf", {
 		{"guess", "core"}, // HF guess
@@ -32,7 +34,11 @@ static const json valid_keys =
 		{"use_df", false}, // whether to use df 
 		{"print", 0}, // print level (0, 1 or 2 at the moment, -1 for silent output)
 		{"skip", false}, // skip hartree fock and read from files
-		{"max_iter", 10} 
+		{"max_iter", 10},
+		{"SAD_guess", "core"},
+		{"SAD_diis", true},
+		{"SAD_use_df", true},
+		{"SAD_spin_average", true}
 	}},
 	{"adc", {
 		{"print", 0},

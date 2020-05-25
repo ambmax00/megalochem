@@ -28,7 +28,7 @@ private:
 	
 	// options
 	bool m_restricted;
-	bool m_nobeta;
+	bool m_nobetaorb;
 	bool m_diis;
 	bool m_diis_beta;
 	std::string m_guess;

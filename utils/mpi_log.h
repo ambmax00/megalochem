@@ -18,14 +18,20 @@ class mpi_log {
 
 private:
 
-	int m_proc = 0;
+	int m_mainproc = 0;
+	int m_rank = 0;
+	int m_size = 0;
 	int global_plev_;
 	MPI_Comm m_comm;
 	
 public:
  
     mpi_log(MPI_Comm comm, int glb) 
-		: global_plev_(glb), m_comm(comm) {};
+		: global_plev_(glb), m_comm(comm) 
+	{
+		MPI_Comm_rank(m_comm,&m_rank);
+		MPI_Comm_size(m_comm,&m_size);
+	}
     
     ~mpi_log() { reset(); }
     
@@ -69,24 +75,20 @@ public:
     mpi_log& os(T in, Args ... args) {
 		
 		if (nprint <= global_plev_) {
-			int rank_;
-			MPI_Comm_rank(m_comm,&rank_);
 			
-			if (m_proc == -1) {
+			if (m_mainproc == -1) {
 				
 				if (omp_in_parallel()) 
 					throw std::runtime_error("ERROR: You should not use mpi_log for all processes (-1) in parallel regions.");
 				
-				int size;
-				MPI_Comm_size(m_comm,&size);
-				for (int i = 0; i != size; ++i) {
-					if (i == rank_) print_(in, args...);
+				for (int i = 0; i != m_size; ++i) {
+					if (i == m_rank) print_(in, args...);
 					MPI_Barrier(m_comm);
 				}
 					
 			} else {
 				
-				if (m_proc == rank_) print_(in, args...);
+				if (m_mainproc == m_rank) print_(in, args...);
 					
 			} //end ifelse	
 			
@@ -98,7 +100,7 @@ public:
 	
 	mpi_log operator()(int n) {
 		mpi_log sub(m_comm, global_plev_);
-		sub.m_proc = n;
+		sub.m_mainproc = n;
 		return sub;
 	}
     
@@ -125,10 +127,7 @@ public:
 	template <int nproc = 0, typename T>
 	void banner(T m, int totl, char del) {
 	
-	  int rank_;
-	  MPI_Comm_rank(m_comm,&rank_);
-	  
-	  if (rank_ == nproc) {
+	  if (m_rank == nproc) {
 	
 	  std::ostringstream stream;
 	  stream << m;

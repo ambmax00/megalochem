@@ -18,17 +18,19 @@
          -1.2737541560,    -0.7748626513,    -0.9540587845
 		],
 		"symbols": ["H", "C", "H", "C", "O", "H", "H", "H", "H"],
-		"basis": "sto-3g",
-		"dfbasis": "cc-pvdz-ri"
+		"basis": "cc-pvdz",
+		"dfbasis": "cc-pvdz-ri",
+		"reorder": false
 	},
 	"hf": 
 	{
-		"diis": true,
+		"diis": false,
 		"guess": "SAD",
 		"scf_thresh": 1e-6,
-		"diis_start": 4,
+		"diis_start": 0,
 		"use_df": true,
-		"print": 999
+		"print": 0,
+		"SAD_diis": true
 	},
 	"adc":
 	{

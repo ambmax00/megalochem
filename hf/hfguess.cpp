@@ -79,7 +79,7 @@ void hfmod::compute_guess() {
 		//dbcsr::print(*m_core_bb);
 		//dbcsr::print(*m_f_bb_A);
 		
-		if (!m_restricted && !m_nobeta) m_f_bb_B->copy_in(*m_core_bb);
+		if (!m_restricted) m_f_bb_B->copy_in(*m_core_bb);
 		
 		diag_fock();
 	
@@ -175,11 +175,12 @@ void hfmod::compute_guess() {
 			//set up options
 			desc::options at_opt(m_opt);
 			
-			int atprint = LOG.global_plev() - 1;
+			int atprint = LOG.global_plev() - 2;
 			at_opt.set<int>("print", atprint);
-			at_opt.set<std::string>("guess", "core");
-			at_opt.set<bool>("diis", false);
-			at_opt.set<double>("scf_thresh",1e-4);
+			at_opt.set<std::string>("guess", m_opt.get<std::string>("SAD_guess", HF_SAD_GUESS));
+			at_opt.set<bool>("diis", m_opt.get<bool>("SAD_diis", HF_SAD_SCF_DIIS));
+			at_opt.set<bool>("use_df", m_opt.get<bool>("SAD_use_df", HF_SAD_USE_DF));
+			at_opt.set<double>("scf_thresh",m_opt.get<double>("SAD_scf_thresh", HF_SAD_SCF_THRESH));
 			
 			int charge = 0;
 			int mult = 0; // will be overwritten
@@ -204,8 +205,11 @@ void hfmod::compute_guess() {
 			
 			std::string name = "ATOM_rank" + std::to_string(m_world.rank()) + "_" + std::to_string(Z);
 			
+			bool spinav = m_opt.get<bool>("SAD_spin_average",HF_SAD_SPIN_AVERAGE);
+			
 			desc::molecule at_mol = desc::molecule::create().name(name).atoms(atvec).charge(charge)
-				.mult(mult).basis(at_basis).dfbasis(at_dfbasis).fractional(true);
+				.mo_split(10).atom_split(1)
+				.mult(mult).basis(at_basis).dfbasis(at_dfbasis).fractional(true).spin_average(spinav);
 				
 			auto at_smol = std::make_shared<desc::molecule>(std::move(at_mol));
 				
@@ -229,12 +233,17 @@ void hfmod::compute_guess() {
 			//std::cout << "PA on rank: " << myrank << std::endl;
 			//dbcsr::print(*pA);
 			
-			mat_d pscaled = mat_d::copy<double>(*pA).name(at_smol->name() + "_density");
-			pscaled.add(0.5, 0.5, *pB);
+			if (pB) {
 			
-			//pscaled.scale(0.5);
-			
-			locdensitymap[Z] = dbcsr::matrix_to_eigen(pscaled);
+				mat_d pscaled = mat_d::copy<double>(*pA).name(at_smol->name() + "_density");
+				pscaled.add(0.5, 0.5, *pB);
+				locdensitymap[Z] = dbcsr::matrix_to_eigen(pscaled);
+				
+			} else {
+				
+				locdensitymap[Z] = dbcsr::matrix_to_eigen(*pA);
+				
+			}
 			
 			ints::registry INTS_REGISTRY;
 			INTS_REGISTRY.clear(name);
@@ -332,14 +341,17 @@ void hfmod::compute_guess() {
 		int off = 0;
 		int size = 0;
 		
+		std::cout << "nbas: " << nbas << std::endl;
+		
 		for (int i = 0; i != m_mol->atoms().size(); ++i) {
 			
 			int Z = m_mol->atoms()[i].atomic_number;
-			size = csizes[i];
+			auto& at_density = densitymap[Z];
+			int at_nbas = at_density.rows();
 			
-			ptot_eigen.block(off,off,size,size) = densitymap[Z];
+			ptot_eigen.block(off,off,at_nbas,at_nbas) = densitymap[Z];
 			
-			off += size;
+			off += at_nbas;
 			
 		}
 		
@@ -367,8 +379,8 @@ void hfmod::compute_guess() {
 		
 		m_c_bm_A->scale(eigvals, "right");
 			
-		if (!m_restricted && !m_nobeta) {
-			m_c_bm_B->copy_in(*m_c_bm_A);
+		if (!m_restricted) {
+			if (!m_nobetaorb) m_c_bm_B->copy_in(*m_c_bm_A);
 			m_p_bb_B->copy_in(*m_p_bb_A);
 		}
 		

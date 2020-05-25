@@ -2,11 +2,13 @@
 	"name": "test",
 	"molecule": 
 	{	
-		"name": "gly_1",
+		"name": "gly_4",
 		"mult": 1,
 		"charge": 0,
 		"unit": "angstrom",
-		"file": "gly_1.xyz",
+		"file": "gly_4.xyz",
+		"mo_split": 10,
+		"atom_split": 1,
 		"basis": "cc-pvdz",
 		"dfbasis": "cc-pvdz-ri"
 	},
@@ -14,10 +16,9 @@
 	{
 		"diis": false,
 		"guess": "SAD",
-		"max_iter": 100,
 		"scf_thresh": 1e-6,
 		"diis_start": 0,
-		"use_df": true,
+		"use_df": false,
 		"print": 0,
 		"skip": false
 	},

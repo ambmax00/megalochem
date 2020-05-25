@@ -2,12 +2,15 @@
 #define EXTERN_SCALAPACK_H
 
 #include <iostream>
+#include <iomanip>
 #include <stdexcept>
+#include <cmath>
 
 extern "C" {
 	
 	void blacs_pinfo_(int* mypnum, int* nprocs);
 	void blacs_get_(int* icontxt, int* what, int* val);
+	int blacs_pnum_(int* icontxt, int* prow, int* pcol);
 	void blacs_gridinit_(int* icontxt, char* layout, int* nprow, int* npcol);
 	void blacs_gridmap_(int* icontxt, int* usermap, int* ldumap, int* nprow, int* npcol);
 	void blacs_barrier_(int* icontxt, char* scope);
@@ -22,9 +25,24 @@ extern "C" {
 	int indxg2l_(int* indxglob, int* nb, int* iproc, int* isrcproc, int* nprocs);
 	int indxg2p_(int* indxglob, int* nb, int* iproc, int* isrcproc, int* nprocs);
 	
+	void pielset_(int* A, int* ia, int* ja, int* desca, int* alpha);
+	void pdelset_(double* A, int* ia, int* ja, int* desca, double* alpha);
+	void pdelget_(char* scope, char* top, double* alpha, double* A, int* ia, int* ja, int* desca);
+	
+	void pdgeadd_(char* trans, int* m, int* n, double* alpha, double* a, int* ia, int* ja,
+		int* desca, double* beta, double* c, int* ic, int* jc, int* desc);
+	
+	void pdgemm_(char* transa, char* transb, int* m, int* n, int* k, double* alpha,
+		double* a, int* ia, int* ja, int* desca, double* b, int* ib, int* jb, 
+		int* descb, double* beta, double* c, int* ic, int* jc, int* desc);
+	
 	void pdsyev_(char* jobz, char* uplo, int* n, double* a, int* ia, int* ja,
 		int* desca, double* w, double* z, int* iz, int* jz, int* descz, 
 		double* work, int* lwork, int* info);
+	
+	void pdlapiv_(char* direc, char* rowcol, char* pivroc, int* m, int* n, 
+		double* a, int* ia, int* ja, int* desca, int* ipiv, int* ip, int* jp,
+		int* descip, int* iwork);
 	
 }
 
@@ -39,6 +57,10 @@ inline void c_blacs_get(int icontxt, int what, int* val)
 inline void c_blacs_gridinit(int* icontxt, char layout, int nprow, int npcol) 
 {
 	blacs_gridinit_(icontxt, &layout, &nprow, &npcol);
+};
+inline int c_blacs_pnum(int icontxt, int prow, int pcol) 
+{
+	return blacs_pnum_(&icontxt,&prow,&pcol);
 };
 inline void c_blacs_gridmap(int* icontxt, int* usermap, int ldumap, int nprow, int npcol)
 {
@@ -87,6 +109,25 @@ inline void c_descinit(int* desc, int m, int n, int mb, int nb, int irsrc, int i
 	descinit_(desc, &m, &n, &mb, &nb, &irsrc, &icsrc, &ictxt, &lld, info);
 };
 
+inline void c_pielset(int* A, int ia, int ja, int* desca, int alpha) 
+{
+	int f_ia = ia + 1;
+	int f_ja = ja + 1;
+	pielset_(A, &f_ia, &f_ja, desca, &alpha);
+};
+inline void c_pdelset(double* A, int ia, int ja, int* desca, double alpha) 
+{
+	int f_ia = ia + 1;
+	int f_ja = ja + 1;
+	pdelset_(A, &f_ia, &f_ja, desca, &alpha);
+};
+inline void c_pdelget(char scope, char top, double* alpha, double* A, int ia, int ja, int* desca)
+{
+	int f_ia = ia + 1;
+	int f_ja = ja + 1;
+	pdelget_(&scope, &top, alpha, A, &f_ia, &f_ja, desca);
+};
+
 inline void c_pdsyev(char jobz, char uplo, int n, double* a, int ia, int ja,
 		int* desca, double* w, double* z, int iz, int jz, int* descz, 
 		double* work, int lwork, int* info)
@@ -96,6 +137,45 @@ inline void c_pdsyev(char jobz, char uplo, int n, double* a, int ia, int ja,
 	int f_iz = iz + 1;
 	int f_jz = jz + 1;
 	pdsyev_(&jobz,&uplo,&n,a,&f_ia,&f_ja,desca,w,z,&f_iz,&f_jz,descz,work,&lwork,info);
+};
+
+
+inline void c_pdlapiv(char direc, char rowcol, char pivroc, int m, int n, 
+		double* a, int ia, int ja, int* desca, int* ipiv, int ip, int jp,
+		int* descip, int* iwork)
+{
+	int f_ia = ia + 1;
+	int f_ja = ja + 1;
+	int f_ip = ip + 1;
+	int f_jp = jp + 1;
+	pdlapiv_(&direc, &rowcol, &pivroc, &m, &n, a, &f_ia, &f_ja, desca, ipiv, &f_ip, &f_jp,
+		descip, iwork);
+};
+
+inline void c_pdgeadd(char trans, int m, int n, double alpha, double* a, int ia, int ja,
+		int* desca, double beta, double* c, int ic, int jc, int* desc)
+{
+	int f_ia = ia + 1;
+	int f_ja = ja + 1;
+	int f_ic = ic + 1;
+	int f_jc = jc + 1;
+	pdgeadd_(&trans,&m,&n,&alpha,a,&f_ia,&f_ja,desca,&beta,c,&f_ic,&f_jc,desc);
+}
+
+inline void c_pdgemm(char transa, char transb, int m, int n, int k, double alpha,
+		double* a, int ia, int ja, int* desca, double* b, int ib, int jb, 
+		int* descb, double beta, double* c, int ic, int jc, int* desc)
+{
+	int f_ia = ia + 1;
+	int f_ja = ja + 1;
+	int f_ib = ib + 1;
+	int f_jb = jb + 1;
+	int f_ic = ic + 1;
+	int f_jc = jc + 1;
+	
+	pdgemm_(&transa,&transb,&m,&n,&k,&alpha,a,&f_ia,&f_ja,desca,b,&f_ib,&f_jb, 
+		descb,&beta,c,&f_ic,&f_jc,desc);
+
 };
 
 namespace scalapack {
@@ -143,6 +223,7 @@ public:
 	int mypcol() { return m_mypcol; }
 	int mypnum() { return m_mypnum; }
 	int nprocs() { return m_nprocs; }
+	int get_pnum(int i, int j) { return c_blacs_pnum(m_ctxt,i,j); }
 	
 };
 
@@ -174,14 +255,18 @@ public:
 		m_rsrc(irsrc), m_csrc(icsrc)
 	{
 		
-		m_nrowsloc = c_numroc(m_nrowstot, m_rowblk_size, global_grid.myprow(), irsrc, global_grid.nprow());
-		m_ncolsloc = c_numroc(m_ncolstot, m_colblk_size, global_grid.mypcol(), icsrc, global_grid.npcol());
+		m_nrowsloc = std::max(1,c_numroc(m_nrowstot, m_rowblk_size, global_grid.myprow(), 
+			irsrc, global_grid.nprow()));
+		m_ncolsloc = std::max(1,c_numroc(m_ncolstot, m_colblk_size, global_grid.mypcol(), 
+			icsrc, global_grid.npcol()));
+		
+		std::cout << "M/N: " << m_nrowsloc << " " << m_ncolsloc << std::endl;
 		
 		int info = 0;
 		c_descinit(&m_desc[0],m_nrowstot,m_ncolstot,m_rowblk_size,
 					m_colblk_size,irsrc,icsrc,global_grid.ctx(),m_nrowsloc,&info);
 					
-		m_data = new T[m_nrowsloc*m_ncolsloc];
+		m_data = new T[m_nrowsloc*m_ncolsloc]();
 		
 	}
 	
@@ -195,12 +280,49 @@ public:
 		return m_data[iloc + m_nrowsloc*jloc];
 	}
 	
+	int iloc(int iglob) {
+		return c_indxg2l(iglob, m_rowblk_size, 0, 0, global_grid.nprow());
+	}
+	
+	int jloc(int jglob) {
+		return c_indxg2l(jglob, m_colblk_size, 0, 0, global_grid.npcol());
+	}
+	
+	int iproc(int iglob) {
+		return c_indxg2p(iglob, m_rowblk_size, 0, m_rsrc, global_grid.nprow());
+	}
+	
+	int jproc(int jglob) {
+		return c_indxg2p(jglob, m_colblk_size, 0, m_csrc, global_grid.npcol());
+	}
+	
 	int iglob(int iloc) {
 		return c_indxl2g(iloc,m_rowblk_size,global_grid.myprow(),m_rsrc,global_grid.nprow());
 	}
 	
 	int jglob(int jloc) {
 		return c_indxl2g(jloc,m_colblk_size,global_grid.mypcol(),m_csrc,global_grid.npcol());
+	}
+	
+	template <typename D = T, typename = typename std::enable_if<std::is_same<D,int>::value,int>::type>
+	void set(int i, int j, int alpha) {
+	
+		c_pielset(m_data, i, j, &m_desc[0], alpha);
+		
+	}
+	
+	template <typename D = T, typename = typename std::enable_if<std::is_same<D,double>::value,int>::type>
+	void set(int i, int j, double alpha) {
+	
+		c_pdelset(m_data, i, j, &m_desc[0], alpha);
+		
+	}
+	
+	template <typename D = T, typename = typename std::enable_if<std::is_same<D,double>::value,int>::type>
+	double get(char scope, char top, int i, int j) {
+		double out;
+		c_pdelget(scope, top, &out, m_data, i, j, &m_desc[0]);
+		return out;
 	}
 	
 	distmat(distmat& d) = delete;
@@ -233,21 +355,29 @@ public:
 	std::array<int,9> desc() { return m_desc; }
 	
 	void print() {
+		
+		c_blacs_barrier(global_grid.ctx(),'A');
+		
 		for (int pi = 0; pi != global_grid.nprow(); ++pi) {
 			for (int pj = 0; pj != global_grid.npcol(); ++pj) {
 				
 				if (pi == global_grid.myprow() && pj == global_grid.mypcol()) {
 					
 					std::cout << "PROW/PCOL: " << pi << " " << pj << std::endl;
+					
 					for (int i = 0; i != m_nrowsloc; ++i) {
 						for (int j = 0; j != m_ncolsloc; ++j) {
-							std::cout << local_access(i,j) << " ";
+							std::cout << std::setw(16) << local_access(i,j);
 						} std::cout << std::endl;
 					}
 				}
+				
 				c_blacs_barrier(global_grid.ctx(),'A');
 			}
 		}
+		
+		c_blacs_barrier(global_grid.ctx(),'A');
+		
 	}
 	
 	int rowblk_size() { return m_rowblk_size; }

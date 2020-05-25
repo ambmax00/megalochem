@@ -11,8 +11,6 @@
 #include <memory>
 
 namespace desc {
-	
-static const int default_split_size = 5;
 
 class molecule {	
 private:
@@ -31,8 +29,8 @@ private:
 	int m_nvir_beta;
 	
 	int m_nele;
-	int m_nele_alpha;
-	int m_nele_beta;
+	double m_nele_alpha;
+	double m_nele_beta;
 	
 	optional<std::vector<double>,val> m_frac_occ_alpha;
 	optional<std::vector<double>,val> m_frac_occ_beta;
@@ -140,9 +138,11 @@ public:
 		make_param(create,basis,std::vector<libint2::Shell>,required,ref)
 		make_param(create,charge,int,required,val)
 		make_param(create,mult,int,required,val)
-		make_param(create,split,int,optional,val)
+		make_param(create,mo_split,int,required,val)
+		make_param(create,atom_split,int,required,val)
 		make_param(create,dfbasis,std::vector<libint2::Shell>,optional,ref)
 		make_param(create,fractional,bool,optional,val)
+		make_param(create,spin_average,bool,optional,val)
 		
 		public:
 	

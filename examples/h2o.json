@@ -1,0 +1,33 @@
+{
+	"name": "test",
+	"molecule": 
+	{	
+		"name": "H2O",
+		"mult": 1,
+		"charge": 0,
+		"unit": "angstrom",
+		"geometry": [
+          0.00000,        0.00000,        0.11779,
+          0.00000,        0.75545,       -0.47116,
+          0.00000,       -0.75545,       -0.47116
+		],
+		"symbols": ["O", "H", "H"],
+		"basis": "sto-3g",
+		"dfbasis": "cc-pvdz-ri",
+		"reorder": false
+	},
+	"hf": 
+	{
+		"diis": false,
+		"guess": "core",
+		"scf_thresh": 1e-6,
+		"diis_start": 0,
+		"use_df": true,
+		"print": 0,
+		"SAD_diis": true
+	},
+	"adc":
+	{
+		"nroots": 1
+	}
+}

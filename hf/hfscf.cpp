@@ -19,12 +19,12 @@ hfmod::hfmod(desc::smolecule mol, desc::options opt, dbcsr::world& w)
 	  m_diis(m_opt.get<bool>("diis", HF_SCF_DIIS)),
 	  m_diis_beta(m_opt.get<bool>("diis_beta", HF_DIIS_BETA)),
 	  m_scf_energy(0.0),
-	  m_nobeta(false)
+	  m_nobetaorb(false)
 {
 	
 	m_restricted = (m_mol->nele_alpha() == m_mol->nele_beta()) ? true : false; 
 	
-	if (m_mol->nele_beta() == 0) m_nobeta = true;
+	if (m_mol->nocc_beta() == 0) m_nobetaorb = true;
 	
 	auto b = m_mol->dims().b();
 	auto oA = m_mol->dims().oa();
@@ -60,22 +60,27 @@ hfmod::hfmod(desc::smolecule mol, desc::options opt, dbcsr::world& w)
 	m_f_bb_A = f_bb_A.get_smatrix();
 	m_c_bm_A = c_bm_A.get_smatrix();
 		
-	if (!m_restricted && !m_nobeta) {
+	if (!m_restricted) {
 		
 		mat_d p_bb_B = mat_d::create_template(*m_core_bb).name("p_bb_B");
 		mat_d f_bb_B = mat_d::create_template(*m_core_bb).name("f_bb_B");
+		
+		m_p_bb_B = p_bb_B.get_smatrix();
+		m_f_bb_B = f_bb_B.get_smatrix();
+		
+	}
+	
+	if (!m_nobetaorb) {
 	
 		mat_d c_bm_B = mat_d::create().set_world(m_world).name("c_bm_B")
 			.row_blk_sizes(b).col_blk_sizes(mB).type(dbcsr_type_no_symmetry);
 		
-		m_p_bb_B = p_bb_B.get_smatrix();
-		m_f_bb_B = f_bb_B.get_smatrix();
 		m_c_bm_B = c_bm_B.get_smatrix();
 		 
 	}
 		
 	m_eps_A = std::make_shared<std::vector<double>>(std::vector<double>(0));
-	if (m_p_bb_B) m_eps_B = std::make_shared<std::vector<double>>(std::vector<double>(0));
+	if (!m_restricted) m_eps_B = std::make_shared<std::vector<double>>(std::vector<double>(0));
 		
 	LOG.os<>("Options: \n");
 	LOG.os<>("print ", LOG.global_plev(), '\n');
@@ -163,7 +168,7 @@ void hfmod::compute_scf_energy() {
 	e1A = m_core_bb->dot(*m_p_bb_A);
 	e2A = m_f_bb_A->dot(*m_p_bb_A);
 	
-	if (!m_restricted && !m_nobeta) {
+	if (!m_restricted) {
 		e1B = m_core_bb->dot(*m_p_bb_B);
 		e2B = m_f_bb_B->dot(*m_p_bb_B);
 	} 
@@ -261,14 +266,14 @@ void hfmod::compute() {
 		// compute error, do diis, compute energy
 		
 		e_A = compute_errmat(m_f_bb_A, m_p_bb_A, m_s_bb, "A");
-		if (!m_restricted && !m_nobeta)
+		if (!m_restricted)
 			e_B = compute_errmat(m_f_bb_B, m_p_bb_B, m_s_bb, "B");
 		
 		double old_energy = m_scf_energy;
 		compute_scf_energy();
 		
 		norm_A = RMS(e_A);
-		if (m_restricted || m_nobeta) {
+		if (m_restricted) {
 			norm_B = norm_A;
 		} else {
 			norm_B = RMS(e_B);
@@ -289,7 +294,7 @@ void hfmod::compute() {
 		if (m_diis) {
 			diis_A.compute_extrapolation_parameters(m_f_bb_A, e_A, iter);
 			diis_A.extrapolate(m_f_bb_A, iter);
-			if (!m_restricted && !m_nobeta) {
+			if (!m_restricted && !m_nobetaorb) {
 				
 				if (m_diis_beta) {	
 					// separate diis optimization for beta
@@ -320,14 +325,6 @@ void hfmod::compute() {
 	if (e_B) e_B->release();
 	
 	if (iter > m_max_iter) throw std::runtime_error("HF did not converge.");
-	
-	if (m_nobeta) {
-		// take care of densit
-		//m_p_bb_B = dbcsr::make_stensor<2>({.name = "p_bb_B", .pgridN = grid, .map1 = {0}, .map2 = {1}, .blk_sizes = m_p_bb_A->blk_size()});
-		mat_d p_bb_B = mat_d::create_template(*m_p_bb_A).name("p_bb_B");
-		m_p_bb_B = p_bb_B.get_smatrix();
-		m_p_bb_B->set(0.0);
-	}
 	
 	LOG.os<>("Done with SCF cycle. Took ", iter, " iterations.\n");
 	LOG.scientific();

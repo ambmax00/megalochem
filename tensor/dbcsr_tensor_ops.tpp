@@ -297,13 +297,18 @@ dbcsr::tensor<N+1,T> add_dummy(tensor<N,T>& t) {
     newidx[N] = 0;
     newsize[N] = 1;
     
-    auto locblks = t.blks_local();
-    arrvec<int,N+1> newlocblks;
+    //auto locblks = t.blks_local();
+    //arrvec<int,N+1> newlocblks;
     
-    std::copy(locblks.begin(),locblks.end(),newlocblks.begin());
-    newlocblks[N] = vec<int>(locblks[0].size(),0);
+    //std::copy(locblks.begin(),locblks.end(),newlocblks.begin());
+    //newlocblks[N] = vec<int>(locblks[0].size(),0);
     
-    new_t.reserve(newlocblks);
+    //new_t.reserve(newlocblks);
+    
+    arrvec<int,N+1> resblkidx;
+	for (int i = 0; i != N+1; ++i) {
+		resblkidx[i] = vec<int>(1);
+	}
     
     it.start();
 	
@@ -324,7 +329,13 @@ dbcsr::tensor<N+1,T> add_dummy(tensor<N,T>& t) {
 		
 		//std::cout << "IDX: " << new_idx.size() << std::endl;
 		//std::cout << "BLK: " << new_blk.sizes().size() << std::endl;
-				
+		
+		for (int i = 0; i != N+1; ++i) {
+			resblkidx[i][0] = newidx[i];
+		}
+		
+		new_t.reserve(resblkidx);
+		
 		new_t.put_block(newidx, newblk);
 		
 	}
@@ -360,16 +371,23 @@ dbcsr::tensor<N-1,T> remove_dummy(tensor<N,T>& t, vec<int> map1, vec<int> map2, 
 	iterator_t<N> it(t);
     
     // reserve 
-    auto locblks = t.blks_local();
-    arrvec<int,N-1> newlocblks;
+    //auto locblks = t.blks_local();
     
-    std::copy(locblks.begin(),locblks.end()-1,newlocblks.begin());
+    //arrvec<int,N-1> newlocblks;
     
-    new_t.reserve(newlocblks);
+    //std::copy(locblks.begin(),locblks.end()-1,newlocblks.begin());
+    
+    //new_t.reserve(newlocblks);
 	
     it.start();
     
-	// parallelize this:
+	// parallelize this (?):
+	
+	arrvec<int,N-1> resblkidx;
+	for (int i = 0; i != N; ++i) {
+		resblkidx[i] = vec<int>(1);
+	}
+	
 	while (it.blocks_left()) {
 		
 		it.next();
@@ -387,7 +405,13 @@ dbcsr::tensor<N-1,T> remove_dummy(tensor<N,T>& t, vec<int> map1, vec<int> map2, 
 		auto blk = t.get_block(idx, size, found);
 		
 		block<N-1,T> newblk(newsize, blk.data());
-				
+		
+		for (int i = 0; i != N-1; ++i) {
+			resblkidx[i][0] = newidx[i];
+		}
+		
+		new_t.reserve(resblkidx);
+		
 		new_t.put_block(newidx, newblk);
 		
 	}

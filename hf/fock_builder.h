@@ -32,6 +32,7 @@ private:
 	//options
 	bool m_use_df;
 	bool m_restricted;
+	bool m_nobetaorb;
 	
 	// pure 3c2e ints
 	stensor<3> m_3c2e_ints;

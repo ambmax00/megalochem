@@ -14,7 +14,7 @@
 #include "extern/scalapack.h"
 #endif
 
-//#include "ints/aofactory.h"
+#include "ints/aofactory.h"
 //#include "math/solvers/hermitian_eigen_solver.h"
 
 template <int N>
@@ -123,7 +123,6 @@ int main(int argc, char** argv) {
 	c_blacs_get(0, 0, &sysctxt);
 	int gridctxt = sysctxt;
 	c_blacs_gridinit(&gridctxt, 'R', wrd.nprow(), wrd.npcol());
-	std::cout << "HEREEE: " << wrd.nprow() << " " << wrd.npcol() << std::endl;
 	scalapack::global_grid.set(gridctxt);
 #endif
 	

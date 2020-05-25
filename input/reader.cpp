@@ -243,7 +243,7 @@ void unpack(const json& j_in, desc::options& opt, std::string root) {
 	}
 }	
 
-reader::reader(MPI_Comm comm, std::string filename, int print) : m_comm(comm), LOG(m_comm, print) {
+reader::reader(MPI_Comm comm, std::string filename, int print) : m_comm(comm), LOG(comm, print) {
 	
 	std::ifstream in;
 	in.open(filename + ".json");
@@ -261,6 +261,17 @@ reader::reader(MPI_Comm comm, std::string filename, int print) : m_comm(comm), L
 	validate(data, valid_keys);
 	
 	json& jmol = data["molecule"];
+	
+	int mo_split = 10;
+	int atom_split = 1;
+	
+	if (jmol.find("mo_split") != jmol.end()) {
+		mo_split = jmol["mo_split"];
+	}
+	
+	if (jmol.find("atom_split") != jmol.end()) {
+		atom_split = jmol["atom_split"];
+	}
 	
 	LOG.os<>("Processing atomic coordinates...\n");
 	auto atoms = get_geometry(jmol);
@@ -330,7 +341,8 @@ reader::reader(MPI_Comm comm, std::string filename, int print) : m_comm(comm), L
 	LOG.reset();
 	
 	desc::molecule mol = desc::molecule::create().name(name).atoms(atoms).charge(charge)
-		.mult(mult).split(5).basis(basis).dfbasis(dfbasis);
+		.mult(mult).mo_split(mo_split).atom_split(atom_split)
+		.basis(basis).dfbasis(dfbasis);
 		
 	mol.print_info(m_comm,1);
 	LOG.os<>('\n');

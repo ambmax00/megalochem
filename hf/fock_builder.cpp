@@ -23,6 +23,7 @@ fockbuilder::fockbuilder(desc::smolecule mol, desc::options opt, dbcsr::world& w
 	ints::aofactory ao(*m_mol, m_world);
 	
 	m_restricted = (m_mol->nele_alpha() == m_mol->nele_beta()) ? true : false;
+	m_nobetaorb = (m_mol->nocc_beta() == 0) ? true : false;
 	
 	//std::cout << std::scientific;
 	//std::cout << std::setprecision(12);
@@ -131,7 +132,7 @@ fockbuilder::fockbuilder(desc::smolecule mol, desc::options opt, dbcsr::world& w
 		
 	m_f_bb_A = f_bb_A.get_smatrix();
 	
-	if (!m_restricted && m_mol->nele_beta() != 0) {
+	if (!m_restricted) {
 		mat f_bb_B = mat::create_template(*m_f_bb_A).name("f_bb_B");
 		m_f_bb_B = f_bb_B.get_smatrix();
 	} else {
@@ -146,7 +147,7 @@ void fockbuilder::build_j(stensor<2>& p_A, stensor<2>& p_B) {
 	dbcsr::tensor<2> pt = dbcsr::tensor<2>::create_template().tensor_in(*p_A).name("ptot");
 	dbcsr::copy(*p_A, pt).perform();
 	
-	if (p_B) {
+	if (!m_restricted) {
 		dbcsr::copy(*p_B, pt).sum(true).perform();
 	} else {
 		pt.scale(2.0);
@@ -275,6 +276,12 @@ void fockbuilder::build_k(stensor<2>& p_A, stensor<2>& p_B, stensor<2>& c_A, ste
 				tensor<2>::create_template().tensor_in(*p_bb).name("k_bb_"+x));
 			}
 			
+			if (m_nobetaorb) {
+				k_bb->scale(0.0);
+				k_bb->filter();
+				return;
+			}
+			
 			vec<int> o = c_bm->blk_sizes()[1];
 			
 			arrvec<int,3> HTsizes = {m_mol->dims().x(), m_mol->dims().b(), o};
@@ -325,7 +332,7 @@ void fockbuilder::build_k(stensor<2>& p_A, stensor<2>& p_B, stensor<2>& c_A, ste
 		
 		make_k(p_A, c_A, m_k_bb_A, "A", SAD);
 		
-		if (p_B && c_B) 
+		if (!m_restricted) 
 			make_k(p_B, c_B, m_k_bb_B, "B", SAD);
 			
 	}

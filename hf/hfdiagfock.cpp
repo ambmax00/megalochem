@@ -4,6 +4,10 @@
 #include "math/solvers/hermitian_eigen_solver.h"
 #include <algorithm> 
 
+
+#include "math/linalg/piv_cd.h"
+
+
 namespace hf { 
 	
 void hfmod::diag_fock() {
@@ -100,13 +104,25 @@ void hfmod::diag_fock() {
 		std::copy(fraca->begin(),fraca->end(),occs.begin());
 		
 		m_c_bm_A->scale(occs, "right");
+		
+		if (LOG.global_plev() >= 1) {
+			LOG.os<1>("Fractional coeff A\n");
+			dbcsr::print(*m_c_bm_A);
+		}
+		
 	}
 	
 	auto fracb = m_mol->frac_occ_beta();
-	if (fracb && m_c_bm_B) {
+	if (fracb && !m_restricted) {
 		vec<double> occs(m_mol->nocc_beta() + m_mol->nvir_beta(),1.0);
 		std::copy(fracb->begin(),fracb->end(),occs.begin());
 		m_c_bm_B->scale(occs, "right");
+		
+		if (LOG.global_plev() >= 1) {
+			LOG.os<1>("Fractional coeff B\n");
+			dbcsr::print(*m_c_bm_B);
+		}
+		
 	}
 	
 	auto& t_density = TIME.sub("Form Density Matrix.");
@@ -114,9 +130,22 @@ void hfmod::diag_fock() {
 	t_density.start();
 	
 	form_density(m_p_bb_A, m_c_bm_A, "A");
-	if (m_p_bb_B && !m_nobeta) {
+	
+	static int i = 0;
+	
+	if (i == 1) {
+	
+		math::piv_cholesky_decomposition cd(m_p_bb_A);
+		
+		cd.compute();
+	
+	}
+	
+	i++;
+	
+	if (!m_restricted && !m_nobetaorb) {
 		form_density(m_p_bb_B, m_c_bm_B, "B");
-	} else if (!m_restricted && m_nobeta) {
+	} else if (!m_restricted && m_nobetaorb) {
 		mat_d p_bb_B = mat_d::create_template(*m_p_bb_A).name("p_bb_B");
 		m_p_bb_B = p_bb_B.get_smatrix();
 		m_p_bb_B->set(0.0);

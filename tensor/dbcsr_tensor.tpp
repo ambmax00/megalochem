@@ -407,6 +407,12 @@ public:
 	reserve(arrvec<int,N> nzblks) {
 			
 		if (nzblks[0].size() == 0) return;
+		if (!(nzblks[0].size() == nzblks[1].size()
+	#:for n in range(2,idim)
+		&& nzblks[0].size() == nzblks[${n}$].size()
+	#:endfor
+		)) throw std::runtime_error("tensor.reserve : wrong dimensions.");
+		
 		
 		c_dbcsr_t_reserve_blocks_index(m_tensor_ptr, nzblks[0].size(), 
 			${repeatvar('nzblks[',0,idim-1,'].data()')}$
@@ -442,6 +448,15 @@ public:
 		
 		loop(0,arr);
 		this->reserve(res);
+		
+		std::cout << "RESERVING: " << res[0].size() << std::endl;
+		for (int i = 0; i != res[0].size(); ++i) {
+			std::cout << "R ";
+			for (int n = 0; n != N; ++n) {
+				std::cout << res[n][i] << " ";
+			} std::cout << std::endl;
+		}
+		
         delete[] arr;
 		
 	}
@@ -646,8 +661,6 @@ void print(tensor<N,T>& t_in) {
 				bool found = false;
 				auto idx = iter.idx();
 				auto size = iter.size();
-				
-				auto blk = t_in.get_block(idx, size, found);
                 
                 std::cout << myrank << ": [";
                 
@@ -664,6 +677,7 @@ void print(tensor<N,T>& t_in) {
 				}
 				std::cout << ") {";
 				
+				auto blk = t_in.get_block(idx, size, found);
 				
 				for (int i = 0; i != blk.ntot(); ++i) {
 					std::cout << blk[i] << " ";

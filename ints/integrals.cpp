@@ -352,6 +352,10 @@ void calc_ints(dbcsr::tensor<4>& t_out, util::ShrPool<libint2::Engine>& engine,
 	auto& cbas4 = basvec[3];
 	
 	t_out.reserve_all();
+	
+	dbcsr::print(t_out);
+	
+	size_t nblks = 0;
 
 	#pragma omp parallel 
 	{	
@@ -366,9 +370,9 @@ void calc_ints(dbcsr::tensor<4>& t_out, util::ShrPool<libint2::Engine>& engine,
 			
 			iter.next();
 						
-			auto& idx = iter.idx();
-			auto& size = iter.size();
-			auto& off = iter.offset();
+			auto idx = iter.idx();
+			auto size = iter.size();
+			auto off = iter.offset();
 			
 			std::vector<libint2::Shell>& c1 = cbas1[idx[0]];
 			std::vector<libint2::Shell>& c2 = cbas2[idx[1]];
@@ -394,6 +398,9 @@ void calc_ints(dbcsr::tensor<4>& t_out, util::ShrPool<libint2::Engine>& engine,
 			int locblkoff2 = 0;
 			int locblkoff3 = 0;
 			int locblkoff4 = 0;
+			
+			std::cout << "IDX: " << idx[0] << " " << idx[1] << " " << idx[2] << " " << idx[3] << " " << nblks++ << std::endl;
+			std::cout << "SIZE: " << size[0] << " " << size[1] << " " << size[2] << " " << size[3] << " " << nblks++ << std::endl;
 			
 			for (int s1 = 0; s1!= c1.size(); ++s1) {
 		
@@ -421,7 +428,7 @@ void calc_ints(dbcsr::tensor<4>& t_out, util::ShrPool<libint2::Engine>& engine,
 								
 								//std::cout << "TENSOR AT " << toff1 << " " << toff2 << " " << toff3 << " " << toff4 << " : mult " << sfac << std::endl;
 								
-								//std::cout << "Shells: " << s1 << " " << s2 << " " << s3 << " " << s4 << std::endl;
+								//std::cout << "Shell: " << s1 << " " << s2 << " " << s3 << " " << s4 << std::endl;
 								//std::cout << "Sizes: " << sh1.size() << " " << sh2.size() << " " << sh3.size() << " " << sh4.size() << std::endl;
 								//std::cout << "Offset: " << off1 << " " << off2 << " " << off3 << " " << off4 << std::endl;
 								
