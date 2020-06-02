@@ -449,14 +449,6 @@ public:
 		loop(0,arr);
 		this->reserve(res);
 		
-		std::cout << "RESERVING: " << res[0].size() << std::endl;
-		for (int i = 0; i != res[0].size(); ++i) {
-			std::cout << "R ";
-			for (int n = 0; n != N; ++n) {
-				std::cout << res[n][i] << " ";
-			} std::cout << std::endl;
-		}
-		
         delete[] arr;
 		
 	}

@@ -4,10 +4,6 @@
 #include "math/solvers/hermitian_eigen_solver.h"
 #include <algorithm> 
 
-
-#include "math/linalg/piv_cd.h"
-
-
 namespace hf { 
 	
 void hfmod::diag_fock() {
@@ -130,18 +126,6 @@ void hfmod::diag_fock() {
 	t_density.start();
 	
 	form_density(m_p_bb_A, m_c_bm_A, "A");
-	
-	static int i = 0;
-	
-	if (i == 1) {
-	
-		math::piv_cholesky_decomposition cd(m_p_bb_A);
-		
-		cd.compute();
-	
-	}
-	
-	i++;
 	
 	if (!m_restricted && !m_nobetaorb) {
 		form_density(m_p_bb_B, m_c_bm_B, "B");

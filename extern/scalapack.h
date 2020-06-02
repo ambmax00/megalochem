@@ -29,6 +29,8 @@ extern "C" {
 	void pdelset_(double* A, int* ia, int* ja, int* desca, double* alpha);
 	void pdelget_(char* scope, char* top, double* alpha, double* A, int* ia, int* ja, int* desca);
 	
+	double pdlange_(char* nrom, int* m, int* n, double* a, int* ia, int* ja, int* desca, double* work);
+	
 	void pdgeadd_(char* trans, int* m, int* n, double* alpha, double* a, int* ia, int* ja,
 		int* desca, double* beta, double* c, int* ic, int* jc, int* desc);
 	
@@ -43,7 +45,10 @@ extern "C" {
 	void pdlapiv_(char* direc, char* rowcol, char* pivroc, int* m, int* n, 
 		double* a, int* ia, int* ja, int* desca, int* ipiv, int* ip, int* jp,
 		int* descip, int* iwork);
-	
+		
+	void Cigebs2d(int ConTxt, char *scope, char *top, int m, int n, int *A, int lda);
+	void Cigebr2d(int ConTxt, char *scope, char *top, int m, int n, int *A,
+               int lda, int rsrc, int csrc);
 }
 
 inline void c_blacs_pinfo(int* mypnum, int* nprocs)
@@ -138,6 +143,13 @@ inline void c_pdsyev(char jobz, char uplo, int n, double* a, int ia, int ja,
 	int f_jz = jz + 1;
 	pdsyev_(&jobz,&uplo,&n,a,&f_ia,&f_ja,desca,w,z,&f_iz,&f_jz,descz,work,&lwork,info);
 };
+
+inline double c_pdlange(char nrom, int m, int n, double* a, int ia, int ja, int* desca, double* work) 
+{
+	int f_ia = ia + 1;
+	int f_ja = ja + 1;
+	return pdlange_(&nrom, &m, &n, a, &f_ia, &f_ja, desca, work);
+}
 
 
 inline void c_pdlapiv(char direc, char rowcol, char pivroc, int m, int n, 
@@ -259,9 +271,18 @@ public:
 			irsrc, global_grid.nprow()));
 		m_ncolsloc = std::max(1,c_numroc(m_ncolstot, m_colblk_size, global_grid.mypcol(), 
 			icsrc, global_grid.npcol()));
-		
-		std::cout << "M/N: " << m_nrowsloc << " " << m_ncolsloc << std::endl;
-		
+			
+		for (int i = 0; i != global_grid.nprow(); ++i) {
+			for (int j = 0; j != global_grid.npcol(); ++j) {
+				if (global_grid.myprow() == i && global_grid.mypcol() == j) {
+					std::cout << "@" << i << "," << j << " : " << m_nrowsloc << " " << m_ncolsloc << std::endl;
+				}
+				c_blacs_barrier(global_grid.ctx(),'A');
+			}
+			c_blacs_barrier(global_grid.ctx(),'A');
+		}
+		c_blacs_barrier(global_grid.ctx(),'A');
+				
 		int info = 0;
 		c_descinit(&m_desc[0],m_nrowstot,m_ncolstot,m_rowblk_size,
 					m_colblk_size,irsrc,icsrc,global_grid.ctx(),m_nrowsloc,&info);
@@ -379,6 +400,9 @@ public:
 		c_blacs_barrier(global_grid.ctx(),'A');
 		
 	}
+	
+	int nrowstot() { return m_nrowstot; }
+	int ncolstot() { return m_ncolstot; }
 	
 	int rowblk_size() { return m_rowblk_size; }
 	int colblk_size() { return m_colblk_size; }

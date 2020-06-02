@@ -25,20 +25,22 @@ static const std::vector<int> conf_orb = {0, 2, 10, 18, 36, 54, 86, 118};
 molecule::molecule(molecule::create& p) : 
 	m_name(*p.c_name),
 	m_mult(*p.c_mult), 
-	m_charge(*p.c_charge)
+	m_charge(*p.c_charge),
+	m_mo_split((p.c_mo_split) ? *p.c_mo_split : MOLECULE_MO_SPLIT),
+	m_atom_split((p.c_atom_split) ? *p.c_atom_split : MOLECULE_ATOM_SPLIT)
 	{
 	
 	//atoms
 	m_atoms = *p.c_atoms;
 	
 	// first: form clustered basis sets
-	cluster_basis cbas(*p.c_basis,*p.c_atom_split);
+	cluster_basis cbas(*p.c_basis,m_atom_split);
 	
 	m_cluster_basis = cbas;
 	
 	if (p.c_dfbasis) {
 		//std::cout << "There is a df basis: " << p.c_dfbasis->size() << std::endl;
-		cluster_basis cdfbas(*p.c_dfbasis,*p.c_atom_split);
+		cluster_basis cdfbas(*p.c_dfbasis,m_atom_split);
 		
 		//for (auto i : cdfbas.cluster_sizes()) {
 		//	std::cout << i << std::endl;
@@ -135,7 +137,7 @@ molecule::molecule(molecule::create& p) :
 	
 	}
 	
-	block_sizes blks(*this, *p.c_mo_split);
+	block_sizes blks(*this, m_mo_split);
 	
 	m_blocks = blks;
 

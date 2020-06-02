@@ -3,20 +3,43 @@
 
 #include <dbcsr_conversions.hpp>
 
+#include "utils/mpi_log.h"
+
+#include <utility>
+#include <string>
+
 namespace math {
 	
-class piv_cholesky_decomposition {
+class pivinc_cd {
 private:
 
 	dbcsr::smat_d m_mat_in;
+	std::shared_ptr<scalapack::distmat<double>> m_L;
+	
+	util::mpi_log LOG;
+	
+	int m_rank = -1;
+	
+	std::optional<std::string> m_reorder_method = std::nullopt;
+	
+	void reorder_and_reduce(scalapack::distmat<double>& L);
 
 public:
 
-	piv_cholesky_decomposition(dbcsr::smat_d mat_in) : m_mat_in(mat_in) {}
-	~piv_cholesky_decomposition() {}
+	inline pivinc_cd& reorder(std::string method) {
+		m_reorder_method = method;
+		return *this;
+	}
+
+	pivinc_cd(dbcsr::smat_d mat_in, int print) : 
+		m_mat_in(mat_in), LOG(m_mat_in->get_world().comm(), print) {}
+	~pivinc_cd() {}
 	
 	void compute(int nb = 5);
 	
+	int rank() { return m_rank; }
+	
+	dbcsr::smat_d L(std::vector<int> rowblksizes, std::vector<int> colblksizes);
 	
 };
 	

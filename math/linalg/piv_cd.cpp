@@ -1,56 +1,175 @@
  #include "math/linalg/piv_cd.h"
  #include <cmath>
  #include <limits>
+ #include <numeric>
  #include <algorithm>
  
 #include "extern/scalapack.h"
 
 namespace math {
- 
-void piv_cholesky_decomposition::compute(int nb) {
+	 
+void pivinc_cd::reorder_and_reduce(scalapack::distmat<double>& L) {
+	
+	// REORDER COLUMNS ACCORDING TO SORT METHOD
+	
+	int N = L.nrowstot();
+	int nb = L.rowblk_size();
+	
+	std::vector<int> new_col_perms(N);
+	std::iota(new_col_perms.begin(),new_col_perms.end(),0);
+	
+	if (m_reorder_method) {
+		
+		LOG.os<>("-- Reordering cholesky orbitals according to method \"", *m_reorder_method, "\"\n");
+		
+		if (m_reorder_method == "value" || m_reorder_method == "v") {
+			
+			double reorder_thresh = 1e-12;
+			
+			// reorder it according to matrix values
+			std::vector<double> lmo_pos(m_rank,0);
+			
+			for (int j = 0; j != m_rank; ++j) {
+				
+				int first_mu = -1;
+				int last_mu = N-1;
+				
+				for (int i = 0; i != N; ++i) {
+					
+					double L_ij = L.get('A', ' ', i, j);
+					
+					if (fabs(L_ij) > reorder_thresh && first_mu == -1) {
+						first_mu = i;
+						last_mu = i;
+					} else if (fabs(L_ij) > reorder_thresh && first_mu != -1) {
+						last_mu = i;
+					}
+					
+				}
+				
+				if (first_mu == -1) throw std::runtime_error("Piv. Cholesky decomposition: Reorder failed.");
+				
+				lmo_pos[j] = (double)(first_mu + last_mu) / 2;
+				
+			}
+			
+			if (LOG.global_plev() >= 2) {
+				LOG.os<2>("-- Orbital weights: \n");	
+				for (auto x : lmo_pos) { 
+					LOG.os<2>(x, " "); 
+				} LOG.os<2>('\n');
+			}		
+			
+			std::stable_sort(new_col_perms.begin(), new_col_perms.begin() + m_rank, 
+				[&lmo_pos](int i1, int i2) { return lmo_pos[i1] < lmo_pos[i2]; });
+			
+			if (LOG.global_plev() >= 2) {
+				LOG.os<2>("-- Reordered indices: \n");	
+				for (auto x : new_col_perms) { 
+					LOG.os<2>(x, " "); 
+				} LOG.os<2>("\n");
+			}	
+		}
+		
+		LOG.os<>("-- Finished reordering.\n");
+				
+	}
+	
+	m_L = std::make_shared<scalapack::distmat<double>>(N,m_rank,nb,nb,0,0);
+	
+	LOG.os<>("-- Reducing and reordering L.\n");
+	
+	for (int i = 0; i != m_rank; ++i) {
+		
+		c_pdgeadd('N', N, 1, 1.0, L.data(), 0, new_col_perms[i], L.desc().data(), 0.0,
+			m_L->data(), 0, i, m_L->desc().data());
+			
+	}
+	
+}
+
+void pivinc_cd::compute(int nb) {
 	
 	// convert input mat to scalapack format
 	
+	LOG.os<>("Starting pivoted incomplete cholesky decomposition.\n");
+	
+	LOG.os<>("-- Setting up scalapack environment and matrices.\n"); 
+	
 	int N = m_mat_in->nfullrows_total();
-	double thresh = N * std::numeric_limits<double>::epsilon();
-	int rank = 0;
 	int iter = 0;
 	int* iwork = new int[N];
+	char scopeR = 'R';
+	char scopeC = 'C';
+	char top = ' ';
+	
+	auto& _grid = scalapack::global_grid;
 	
 	MPI_Comm comm = m_mat_in->get_world().comm();
 	int myrank = m_mat_in->get_world().rank();
-	int myprow = scalapack::global_grid.myprow();
-	int mypcol = scalapack::global_grid.mypcol();
+	int myprow = _grid.myprow();
+	int mypcol = _grid.mypcol();
 	
 	int ori_proc = m_mat_in->proc(0,0);
 	int ori_coord[2];
 	
 	if (myrank == ori_proc) {
-		ori_coord[0] = scalapack::global_grid.myprow();
-		ori_coord[1] = scalapack::global_grid.mypcol();
+		ori_coord[0] = _grid.myprow();
+		ori_coord[1] = _grid.mypcol();
 	}
 	
 	MPI_Bcast(&ori_coord[0],2,MPI_INT,ori_proc,comm);
 		
 	scalapack::distmat<double> U = dbcsr::matrix_to_scalapack(*m_mat_in, 
 		m_mat_in->name() + "_scalapack", nb, nb, ori_coord[0], ori_coord[1]);
-		
-	U.print();
+	
+	scalapack::distmat<double> Ucopy(N,N,nb,nb,0,0);
+	
+	c_pdgeadd('N', N, N, 1.0, U.data(), 0, 0, U.desc().data(), 
+		0.0, Ucopy.data(), 0, 0, Ucopy.desc().data());
+	
+	if (LOG.global_plev() >= 3) {
+		LOG.os<3>("-- Input matrix: \n");
+		U.print();
+	}
 	
 	// permutation vector
-	scalapack::distmat<int> Pcol(N, 1, nb, nb, 0, 0);
-	scalapack::distmat<int> Prow(1, N, nb, nb, 0, 0);
 	
+	int LOCr = c_numroc(N, nb, _grid.myprow(), 0, _grid.nprow());
+	int LOCc = c_numroc(N, nb, _grid.mypcol(), 0, _grid.npcol());
+	
+	int lipiv_r = LOCr + nb;
+	int lipiv_c = LOCc + nb;
+	
+	int* ipiv_r = new int[lipiv_r]; // column vector distributed over rows
+	int* ipiv_c = new int[lipiv_c]; // row vector distributed over cols
+	
+	int desc_r[9];
+	int desc_c[9];
+	
+	int info = 0;
+	c_descinit(&desc_r[0],N + nb*_grid.nprow(),1,nb,nb,0,0,_grid.ctx(),lipiv_r,&info);
+	c_descinit(&desc_c[0],1,N + nb*_grid.npcol(),nb,nb,0,0,_grid.ctx(),1,&info);
+	
+	// vector to keep track of permutations
 	std::vector<int> perms(N);
-	for (size_t i = 0; i != N; ++i) { perms[i] = i+1; }
-	// !!! WE ARE USING 1-INDEXING FOR PERMUTATIONS !!!
-	
+	std::iota(perms.begin(),perms.end(),1);
 	
 	// chol mat
 	scalapack::distmat<double> L(N,N,nb,nb,0,0);
 	
-	// u_i
-	scalapack::distmat<double> u_i(N,1,nb,nb,0,0);
+	auto printp = [](int* p, int n) {
+		for (int ir = 0; ir != _grid.nprow(); ++ir) {
+			for (int ic = 0; ic != _grid.npcol(); ++ic) {
+				if (ir == _grid.myprow() && ic == _grid.mypcol()) {
+					std::cout << ir << " " << ic << std::endl;
+					for (int i = 0; i != n; ++i) {
+						std::cout << p[i] << " ";
+					} std::cout << std::endl;
+				}
+			}
+		}
+	};
 	
 	// get max diag element
 	double max_U_diag_global = 0.0;
@@ -61,229 +180,208 @@ void piv_cholesky_decomposition::compute(int nb) {
 			fabs(U.get('A', ' ', ix, ix)));
 			
 	}
-		
-	std::cout << "MAX GLOBAL DIAG: " << max_U_diag_global << std::endl;	
 	
-	for (int I = 0; I != N-1; ++I) {
+	LOG.os<>("-- Problem size: ", N, '\n');
+	LOG.os<1>("-- Maximum diagonal element of input matrix: ", max_U_diag_global, '\n');
+	
+	double thresh = N * std::numeric_limits<double>::epsilon() * max_U_diag_global;
+	
+	LOG.os<>("-- Threshold: ", thresh, '\n');
+	
+	std::function<void(int)> cd_step;
+	cd_step = [&](int I) {
 		
-		// find index of maximum diagonal element
+		// STEP 1: If Dimension of U is one, then set L and return 
 		
-		std::cout << "LOOP: " << I << std::endl;
+		LOG.os<1>("---- Level ", I, '\n');
 		
-		int max_U_dd_i = 0;
-		double max_U_dd = 0;
+		if (I == N-1) {
+			double U_II = U.get('A', ' ', I, I);
+			L.set(I,I,sqrt(U_II));
+			m_rank = I+1;
+			return;
+		}
+		
+		// STEP 2.0: Permutation
+		
+		// a) find maximum diagonal element
+		
+		double max_U_diag = 0.0;
+		int max_U_idx;
 		
 		for (int ix = I; ix != N; ++ix) {
-	
-			double ele_ix = U.get('A', ' ', ix, ix);
-			
-			if (fabs(max_U_dd) < fabs(ele_ix)) {
-				max_U_dd = ele_ix;
-				max_U_dd_i = ix;
+			double ele = U.get('A', ' ', ix, ix);
+			if (ele > max_U_diag) {
+				max_U_diag = ele;
+				max_U_idx = ix;
 			}
-			
 		}
 		
-		if (myrank == 0) std::cout << "MAX: " << max_U_dd << " @ " << max_U_dd_i << std::endl;
+		LOG.os<1>("---- MAX ", max_U_diag, " @ ", max_U_idx, '\n');
 		
-		for (int ix = 0; ix != N; ++ix) {
+		// b) permute rows/cols
+		// U := P * U * P^t
+		
+		LOG.os<1>("---- Permuting U.\n");
+		/*
+		for (int ix = I; ix != N; ++ix) {
 			Pcol.set(ix,0,ix+1);
 			Prow.set(0,ix,ix+1);
+		}*/
+		for (int ir = 0; ir != LOCr; ++ir) {
+			ipiv_r[ir] = U.iglob(ir)+1;
+		}
+		for (int ic = 0; ic != LOCc; ++ic) {
+			ipiv_c[ic] = U.jglob(ic)+1;
+		}		
+		
+		//Pcol.set(I,0,max_U_idx + 1);
+		//Prow.set(0,I,max_U_idx + 1);
+		
+		if (_grid.myprow() == U.iproc(I)) {
+			ipiv_r[U.iloc(I)] = max_U_idx + 1;
+		}
+		if (_grid.mypcol() == U.jproc(I)) {
+			ipiv_c[U.jloc(I)] = max_U_idx + 1;
 		}
 		
-		Pcol.set(I,0,max_U_dd_i + 1);
-		Prow.set(0,I,max_U_dd_i + 1);
+		//LOG.os<>("P\n");
 		
-		Pcol.print();
+		//c_blacs_barrier(_grid.ctx(),'A');
 		
-		auto desca = U.desc();
+		//printp(ipiv_r,LOCr);
 		
-		c_pdlapiv('F', 'C', 'C', N, N, U.data(), 0, 0, &desca[0], Pcol.data(), 0, 0, Pcol.desc().data(), iwork);
-		c_pdlapiv('F', 'R', 'R', N, N, U.data(), 0, 0, &desca[0], Prow.data(), 0, 0, Prow.desc().data(), iwork);
+		//c_blacs_barrier(_grid.ctx(),'A');
 		
-		U.print();
+		//printp(ipiv_c,LOCc);
 		
-		// get first diagonal element of permuted matrix U_ii
+		//U.print();
+		
+		c_pdlapiv('F', 'R', 'C', N-I, N-I, U.data(), I, I, U.desc().data(), ipiv_r, I, 0, desc_r, iwork);
+		c_pdlapiv('F', 'C', 'R', N-I, N-I, U.data(), I, I, U.desc().data(), ipiv_c, 0, I, desc_c, iwork);
+		
+		//U.print();
+		
+		// STEP 3.0: Convergence criterion
+		
+		LOG.os<1>("---- Checking convergence.\n");
 		
 		double U_II = U.get('A', ' ', I, I);
 		
-		if (myrank == 0) std::cout << "MAXDIAG: " << U_II << std::endl;
+		if (U_II < 0.0 && fabs(U_II) > thresh)
+			throw std::runtime_error("Negative Pivot element. CD not possible.");
 		
-		if (U_II < 0.0) {
-			throw std::runtime_error("Negative pivot element, cholesky decomposition not possible!");
+		if (fabs(U_II) < thresh) {
+			
+			perms[I] = max_U_idx + 1;
+			
+			m_rank = I;
+			return;
 		}
 		
-		std::cout << "THRESH: " << thresh * max_U_diag_global << std::endl;
-		
-		if (fabs(U_II) < fabs(thresh * max_U_diag_global)) {
-			rank = I;
-			std::cout << "FINISHED AT RANK :" << rank << std::endl;
-			break;
-		}
-		
-		std::swap(perms[I], perms[max_U_dd_i]);
-		
-		// // get rest of considered column, u
-		
+		// STEP 3.1: Form Utilde := sub(U) - u * ut
+	
+		// a) get u
+		// u_i
+		scalapack::distmat<double> u_i(N,1,nb,nb,0,0);
 		c_pdgeadd('N', N-I-1, 1, 1.0, U.data(), I+1, I, U.desc().data(), 0.0, u_i.data(), I+1, 0, u_i.desc().data());
 		
-		u_i.print(); 
-		
-		// FORM Lpr
-		L.set(I,I,sqrt(fabs(U_II)));
-		
+		// b) form Utilde
 		c_pdgemm('N', 'T', N-I-1, N-I-1, 1, -1/U_II, u_i.data(), I+1, 0, u_i.desc().data(),
 			u_i.data(), I+1, 0, u_i.desc().data(), 1.0, U.data(), I+1, I+1, U.desc().data());
-			
-		U.print();
 		
-		// copy u_i/U_II into L
+		// STEP 3.2: Solve P * Utilde * Pt = L * Lt
 		
-		c_pdgeadd('N', N-I-1, 1, 1/sqrt(fabs(U_II)), u_i.data(), I+1, 0, u_i.desc().data(), 0.0, 
-			L.data(), I+1, I, L.desc().data());
+		LOG.os<1>("---- Start decomposition of submatrix of dimension ", N-I-1, '\n');
+		cd_step(I+1);
 		
-		std::cout << "L: " << std::endl;
-		L.print();
+		// STEP 3.3: Form L
+		// (a) diagonal element
 		
-		++iter;
+		L.set(I,I,sqrt(U_II));
 		
-	}
-	
-	if (iter == N-1) {
+		// (b) permute u_i
+		//for (int ix = I; ix != N; ++ix) {
+		//	Pcol.set(ix,0,perms[ix]);
+		//}
 		
-		double Unn = U.get('A', ' ', N-1, N-1);
-		
-		if (fabs(Unn) < max_U_diag_global * thresh) {
-			rank = N - 1;
-		} else {
-			L.set(N-1,N-1,sqrt(Unn));
-			rank = N;
+		for (int ir = 0; ir != LOCr; ++ir) {
+			ipiv_r[ir] = perms[U.iglob(ir)];
 		}
 		
+		//printp(ipiv_r,LOCr);
+		
+		//LOG.os<>("LITTLE U\n");
+		//u_i.print();
+		
+		c_pdlapiv('F', 'R', 'C', N-I-1, 1, u_i.data(), I+1, 0, u_i.desc().data(), ipiv_r, I+1, 0, desc_r, iwork);
+		
+		//u_i.print();
+		
+		// (c) add u_i to L
+		
+		//L.print();
+		
+		c_pdgeadd('N', N-I-1, 1, 1.0/sqrt(U_II), u_i.data(), I+1, 0, u_i.desc().data(), 0.0, L.data(), I+1, I, L.desc().data());
+		
+		//L.print();
+		
+		perms[I] = max_U_idx + 1;
+		
+		return;
+		
+	};
+	
+	LOG.os<>("-- Starting recursive decomposition.\n");
+	cd_step(0);
+	
+	LOG.os<>("-- Rank of L: ", m_rank, '\n');
+	
+	for (int ir = 0; ir != LOCr; ++ir) {
+		ipiv_r[ir] = perms[U.iglob(ir)];
 	}
+		
+	//printp(ipiv_r,LOCr);
 	
-	std::cout << "NUMERICAL RANK: " << rank << std::endl;
+	LOG.os<>("-- Permuting L.\n");
 	
-	// REORDER BACK
+	//L.print();
 	
-	for (auto x : perms) {
-		std::cout << x << " ";
-	} std::cout << std::endl;
+	c_pdlapiv('B', 'R', 'C', N, N, L.data(), 0, 0, L.desc().data(), ipiv_r, 0, 0, desc_r, iwork);
 	
-	for (int i = 0; i != N; ++i) {
-		Prow.set(0,i,perms[i]);
-		Pcol.set(i,0,perms[i]);
-	}
+	//L.print();
 	
-	Prow.print();
+	//c_pdlapiv('B', 'C', 'C', N, N, Uc.data(), 0, 0, Uc.desc().data(), Pcol.data(), 0, 0, Pcol.desc().data(), iwork);
+	//c_pdlapiv('B', 'R', 'R', N, N, Uc.data(), 0, 0, Uc.desc().data(), Prow.data(), 0, 0, Prow.desc().data(), iwork);
 	
-	c_pdlapiv('F', 'R', 'R', N, N, L.data(), 0, 0, L.desc().data(), Prow.data(), 0, 0, Prow.desc().data(), iwork);
-	c_pdlapiv('F', 'C', 'C', N, N, L.data(), 0, 0, L.desc().data(), Pcol.data(), 0, 0, Pcol.desc().data(), iwork);
+	//c_pdgeadd('N', N, N, 1.0, Ucopy.data(), 0, 0, Ucopy.desc().data(), -1.0, Uc.data(), 0, 0, Uc.desc().data());
 	
-	std::cout << "LAST: " << std::endl;
-	L.print();
+	c_pdgemm('N', 'T', N, N, N, 1.0, L.data(), 0, 0, L.desc().data(), 
+		L.data(), 0, 0, L.desc().data(), -1.0, Ucopy.data(), 0, 0, Ucopy.desc().data());
+	
+	double err = c_pdlange('N', N, N, Ucopy.data(), 0, 0, Ucopy.desc().data(), nullptr);
+	
+	LOG.os<>("-- CD error: ", err, '\n');
+	
+	reorder_and_reduce(L);
+	
+	LOG.os<>("Finished decomposition.\n");
 	
 	delete [] iwork;
+		
+}
 	
-	c_pdgemm('N', 'T', N, N, N, 1.0, L.data(), 0, 0, L.desc().data(),
-			L.data(), 0, 0, L.desc().data(), 0.0, U.data(), 0, 0, U.desc().data());
-			
-	U.print();
+dbcsr::smat_d pivinc_cd::L(std::vector<int> rowblksizes, std::vector<int> colblksizes) {
 	
-	exit(0);
+	auto w = m_mat_in->get_world();
+	
+	dbcsr::mat_d out = dbcsr::scalapack_to_matrix(*m_L, "Inc. Chol. Decom. of " + m_mat_in->name(), 
+		w, rowblksizes, colblksizes);
+		
+	m_L->release();
+	
+	return out.get_smatrix();
 	
 }
 	
 }
-
-// copy L into U
- 
-// loop form 0 to N-1
-
-	// get index for maximum diagonal element imax
-	
-	// permute columns i and imax
-	
-	// get first diagonal element of permuted matrix for current iteration Uii
-	
-	// get rest of considered column, u (j i+1 -> N-1
- 
-	 // abortion criterion!
- 
-	// FORM Lpr
-	//Lpr[i*N+i] = sqrt(fabs(Uii));
-
-    // get index of largest diagonal element in U~ for permutation P~ on u,
-    // actual permutation on U~ will be performed on next loop iteration
-
-    //Lpr[i*N+i] = sqrt(Uii);
-    
-
-    // update U by forming U~ - uuT/Lii
-
-    //for (j = i+1; j < N; j++){
-    //  for (k = i+1; k < N; k++){
-
-     //   U[j*N+k] -= u[j]*u[k]/Uii;
-	
-	/*
-    maxUjjtilde = 0.e0;
-
-    for (j = i+1; j < N; j++){
-
-      if (fabs(U[j*N+j]) >= maxUjjtilde){
-
-         maxUjjtilde = U[j*N+j];
-         j_maxUjjtilde = j;
-
-      }
-    }
-                                                                           
-    for (j = i+1; j < N; j++){
-
-      Lpr[j*N+i] = u[j]/Lpr[i*N+i];
-
-    }
-    */
-    
-    //DO SOMETHING!!!
-
-    // permute lower left block of Lpr according to P~
-
-    //permute_rows(Lpr,N,0,i+1,i+1,j_maxUjjtilde);
-           
- // } // end decomposition loop
-
-/*
-  // in case the algorithm has not stopped during the previous loop, 
-  // i.e. if the iteration counter has reached its maximum value of N-1, implying that the matrix 
-  // to be decomposed has rank greater than N-1,
-  // the last element of the Cholesky factor has to be computed this way
-  // if (it_counter == N-1 && fabs(U[(N-1)*N+(N-1)]) >= thresh){ 
-  if (it_counter == N-1){
-     
-     //if (fabs(U[(N-1)*N+(N-1)]) >= thresh){
-     if (fabs(U[(N-1)*N+(N-1)]) >= maxUii*thresh){
-        Lpr[(N-1)*N+(N-1)] = sqrt(U[(N-1)*N+(N-1)]);
-        num_rank = N;
-        it_counter++;
-     } else {
-        num_rank = N-1;
-     }
-     cout << "numerical rank: " << N << endl;
-  }
-            
-  // permute Lprime back to L using record of original order of diagonal elements
-  // (ATTENTION: this destroys L's triangular form!!)
-
-  for (i = 0; i < N; i++){
-    for (j = 0; j < N; j++){
-
-      L[order[i]*N+j] = Lpr[i*N+j]; 
-
-    }
-  }
- 
- */
-
-

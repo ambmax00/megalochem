@@ -2,8 +2,12 @@
 #include "ints/registry.h"
 #include "hf/hfdefaults.h"
 #include "math/solvers/hermitian_eigen_solver.h"
+#include "math/linalg/piv_cd.h"
 #include <dbcsr_conversions.hpp>
 #include <limits>
+
+#include <dbcsr_matrix_ops.hpp>
+
 
 #ifdef USE_SCALAPACK
 #include "extern/scalapack.h"
@@ -83,7 +87,7 @@ void hfmod::compute_guess() {
 		
 		diag_fock();
 	
-	} else if (m_guess == "SAD") {
+	} else if (m_guess == "SADNO" || m_guess == "SAD") {
 		
 		LOG.os<>("Forming guess from SAD :'( ...\n");
 		// divide up comm <- for later
@@ -341,8 +345,6 @@ void hfmod::compute_guess() {
 		int off = 0;
 		int size = 0;
 		
-		std::cout << "nbas: " << nbas << std::endl;
-		
 		for (int i = 0; i != m_mol->atoms().size(); ++i) {
 			
 			int Z = m_mol->atoms()[i].atomic_number;
@@ -355,29 +357,58 @@ void hfmod::compute_guess() {
 			
 		}
 		
-		//std::cout << "PTOT: " << nbas << std::endl;
-		//std::cout << ptot_eigen << std::endl;
 		
 		auto b = m_mol->dims().b();
 		mat_d ptot = dbcsr::eigen_to_matrix(ptot_eigen, m_world, "p_bb_A", b, b, dbcsr_type_symmetric);
 		
 		m_p_bb_A = ptot.get_smatrix();
+		m_p_bb_A->filter();
 		
-		math::hermitian_eigen_solver solver(m_p_bb_A, 'V', (LOG.global_plev() >= 2) ? true : false);
+		if (m_guess == "SADNO") {
+			
+			LOG.os<>("Forming natural orbitals from SAD guess density.\n");
 		
-		solver.compute();
-		
-		auto eigvals = solver.eigvals();
-		m_c_bm_A = solver.eigvecs();
-		
-		std::for_each(eigvals.begin(),eigvals.end(),
-			[](double& d) 
-			{ 
-				d = (d < std::numeric_limits<double>::epsilon())
-					? 0 : sqrt(d); 
-		});
-		
-		m_c_bm_A->scale(eigvals, "right");
+			math::hermitian_eigen_solver solver(m_p_bb_A, 'V', (LOG.global_plev() >= 2) ? true : false);
+			
+			solver.compute();
+			
+			auto eigvals = solver.eigvals();
+			m_c_bm_A = solver.eigvecs();
+			
+			std::for_each(eigvals.begin(),eigvals.end(),
+				[](double& d) 
+				{ 
+					d = (d < std::numeric_limits<double>::epsilon())
+						? 0 : sqrt(d); 
+			});
+			
+			m_c_bm_A->scale(eigvals, "right");
+			
+		} else {
+			
+			LOG.os<>("Forming cholesky orbitals from SAD guess.");
+			
+			math::pivinc_cd cd(m_p_bb_A, LOG.global_plev());
+			
+			cd.compute();
+			
+			int rank = cd.rank();
+			
+			auto o_sad = m_mol->dims().split_range(rank, m_mol->mo_split());
+			auto b = m_mol->dims().b(); 
+			
+			m_c_bm_A = cd.L(b,o_sad);
+			
+			m_c_bm_A->setname("c_bm_A");
+			m_c_bm_A->filter();
+			
+			//dbcsr::print(*m_c_bm_A);
+			
+			//dbcsr::multiply('N', 'T', *m_c_bm_A, *m_c_bm_A, *m_p_bb_A).beta(-1.0).perform();
+			
+			//dbcsr::print(*m_p_bb_A);
+			
+		}
 			
 		if (!m_restricted) {
 			if (!m_nobetaorb) m_c_bm_B->copy_in(*m_c_bm_A);

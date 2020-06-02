@@ -262,15 +262,15 @@ reader::reader(MPI_Comm comm, std::string filename, int print) : m_comm(comm), L
 	
 	json& jmol = data["molecule"];
 	
-	int mo_split = 10;
-	int atom_split = 1;
+	optional<int,val> opt_mo_split;
+	optional<int,val> opt_atom_split;
 	
 	if (jmol.find("mo_split") != jmol.end()) {
-		mo_split = jmol["mo_split"];
+		opt_mo_split = jmol["mo_split"];
 	}
 	
 	if (jmol.find("atom_split") != jmol.end()) {
-		atom_split = jmol["atom_split"];
+		opt_atom_split = jmol["atom_split"];
 	}
 	
 	LOG.os<>("Processing atomic coordinates...\n");
@@ -341,7 +341,7 @@ reader::reader(MPI_Comm comm, std::string filename, int print) : m_comm(comm), L
 	LOG.reset();
 	
 	desc::molecule mol = desc::molecule::create().name(name).atoms(atoms).charge(charge)
-		.mult(mult).mo_split(mo_split).atom_split(atom_split)
+		.mult(mult).mo_split(opt_mo_split).atom_split(opt_atom_split)
 		.basis(basis).dfbasis(dfbasis);
 		
 	mol.print_info(m_comm,1);

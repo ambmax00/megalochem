@@ -256,7 +256,7 @@ void hfmod::compute() {
 		
 		// form fock matrix
 		
-		bool SAD_iter = ((iter == 0) && (m_guess == "SAD")) ? true : false;
+		bool SAD_iter = ((iter == 0) && (m_guess == "SAD" || m_guess == "SADNO")) ? true : false;
 		
 		fbuilder.compute(m_core_bb, m_p_bb_A, m_c_bm_A, m_p_bb_B, m_c_bm_B, SAD_iter);;
 		

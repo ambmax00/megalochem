@@ -304,6 +304,7 @@ void fockbuilder::build_k(stensor<2>& p_A, stensor<2>& p_B, stensor<2>& c_A, ste
 				
 			} else {
 				
+				std::cout << "SAD iter." << std::endl;
 				dbcsr::contract(*c_bm, *m_3c2e_ints, HT).perform("Ni, XMN -> XMi");
 				
 			}

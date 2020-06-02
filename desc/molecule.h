@@ -12,6 +12,10 @@
 
 namespace desc {
 
+// defualts
+static const int MOLECULE_MO_SPLIT = 5;
+static const int MOLECULE_ATOM_SPLIT = 1;
+
 class molecule {	
 private:
 
@@ -27,6 +31,9 @@ private:
 	int m_nocc_beta;
 	int m_nvir_alpha;
 	int m_nvir_beta;
+	
+	int m_mo_split;
+	int m_atom_split;
 	
 	int m_nele;
 	double m_nele_alpha;
@@ -54,25 +61,6 @@ private:
 		block_sizes() {}
 	
 		block_sizes(molecule& mol, int nsplit) {
-			
-			auto split_range = [](int n, int split) {
-	
-				// number of intervals
-				int nblock = n%split == 0 ? n/split : n/split + 1;
-				bool even = n%split == 0 ? true : false;
-				
-				//std::cout << "NBLOCK: " << nblock << std::endl;
-				//std::cout << "NSPLIT: " << split << std::endl;
-				
-				if (even) {
-					std::vector<int> out(nblock,split);
-					return out;
-				} else {
-					std::vector<int> out(nblock,split);
-					out[nblock-1] = n%split;
-					return out;
-				}
-			};
 			
 			m_occ_alpha_sizes = split_range(mol.m_nocc_alpha,nsplit);
 			m_occ_beta_sizes = split_range(mol.m_nocc_beta,nsplit);
@@ -122,6 +110,22 @@ private:
 		
 		~block_sizes() {}
 		
+		std::vector<int> split_range(int n, int split) {
+	
+			// number of intervals
+			int nblock = n%split == 0 ? n/split : n/split + 1;
+			bool even = n%split == 0 ? true : false;
+			
+			if (even) {
+				std::vector<int> out(nblock,split);
+				return out;
+			} else {
+				std::vector<int> out(nblock,split);
+				out[nblock-1] = n%split;
+				return out;
+			}
+		}
+		
 	};
 	
 	block_sizes m_blocks;
@@ -138,8 +142,8 @@ public:
 		make_param(create,basis,std::vector<libint2::Shell>,required,ref)
 		make_param(create,charge,int,required,val)
 		make_param(create,mult,int,required,val)
-		make_param(create,mo_split,int,required,val)
-		make_param(create,atom_split,int,required,val)
+		make_param(create,mo_split,int,optional,val)
+		make_param(create,atom_split,int,optional,val)
 		make_param(create,dfbasis,std::vector<libint2::Shell>,optional,ref)
 		make_param(create,fractional,bool,optional,val)
 		make_param(create,spin_average,bool,optional,val)
@@ -195,6 +199,14 @@ public:
 	
 	int nvir_beta() {
 		return m_nvir_beta;
+	}
+	
+	int mo_split() {
+		return m_mo_split;
+	}
+	
+	int atom_split() {
+		return m_atom_split;
 	}
 
 	optional<std::vector<double>,val> frac_occ_alpha() {

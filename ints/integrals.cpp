@@ -353,8 +353,6 @@ void calc_ints(dbcsr::tensor<4>& t_out, util::ShrPool<libint2::Engine>& engine,
 	
 	t_out.reserve_all();
 	
-	dbcsr::print(t_out);
-	
 	size_t nblks = 0;
 
 	#pragma omp parallel 
