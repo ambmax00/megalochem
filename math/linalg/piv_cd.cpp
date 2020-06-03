@@ -75,7 +75,11 @@ void pivinc_cd::reorder_and_reduce(scalapack::distmat<double>& L) {
 				
 	}
 	
-	m_L = std::make_shared<scalapack::distmat<double>>(N,m_rank,nb,nb,0,0);
+	if (m_reduce && *m_reduce) {
+		m_L = std::make_shared<scalapack::distmat<double>>(N,m_rank,nb,nb,0,0);
+	} else {
+		m_L = std::make_shared<scalapack::distmat<double>>(N,N,nb,nb,0,0);
+	}
 	
 	LOG.os<>("-- Reducing and reordering L.\n");
 	

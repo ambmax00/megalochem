@@ -152,6 +152,8 @@ void hfmod::compute_virtual_density() {
 		mat_d p = mat_d::create_template(*m_p_bb_A).name("pv_bb_"+x);
 		pv_bb = p.get_smatrix();
 		
+		std::cout << "HERE: " << x << std::endl;
+		
 		if (x == "A") {
 			lobound = m_mol->nocc_alpha();
 			upbound = lobound + m_mol->nvir_alpha() - 1;
@@ -167,6 +169,8 @@ void hfmod::compute_virtual_density() {
 		
 		if (LOG.global_plev() >= 2) 
 			dbcsr::print(*pv_bb);
+		
+		std::cout << "DONE." << std::endl;
 		
 	};
 	

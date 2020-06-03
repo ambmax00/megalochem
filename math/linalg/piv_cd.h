@@ -21,6 +21,7 @@ private:
 	int m_rank = -1;
 	
 	std::optional<std::string> m_reorder_method = std::nullopt;
+	std::optional<bool> m_reduce = std::nullopt;
 	
 	void reorder_and_reduce(scalapack::distmat<double>& L);
 
@@ -30,6 +31,12 @@ public:
 		m_reorder_method = method;
 		return *this;
 	}
+	
+	inline pivinc_cd& reduce(bool red) {
+		m_reduce = red;
+		return *this;
+	}
+		
 
 	pivinc_cd(dbcsr::smat_d mat_in, int print) : 
 		m_mat_in(mat_in), LOG(m_mat_in->get_world().comm(), print) {}

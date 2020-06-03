@@ -271,7 +271,8 @@ public:
 			irsrc, global_grid.nprow()));
 		m_ncolsloc = std::max(1,c_numroc(m_ncolstot, m_colblk_size, global_grid.mypcol(), 
 			icsrc, global_grid.npcol()));
-			
+		
+		/*	
 		for (int i = 0; i != global_grid.nprow(); ++i) {
 			for (int j = 0; j != global_grid.npcol(); ++j) {
 				if (global_grid.myprow() == i && global_grid.mypcol() == j) {
@@ -282,6 +283,7 @@ public:
 			c_blacs_barrier(global_grid.ctx(),'A');
 		}
 		c_blacs_barrier(global_grid.ctx(),'A');
+		*/
 				
 		int info = 0;
 		c_descinit(&m_desc[0],m_nrowstot,m_ncolstot,m_rowblk_size,

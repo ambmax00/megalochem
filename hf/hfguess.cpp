@@ -394,10 +394,10 @@ void hfmod::compute_guess() {
 			
 			int rank = cd.rank();
 			
-			auto o_sad = m_mol->dims().split_range(rank, m_mol->mo_split());
+			auto m = m_c_bm_A->col_blk_sizes();
 			auto b = m_mol->dims().b(); 
 			
-			m_c_bm_A = cd.L(b,o_sad);
+			m_c_bm_A = cd.L(b,m);
 			
 			m_c_bm_A->setname("c_bm_A");
 			m_c_bm_A->filter();
