@@ -285,12 +285,31 @@ void fockbuilder::build_k(stensor<2>& p_A, stensor<2>& p_B, stensor<2>& c_A, ste
 			vec<int> o = c_bm->blk_sizes()[1];
 			
 			arrvec<int,3> HTsizes = {m_mol->dims().x(), m_mol->dims().b(), o};
+			arrvec<int,3> Xbb = {m_mol->dims().x(), m_mol->dims().b(), m_mol->dims().b()};
 			
-			dbcsr::tensor<3> HT = dbcsr::tensor<3>::create().name("HT_"+x).ngrid(grid3)
+			auto& reo_int_1 = t_k.sub("Reorder Integrals (1)");
+			auto& reo_int_2 = t_k.sub("Reorder Integrals (2)");
+			auto& con1 = t_k.sub("Contraction (1)");
+			auto& con2 = t_k.sub("Contraction (2)");
+			auto& con3 = t_k.sub("Contraction (3)");
+			auto& reo_HT_1 = t_k.sub("Reordering HT (1)");
+			auto& reo_HT_2 = t_k.sub("Reordering HT (2)");
+			auto& reo_D_1 = t_k.sub("Reordering D (1)");
+			
+			dbcsr::tensor<3> INTS_01_2 = dbcsr::tensor<3>::create().name("INTS_01_2").ngrid(grid3)
+				.map1({0,1}).map2({2}).blk_sizes(Xbb);
+			dbcsr::tensor<3> HT_01_2 = dbcsr::tensor<3>::create().name("HT_Xbi_01_2_"+x).ngrid(grid3)
 				.map1({0,1}).map2({2}).blk_sizes(HTsizes);
-			dbcsr::tensor<3> D = dbcsr::tensor<3>::create().name("D_"+x).ngrid(grid3)
+			dbcsr::tensor<3> D_0_12 = dbcsr::tensor<3>::create().name("D_Xbi_0_12_"+x).ngrid(grid3)
 				.map1({0}).map2({1,2}).blk_sizes(HTsizes);
+				
+			reo_int_1.start();
+				
+			dbcsr::copy(*m_3c2e_ints, INTS_01_2).move_data(true).perform();
 			
+			reo_int_1.finish();
+			
+			con1.start();
 			// HTa("M,mu,i") = Coa("nu,i") * B("M,mu,nu");
 			if (!SAD_iter) {
 				
@@ -300,24 +319,51 @@ void fockbuilder::build_k(stensor<2>& p_A, stensor<2>& p_B, stensor<2>& c_A, ste
 							
 				vec<vec<int>> occ_bounds = {{0,nocc}};
 				
-				dbcsr::contract(*c_bm, *m_3c2e_ints, HT).bounds2(occ_bounds).perform("Ni, XMN -> XMi");
+				dbcsr::contract(*c_bm, INTS_01_2, HT_01_2).bounds2(occ_bounds).perform("Ni, XMN -> XMi");
 				
 			} else {
 				
 				std::cout << "SAD iter." << std::endl;
-				dbcsr::contract(*c_bm, *m_3c2e_ints, HT).perform("Ni, XMN -> XMi");
+				dbcsr::contract(*c_bm, INTS_01_2, HT_01_2).perform("Ni, XMN -> XMi");
 				
 			}
 			
-			HT.filter();
+			con1.finish();
+			
+			HT_01_2.filter();
 			
 			//Da("M,mu,i") = HTa("N,mu,i") * Jinv("N,M");
-			dbcsr::contract(HT, *m_inv_xx, D).perform("XMi, XY -> YMi");
+			dbcsr::tensor<3> HT_0_12 = dbcsr::tensor<3>::create().name("HT_Xbi_0_12_"+x).ngrid(grid3)
+				.map1({0}).map2({1,2}).blk_sizes(HTsizes);
 			
-			D.filter();
+			reo_HT_1.start();
+			dbcsr::copy(HT_01_2, HT_0_12).move_data(true).perform();
+			reo_HT_1.finish();
+			
+			con2.start();
+			dbcsr::contract(HT_0_12, *m_inv_xx, D_0_12).perform("XMi, XY -> YMi");
+			con2.finish();
+			
+			D_0_12.filter();
 			
 			//ka("mu,nu") = HTa("M,mu,i") * Da("M,nu,i");
-			dbcsr::contract(HT, D, *k_bb).alpha(-1.0).perform("XMi, XNi -> MN");
+			
+			dbcsr::tensor<3> HT_02_1 = dbcsr::tensor<3>::create().name("HT_Xbi_02_1_"+x).ngrid(grid3)
+				.map1({0,2}).map2({1}).blk_sizes(HTsizes);
+				
+			dbcsr::tensor<3> D_02_1 = dbcsr::tensor<3>::create().name("D_Xbi_02_1_"+x).ngrid(grid3)
+				.map1({0,2}).map2({1}).blk_sizes(HTsizes);
+			
+			reo_HT_2.start();
+			dbcsr::copy(HT_0_12, HT_02_1).move_data(true).perform();
+			reo_HT_2.finish();
+			reo_D_1.start();
+			dbcsr::copy(D_0_12, D_02_1).move_data(true).perform();
+			reo_D_1.finish();
+			
+			con3.start();
+			dbcsr::contract(HT_02_1, D_02_1, *k_bb).move(true).alpha(-1.0).perform("XMi, XNi -> MN");
+			con3.finish();
 			
 			k_bb->filter();
 			
@@ -325,9 +371,10 @@ void fockbuilder::build_k(stensor<2>& p_A, stensor<2>& p_B, stensor<2>& c_A, ste
 				double sp = k_bb->occupation();
 				LOG.os<1>("Exchange (", x, ") matrix sparsity: ", sp*100, "%\n");
 			}
-						
-			HT.destroy();
-			D.destroy();
+			
+			reo_int_2.start();
+			dbcsr::copy(INTS_01_2, *m_3c2e_ints).move_data(true).perform();
+			reo_int_2.finish();
 		
 		};
 		

@@ -14,11 +14,11 @@
 	},
 	"hf": 
 	{
-		"diis": false,
+		"diis": true,
 		"guess": "SAD",
 		"scf_thresh": 1e-6,
 		"diis_start": 0,
-		"use_df": false,
+		"use_df": true,
 		"print": 0,
 		"skip": false
 	},

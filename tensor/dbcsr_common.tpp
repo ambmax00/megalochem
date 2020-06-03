@@ -113,7 +113,7 @@ void copy_tensor_to_matrix(tensor<2,T>& t_in, matrix<T>& m_out, std::optional<bo
 template <typename T>
 void copy_matrix_to_tensor(matrix<T>& m_in, tensor<2,T>& t_out, std::optional<bool> summation = std::nullopt);
 
-static inline double filter_eps = 1e-16;
+static inline double filter_eps = 1e-9;
 static inline bool filter_use_absolute = true;
 
 
