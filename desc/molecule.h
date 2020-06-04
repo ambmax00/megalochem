@@ -12,9 +12,9 @@
 
 namespace desc {
 
-// defualts
+// defaults
 static const int MOLECULE_MO_SPLIT = 5;
-static const int MOLECULE_ATOM_SPLIT = 1;
+static const std::string MOLECULE_AO_SPLIT_METHOD = "atomic";
 
 class molecule {	
 private:
@@ -33,7 +33,7 @@ private:
 	int m_nvir_beta;
 	
 	int m_mo_split;
-	int m_atom_split;
+	std::string m_ao_split_method;
 	
 	int m_nele;
 	double m_nele_alpha;
@@ -143,7 +143,7 @@ public:
 		make_param(create,charge,int,required,val)
 		make_param(create,mult,int,required,val)
 		make_param(create,mo_split,int,optional,val)
-		make_param(create,atom_split,int,optional,val)
+		make_param(create,ao_split_method,std::string,optional,val)
 		make_param(create,dfbasis,std::vector<libint2::Shell>,optional,ref)
 		make_param(create,fractional,bool,optional,val)
 		make_param(create,spin_average,bool,optional,val)
@@ -205,8 +205,8 @@ public:
 		return m_mo_split;
 	}
 	
-	int atom_split() {
-		return m_atom_split;
+	std::string ao_split_method() {
+		return m_ao_split_method;
 	}
 
 	optional<std::vector<double>,val> frac_occ_alpha() {

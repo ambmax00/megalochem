@@ -8,7 +8,7 @@
 		"unit": "angstrom",
 		"file": "gly_4.xyz",
 		"mo_split": 10,
-		"atom_split": 1,
+		"ao_split_method": "shell",
 		"basis": "cc-pvdz",
 		"dfbasis": "cc-pvdz-ri"
 	},

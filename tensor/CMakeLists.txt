@@ -35,6 +35,7 @@ target_link_libraries(
 	INTERFACE
 	Eigen3::Eigen
 	MPI::MPI_CXX
+	PkgConfig::deps
         DBCSR::dbcsr_c
 )
 

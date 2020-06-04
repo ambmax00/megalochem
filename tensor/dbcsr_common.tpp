@@ -17,6 +17,21 @@
 
 #include "utils/params.hpp"
 
+//-----------------------------------------
+//            external functions
+//-----------------------------------------
+
+/*
+extern "C" {
+	
+	double flange_(char* norm, int* m, int* n, float* A, int* lda, double* work);
+	double dlange_(char* norm, int* m, int* n, double* A, int* lda, double* work);
+	double zlange_(char* norm, int* m, int* n, float _Complex* A, int* lda, double* work);
+	double clange_(char* norm, int* m, int* n, double _Complex* A, int* lda, double* work);
+	
+}
+*/
+
 // ----------------------------------------
 //               typedefs                 
 // ----------------------------------------

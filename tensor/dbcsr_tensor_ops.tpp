@@ -384,7 +384,7 @@ dbcsr::tensor<N-1,T> remove_dummy(tensor<N,T>& t, vec<int> map1, vec<int> map2, 
 	// parallelize this (?):
 	
 	arrvec<int,N-1> resblkidx;
-	for (int i = 0; i != N; ++i) {
+	for (int i = 0; i != N-1; ++i) {
 		resblkidx[i] = vec<int>(1);
 	}
 	

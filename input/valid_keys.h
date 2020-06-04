@@ -20,7 +20,7 @@ static const json valid_keys =
 		{"mult", 0}, // multiplicity
 		{"charge", 0}, // total charge
 		{"mo_split", 10},
-		{"atom_split", 1}
+		{"ao_split_method", "atomic"} // atomic or shell
 	}},
 	{"hf", {
 		{"guess", "core"}, // HF guess

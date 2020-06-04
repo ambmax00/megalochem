@@ -580,6 +580,14 @@ public:
         return m_blk_ptr[i + m_row_size * j];
     }
     
+    double norm() {
+		double out = 0.0;
+		for (int n = 0; n != m_row_size*m_col_size; ++n) {
+			out += pow(m_blk_ptr[n],2);
+		}
+		return sqrt(out);
+	}
+    
 #:set list = ['row', 'col', 'iblk', 'blk_p', 'row_size', 'col_size', 'row_offset', 'col_offset']
 #:for var in list
     int ${var}$() { return m_${var}$; }

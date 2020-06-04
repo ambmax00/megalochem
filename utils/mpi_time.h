@@ -31,7 +31,7 @@ public:
 
 	mpi_time() : proc_name(""), has_started(false), has_finished(true), LOG(m_comm,0), lev(0), nproc(0) {}
 	mpi_time(MPI_Comm comm, std::string n, int plev = 0) : proc_name(n), has_started(false), 
-		has_finished(true), LOG(comm,plev), lev(0), nproc(0), m_comm(comm) {}
+		has_finished(true), LOG(comm,plev), lev(0), nproc(0), tot(0), m_comm(comm) {}
 	
 	~mpi_time() {}
 	

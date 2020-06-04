@@ -381,6 +381,44 @@ void copy_matrix_to_tensor(matrix<T>& m_in, tensor<2,T>& t_out, std::optional<bo
 	
 }
 
+template <typename T>
+MatrixX<float> block_norms(matrix<T>& m_in) {
+	
+	// returns an eigen matrix with block norms
+	int nrows = m_in.nblkrows_total();
+	int ncols = m_in.nblkcols_total();
+	
+	MatrixX<float> eigen_out(nrows,ncols);
+	
+	m_in.replicate_all();
+
+	dbcsr::iterator iter(m_in);
+
+#pragma omp parallel
+{
+	iter.start();
+	
+	while (iter.blocks_left()) {
+		
+		iter.next_block();
+		
+		int iblk = iter.row();
+		int jblk = iter.col();
+		
+		eigen_out(iblk,jblk) = iter.norm();
+		
+	}
+	
+	iter.stop();
+	m_in.finalize();
+}//end parallel region
+
+	m_in.distribute();
+	return eigen_out;
+	
+}
+	
+
 	
 }
 	

@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.10 FATAL_ERROR)
+cmake_minimum_required(VERSION 3.13 FATAL_ERROR)
 
 project(chem)
 enable_language(Fortran CXX)
@@ -18,6 +18,8 @@ find_package(OpenMP REQUIRED)
 find_package(Boost REQUIRED)
 find_package(MPI REQUIRED)
 find_package(DBCSR 2.0.0 CONFIG REQUIRED)
+find_package(PkgConfig)
+pkg_check_modules(deps REQUIRED IMPORTED_TARGET GLOBAL libxsmmf)
 find_package(TBB REQUIRED)
 find_package(Libint2 2.6.0 CONFIG REQUIRED)
 

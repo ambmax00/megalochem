@@ -212,7 +212,7 @@ void hfmod::compute_guess() {
 			bool spinav = m_opt.get<bool>("SAD_spin_average",HF_SAD_SPIN_AVERAGE);
 			
 			desc::molecule at_mol = desc::molecule::create().name(name).atoms(atvec).charge(charge)
-				.mo_split(10).atom_split(1)
+				.mo_split(10).ao_split_method("atomic")
 				.mult(mult).basis(at_basis).dfbasis(at_dfbasis).fractional(true).spin_average(spinav);
 				
 			auto at_smol = std::make_shared<desc::molecule>(std::move(at_mol));

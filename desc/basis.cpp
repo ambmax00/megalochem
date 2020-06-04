@@ -3,11 +3,12 @@
 
 namespace desc {
 
-cluster_basis::cluster_basis(vshell& basis, int nsplit) : m_basis(basis) {
+cluster_basis::cluster_basis(vshell& basis, std::string method) : m_basis(basis) {
 	
 	std::vector<size_t> shell2bf = libint2::BasisSet::compute_shell2bf(basis);
 	
 	int nbas = libint2::nbf(basis);
+	int nsplit = 1; // = (method == "atomic") ? 1 : INT_MAX;
 		
 	int nfunc(0);
 		
@@ -15,10 +16,12 @@ cluster_basis::cluster_basis(vshell& basis, int nsplit) : m_basis(basis) {
 	int n = 1;
 	libint2::Shell prev_shell;
 		
-	auto coord = [&](libint2::Shell& s1, libint2::Shell& s2) {
-			
+	auto coord = [&](libint2::Shell& s1, libint2::Shell& s2) {	
 		return (s1.O[0] == s2.O[0]) && (s1.O[1] == s2.O[1]) && (s1.O[2] == s2.O[2]);
-			
+	};
+	
+	auto angmom = [](libint2::Shell& s1, libint2::Shell& s2) {
+		return (s1.contr.size() == s2.contr.size()) && (s1.contr[0].l == s2.contr[0].l);
 	};
 		
 	for (int i = 0; i != basis.size(); ++i) {
@@ -31,8 +34,16 @@ cluster_basis::cluster_basis(vshell& basis, int nsplit) : m_basis(basis) {
 			prev_shell = basis[i];
 				
 		} else {
-				
-			if (coord(basis[i], prev_shell)) {
+			
+			bool push;
+			
+			if (method == "shell") {
+				push = (coord(basis[i], prev_shell) && angmom(basis[i], prev_shell));
+			} else {
+				push = coord(basis[i], prev_shell);
+			}
+			
+			if (push) {
 				
 				//std::cout << "  Same as previous" << std::endl;
 				cluster_part.push_back(basis[i]);

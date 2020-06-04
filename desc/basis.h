@@ -18,7 +18,7 @@ public:
 
 	cluster_basis() {}
 	
-	cluster_basis(vshell& basis, int nsplit);
+	cluster_basis(vshell& basis, std::string method);
 	
 	cluster_basis(const cluster_basis& cbasis) : 
 		m_basis(cbasis.m_basis),

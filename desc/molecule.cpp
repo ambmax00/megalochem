@@ -27,20 +27,20 @@ molecule::molecule(molecule::create& p) :
 	m_mult(*p.c_mult), 
 	m_charge(*p.c_charge),
 	m_mo_split((p.c_mo_split) ? *p.c_mo_split : MOLECULE_MO_SPLIT),
-	m_atom_split((p.c_atom_split) ? *p.c_atom_split : MOLECULE_ATOM_SPLIT)
+	m_ao_split_method((p.c_ao_split_method) ? *p.c_ao_split_method : MOLECULE_AO_SPLIT_METHOD)
 	{
 	
 	//atoms
 	m_atoms = *p.c_atoms;
 	
 	// first: form clustered basis sets
-	cluster_basis cbas(*p.c_basis,m_atom_split);
+	cluster_basis cbas(*p.c_basis,m_ao_split_method);
 	
 	m_cluster_basis = cbas;
 	
 	if (p.c_dfbasis) {
 		//std::cout << "There is a df basis: " << p.c_dfbasis->size() << std::endl;
-		cluster_basis cdfbas(*p.c_dfbasis,m_atom_split);
+		cluster_basis cdfbas(*p.c_dfbasis,m_ao_split_method);
 		
 		//for (auto i : cdfbas.cluster_sizes()) {
 		//	std::cout << i << std::endl;

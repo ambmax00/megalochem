@@ -14,6 +14,7 @@
 		"symbols": ["O", "H", "H"],
 		"basis": "cc-pvdz",
 		"dfbasis": "cc-pvdz-ri",
+		"ao_split_method": "atom",
 		"reorder": false
 	},
 	"hf": 
