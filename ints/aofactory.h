@@ -25,18 +25,22 @@ private:
 	
 public:
 
-	aofactory& op(std::string i_op);
-	aofactory& dim(std::string i_dim); 
-	aofactory& screen(std::string i_screen);
-	
+	desc::molecule& m_mol;
+
 	aofactory(desc::molecule& mol, dbcsr::world& w);
 	~aofactory();
 	
-	dbcsr::stensor<2,double> compute_2(std::vector<int> map1, std::vector<int> map2);
-	dbcsr::stensor<3,double> compute_3(std::vector<int> map1, std::vector<int> map2, 
-		eigen_smat_f bra = nullptr, eigen_smat_f ket = nullptr);
-	dbcsr::stensor<4,double> compute_4(std::vector<int> map1, std::vector<int> map2);
-	dbcsr::smatrix<double> compute();
+	dbcsr::smatrix<double> ao_overlap();
+	dbcsr::smatrix<double> ao_kinetic();
+	dbcsr::smatrix<double> ao_nuclear();
+	
+	dbcsr::smatrix<double> ao_3coverlap();
+	
+	dbcsr::stensor<3,double> ao_3c2e(vec<int> map1, vec<int> map2, dbcsr::smatrix<double> scr = nullptr);
+	dbcsr::stensor<4,double> ao_eri(vec<int> map1, vec<int> map2, bool reorder = false, bool move = false);
+	
+	dbcsr::smatrix<double> ao_schwarz();
+	dbcsr::smatrix<double> ao_3cschwarz();
 		
 }; // end class aofactory
 

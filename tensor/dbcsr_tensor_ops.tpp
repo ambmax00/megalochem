@@ -268,162 +268,232 @@ template <int N1, int N2, int N3, typename T>
 contract(tensor<N1,T>& t1, tensor<N2,T>& t2, tensor<N3,T>& t3) 
 -> contract<tensor<N1,T>::dim,tensor<N2,T>::dim,tensor<N3,T>::dim, T>;
 
-template <int N, typename T = double>
-dbcsr::tensor<N+1,T> add_dummy(tensor<N,T>& t) {
+template <typename T = double>
+void copy_2Dtensor_to_3Dtensor(tensor<2,T>& t2, tensor<3,T>& t3, bool sum = false) {
 	
-	vec<int> map1 = t.map1_2d();
-    vec<int> map2 = t.map2_2d();   
-	
-	vec<int> new_map1 = map1;
-	new_map1.insert(new_map1.end(), map2.begin(), map2.end());
-	
-	vec<int> new_map2 = {N};
-	
-	pgrid<N+1> grid(t.comm());
-	
-	arrvec<int,N> blksizes = t.blk_sizes();
-    arrvec<int,N+1> blksizesnew;
+	iterator_t<2> it2(t2);
+    index<3> idx3d;
+    index<3> size3;
     
-    std::copy(blksizes.begin(),blksizes.end(),blksizesnew.begin());
-    blksizesnew[N] = vec<int>{1};
-	
-	tensor<N+1,T> new_t = typename tensor<N+1,T>::create().name(t.name() + " dummy").ngrid(grid)
-        .map1(new_map1).map2(new_map2).blk_sizes(blksizesnew);
-	
-	iterator_t<N> it(t);
-    index<N+1> newidx;
-    index<N+1> newsize;
+    idx3d[2] = 0;
+    size3[2] = 1;
     
-    newidx[N] = 0;
-    newsize[N] = 1;
-    
-    //auto locblks = t.blks_local();
-    //arrvec<int,N+1> newlocblks;
-    
-    //std::copy(locblks.begin(),locblks.end(),newlocblks.begin());
-    //newlocblks[N] = vec<int>(locblks[0].size(),0);
-    
-    //new_t.reserve(newlocblks);
-    
-    arrvec<int,N+1> resblkidx;
-	for (int i = 0; i != N+1; ++i) {
+    arrvec<int,3> resblkidx;
+	for (int i = 0; i != 3; ++i) {
 		resblkidx[i] = vec<int>(1);
 	}
-    
-    it.start();
 	
-	while (it.blocks_left()) {
+	resblkidx[2][0] = 0;
+    
+    it2.start();
+	
+	while (it2.blocks_left()) {
 		
-		it.next();
+		it2.next();
 		
-		auto& idx = it.idx();
-        auto& size = it.size();
+		auto& idx2d = it2.idx();
+        auto& size2 = it2.size();
 				
-		std::copy(size.begin(),size.end(),newsize.begin());
-		std::copy(idx.begin(),idx.end(),newidx.begin());
+		idx3d[0] = idx2d[0];
+		idx3d[1] = idx2d[1];
+		
+		size3[0] = size2[0];
+		size3[1] = size2[1];
         
 		bool found = false;
-		auto blk = t.get_block(idx, size, found);
+		auto blk2 = t2.get_block(idx2d, size2, found);
 		
-		block<N+1,T> newblk(newsize,blk.data());
+		block<3,T> blk3(size3,blk3.data());
 		
-		//std::cout << "IDX: " << new_idx.size() << std::endl;
-		//std::cout << "BLK: " << new_blk.sizes().size() << std::endl;
+		resblkidx[0][0] = idx3d[0];
+		resblkidx[1][0] = idx3d[1];
 		
-		for (int i = 0; i != N+1; ++i) {
-			resblkidx[i][0] = newidx[i];
-		}
+		t3.reserve(resblkidx);
 		
-		new_t.reserve(resblkidx);
-		
-		new_t.put_block(newidx, newblk);
+		t3.put_block(idx3d, blk3);
 		
 	}
     
-    it.stop();
+    it2.stop();
 		
 	//print(new_t);
-    t.finalize();
-    new_t.finalize();
-	
-	grid.destroy();
-	
-	return new_t;
+    t2.finalize();
+    t3.finalize();
 	
 }
 
-template <int N, typename T = double>
-dbcsr::tensor<N-1,T> remove_dummy(tensor<N,T>& t, vec<int> map1, vec<int> map2, std::optional<std::string> name = std::nullopt) {
+template <typename T = double>
+void copy_3Dtensor_to_2Dtensor(tensor<3,T>& t3, tensor<2,T>& t2, bool sum = false) {
 	
-	//std::cout << "Removing dummy dim." << std::endl;
-	
-	pgrid<N-1> grid(t.comm());
-	
-	auto blksizes = t.blk_sizes();
-	arrvec<int,N-1> newblksizes;
+	iterator_t<3> it3(t3);
+    index<2> idx2d;
+    index<2> size2;
     
-    std::copy(blksizes.begin(),blksizes.end()-1,newblksizes.begin());
-	std::string newname = (name) ? *name : t.name();
-    
-	tensor<N-1,T> new_t = typename dbcsr::tensor<N-1,T>::create().name(newname).ngrid(grid).map1(map1).map2(map2)
-		.blk_sizes(newblksizes);
-	
-	iterator_t<N> it(t);
-    
-    // reserve 
-    //auto locblks = t.blks_local();
-    
-    //arrvec<int,N-1> newlocblks;
-    
-    //std::copy(locblks.begin(),locblks.end()-1,newlocblks.begin());
-    
-    //new_t.reserve(newlocblks);
-	
-    it.start();
-    
-	// parallelize this (?):
-	
-	arrvec<int,N-1> resblkidx;
-	for (int i = 0; i != N-1; ++i) {
+    arrvec<int,2> resblkidx;
+	for (int i = 0; i != 2; ++i) {
 		resblkidx[i] = vec<int>(1);
 	}
-	
-	while (it.blocks_left()) {
-		
-		it.next();
-		
-		auto& idx = it.idx();
-        auto& size = it.size();
-        
-		index<N-1> newidx;
-        index<N-1> newsize;
-        
-        std::copy(idx.begin(),idx.end()-1,newidx.begin());
-        std::copy(size.begin(),size.end()-1,newsize.begin());
     
+    it3.start();
+	
+	while (it3.blocks_left()) {
+		
+		it3.next();
+		
+		auto& idx3d = it3.idx();
+        auto& size3 = it3.size();
+				
+		idx2d[0] = idx3d[0];
+		idx2d[1] = idx3d[1];
+		
+		size2[0] = size3[0];
+		size2[1] = size3[1];
+        
 		bool found = false;
-		auto blk = t.get_block(idx, size, found);
+		auto blk3 = t3.get_block(idx3d, size3, found);
 		
-		block<N-1,T> newblk(newsize, blk.data());
+		block<2,T> blk2(size2,blk3.data());
 		
-		for (int i = 0; i != N-1; ++i) {
-			resblkidx[i][0] = newidx[i];
-		}
+		resblkidx[0][0] = idx2d[0];
+		resblkidx[1][0] = idx2d[1];
 		
-		new_t.reserve(resblkidx);
+		t2.reserve(resblkidx);
 		
-		new_t.put_block(newidx, newblk);
+		t2.put_block(idx2d, blk2);
 		
 	}
-		
-	t.finalize();
-    new_t.finalize();
     
-    it.stop();
+    it3.stop();
+		
+	//print(new_t);
+    t2.finalize();
+    t3.finalize();
 	
-	grid.destroy();
+}
+
+template <typename T>
+void copy_matrix_to_3Dtensor(matrix<T>& m, tensor<3,T>& t, bool sum = false, bool sym = false) {
 	
-	return new_t;
+	if (!sum) t.clear();
+	
+	iterator iter(m);
+    
+    iter.start();	
+    
+    dbcsr::idx3 idx = {0,0,0};
+    dbcsr::idx3 sizes = {0,0,1};
+    arrvec<int,3> res = {vec<int>{0},vec<int>{0},vec<int>{0}};
+    
+    char symtype = m.matrix_type();
+    
+    while (iter.blocks_left()) {
+		iter.next_block();
+		
+		int r = iter.row();
+		int c = iter.col();
+		
+		res[0].push_back(r);
+		res[1].push_back(c);
+		res[2].push_back(0);
+		
+		if (sym && symtype == dbcsr_type_symmetric && r != c) {
+			res[0].push_back(c);
+			res[1].push_back(r);
+			res[2].push_back(0);
+		} 
+		
+	}
+	
+	iter.stop();
+	
+	t.reserve(res);
+	
+	iter.start();
+	
+	while (iter.blocks_left()) {
+		
+		iter.next_block();
+				
+		idx[0] = iter.row();
+		idx[1] = iter.col();
+        		
+		sizes[0] = iter.row_size();
+		sizes[1] = iter.col_size();
+		block<3,T> blk(sizes,iter.data());
+		
+		t.put_block(idx, blk, sum);
+		
+		if (sym && symtype == dbcsr_type_symmetric && idx[0] != idx[1]) {
+			
+			sizes[0] = iter.col_size();
+			sizes[1] = iter.row_size();
+			
+			idx[0] = iter.col();
+			idx[1] = iter.row();
+			
+			block<3,T> blk(sizes);
+			
+			for (int i = 0; i != sizes[0]; ++i) {
+				for (int j = 0; j != sizes[1]; ++j) {
+					blk(i,j,0) = iter(j,i);
+				}
+			}
+			
+			t.put_block(idx, blk, sum);
+			
+		}
+		
+	}
+    
+    iter.stop();
+		
+    t.finalize();
+    m.finalize();
+	
+}
+
+template <typename T>
+void copy_3Dtensor_to_matrix(tensor<3,T>& t, matrix<T>& m, bool sum = false) {
+	
+	if (sum) m.clear();
+	
+	iterator_t<3,double> iter3(t);
+    
+    iter3.start();
+    
+	vec<int> resrow, rescol;
+	std::array<int,2> size2 = {0,0};
+	resrow = rescol = {0};
+	
+	while (iter3.blocks_left()) {
+		
+		iter3.next();
+				
+		auto& idx = iter3.idx();
+		auto& size3 = iter3.size();
+		
+		bool found = true;
+	
+		block<3,T> blk3 = t.get_block(idx,size3,found);
+		
+		size2[0] = size3[0];
+		size2[1] = size3[1];
+		
+		block<2,T> blk2(size2,blk3.data());
+		
+		resrow[0] = idx[0];
+		rescol[0] = idx[1];
+		
+		t.reserve(resrow,rescol);
+		
+		t.put_block(idx,blk3);
+		
+	}
+    
+    iter3.stop();
+		
+    t.finalize();
+    m.finalize();
 	
 }
 

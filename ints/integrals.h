@@ -27,7 +27,7 @@ void calc_ints(dbcsr::tensor<4>& t_out, util::ShrPool<libint2::Engine>& eng,
 void calc_ints_schwarz_mn(dbcsr::mat_d& m_out, util::ShrPool<libint2::Engine>& engine,
 	std::vector<desc::cluster_basis>& basvec);
 	
-void calc_ints_schwarz_xy(dbcsr::mat_d& m_out, util::ShrPool<libint2::Engine>& engine,
+void calc_ints_schwarz_x(dbcsr::mat_d& m_out, util::ShrPool<libint2::Engine>& engine,
 	std::vector<desc::cluster_basis>& basvec);
 
 	

@@ -375,8 +375,8 @@ void calc_ints(dbcsr::tensor<4>& t_out, util::ShrPool<libint2::Engine>& engine,
 			int locblkoff3 = 0;
 			int locblkoff4 = 0;
 			
-			std::cout << "IDX: " << idx[0] << " " << idx[1] << " " << idx[2] << " " << idx[3] << " " << nblks++ << std::endl;
-			std::cout << "SIZE: " << size[0] << " " << size[1] << " " << size[2] << " " << size[3] << " " << nblks++ << std::endl;
+			//std::cout << "IDX: " << idx[0] << " " << idx[1] << " " << idx[2] << " " << idx[3] << " " << nblks++ << std::endl;
+			//std::cout << "SIZE: " << size[0] << " " << size[1] << " " << size[2] << " " << size[3] << " " << nblks++ << std::endl;
 			
 			for (int s1 = 0; s1!= c1.size(); ++s1) {
 		
@@ -519,8 +519,8 @@ void calc_ints_schwarz_mn(dbcsr::mat_d& m_out, util::ShrPool<libint2::Engine>& e
 						
 							for (int i = 0; i != sh1.size(); ++i) {
 								for (int j = 0; j != sh2.size(); ++j) {
-									iter(i + locblkoff1, j + locblkoff2) = sqrt(ints_shellsets[i + j*sh1size 
-										+ i*sh2size*sh1size + j*sh1size*sh2size*sh1size]);
+									iter(i + locblkoff1, j + locblkoff2) = sqrt(fabs(ints_shellsets[i*sh2size*sh2size*sh1size
+										+ j*sh1size*sh2size + i*sh2size + j]));
 									//std::cout << i << " " << j << " " << blk(i + locblkoff1, j + locblkoff2) << std::endl;
 							}}
 						}
@@ -550,13 +550,12 @@ void calc_ints_schwarz_mn(dbcsr::mat_d& m_out, util::ShrPool<libint2::Engine>& e
 	//std::cout << "Done reading." << std::endl;
 }
 
-void calc_ints_schwarz_xy(dbcsr::mat_d& m_out, util::ShrPool<libint2::Engine>& engine,
+void calc_ints_schwarz_x(dbcsr::mat_d& m_out, util::ShrPool<libint2::Engine>& engine,
 	std::vector<desc::cluster_basis>& basvec) {
 
 	auto my_world = m_out.get_world();
 	
 	auto& cbas1 = basvec[0];
-	auto& cbas2 = basvec[1];
 	
 	#pragma omp parallel 
 	{	
@@ -573,61 +572,34 @@ void calc_ints_schwarz_xy(dbcsr::mat_d& m_out, util::ShrPool<libint2::Engine>& e
 			iter.next_block();		
 						
 			std::vector<libint2::Shell>& c1 = cbas1[iter.row()];
-			std::vector<libint2::Shell>& c2 = cbas2[iter.col()];
 			
 			//block lower bounds
 			int lb1 = iter.row_offset();
-			int lb2 = iter.col_offset();
 			
 			// tensor offsets
 			int toff1 = lb1;
-			int toff2 = lb2;
 			// local Block offsets
 			int locblkoff1 = 0;
-			int locblkoff2 = 0;
 						
 			for (int s1 = 0; s1!= c1.size(); ++s1) {
 							
 				auto& sh1 = c1[s1];
 				auto sh1size = sh1.size();
 				toff1 += locblkoff1;
-					
-				for (int s2 = 0; s2 != c2.size(); ++s2) {
-					
-					auto& sh2 = c2[s2];
-					auto sh2size = sh2.size();
-					toff2 += locblkoff2;
-					
-					//std::cout << "Tensor offsets: " << toff1 << " " << toff2 << std::endl;
-					//std::cout << "Local offsets: " << locblkoff1 << " " << locblkoff2 << std::endl;
-					//std::cout << "MULT: " << multiplicity(toff1,toff2) << std::endl;
-					
-					//std::cout << "Shells: " << std::endl;
-					//std::cout << sh1 << std::endl;
-					//std::cout << sh2 << std::endl;	
-					//if (is_canonical(toff1,toff2)) {
 						
-						//int sfac = multiplicity(toff1,toff2);
-						
-						loc_eng.compute(sh1,sh2);										
-						auto ints_shellsets = results[0];
-											
-						if (ints_shellsets != nullptr) {
-						
-							int idx = 0;
-							for (int i = 0; i != sh1.size(); ++i) {
-								for (int j = 0; j != sh2.size(); ++j) {
-									iter(i + locblkoff1, j + locblkoff2) = sqrt(ints_shellsets[idx++]);
-									//std::cout << i << " " << j << " " << blk(i + locblkoff1, j + locblkoff2) << std::endl;
-							}}
+					loc_eng.compute(sh1,sh1);										
+					auto ints_shellsets = results[0];
+										
+					if (ints_shellsets != nullptr) {
+					
+						int idx = 0;
+						for (int i = 0; i != sh1.size(); ++i) {
+							iter(i + locblkoff1, 0) = sqrt(ints_shellsets[i*sh1.size() + i]);
+							//std::cout << i << " " << j << " " << blk(i + locblkoff1, j + locblkoff2) << std::endl;
 						}
-					//}
-					
-					locblkoff2 += sh2.size();						
-				}//endfor s2
+					}
+				//}
 				
-				toff2 = lb2;
-				locblkoff2 = 0;
 				locblkoff1 += sh1.size();
 			}//endfor s1
 						

@@ -2,6 +2,7 @@
 #include <stdexcept>
 #include "ints/aofactory.h"
 #include "ints/integrals.h"
+#include "ints/registry.h"
 #include "utils/pool.h"
 #include <libint2.hpp>
 
@@ -19,22 +20,14 @@ private:
 	libint2::Operator m_Op = libint2::Operator::invalid;
 	libint2::BraKet m_BraKet = libint2::BraKet::invalid;
 	
-	inline static std::map<std::string,dbcsr::smat_d> m_matrix_registry;
-	inline static std::map<std::string,dbcsr::stensor2_d> m_tensor2d_registry;
-	inline static std::map<std::string,dbcsr::stensor3_d> m_tensor3d_registry;
-	inline static std::map<std::string,dbcsr::stensor4_d> m_tensor4d_registry;
-
-public:
-	
 	vec<desc::cluster_basis> m_basvec;
 	util::ShrPool<libint2::Engine> m_eng_pool;
 	
-	std::string m_opname;
-	std::string m_dimname;
-	std::string m_screenname;
 	std::string m_intname = "";
 
 public:
+
+	registry m_reg;
 	
 	impl(desc::molecule& mol, dbcsr::world w) :
 		m_mol(mol), m_world(w) { init(); }
@@ -47,19 +40,14 @@ public:
 		
 		if (op == "coulomb") {
 			m_Op = libint2::Operator::coulomb;
-			m_opname = "i_";
 		} else if (op == "overlap") {
 			m_Op = libint2::Operator::overlap;
-			m_opname = "s_";
 		} else if (op == "kinetic") {
 			m_Op = libint2::Operator::kinetic;
-			m_opname = "t_";
 		} else if (op == "nuclear") {
 			m_Op = libint2::Operator::nuclear;
-			m_opname = "v_";
 		} else if (op == "erfc_coulomb") {
 			m_Op = libint2::Operator::erfc_coulomb;
-			m_opname = "erfc_";
 		}
 		
 		if (m_Op == libint2::Operator::invalid) 
@@ -86,18 +74,10 @@ public:
 			throw std::runtime_error("Unsupported basis set specifications: "+ dim);
 		}
 		
-		m_dimname = dim;
-		
 	}
 	
-	void set_screen(std::string screen) {
-		
-		if (screen == "schwarz") {
-			m_screenname = screen;
-		} else {
-			throw std::runtime_error("Unknown screening procedure.");
-		}
-		
+	void set_name(std::string istr) {
+		m_intname = istr;
 	}
 	
 	void setup_calc() {
@@ -122,9 +102,7 @@ public:
 		eng.set(m_BraKet);
 			
 		m_eng_pool = util::make_pool<libint2::Engine>(eng);
-		
-		m_intname = m_opname + "_" + m_dimname + "_" + m_screenname;
-		
+				
 	}
 	
 	void finalize() {
@@ -132,11 +110,6 @@ public:
 	}
 	
 	dbcsr::smatrix<double> compute() {
-		
-		std::string rname = m_mol.name() + "_" + m_intname;
-		
-		if (m_matrix_registry.find(rname) != m_matrix_registry.end())
-			return m_matrix_registry[rname];
 		
 		auto rowsizes = m_basvec[0].cluster_sizes();
 		auto colsizes = m_basvec[1].cluster_sizes();
@@ -162,20 +135,67 @@ public:
 		}
 		
 		m_ints.reserve_blocks(resrows,rescols);
+
+		calc_ints(m_ints, m_eng_pool, m_basvec);
+		
+		auto out = m_ints.get_smatrix();
+		
+		m_reg.insert_matrix<double>(m_intname,out);
+		
+		return out;
+		
+	}
 	
-		if (m_screenname == "schwarz" && m_dimname == "bb") {
-			calc_ints_schwarz_mn(m_ints,m_eng_pool,m_basvec);
-		} else if (m_screenname == "schwarz" && m_dimname == "xx") {
-			calc_ints_schwarz_xy(m_ints,m_eng_pool,m_basvec);
+	dbcsr::smatrix<double> compute_screen(std::string method, std::string dim) {
+		
+		auto rowsizes = m_basvec[0].cluster_sizes();
+		auto colsizes = (dim == "bbbb") ? m_basvec[1].cluster_sizes() : vec<int>{1};
+		
+		char sym = (dim == "bbbb") ? dbcsr_type_symmetric : dbcsr_type_no_symmetry;
+		
+		dbcsr::mat_d m_ints = dbcsr::mat_d::create()
+			.name(m_intname)
+			.set_world(m_world)
+			.row_blk_sizes(rowsizes).col_blk_sizes(colsizes)
+			.type(sym);
+			
+		// reserve symmtric blocks
+		int nblks = m_ints.nblkrows_total();
+		
+		if (sym == dbcsr_type_symmetric) {
+		
+			vec<int> resrows, rescols;
+			
+			for (int i = 0; i != nblks; ++i) {
+				for (int j = 0; j != nblks; ++j) {
+					if (m_ints.proc(i,j) == m_world.rank() && i <= j) {
+						resrows.push_back(i);
+						rescols.push_back(j);
+					}
+				}
+			}
+			
+			m_ints.reserve_blocks(resrows,rescols);
+			
 		} else {
-			calc_ints(m_ints, m_eng_pool, m_basvec);
+			
+			m_ints.reserve_all();
+			
 		}
 		
-		auto m_ints_out = m_ints.get_smatrix();
+		if (dim == "bbbb" && method == "schwarz") {
+			calc_ints_schwarz_mn(m_ints, m_eng_pool, m_basvec);
+		} else if (dim == "xx" && method == "schwarz") {
+			calc_ints_schwarz_x(m_ints, m_eng_pool, m_basvec);
+		} else {
+			throw std::runtime_error("Unknown screening method.");
+		}
 		
-		m_matrix_registry[rname] = m_ints_out;
+		auto out = m_ints.get_smatrix();
 		
-		return m_ints_out;
+		m_reg.insert_matrix<double>(m_intname,out);
+		
+		return out;
 		
 	}
 		
@@ -194,7 +214,7 @@ public:
 		return t_ints.get_stensor();
 	}
 	
-	dbcsr::stensor<3,double> compute_3(vec<int>& map1, vec<int>& map2, eigen_smat_f bra, eigen_smat_f ket) { 
+	dbcsr::stensor<3,double> compute_3(vec<int>& map1, vec<int>& map2, dbcsr::smatrix<double> scr) { 
 		dbcsr::pgrid<3> grid(m_world.comm()); 
 		arrvec<int,3> blksizes; 
 		for (int i = 0; i != 3; ++i) { 
@@ -204,24 +224,64 @@ public:
 		dbcsr::tensor<3> t_ints = dbcsr::tensor<3>::create().name(m_intname) 
 			.ngrid(grid).map1(map1).map2(map2).blk_sizes(blksizes); 
 			
-		if (bra && ket) {
+		if (scr) {
 			
-			t_ints.reserve_all();
+			auto Z_blocks = dbcsr::block_norms(*scr);
+			
+			size_t x_nblks = blksizes[2].size();
+			size_t b_nblks = blksizes[1].size();
+			
+			size_t ntot = x_nblks*b_nblks*b_nblks;
+			
+			arrvec<int,3> res;
+			res[0].reserve(ntot);
+			res[1].reserve(ntot);
+			res[2].reserve(ntot);
+			
+			size_t totblk = 0;
+			
+			auto blk_idx_loc = t_ints.blks_local();
+			
+			int blk_mu, blk_nu, blk_x;
+			
+			for (int i = 0; i != blk_idx_loc[1].size(); ++i) {
+				blk_mu = blk_idx_loc[1][i];
+				for (int j = 0; j != blk_idx_loc[2].size(); ++j) {
+					blk_nu = blk_idx_loc[2][j];
+					
+					if (Z_blocks(blk_mu,blk_nu) >= dbcsr::filter_eps) {
+						for (int x = 0; x != blk_idx_loc[0].size(); ++x) {
+							blk_x = blk_idx_loc[0][x];
+							res[0].push_back(blk_x);
+							res[1].push_back(blk_mu);
+							res[2].push_back(blk_nu);
+						}
+					} else {
+						++totblk;
+					}
+				}
+			}
+			
+			std::cout << "SCREENED: " << totblk << std::endl;
+			
+			t_ints.reserve(res);
 			
 		} else {
-		
+			
 			t_ints.reserve_all();
 			
 		}	
 		
 		calc_ints(t_ints, m_eng_pool, m_basvec); 
+		auto out = t_ints.get_stensor();
 		
-		// set up sparsity 
+		m_reg.insert_tensor<3,double>(m_intname,out);
 		
-		return t_ints.get_stensor();
+		return out;
 	}
 	
-	dbcsr::stensor<4,double> compute_4(vec<int>& map1, vec<int>& map2) { 
+	dbcsr::stensor<4,double> compute_4(vec<int>& map1, vec<int>& map2) {
+		
 		dbcsr::pgrid<4> grid(m_world.comm()); 
 		arrvec<int,4> blksizes; 
 		for (int i = 0; i != 4; ++i) { 
@@ -234,80 +294,121 @@ public:
 		t_ints.reserve_all();
 			
 		calc_ints(t_ints, m_eng_pool, m_basvec); 
-		return t_ints.get_stensor();
+		auto out = t_ints.get_stensor();
+		
+		m_reg.insert_tensor<4,double>(m_intname,out);
+		
+		dbcsr::print(*out);
+		
+		return out;
 	}
-	
+		
 };
 
-aofactory& aofactory::op(std::string i_op) {
-		pimpl->set_operator(i_op);
-		return *this;
-	}
-aofactory& aofactory::dim(std::string i_dim) { 
-		pimpl->set_braket(i_dim);
-		return *this; 
-}
-aofactory& aofactory::screen(std::string i_screen) { 
-		pimpl->set_screen(i_screen);
-		return *this; 
-}
-
-aofactory::aofactory(desc::molecule& mol, dbcsr::world& w) : pimpl(new impl(mol, w))  {}
+aofactory::aofactory(desc::molecule& mol, dbcsr::world& w) : m_mol(mol), pimpl(new impl(mol, w))  {}
 aofactory::~aofactory() { delete pimpl; };
 
-dbcsr::smatrix<double> aofactory::compute() {
+dbcsr::smatrix<double> aofactory::ao_overlap() {
+	
+	std::string intname = m_mol.name() + "_s_bb";
+	
+	auto out = pimpl->m_reg.get_matrix<double>(intname);
+	if (out) return out;
+	
+	pimpl->set_name("s_bb");
+	pimpl->set_braket("bb");
+	pimpl->set_operator("overlap");
+	pimpl->setup_calc();
+	return pimpl->compute();
+}
+	
+dbcsr::smatrix<double> aofactory::ao_kinetic() {
+	
+	std::string intname = m_mol.name() + "_k_bb";
+	
+	auto out = pimpl->m_reg.get_matrix<double>(intname);
+	if (out) return out;
+	
+	pimpl->set_name("t_bb");
+	pimpl->set_braket("bb");
+	pimpl->set_operator("kinetic");
 	pimpl->setup_calc();
 	return pimpl->compute();
 }
 
-dbcsr::stensor<2,double> aofactory::compute_2(std::vector<int> map1, std::vector<int> map2) {
+dbcsr::smatrix<double> aofactory::ao_nuclear() {
+	
+	std::string intname = m_mol.name() + "_v_bb";
+	
+	auto out = pimpl->m_reg.get_matrix<double>(intname);
+	if (out) return out;
+	
+	pimpl->set_name("v_bb");
+	pimpl->set_braket("bb");
+	pimpl->set_operator("nuclear");
 	pimpl->setup_calc();
-	return pimpl->compute_2(map1,map2);
+	return pimpl->compute();
 }
 
-dbcsr::stensor<3,double> aofactory::compute_3(std::vector<int> map1, std::vector<int> map2, eigen_smat_f bra, eigen_smat_f ket) {
+dbcsr::smatrix<double> aofactory::ao_3coverlap() {
+	
+	std::string intname = m_mol.name() + "_s_xx";
+	
+	auto out = pimpl->m_reg.get_matrix<double>(intname);
+	if (out) return out;
+	
+	pimpl->set_name("s_xx");
+	pimpl->set_braket("xx");
+	pimpl->set_operator("coulomb");
 	pimpl->setup_calc();
-	return pimpl->compute_3(map1,map2,bra,ket);
+	return pimpl->compute();
 }
 
-dbcsr::stensor<4,double> aofactory::compute_4(std::vector<int> map1, std::vector<int> map2) {
+dbcsr::stensor<3,double> aofactory::ao_3c2e(vec<int> map1, vec<int> map2, dbcsr::smatrix<double> scr) {
+	
+	auto name = m_mol.name() + "_i_xbb_" + pimpl->m_reg.map_to_string(map1,map2);
+	
+	auto out = pimpl->m_reg.get_tensor<3,double>(name);
+	if (out) return out;
+	
+	pimpl->set_name(name);
+	pimpl->set_braket("xbb");
+	pimpl->set_operator("coulomb");
+	pimpl->setup_calc();
+	return pimpl->compute_3(map1,map2,scr);
+}
+
+dbcsr::stensor<4,double> aofactory::ao_eri(vec<int> map1, vec<int> map2, bool reorder, bool move) {
+	
+	auto name = m_mol.name() + "_i_bbbb_" + pimpl->m_reg.map_to_string(map1,map2);
+	
+	auto out = pimpl->m_reg.get_tensor<4,double>(name,reorder,move);
+	if (out) return out;
+	
+	std::cout << "Computing ints." << std::endl;
+	
+	pimpl->set_name(name);
+	pimpl->set_braket("bbbb");
+	pimpl->set_operator("coulomb");
 	pimpl->setup_calc();
 	return pimpl->compute_4(map1,map2);
 }
-		
-/*
-dbcsr::stensor<2> aofactory::invert(dbcsr::stensor<2>& in, int order) {
-	
-	//if (method != 0) throw std::runtime_error("No other method for inverting has been implemented.");
-	if (!(order == 1 || order == 2)) throw std::runtime_error("Wrong order for inverting.");
-	
-	dbcsr::stensor<2> out;
-	
-	std::string intname = in->name();
-	
-	if (order == 1) intname += "^-1";
-	if (order == 2) intname += "^-1/2";
-	
-	registry INT_REGISTRY;
-	out = INT_REGISTRY.get<2>(m_mol.name(), intname);
-	
-	if (out) return out;
-	
-	if (order == 1) {
-		out = math::eigen_inverse(in,intname);
-	} else {
-		out = math::eigen_sqrt_inverse(in,intname);
-	}
-	
-	INT_REGISTRY.insert<2>(m_mol.name(), intname, out);
-	
-	return out;
-	
-}
 
-template dbcsr::stensor<2,double> aofactory::compute();
-template dbcsr::stensor<3,double> aofactory::compute();
-template dbcsr::stensor<4,double> aofactory::compute();
-*/
+dbcsr::smatrix<double> aofactory::ao_schwarz() {
+	pimpl->set_name("Z_mn");
+	pimpl->set_braket("bbbb");
+	pimpl->set_operator("coulomb");
+	pimpl->setup_calc();
+	return pimpl->compute_screen("schwarz", "bbbb");
+}
+	
+dbcsr::smatrix<double> aofactory::ao_3cschwarz() {
+	pimpl->set_name("Z_x");
+	pimpl->set_braket("xx");
+	pimpl->set_operator("coulomb");
+	pimpl->setup_calc();
+	return pimpl->compute_screen("schwarz", "xx");
+}
+		
 
 } // end namespace ints

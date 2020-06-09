@@ -3,8 +3,6 @@ set(SOURCES
 	hfscf.cpp
 	hfguess.cpp
 	hfdiagfock.cpp
-	fock_builder.h
-	fock_builder.cpp
 )
 
 add_library(chem_hf ${SOURCES})
@@ -15,4 +13,5 @@ target_link_libraries(
 	chem_desc
 	chem_math_linalg
 	chem_math_solvers
+	chem_fock
 )

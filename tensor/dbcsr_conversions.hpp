@@ -394,8 +394,8 @@ MatrixX<float> block_norms(matrix<T>& m_in) {
 
 	dbcsr::iterator iter(m_in);
 
-#pragma omp parallel
-{
+//#pragma omp parallel
+//{
 	iter.start();
 	
 	while (iter.blocks_left()) {
@@ -405,13 +405,13 @@ MatrixX<float> block_norms(matrix<T>& m_in) {
 		int iblk = iter.row();
 		int jblk = iter.col();
 		
-		eigen_out(iblk,jblk) = iter.norm();
+		eigen_out(iblk,jblk) = eigen_out(jblk,iblk) = iter.norm();
 		
 	}
 	
 	iter.stop();
 	m_in.finalize();
-}//end parallel region
+//}//end parallel region
 
 	m_in.distribute();
 	return eigen_out;

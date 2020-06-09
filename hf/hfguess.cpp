@@ -249,8 +249,8 @@ void hfmod::compute_guess() {
 				
 			}
 			
-			ints::registry INTS_REGISTRY;
-			INTS_REGISTRY.clear(name);
+			//ints::registry INTS_REGISTRY;
+			//INTS_REGISTRY.clear(name);
 			
 		}
 		

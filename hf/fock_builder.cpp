@@ -35,7 +35,7 @@ fockbuilder::fockbuilder(desc::smolecule mol, desc::options opt, dbcsr::world& w
 		t_int2ele.start();
 	
 		LOG.os<>("Computing 2e integrals...\n");
-		m_2e_ints = ao.op("coulomb").dim("bbbb").compute_4(vec<int>{0,1}, vec<int>{2,3});
+		m_2e_ints = ao.ao_eri(vec<int>{0,1}, vec<int>{2,3});
 		
 		t_int2ele.finish();
 		
@@ -45,10 +45,18 @@ fockbuilder::fockbuilder(desc::smolecule mol, desc::options opt, dbcsr::world& w
 		
 		auto& t_int3c2e = TIME.sub("3-centre-2-electron integrals");
 		
+		auto& screen = TIME.sub("screen.");
+		
+		screen.start();
+		
+		auto Z_mn = ao.ao_schwarz();
+		
+		screen.finish();
+		
 		t_int3c2e.start();
 		
 		LOG.os<>("Computing 3c2e integrals...\n");
-		m_3c2e_ints = ao.op("coulomb").dim("xbb").compute_3(vec<int>{0},vec<int>{1,2});
+		m_3c2e_ints = ao.ao_3c2e(vec<int>{0},vec<int>{1,2},Z_mn);
 		
 		if (LOG.global_plev() >= 1) {
 			double sp = m_3c2e_ints->occupation();
@@ -68,7 +76,7 @@ fockbuilder::fockbuilder(desc::smolecule mol, desc::options opt, dbcsr::world& w
 		t_metric.start();
 		
 		LOG.os<>("Computing metric...\n");
-		auto metric_xx = ao.op("coulomb").dim("xx").compute();
+		auto metric_xx = ao.ao_3coverlap();
 		
 		t_metric.finish();
 		
@@ -144,7 +152,7 @@ fockbuilder::fockbuilder(desc::smolecule mol, desc::options opt, dbcsr::world& w
 void fockbuilder::build_j(stensor<2>& p_A, stensor<2>& p_B) {
 	
 	// build PT = PA + PB
-	dbcsr::tensor<2> pt = dbcsr::tensor<2>::create_template().tensor_in(*p_A).name("ptot");
+	dbcsr::tensor<2> pt = dbcsr::tensor<2>::create_template(*p_A).name("ptot");
 	dbcsr::copy(*p_A, pt).perform();
 	
 	if (!m_restricted) {
@@ -273,7 +281,7 @@ void fockbuilder::build_k(stensor<2>& p_A, stensor<2>& p_B, stensor<2>& c_A, ste
 			
 			if (!k_bb) {
 				k_bb = dbcsr::make_stensor<2>(
-				tensor<2>::create_template().tensor_in(*p_bb).name("k_bb_"+x));
+				tensor<2>::create_template(*p_bb).name("k_bb_"+x));
 			}
 			
 			if (m_nobetaorb) {
@@ -421,7 +429,7 @@ void fockbuilder::compute(smat& core, smat& p_A, smat& c_A, smat& p_B, smat& c_B
 	
 	if (p_B) {
 		t_p_B = dbcsr::make_stensor<2>(
-			tensor<2>::create_template().tensor_in(*t_p_A).name("pB tensor"));
+			tensor<2>::create_template(*t_p_A).name("pB tensor"));
 		dbcsr::copy_matrix_to_tensor(*p_B, *t_p_B);
 	}
 	

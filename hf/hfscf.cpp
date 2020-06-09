@@ -1,6 +1,6 @@
 #include "hf/hfmod.h"
-#include "hf/fock_builder.h"
 #include "hf/hfdefaults.h"
+#include "fock/fockmod.h"
 #include "ints/aofactory.h"
 #include "math/linalg/orthogonalizer.h"
 #include "math/solvers/diis.h"
@@ -48,10 +48,8 @@ hfmod::hfmod(desc::smolecule mol, desc::options opt, dbcsr::world& w)
 	
 	mat_d core_bb = mat_d::create().set_world(m_world).name("core_bb")
 		.row_blk_sizes(b).col_blk_sizes(b).type(dbcsr_type_symmetric);
-	
 	mat_d p_bb_A = mat_d::create_template(core_bb).name("p_bb_A");
 	mat_d f_bb_A = mat_d::create_template(core_bb).name("f_bb_A");
-	
 	mat_d c_bm_A = mat_d::create().set_world(m_world).name("c_bm_A")
 		.row_blk_sizes(b).col_blk_sizes(mA).type(dbcsr_type_no_symmetry);
 		
@@ -125,13 +123,13 @@ void hfmod::one_electron() {
 	ints::aofactory int_engine(*m_mol, m_world);
 	
 	// overlap			 
-	m_s_bb = int_engine.op("overlap").dim("bb").compute();		 
+	m_s_bb = int_engine.ao_overlap();	 
 	
 	//kinetic
-	m_t_bb = int_engine.op("kinetic").dim("bb").compute();
+	m_t_bb = int_engine.ao_kinetic();
 	
 	// nuclear
-	m_v_bb = int_engine.op("nuclear").dim("bb").compute();
+	m_v_bb = int_engine.ao_nuclear();
 	
 	// get X
 	math::orthogonalizer og(m_s_bb, (LOG.global_plev() >= 2) ? true : false);
@@ -222,7 +220,15 @@ void hfmod::compute() {
 	int dmin = m_opt.get<int>("diis_min_vecs", HF_DIIS_MIN_VECS);
 	int dstart = m_opt.get<int>("diis_start", HF_DIIS_START);
 	
-	fockbuilder fbuilder(m_mol, m_opt, m_world, LOG.global_plev(), TIME);
+	fock::fockmod fbuilder(m_world, m_mol, m_opt);
+	
+	fbuilder.set_density_alpha(m_p_bb_A);
+	fbuilder.set_density_beta(m_p_bb_B);
+	fbuilder.set_coeff_alpha(m_c_bm_A);
+	fbuilder.set_coeff_beta(m_c_bm_B);
+	fbuilder.set_core(m_core_bb);
+	
+	fbuilder.init();
 	
 	math::diis_helper<2> diis_A(m_world.comm(),dstart, dmin, dmax, (LOG.global_plev() >= 2) ? true : false );
 	math::diis_helper<2> diis_B(m_world.comm(),dstart, dmin, dmax, (LOG.global_plev() >= 2) ? true : false );
@@ -258,10 +264,10 @@ void hfmod::compute() {
 		
 		bool SAD_iter = ((iter == 0) && (m_guess == "SAD" || m_guess == "SADNO")) ? true : false;
 		
-		fbuilder.compute(m_core_bb, m_p_bb_A, m_c_bm_A, m_p_bb_B, m_c_bm_B, SAD_iter);;
+		fbuilder.compute();
 		
-		m_f_bb_A = fbuilder.fock_alpha();
-		m_f_bb_B = fbuilder.fock_beta();
+		m_f_bb_A = fbuilder.get_f_A();
+		m_f_bb_B = fbuilder.get_f_B();
 		
 		// compute error, do diis, compute energy
 		
@@ -282,6 +288,7 @@ void hfmod::compute() {
 		LOG.left();
 		LOG.setw(width).os<>("UHF@"+std::to_string(iter));
 		LOG.scientific();
+		LOG.setprecision(10);
 		LOG.setw(width).os<>(m_scf_energy + m_nuc_energy)
 			.setw(width).os<>(old_energy - m_scf_energy)
 			.setw(width).os<>(norm_A)

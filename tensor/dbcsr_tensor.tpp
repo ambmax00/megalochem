@@ -368,13 +368,23 @@ public:
         ['ndist', 'dist_t<N>', 'optional', 'ref'],&
         ['map1', 'vec<int>', 'optional', 'val'],&
         ['map2', 'vec<int>', 'optional', 'val']]
-    ${make_struct(structname='create_template',friend='tensor',params=list)}$
-	
+    struct create_template {
+        ${make_param(structname='create_template',params=list)}$
+        private:
+            
+        required<tensor,ref> c_template;
+        
+        public:
+        
+        create_template(tensor& temp) : c_template(temp) {}
+        friend class tensor;
+    };
+    
 	tensor(create_template& p) : m_tensor_ptr(nullptr) {
         
-        m_comm = p.c_tensor_in->m_comm;
+        m_comm = p.c_template->m_comm;
 		
-		c_dbcsr_t_create_template(p.c_tensor_in->m_tensor_ptr, &m_tensor_ptr, 
+		c_dbcsr_t_create_template(p.c_template->m_tensor_ptr, &m_tensor_ptr, 
             p.c_name->c_str(), (p.c_ndist) ? p.c_ndist->m_dist_ptr : nullptr,
             (p.c_map1) ? p.c_map1->data() : nullptr,
             (p.c_map1) ? p.c_map1->size() : 0,
