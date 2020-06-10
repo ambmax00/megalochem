@@ -32,6 +32,9 @@ public:
 		MPI_Comm_rank(m_comm,&m_rank);
 		MPI_Comm_size(m_comm,&m_size);
 	}
+	
+	mpi_log(const mpi_log& in) = default;
+	mpi_log& operator=(const mpi_log& in) = default;
     
     ~mpi_log() { reset(); }
     

@@ -31,7 +31,8 @@ static const json valid_keys =
 		{"diis_min_vecs", 2}, // minimum number of diis vectors in subspace
 		{"diis_start", 0}, // at what iteration to start diis
 		{"diis_beta", true}, // whether to use separate coeficients for beta
-		{"use_df", false}, // whether to use df 
+		{"build_J", "exact"},
+		{"build_K", "exact"},
 		{"print", 0}, // print level (0, 1 or 2 at the moment, -1 for silent output)
 		{"skip", false}, // skip hartree fock and read from files
 		{"max_iter", 10},

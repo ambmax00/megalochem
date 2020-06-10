@@ -46,10 +46,12 @@ public:
 	
 	void init();
 	
-	void compute();
+	void compute(bool SAD_iter = false);
 	
 	dbcsr::smat_d get_f_A() { return m_f_bb_A; }
 	dbcsr::smat_d get_f_B() { return m_f_bb_B; }
+	
+	void print_info() { TIME.print_info(); }
 	
 };
 	

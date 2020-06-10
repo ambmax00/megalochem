@@ -1,4 +1,5 @@
 #include "fock/fockmod.h"
+#include "math/solvers/hermitian_eigen_solver.h"
 #include "fock/fock_defaults.h"
 
 namespace fock {
@@ -29,11 +30,27 @@ void fockmod::init() {
 	std::string j_method = m_opt.get<std::string>("build_J", FOCK_BUILD_J);
 	std::string k_method = m_opt.get<std::string>("build_K", FOCK_BUILD_K);
 	
+	bool compute_eris = false;
+	bool compute_3c2e = false;
+	bool compute_s_xx = false;
+	bool compute_s_xx_inv = false;
+	
 	// set J
 	if (j_method == "exact") {
 		
 		J* builder = new EXACT_J(m_world, m_opt);
 		m_J_builder.reset(builder);
+		
+		compute_eris = true;
+		
+	} else if (j_method == "df") {
+		
+		J* builder = new DF_J(m_world, m_opt);
+		m_J_builder.reset(builder);
+		
+		compute_3c2e = true;
+		compute_s_xx = true;
+		compute_s_xx_inv = true;
 		
 	}
 	
@@ -43,6 +60,17 @@ void fockmod::init() {
 		K* builder = new EXACT_K(m_world, m_opt);
 		m_K_builder.reset(builder);
 		
+		compute_eris = true;
+		
+	} else if (k_method == "df") {
+		
+		K* builder = new DF_K(m_world,m_opt);
+		m_K_builder.reset(builder);
+		
+		compute_3c2e = true;
+		compute_s_xx = true;
+		compute_s_xx_inv = true;
+		
 	}
 	
 	LOG.os<>("Setting up JK builder.\n");
@@ -50,35 +78,120 @@ void fockmod::init() {
 	LOG.os<>("K method: ", k_method, '\n');
 	
 	std::shared_ptr<ints::aofactory> aofac =
-		std::make_shared<ints::aofactory>(*m_mol,m_world);
-	
+		std::make_shared<ints::aofactory>(m_mol,m_world);
+		
 	m_J_builder->set_density_alpha(m_p_A);
 	m_J_builder->set_density_beta(m_p_B);
 	m_J_builder->set_coeff_alpha(m_c_A);
 	m_J_builder->set_coeff_beta(m_c_B);
 	m_J_builder->set_factory(aofac);
+	m_J_builder->set_timer(TIME);
 	
 	m_K_builder->set_density_alpha(m_p_A);
 	m_K_builder->set_density_beta(m_p_B);
 	m_K_builder->set_coeff_alpha(m_c_A);
 	m_K_builder->set_coeff_beta(m_c_B);
 	m_K_builder->set_factory(aofac);
+	m_J_builder->set_timer(TIME);
+	
+	// initialize integrals depending on method combination
+	
+	ints::registry reg;
+	
+	if (compute_eris) {
+		
+		auto eris = aofac->ao_eri(vec<int>{0,1},vec<int>{2,3});
+		reg.insert_tensor<4,double>(m_mol->name() + "_i_bbbb_(01|23)", eris);
+		
+	}
+	
+	if (compute_3c2e) {
+		
+		auto& t_eri = TIME.sub("3c2e integrals");
+		t_eri.start();
+		
+		auto out = aofac->ao_3c2e(vec<int>{0}, vec<int>{1,2});
+		reg.insert_tensor<3,double>(m_mol->name() + "_i_xbb_(0|12)", out);
+		
+		t_eri.finish();
+		
+	}
+	
+	if (compute_s_xx) {
+		
+		auto& t_eri = TIME.sub("Metric");
+		
+		t_eri.start();
+		
+		auto out = aofac->ao_3coverlap();
+		reg.insert_matrix<double>(m_mol->name() + "_s_xx", out);
+		
+		t_eri.finish();
+		
+	}
+	
+	if (compute_s_xx_inv) {
+		
+		auto& t_inv = TIME.sub("Inverting metric");
+		
+		t_inv.start();
+		
+		auto s_xx = reg.get_matrix<double>(m_mol->name() + "_s_xx");
+		math::hermitian_eigen_solver solver(s_xx, 'V');
+		
+		solver.compute();
+		
+		auto inv = solver.inverse();
+		
+		std::string name = m_mol->name() + "_s_xx_inv_(0|1)";
+		
+		dbcsr::pgrid<2> grid2(m_world.comm());
+		arrvec<int,2> xx = {m_mol->dims().x(), m_mol->dims().x()};
+		
+		dbcsr::stensor2_d out = dbcsr::make_stensor<2>(
+			dbcsr::tensor2_d::create().name(name).ngrid(grid2)
+			.map1({0}).map2({1}).blk_sizes(xx));
+			
+		dbcsr::copy_matrix_to_tensor(*inv,*out);
+		
+		reg.insert_tensor<2,double>(name, out);
+		
+		t_inv.finish();
+		
+	}
 	
 	m_J_builder->init();
 	m_K_builder->init();
+	
+	m_J_builder->init_tensors();
+	m_K_builder->init_tensors();
 	
 	LOG.os<>("Finished setting up JK builder \n \n");
 	
 }
 
-void fockmod::compute() {
+void fockmod::compute(bool SAD_iter) {
+	
+	TIME.start();
+	
+	m_J_builder->set_SAD(SAD_iter);
+	m_K_builder->set_SAD(SAD_iter);
+	
+	auto& t_j = TIME.sub("J builder");
+	auto& t_k = TIME.sub("K builder");
 	
 	LOG.os<1>("Computing coulomb matrix.\n");
+	t_j.start();
 	m_J_builder->compute_J();
+	t_j.finish();
+	
 	LOG.os<1>("Computing exchange matrix.\n");
+	t_k.start();	
 	m_K_builder->compute_K();
+	t_k.finish();
 	
 	auto Jtensor = m_J_builder->get_J();
+	
 	auto KtensorA = m_K_builder->get_K_A();
 	auto KtensorB = m_K_builder->get_K_B();
 	
@@ -99,6 +212,8 @@ void fockmod::compute() {
 			dbcsr::print(*m_f_bb_B);
 		}
 	}
+	
+	TIME.finish();
 		
 }
 

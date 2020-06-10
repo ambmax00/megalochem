@@ -120,7 +120,7 @@ void hfmod::one_electron() {
 	
 	TIME_1e.start();
 	
-	ints::aofactory int_engine(*m_mol, m_world);
+	ints::aofactory int_engine(m_mol, m_world);
 	
 	// overlap			 
 	m_s_bb = int_engine.ao_overlap();	 
@@ -264,7 +264,7 @@ void hfmod::compute() {
 		
 		bool SAD_iter = ((iter == 0) && (m_guess == "SAD" || m_guess == "SADNO")) ? true : false;
 		
-		fbuilder.compute();
+		fbuilder.compute(SAD_iter);
 		
 		m_f_bb_A = fbuilder.get_f_A();
 		m_f_bb_B = fbuilder.get_f_B();
@@ -340,8 +340,9 @@ void hfmod::compute() {
 	LOG.reset();
 	
 	TIME.finish();
-	TIME.print_info();
 	
+	TIME.print_info();
+	fbuilder.print_info();
 		
 }
 

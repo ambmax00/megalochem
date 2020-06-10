@@ -25,10 +25,12 @@ private:
 	
 public:
 
-	desc::molecule& m_mol;
+	desc::smolecule m_mol;
 
-	aofactory(desc::molecule& mol, dbcsr::world& w);
+	aofactory(desc::smolecule mol, dbcsr::world& w);
 	~aofactory();
+	
+	desc::smolecule mol();
 	
 	dbcsr::smatrix<double> ao_overlap();
 	dbcsr::smatrix<double> ao_kinetic();
@@ -37,7 +39,7 @@ public:
 	dbcsr::smatrix<double> ao_3coverlap();
 	
 	dbcsr::stensor<3,double> ao_3c2e(vec<int> map1, vec<int> map2, dbcsr::smatrix<double> scr = nullptr);
-	dbcsr::stensor<4,double> ao_eri(vec<int> map1, vec<int> map2, bool reorder = false, bool move = false);
+	dbcsr::stensor<4,double> ao_eri(vec<int> map1, vec<int> map2);
 	
 	dbcsr::smatrix<double> ao_schwarz();
 	dbcsr::smatrix<double> ao_3cschwarz();

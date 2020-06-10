@@ -418,7 +418,11 @@ void hfmod::compute_guess() {
 		LOG.os<2>("SAD density matrices.\n");
 		if (LOG.global_plev() >= 2) {
 			dbcsr::print(*m_p_bb_A);
-			if (m_p_bb_B) dbcsr::print(*m_p_bb_B);
+			dbcsr::print(*m_c_bm_A);
+			if (m_p_bb_B) {
+				dbcsr::print(*m_p_bb_B);
+				dbcsr::print(*m_c_bm_B);
+			}
 		}
 		
 		LOG.os<>("Finished with SAD.\n");

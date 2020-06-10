@@ -12,9 +12,9 @@
 namespace ints {
 	
 class aofactory::impl {
-private:
+protected:
 
-	desc::molecule& m_mol;
+	desc::smolecule m_mol;
 	dbcsr::world m_world;
 	
 	libint2::Operator m_Op = libint2::Operator::invalid;
@@ -29,12 +29,14 @@ public:
 
 	registry m_reg;
 	
-	impl(desc::molecule& mol, dbcsr::world w) :
+	impl(desc::smolecule mol, dbcsr::world w) :
 		m_mol(mol), m_world(w) { init(); }
 	
 	void init() {
 		libint2::initialize();
 	}
+	
+	desc::smolecule mol() { return m_mol; }
 	
 	void set_operator(std::string op) {
 		
@@ -56,8 +58,8 @@ public:
 	
 	void set_braket(std::string dim) {
 		
-		auto cbas = m_mol.c_basis();
-		auto xbas = m_mol.c_dfbasis();
+		auto cbas = m_mol->c_basis();
+		auto xbas = m_mol->c_dfbasis();
 		
 		if (dim == "bb") { 
 			m_basvec = {cbas,cbas};
@@ -93,7 +95,7 @@ public:
 		libint2::Engine eng(m_Op, max_nprim, max_l, 0, std::numeric_limits<double>::epsilon());
 			
 		if (m_Op == libint2::Operator::nuclear) {
-			eng.set_params(make_point_charges(m_mol.atoms())); 
+			eng.set_params(make_point_charges(m_mol->atoms())); 
 		} else if (m_Op == libint2::Operator::erfc_coulomb) {
 			double omega = 0.1; //*ctx.get<double>("INT/omega");
 			eng.set_params(omega);
@@ -139,8 +141,6 @@ public:
 		calc_ints(m_ints, m_eng_pool, m_basvec);
 		
 		auto out = m_ints.get_smatrix();
-		
-		m_reg.insert_matrix<double>(m_intname,out);
 		
 		return out;
 		
@@ -192,9 +192,7 @@ public:
 		}
 		
 		auto out = m_ints.get_smatrix();
-		
-		m_reg.insert_matrix<double>(m_intname,out);
-		
+	
 		return out;
 		
 	}
@@ -275,8 +273,6 @@ public:
 		calc_ints(t_ints, m_eng_pool, m_basvec); 
 		auto out = t_ints.get_stensor();
 		
-		m_reg.insert_tensor<3,double>(m_intname,out);
-		
 		return out;
 	}
 	
@@ -296,8 +292,6 @@ public:
 		calc_ints(t_ints, m_eng_pool, m_basvec); 
 		auto out = t_ints.get_stensor();
 		
-		m_reg.insert_tensor<4,double>(m_intname,out);
-		
 		dbcsr::print(*out);
 		
 		return out;
@@ -305,15 +299,14 @@ public:
 		
 };
 
-aofactory::aofactory(desc::molecule& mol, dbcsr::world& w) : m_mol(mol), pimpl(new impl(mol, w))  {}
+aofactory::aofactory(desc::smolecule mol, dbcsr::world& w) : m_mol(mol), pimpl(new impl(mol, w))  {}
 aofactory::~aofactory() { delete pimpl; };
+
+desc::smolecule aofactory::mol() { return pimpl->mol(); }
 
 dbcsr::smatrix<double> aofactory::ao_overlap() {
 	
-	std::string intname = m_mol.name() + "_s_bb";
-	
-	auto out = pimpl->m_reg.get_matrix<double>(intname);
-	if (out) return out;
+	std::string intname = m_mol->name() + "_s_bb";
 	
 	pimpl->set_name("s_bb");
 	pimpl->set_braket("bb");
@@ -324,10 +317,7 @@ dbcsr::smatrix<double> aofactory::ao_overlap() {
 	
 dbcsr::smatrix<double> aofactory::ao_kinetic() {
 	
-	std::string intname = m_mol.name() + "_k_bb";
-	
-	auto out = pimpl->m_reg.get_matrix<double>(intname);
-	if (out) return out;
+	std::string intname = m_mol->name() + "_k_bb";
 	
 	pimpl->set_name("t_bb");
 	pimpl->set_braket("bb");
@@ -338,10 +328,7 @@ dbcsr::smatrix<double> aofactory::ao_kinetic() {
 
 dbcsr::smatrix<double> aofactory::ao_nuclear() {
 	
-	std::string intname = m_mol.name() + "_v_bb";
-	
-	auto out = pimpl->m_reg.get_matrix<double>(intname);
-	if (out) return out;
+	std::string intname = m_mol->name() + "_v_bb";
 	
 	pimpl->set_name("v_bb");
 	pimpl->set_braket("bb");
@@ -352,10 +339,7 @@ dbcsr::smatrix<double> aofactory::ao_nuclear() {
 
 dbcsr::smatrix<double> aofactory::ao_3coverlap() {
 	
-	std::string intname = m_mol.name() + "_s_xx";
-	
-	auto out = pimpl->m_reg.get_matrix<double>(intname);
-	if (out) return out;
+	std::string intname = m_mol->name() + "_s_xx";
 	
 	pimpl->set_name("s_xx");
 	pimpl->set_braket("xx");
@@ -364,12 +348,40 @@ dbcsr::smatrix<double> aofactory::ao_3coverlap() {
 	return pimpl->compute();
 }
 
+/*
+dbcsr::smatrix<double> ao_3coverlap_inv() {
+	
+	std::string name = m_mol->name() + "_s_xx_inv";
+	
+	auto s_xx = this->ao_3coverlap();
+	math::hermitian_eigen_solver solver(s_xx, 'V');
+	solver.compute();
+	
+	out = solver.inverse();
+	out.set_name(name);
+	
+	return out;
+	
+}
+
+dbcsr::smatrix<double> ao_3coverlap_invsqrt() {
+	
+	std::string name = m_mol->name() + "_s_xx_invsqrt";
+	
+	auto s_xx = this->ao_3coverlap();
+	math::hermitian_eigen_solver solver(s_xx, 'V');
+	solver.compute();
+	
+	out = solver.inverse_sqrt();
+	out.set_name(name);
+	
+	return out;
+	
+}
+*/
 dbcsr::stensor<3,double> aofactory::ao_3c2e(vec<int> map1, vec<int> map2, dbcsr::smatrix<double> scr) {
 	
-	auto name = m_mol.name() + "_i_xbb_" + pimpl->m_reg.map_to_string(map1,map2);
-	
-	auto out = pimpl->m_reg.get_tensor<3,double>(name);
-	if (out) return out;
+	auto name = m_mol->name() + "_i_xbb_" + pimpl->m_reg.map_to_string(map1,map2);
 	
 	pimpl->set_name(name);
 	pimpl->set_braket("xbb");
@@ -378,14 +390,9 @@ dbcsr::stensor<3,double> aofactory::ao_3c2e(vec<int> map1, vec<int> map2, dbcsr:
 	return pimpl->compute_3(map1,map2,scr);
 }
 
-dbcsr::stensor<4,double> aofactory::ao_eri(vec<int> map1, vec<int> map2, bool reorder, bool move) {
+dbcsr::stensor<4,double> aofactory::ao_eri(vec<int> map1, vec<int> map2) {
 	
-	auto name = m_mol.name() + "_i_bbbb_" + pimpl->m_reg.map_to_string(map1,map2);
-	
-	auto out = pimpl->m_reg.get_tensor<4,double>(name,reorder,move);
-	if (out) return out;
-	
-	std::cout << "Computing ints." << std::endl;
+	auto name = m_mol->name() + "_i_bbbb_" + pimpl->m_reg.map_to_string(map1,map2);
 	
 	pimpl->set_name(name);
 	pimpl->set_braket("bbbb");

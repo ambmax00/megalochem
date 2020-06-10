@@ -10,5 +10,6 @@ add_library(chem_fock ${SOURCES})
 target_link_libraries(
 	chem_fock
 	chem_desc
+	chem_math_solvers
 	chem_tensor
 )

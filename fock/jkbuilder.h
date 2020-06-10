@@ -2,6 +2,7 @@
 #define FOCK_JK_BUILDER_H
 
 #include "ints/aofactory.h"
+#include "ints/registry.h"
 #include "desc/molecule.h"
 #include "desc/options.h"
 #include "utils/mpi_time.h"
@@ -12,8 +13,11 @@ namespace fock {
 class JK_common {
 protected:
 	
+	desc::smolecule m_mol;
 	desc::options m_opt;
 	dbcsr::world m_world;
+	
+	ints::registry m_reg;
 	
 	util::mpi_log LOG;
 	util::mpi_time TIME;
@@ -22,6 +26,8 @@ protected:
 	dbcsr::smat_d m_p_B;
 	dbcsr::smat_d m_c_A;
 	dbcsr::smat_d m_c_B;
+	
+	bool m_SAD_iter;
 	
 	std::shared_ptr<ints::aofactory> m_factory;
 	
@@ -32,7 +38,12 @@ public:
 	void set_density_beta(dbcsr::smat_d& ipB) { m_p_B = ipB; }
 	void set_coeff_alpha(dbcsr::smat_d& icA) { m_c_A = icA; }
 	void set_coeff_beta(dbcsr::smat_d& icB) { m_c_B = icB; }
-	void set_factory(std::shared_ptr<ints::aofactory>& ifac) { m_factory = ifac; }
+	void set_factory(std::shared_ptr<ints::aofactory>& ifac) { 
+		m_factory = ifac; 
+		m_mol = m_factory->mol();
+	}
+	void set_timer(util::mpi_time& iTIME) { TIME = iTIME; }
+	void set_SAD(bool SAD) { m_SAD_iter = SAD; }
 	
 	~JK_common() {}
 	
@@ -49,6 +60,7 @@ public:
 	J(dbcsr::world& w, desc::options& opt) : JK_common(w,opt) {}
 	~J() {}
 	virtual void compute_J() = 0;
+	virtual void init_tensors() = 0;
 	
 	void init();
 	
@@ -67,6 +79,8 @@ public:
 	K(dbcsr::world& w, desc::options& opt) : JK_common(w,opt) {}
 	~K() {}
 	virtual void compute_K() = 0;
+	virtual void init_tensors() = 0;
+	
 	void init();
 	
 	dbcsr::stensor2_d get_K_A() { return m_K_A; }
@@ -85,6 +99,7 @@ public:
 	
 	EXACT_J(dbcsr::world& w, desc::options& opt);
 	void compute_J() override;
+	void init_tensors() override;
 	
 };
 
@@ -98,6 +113,44 @@ public:
 
 	EXACT_K(dbcsr::world& w, desc::options& opt);
 	void compute_K() override;
+	void init_tensors() override;
+	
+};
+
+class DF_J : public J {
+private:
+	
+	dbcsr::stensor3_d m_J_bbd;
+	dbcsr::stensor3_d m_ptot_bbd;
+	dbcsr::stensor2_d m_c_xd;
+	dbcsr::stensor2_d m_c2_xd;
+	dbcsr::stensor2_d m_inv;
+
+public:
+
+	DF_J(dbcsr::world& w, desc::options& opt);
+	void compute_J() override;
+	void init_tensors() override;
+	
+};
+
+class DF_K : public K {
+private:
+
+	dbcsr::stensor3_d m_HT_01_2;
+	dbcsr::stensor3_d m_HT_0_12;
+	dbcsr::stensor3_d m_HT_02_1;
+	dbcsr::stensor3_d m_D_0_12;
+	dbcsr::stensor3_d m_D_02_1;
+	dbcsr::stensor3_d m_INTS_01_2;
+	dbcsr::stensor2_d m_inv;
+	dbcsr::stensor2_d m_c_bm;
+
+public:
+
+	DF_K(dbcsr::world& w, desc::options& opt);
+	void compute_K() override;
+	void init_tensors() override;
 	
 };
 

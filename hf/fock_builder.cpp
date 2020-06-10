@@ -20,7 +20,7 @@ fockbuilder::fockbuilder(desc::smolecule mol, desc::options opt, dbcsr::world& w
 	m_use_df(opt.get<bool>("use_df", HF_USE_DF)) {
 
 	// build the integrals 
-	ints::aofactory ao(*m_mol, m_world);
+	ints::aofactory ao(m_mol, m_world);
 	
 	m_restricted = (m_mol->nele_alpha() == m_mol->nele_beta()) ? true : false;
 	m_nobetaorb = (m_mol->nocc_beta() == 0) ? true : false;

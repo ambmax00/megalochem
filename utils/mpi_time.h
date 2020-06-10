@@ -22,10 +22,6 @@ private:
 	int nproc; //<- how many times it was started
 	
 	std::map<std::string, mpi_time> subprocs;
-	
-	mpi_time operator=(mpi_time t) {
-		return t;
-	}
 
 public: 
 
@@ -34,6 +30,9 @@ public:
 		has_finished(true), LOG(comm,plev), lev(0), nproc(0), tot(0), m_comm(comm) {}
 	
 	~mpi_time() {}
+	
+	mpi_time(const mpi_time& in) = default;
+	mpi_time& operator=(const mpi_time& in) = default;
 	
 	void start() {
 		
