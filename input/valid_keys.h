@@ -14,7 +14,6 @@ static const json valid_keys =
 		{"unit", "string"}, // angstrom
 		{"basis", "string"}, // basisset name
 		{"gen_basis", "basis"}, // custom basis set input
-		{"dfbasis", "string"}, // df basis set name
 		{"geometry", {0,0,0}}, // mol xyz
 		{"symbols", "string"}, // mol elements
 		{"mult", 0}, // multiplicity
@@ -39,7 +38,13 @@ static const json valid_keys =
 		{"SAD_guess", "core"},
 		{"SAD_diis", true},
 		{"SAD_use_df", true},
-		{"SAD_spin_average", true}
+		{"SAD_spin_average", true},
+		{"dfbasis", "string"} 
+	}},
+	{"mp", {
+		{"print", 0},
+		{"nlap", 5}, // number of laplace points
+		{"dfbasis", "basis"}
 	}},
 	{"adc", {
 		{"print", 0},

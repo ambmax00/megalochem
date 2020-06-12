@@ -342,7 +342,7 @@ reader::reader(MPI_Comm comm, std::string filename, int print) : m_comm(comm), L
 	
 	desc::molecule mol = desc::molecule::create().name(name).atoms(atoms).charge(charge)
 		.mult(mult).mo_split(opt_mo_split).ao_split_method(opt_ao_split_method)
-		.basis(basis).dfbasis(dfbasis);
+		.basis(basis);
 		
 	mol.print_info(m_comm,1);
 	LOG.os<>('\n');
@@ -350,6 +350,8 @@ reader::reader(MPI_Comm comm, std::string filename, int print) : m_comm(comm), L
 	desc::options opt;
 	
 	unpack(data, opt, "hf");
+	
+	unpack(data, opt, "mp");
 	
 	unpack(data, opt, "adc");
 	

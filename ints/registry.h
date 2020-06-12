@@ -132,14 +132,26 @@ public:
 	}
 	
 	// clear registry for a molecule
-	/*
+	
 	void clear(std::string name) {
-		for (auto& m : m_map) {
-			if (m.first.molname == name) {
-				m_map.erase(m.first);
-			}
+		
+		while (true) {
+			
+			auto iter = std::find_if(m_map.begin(),m_map.end(),
+			[name](std::pair<std::string,std::any> p) {
+				if (p.first.find(name) != std::string::npos) {
+					return true;
+				}
+				return false;
+			});
+			
+			if (iter == m_map.end()) break;
+			
+			m_map.erase(iter);
+			
 		}
-	}*/
+			
+	}
 		
 		
 };

@@ -20,7 +20,7 @@ private:
 
 	smolecule m_mol;
 
-	dbcsr::smatrix<double> m_s_bb;
+	//dbcsr::smatrix<double> m_s_bb;
 	
 	dbcsr::smatrix<double> m_f_bb_A;
 	dbcsr::smatrix<double> m_c_bm_A;
@@ -53,7 +53,7 @@ public:
 	
 	desc::smolecule mol() { return m_mol; }
 	
-	dbcsr::smatrix<double> s_bb() { return m_s_bb; }
+	//dbcsr::smatrix<double> s_bb() { return m_s_bb; }
 	
 	dbcsr::smatrix<double> f_bb_A() { return m_f_bb_A; }
 	dbcsr::smatrix<double> c_bo_A() { return m_c_bo_A; }
@@ -80,7 +80,7 @@ public:
 		
 		auto mname = m_mol->name();
 		
-		write_matrix(m_s_bb, mname);
+		//write_matrix(m_s_bb, mname);
 		
 		write_matrix(m_f_bb_A, mname);
 		write_matrix(m_po_bb_A, mname);
@@ -98,7 +98,7 @@ public:
 			
 		}
 		
-		MPI_Comm comm = m_s_bb->get_world().comm();
+		MPI_Comm comm = m_f_bb_A->get_world().comm();
 		
 		write_vector(m_eps_occ_A, m_mol->name(), "eps_occ_A", comm);
 		write_vector(m_eps_vir_A, m_mol->name(), "eps_vir_A", comm);
@@ -120,7 +120,7 @@ public:
 		auto vA = m_mol->dims().va();
 		auto vB = m_mol->dims().vb();
 
-		m_s_bb = read_matrix(m_mol->name(), "s_bb", w, b, b, dbcsr_type_symmetric);
+		//m_s_bb = read_matrix(m_mol->name(), "s_bb", w, b, b, dbcsr_type_symmetric);
 		
 		m_f_bb_A = read_matrix(m_mol->name(), "f_bb_A", w, b, b, dbcsr_type_symmetric);
 		m_po_bb_A = read_matrix(m_mol->name(), "p_bb_A", w, b, b, dbcsr_type_symmetric);

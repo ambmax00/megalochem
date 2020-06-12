@@ -13,7 +13,6 @@
 		],
 		"symbols": ["O", "H", "H"],
 		"basis": "cc-pvdz",
-		"dfbasis": "cc-pvdz-ri",
 		"ao_split_method": "atom",
 		"reorder": false
 	},
@@ -26,7 +25,12 @@
 		"build_J": "df",
 		"build_K": "df",
 		"print": 0,
-		"SAD_diis": true
+		"SAD_diis": true, 
+		"dfbasis": "cc-pvdz-ri"
+	},
+	"mp": 
+	{
+		"dfbasis": "cc-pvdz-ri"
 	},
 	"adc":
 	{

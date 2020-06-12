@@ -68,23 +68,14 @@ private:
 			m_vir_beta_sizes = split_range(mol.m_nvir_beta,nsplit);
 			
 			m_bas_sizes = mol.m_cluster_basis.cluster_sizes();
-			if (mol.m_cluster_dfbasis) {
-				//std::cout << "ITS IN BLOCK." << std::endl;
-				optional<std::vector<int>,val> opt(mol.m_cluster_dfbasis->cluster_sizes());
-				m_dfbas_sizes = opt;
-			}
 			
 			for (int i = 0; i != mol.m_cluster_basis.size(); ++i) {
 				m_shell_sizes.push_back(mol.m_cluster_basis[i].size());
 			}
+			
 			if (mol.m_cluster_dfbasis) {
-				optional<std::vector<int>,val> opt(std::vector<int>(0));
-				for (int i = 0; i != mol.m_cluster_dfbasis->size(); ++i) {
-					opt->push_back(mol.m_cluster_dfbasis->operator[](i).size());
-				}
-				m_dfshell_sizes = opt;
-			}
-					
+				set_x(*mol.m_cluster_dfbasis);
+			}	
 		}
 		
 		std::vector<int> oa() { return m_occ_alpha_sizes; }
@@ -107,6 +98,19 @@ private:
 				throw std::runtime_error("Df basis not given.");
 			}
 		}
+		
+		void set_x(cluster_basis& cdf) {
+			
+			optional<std::vector<int>,val> opt(cdf.cluster_sizes());
+			m_dfbas_sizes = opt;
+			
+			opt->clear();
+			for (int i = 0; i != cdf.size(); ++i) {
+				opt->push_back(cdf[i].size());
+			}
+			m_dfshell_sizes = opt;
+			
+		}			
 		
 		~block_sizes() {}
 		
@@ -160,6 +164,8 @@ public:
 	~molecule() {}
 	
 	void print_info(MPI_Comm comm, int level = 0);
+	
+	void set_dfbasis(std::vector<libint2::Shell>& dfbasis);
 	
 	cluster_basis c_basis() {
 		return m_cluster_basis;

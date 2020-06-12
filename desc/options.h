@@ -89,6 +89,13 @@ public:
 		return out;
 		
 	}
+		
+	bool present(std::string name) {
+		
+		if (m_map.find(m_prefix + name) != m_map.end()) return true;
+		return false;
+		
+	}
 	
 };
 

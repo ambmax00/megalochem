@@ -7,6 +7,7 @@
 #include <dbcsr_matrix_ops.hpp>
 #include "input/reader.h"
 #include "hf/hfmod.h"
+#include "mp/mpmod.h"
 //#include "adc/adcmod.h"
 #include "utils/mpi_time.h"
 
@@ -153,6 +154,12 @@ int main(int argc, char** argv) {
 	}
 	
 	MPI_Barrier(MPI_COMM_WORLD);
+	
+	auto mpopt = opt.subtext("mp");
+	
+	mp::mpmod mymp(myhfwfn,mpopt,wrd);
+	
+	mymp.compute();
 	
 	/*
 	

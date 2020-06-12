@@ -3,6 +3,7 @@
 #include "fock/fockmod.h"
 #include "ints/aofactory.h"
 #include "math/linalg/orthogonalizer.h"
+#include <libint2/basis.h>
 #include "math/solvers/diis.h"
 
 namespace hf {
@@ -79,10 +80,27 @@ hfmod::hfmod(desc::smolecule mol, desc::options opt, dbcsr::world& w)
 		
 	m_eps_A = std::make_shared<std::vector<double>>(std::vector<double>(0));
 	if (!m_restricted) m_eps_B = std::make_shared<std::vector<double>>(std::vector<double>(0));
-		
+	
+	// basis set
+	if (m_opt.present("dfbasis")) {
+		 
+		std::string basname = m_opt.get<std::string>("dfbasis");
+		LOG.os<>("Setting df basis: ", basname, "\n\n");
+		libint2::BasisSet bas(basname,m_mol->atoms());
+		std::vector<libint2::Shell> vecbas = std::move(bas);
+		m_mol->set_dfbasis(vecbas);
+	}
+	
 	LOG.os<>("Options: \n");
 	LOG.os<>("print ", LOG.global_plev(), '\n');
 	LOG.os<>("m_guess ", m_guess, '\n');
+	
+}
+
+hfmod::~hfmod() {
+	
+	ints::registry reg;
+	reg.clear(m_mol->name());
 	
 }
 

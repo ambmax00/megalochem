@@ -182,4 +182,14 @@ void molecule::print_info(MPI_Comm comm, int level) {
 	
 }
 
+void molecule::set_dfbasis(std::vector<libint2::Shell>& dfbasis) {
+	
+		cluster_basis cdfbas(dfbasis,m_ao_split_method);
+		
+		m_cluster_dfbasis = optional<cluster_basis,val>(cdfbas);
+		
+		m_blocks.set_x(*m_cluster_dfbasis);
+	
+}
+
 }
