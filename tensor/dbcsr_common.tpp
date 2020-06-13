@@ -310,7 +310,7 @@ private:
 	
 public:
 
-	block() : m_data(nullptr), m_size(N,0), m_nfull(0) {}
+	block() : m_data(nullptr), m_size{N,0}, m_nfull(0) {}
     
 	block(const std::array<int,N> sizes, T* ptr = nullptr) : m_size(sizes) {
 		
@@ -318,6 +318,21 @@ public:
 		
 		if (ptr) {
 			m_data = ptr; 
+			m_own = false;
+		} else {
+			m_data = new T[m_nfull]();
+		}
+		
+	}
+	
+	template <int M = N, typename D = T, typename = typename std::enable_if<M == 2, int>::type>
+	block(const int nrows, const int ncols, T* ptr = nullptr) {
+		
+		m_nfull = nrows * ncols;
+		m_size = {nrows,ncols};
+		
+		if (ptr) {
+			m_data = ptr;
 			m_own = false;
 		} else {
 			m_data = new T[m_nfull]();

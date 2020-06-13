@@ -44,7 +44,8 @@ static const json valid_keys =
 	{"mp", {
 		{"print", 0},
 		{"nlap", 5}, // number of laplace points
-		{"dfbasis", "basis"}
+		{"dfbasis", "basis"},
+		{"c_os", 1.3}
 	}},
 	{"adc", {
 		{"print", 0},

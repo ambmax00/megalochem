@@ -214,7 +214,7 @@ public:
         T* data = nullptr;
         std::array<int,2> size = {0,0};
     
-        c_dbcsr_get_block_notrans_p(m_matrix_ptr, row, col, &data, &found, &size[0], &size[1]);
+        c_dbcsr_get_block_p(m_matrix_ptr, row, col, &data, &found, &size[0], &size[1]);
         
         return block<2,T>(size, data);
     }
@@ -263,8 +263,8 @@ public:
         c_dbcsr_transposed(&m_matrix_ptr, p.c_in.m_matrix_ptr, 
                             (p.c_shallow_copy) ? &*p.c_shallow_copy : nullptr,
                             (p.c_transpose_data) ? &*p.c_transpose_data : nullptr, 
-                            (p.c_transpose_distribution) ? &*p.c_transpose_distribution : nullptr, 
-                            (p.c_use_distribution) ? &*p.c_use_distribution : nullptr);
+                            (p.c_transpose_dist) ? &*p.c_transpose_dist : nullptr, 
+                            (p.c_use_dist) ? &*p.c_use_dist : nullptr);
                             
     }
 

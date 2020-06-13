@@ -463,6 +463,10 @@ public:
 		
 	}
 	
+	void reserve_template(tensor& t_template) {
+		c_dbcsr_t_reserve_blocks_template(t_template.m_tensor_ptr, this->m_tensor_ptr);
+	}
+	
 	void put_block(const index<N>& idx, block<N,T>& blk, std::optional<bool> sum = std::nullopt, std::optional<double> scale = std::nullopt) {
 		
 		c_dbcsr_t_put_block(m_tensor_ptr, idx.data(), blk.size().data(), 

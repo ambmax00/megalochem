@@ -13,7 +13,7 @@
 		],
 		"symbols": ["O", "H", "H"],
 		"basis": "cc-pvdz",
-		"ao_split_method": "atom",
+		"ao_split_method": "shell",
 		"reorder": false
 	},
 	"hf": 
@@ -21,16 +21,18 @@
 		"diis": true,
 		"guess": "SAD",
 		"scf_thresh": 1e-6,
-		"diis_start": 0,
+		"diis_start": 0, 
 		"build_J": "df",
 		"build_K": "df",
 		"print": 0,
 		"SAD_diis": true, 
-		"dfbasis": "cc-pvdz-ri"
+		"dfbasis": "cc-pvdz-ri", 
+		"skip": true
 	},
 	"mp": 
 	{
-		"dfbasis": "cc-pvdz-ri"
+		"dfbasis": "cc-pvdz-ri",
+		"print": 2
 	},
 	"adc":
 	{
