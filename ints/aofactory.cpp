@@ -3,6 +3,7 @@
 #include "ints/aofactory.h"
 #include "ints/integrals.h"
 #include "ints/registry.h"
+#include "ints/screening.h"
 #include "utils/pool.h"
 #include <libint2.hpp>
 
@@ -148,8 +149,8 @@ public:
 	
 	dbcsr::smatrix<double> compute_screen(std::string method, std::string dim) {
 		
-		auto rowsizes = m_basvec[0].cluster_sizes();
-		auto colsizes = (dim == "bbbb") ? m_basvec[1].cluster_sizes() : vec<int>{1};
+		auto rowsizes = (dim == "bbbb") ? m_mol->dims().s() : m_mol->dims().xs();
+		auto colsizes = (dim == "bbbb") ? m_mol->dims().s() : vec<int>{1};
 		
 		char sym = (dim == "bbbb") ? dbcsr_type_symmetric : dbcsr_type_no_symmetry;
 		
@@ -212,7 +213,7 @@ public:
 		return t_ints.get_stensor();
 	}
 	
-	dbcsr::stensor<3,double> compute_3(vec<int>& map1, vec<int>& map2, dbcsr::smatrix<double> scr) { 
+	dbcsr::stensor<3,double> compute_3(vec<int>& map1, vec<int>& map2, screener* scr) { 
 		dbcsr::pgrid<3> grid(m_world.comm()); 
 		arrvec<int,3> blksizes; 
 		for (int i = 0; i != 3; ++i) { 
@@ -221,12 +222,10 @@ public:
 		
 		dbcsr::tensor<3> t_ints = dbcsr::tensor<3>::create().name(m_intname) 
 			.ngrid(grid).map1(map1).map2(map2).blk_sizes(blksizes); 
-			
+	
 		if (scr) {
 			
-			auto Z_blocks = dbcsr::block_norms(*scr);
-			
-			size_t x_nblks = blksizes[2].size();
+			size_t x_nblks = blksizes[0].size();
 			size_t b_nblks = blksizes[1].size();
 			
 			size_t ntot = x_nblks*b_nblks*b_nblks;
@@ -246,16 +245,18 @@ public:
 				blk_mu = blk_idx_loc[1][i];
 				for (int j = 0; j != blk_idx_loc[2].size(); ++j) {
 					blk_nu = blk_idx_loc[2][j];
-					
-					if (Z_blocks(blk_mu,blk_nu) >= dbcsr::filter_eps) {
-						for (int x = 0; x != blk_idx_loc[0].size(); ++x) {
-							blk_x = blk_idx_loc[0][x];
-							res[0].push_back(blk_x);
-							res[1].push_back(blk_mu);
-							res[2].push_back(blk_nu);
+					for (int x = 0; x != blk_idx_loc[0].size(); ++x) {
+						blk_x = blk_idx_loc[0][x];
+						
+						if (scr->skip_block(blk_x,blk_mu,blk_nu)) {
+							++totblk;
+							continue;
 						}
-					} else {
-						++totblk;
+						
+						res[0].push_back(blk_x);
+						res[1].push_back(blk_mu);
+						res[2].push_back(blk_nu);
+						
 					}
 				}
 			}
@@ -265,7 +266,7 @@ public:
 			t_ints.reserve(res);
 			
 		} else {
-			
+		
 			t_ints.reserve_all();
 			
 		}	
@@ -379,7 +380,7 @@ dbcsr::smatrix<double> ao_3coverlap_invsqrt() {
 	
 }
 */
-dbcsr::stensor<3,double> aofactory::ao_3c2e(vec<int> map1, vec<int> map2, dbcsr::smatrix<double> scr) {
+dbcsr::stensor<3,double> aofactory::ao_3c2e(vec<int> map1, vec<int> map2, screener* scr) {
 	
 	auto name = m_mol->name() + "_i_xbb_" + pimpl->m_reg.map_to_string(map1,map2);
 	

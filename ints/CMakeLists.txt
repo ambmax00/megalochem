@@ -5,8 +5,8 @@ set(SOURCES
 	integrals.cpp
 	#gentran.h
 	#gentran.cpp
-	#screening.h
-	#screening.cpp
+	screening.h
+	screening.cpp
 )
 
 add_library(chem_ints ${SOURCES})

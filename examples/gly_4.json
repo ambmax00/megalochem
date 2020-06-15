@@ -8,9 +8,8 @@
 		"unit": "angstrom",
 		"file": "gly_4.xyz",
 		"mo_split": 10,
-		"ao_split_method": "atomic",
-		"basis": "cc-pvdz",
-		"dfbasis": "cc-pvdz-ri"
+		"ao_split_method": "shell",
+		"basis": "cc-pvdz"
 	},
 	"hf": 
 	{
@@ -21,7 +20,12 @@
 		"build_J": "df",
 		"build_K": "df",
 		"print": 0,
-		"skip": false
+		"skip": false, 
+		"dfbasis": "cc-pvdz-ri"
+	},
+	"mp":
+	{
+		"nlap": 1
 	},
 	"adc":
 	{

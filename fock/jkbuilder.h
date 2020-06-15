@@ -42,10 +42,11 @@ public:
 		m_factory = ifac; 
 		m_mol = m_factory->mol();
 	}
-	void set_timer(util::mpi_time& iTIME) { TIME = iTIME; }
 	void set_SAD(bool SAD) { m_SAD_iter = SAD; }
 	
 	~JK_common() {}
+	
+	void print_info() { TIME.print_info(); }
 	
 };
 

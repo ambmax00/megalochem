@@ -1,72 +1,58 @@
 #ifndef INTS_SCREENING_H
 #define INTS_SCREENING_H
 
-#include <mpi.h>
-#include <string>
+#include "ints/aofactory.h"
 
-#include "desc/molecule.h"
-#include "utils/pool.h"
-#include "math/tensor/dbcsr.hpp"
-
-#include <libint2.hpp>
 #include <Eigen/Core>
-#include <map>
 #include <utility>
+#include <string>
 
 // screening classes, inspired by MPQC
 
-namespace std
-{
-    template<typename T, size_t N>
-    struct hash<array<T, N> >
-    {
-        typedef array<T, N> argument_type;
-        typedef size_t result_type;
-
-        result_type operator()(const argument_type& a) const
-        {
-            hash<T> hasher;
-            result_type h = 0;
-            for (result_type i = 0; i < N; ++i)
-            {
-                h = h * 31 + hasher(a[i]);
-            }
-            return h;
-        }
-    };
-}
-
-typedef std::unordered_map<dbcsr::idx2, std::pair<float,dbcsr::block<2>>> blockmap;
-
 namespace ints {
 
-// Matrix which holds info about screening of blocks and shells
-class Zmat {
-private:
+class screener {
+protected:
 
-	//???
-	MPI_Comm m_comm;
-	desc::molecule& m_mol;
-	util::ShrPool<libint2::Engine>& m_eng;
+	std::shared_ptr<aofactory> p_fac;
 	std::string m_method;
 	
-	vec<vec<int>> m_blk_sizes;
-	
-	// methods
-	void compute_schwarz();
-	// void compute_QQR
+	double m_blk_threshold = dbcsr::filter_eps;
+	double m_int_threshold = aofactory::precision;
 	
 public:
 
-	Zmat(MPI_Comm comm, desc::molecule& mol, util::ShrPool<libint2::Engine>& engine, std::string method)
-		: m_comm(comm), m_mol(mol), m_eng(engine), m_method(method) {}
+	screener(std::shared_ptr<aofactory> ifac, std::string method) : 
+		p_fac(ifac), m_method(method) {}
 	
-	void compute();
+	virtual void compute() = 0;
 	
-	~Zmat() {}
+	virtual bool skip_block(int i, int j, int k);
+	virtual bool skip(int i, int j, int k);
 	
-	// map storing the block index, and its associated norm and block
-	blockmap m_blkmap;
+	~screener() {}
+	
+};
+
+class schwarz_screener : public screener {
+protected:
+
+	Eigen::MatrixXd m_blk_norms_mn;
+	Eigen::MatrixXd m_blk_norms_x;
+	Eigen::MatrixXd m_z_mn;
+	Eigen::MatrixXd m_z_x;
+	
+public:
+
+	schwarz_screener(std::shared_ptr<aofactory> ifac) : 
+		screener(ifac, "schwarz") {}
+		
+	void compute() override;
+	
+	bool skip_block(int i, int j, int k) override;
+	bool skip(int i, int j, int k) override;
+	
+	~schwarz_screener() {}
 	
 };
 

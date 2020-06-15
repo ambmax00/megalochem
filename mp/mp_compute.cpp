@@ -37,6 +37,11 @@ void mpmod::compute() {
 	
 	LOG.banner<>("CD-LT-SOS-RI-MP2", 50, '*');
 	
+	// to do:
+	// 1. Insert Screening
+	// 2. Impose sparsity on B_XBB
+	// 3. LOGging and TIMEing
+	
 	// get energies
 	auto eps_o = m_hfwfn->eps_occ_A();
 	auto eps_v = m_hfwfn->eps_vir_A();
@@ -281,7 +286,7 @@ void mpmod::compute() {
 				int iblk = loc_rows[i];
 				int jblk = loc_cols[j];
 				
-				std::cout << iblk << " " << jblk << std::endl;
+				//std::cout << iblk << " " << jblk << std::endl;
 				
 				bool found1 = false;
 				bool found2 = false;
@@ -295,7 +300,7 @@ void mpmod::compute() {
 				
 				if (!found1 || !found2) continue;
 				
-				std::cout << "COMPUTE." << std::endl;
+				//std::cout << "COMPUTE." << std::endl;
 				
 				sum += std::inner_product(blk.data(), blk.data() + blk.ntot(),
 					blk_t.data(), 0.0);

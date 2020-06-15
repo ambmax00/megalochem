@@ -5,6 +5,7 @@
 #include <dbcsr_conversions.hpp>
 #include "desc/molecule.h"
 #include <string>
+#include <limits>
 #include <map>
 #include <mpi.h>
 
@@ -16,6 +17,8 @@
 using eigen_smat_f = std::shared_ptr<Eigen::MatrixXf>;
 
 namespace ints {
+	
+class screener;
 
 class aofactory {
 private:
@@ -38,13 +41,17 @@ public:
 	
 	dbcsr::smatrix<double> ao_3coverlap();
 	
-	dbcsr::stensor<3,double> ao_3c2e(vec<int> map1, vec<int> map2, dbcsr::smatrix<double> scr = nullptr);
+	dbcsr::stensor<3,double> ao_3c2e(vec<int> map1, vec<int> map2, screener* scr = nullptr);
 	dbcsr::stensor<4,double> ao_eri(vec<int> map1, vec<int> map2);
 	
 	dbcsr::smatrix<double> ao_schwarz();
 	dbcsr::smatrix<double> ao_3cschwarz();
+	
+	static double precision;
 		
 }; // end class aofactory
+
+inline double aofactory::precision = std::numeric_limits<double>::epsilon();
 
 } // end namespace ints
 			

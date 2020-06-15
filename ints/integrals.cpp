@@ -516,13 +516,18 @@ void calc_ints_schwarz_mn(dbcsr::mat_d& m_out, util::ShrPool<libint2::Engine>& e
 						auto ints_shellsets = results[0];
 											
 						if (ints_shellsets != nullptr) {
+							
+							double tot = 0.0;
 						
 							for (int i = 0; i != sh1.size(); ++i) {
 								for (int j = 0; j != sh2.size(); ++j) {
-									iter(i + locblkoff1, j + locblkoff2) = sqrt(fabs(ints_shellsets[i*sh2size*sh2size*sh1size
-										+ j*sh1size*sh2size + i*sh2size + j]));
+									tot += fabs(ints_shellsets[i*sh2size*sh2size*sh1size
+										+ j*sh1size*sh2size + i*sh2size + j]);
 									//std::cout << i << " " << j << " " << blk(i + locblkoff1, j + locblkoff2) << std::endl;
 							}}
+							
+							iter(s1,s2) = sqrt(tot);
+							
 						}
 					//}
 					
@@ -592,11 +597,15 @@ void calc_ints_schwarz_x(dbcsr::mat_d& m_out, util::ShrPool<libint2::Engine>& en
 										
 					if (ints_shellsets != nullptr) {
 					
+						double tot = 0;
 						int idx = 0;
 						for (int i = 0; i != sh1.size(); ++i) {
-							iter(i + locblkoff1, 0) = sqrt(ints_shellsets[i*sh1.size() + i]);
+							tot =+ fabs(ints_shellsets[i*sh1.size() + i]);
 							//std::cout << i << " " << j << " " << blk(i + locblkoff1, j + locblkoff2) << std::endl;
 						}
+						
+						iter(s1,0) = sqrt(tot);
+						
 					}
 				//}
 				

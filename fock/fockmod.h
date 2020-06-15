@@ -51,7 +51,11 @@ public:
 	dbcsr::smat_d get_f_A() { return m_f_bb_A; }
 	dbcsr::smat_d get_f_B() { return m_f_bb_B; }
 	
-	void print_info() { TIME.print_info(); }
+	void print_info() { 
+		TIME.print_info();
+		if (m_J_builder) m_J_builder->print_info();
+		if (m_K_builder) m_K_builder->print_info();
+	}
 	
 };
 	

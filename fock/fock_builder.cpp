@@ -1,4 +1,5 @@
 #include "fock/fockmod.h"
+#include "ints/screening.h"
 #include "math/solvers/hermitian_eigen_solver.h"
 #include "fock/fock_defaults.h"
 
@@ -85,14 +86,12 @@ void fockmod::init() {
 	m_J_builder->set_coeff_alpha(m_c_A);
 	m_J_builder->set_coeff_beta(m_c_B);
 	m_J_builder->set_factory(aofac);
-	m_J_builder->set_timer(TIME);
 	
 	m_K_builder->set_density_alpha(m_p_A);
 	m_K_builder->set_density_beta(m_p_B);
 	m_K_builder->set_coeff_alpha(m_c_A);
 	m_K_builder->set_coeff_beta(m_c_B);
 	m_K_builder->set_factory(aofac);
-	m_J_builder->set_timer(TIME);
 	
 	// initialize integrals depending on method combination
 	
@@ -107,13 +106,24 @@ void fockmod::init() {
 	
 	if (compute_3c2e) {
 		
+		auto& t_screen = TIME.sub("3c2e screening");
+		
+		t_screen.start();
+		
+		ints::screener* scr = new ints::schwarz_screener(aofac);
+		scr->compute();
+		
+		t_screen.finish();
+		
 		auto& t_eri = TIME.sub("3c2e integrals");
 		t_eri.start();
 		
-		auto out = aofac->ao_3c2e(vec<int>{0}, vec<int>{1,2});
+		auto out = aofac->ao_3c2e(vec<int>{0}, vec<int>{1,2},scr);
 		reg.insert_tensor<3,double>(m_mol->name() + "_i_xbb_(0|12)", out);
 		
 		t_eri.finish();
+		
+		delete scr;
 		
 	}
 	

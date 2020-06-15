@@ -7,7 +7,7 @@ namespace fock {
 JK_common::JK_common(dbcsr::world& w, desc::options opt) :
 	m_world(w), m_opt(opt),
 	LOG(m_world.comm(),m_opt.get<int>("print", FOCK_PRINT_LEVEL)),
-	TIME(m_world.comm(), "Fock Builder", LOG.global_plev()) {}
+	TIME(m_world.comm(), "JK Builder", LOG.global_plev()) {}
 	
 void J::init() {
 	
