@@ -9,9 +9,9 @@
 #include <dbcsr_matrix_ops.hpp>
 
 
-#ifdef USE_SCALAPACK
+//#ifdef USE_SCALAPACK
 #include "extern/scalapack.h"
-#endif
+//#endif
 
 namespace hf {
 
@@ -150,7 +150,7 @@ void hfmod::compute_guess() {
 		MPI_Comm_split(m_world.comm(), m_world.rank(), m_world.rank(), &mycomm);
 		
 		// set up new scalapack grid
-#ifdef USE_SCALAPACK
+//#ifdef USE_SCALAPACK
 		int sysctxt = -1;
 		c_blacs_get(0, 0, &sysctxt);
 		
@@ -165,7 +165,7 @@ void hfmod::compute_guess() {
 		
 		scalapack::global_grid.set(contexts[m_world.rank()]);
 		
-#endif
+//#endif
 		
 		//for (int r = 0; r != m_world.size(); ++r) {
 			
@@ -262,10 +262,10 @@ void hfmod::compute_guess() {
 		
 		MPI_Barrier(m_world.comm());
 		
-#ifdef USE_SCALAPACK
+//#ifdef USE_SCALAPACK
 		scalapack::global_grid.free();
 		scalapack::global_grid.set(prevctxt);
-#endif
+//#endif
 		
 		MPI_Barrier(m_world.comm());
 		

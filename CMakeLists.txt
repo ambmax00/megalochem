@@ -22,14 +22,7 @@ find_package(PkgConfig)
 pkg_check_modules(deps REQUIRED IMPORTED_TARGET GLOBAL libxsmmf)
 find_package(TBB REQUIRED)
 find_package(Libint2 2.6.0 CONFIG REQUIRED)
-
-find_library(SCALAPACK_LIB NAMES libmkl_scalapack_ilp64.a libscalapack.a PATHS ${SCALAPACK_DIR})
-if (SCALAPACK_LIB)
-	message("-- Found ScaLAPACK implementation: ${SCALAPACK_LIB}")
-        add_definitions(-DUSE_SCALAPACK)	
-else()
-	message("-- Building without ScaLAPACK")
-endif()
+find_package(SCALAPACK REQUIRED)
 
 get_target_property(DBCSR_INCLUDE_DIRS DBCSR::dbcsr INTERFACE_INCLUDE_DIRECTORIES)
 include_directories(

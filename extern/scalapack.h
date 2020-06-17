@@ -348,7 +348,7 @@ public:
 		return out;
 	}
 	
-	distmat(distmat& d) = delete;
+	distmat(const distmat& d) = delete;
 	
 	distmat(distmat&& d) :
 		m_data(d.m_data), m_nrowstot(d.m_nrowstot), 

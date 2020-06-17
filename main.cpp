@@ -11,9 +11,9 @@
 //#include "adc/adcmod.h"
 #include "utils/mpi_time.h"
 
-#ifdef USE_SCALAPACK
+//#ifdef USE_SCALAPACK
 #include "extern/scalapack.h"
-#endif
+//#endif
 
 #include "ints/aofactory.h"
 //#include "math/solvers/hermitian_eigen_solver.h"
@@ -119,13 +119,13 @@ int main(int argc, char** argv) {
 	
 	dbcsr::world wrd(MPI_COMM_WORLD);
 	
-#ifdef USE_SCALAPACK
+//#ifdef USE_SCALAPACK
 	int sysctxt = -1;
 	c_blacs_get(0, 0, &sysctxt);
 	int gridctxt = sysctxt;
 	c_blacs_gridinit(&gridctxt, 'R', wrd.nprow(), wrd.npcol());
 	scalapack::global_grid.set(gridctxt);
-#endif
+//#endif
 	
 	reader filereader(MPI_COMM_WORLD, filename);
 	
@@ -136,6 +136,10 @@ int main(int argc, char** argv) {
 	
 	desc::shf_wfn myhfwfn = std::make_shared<desc::hf_wfn>();
 	hf::hfmod myhf(mol,hfopt,wrd);
+	
+	std::cout << "HERE" << std::endl;
+	if (opt.present("hf/skip")) std::cout << "IN HERE." << std::endl;
+	if (hfopt.present("skip")) std::cout << "ALSO IN HERE" << std::endl;
 	
 	bool skip_hf = hfopt.get<bool>("skip", false);
 	
@@ -293,10 +297,10 @@ int main(int argc, char** argv) {
 
 	*/
 	
-#ifdef USE_SCALAPACK
+//#ifdef USE_SCALAPACK
 	scalapack::global_grid.free();
 	c_blacs_exit(0);
-#endif
+//#endif
 
 	dbcsr::finalize();
 

@@ -3,12 +3,13 @@
 
 #include <Eigen/Core>
 
-#ifdef USE_SCALAPACK
+//#ifdef USE_SCALAPACK
 #include "extern/scalapack.h"
-#endif
+//#endif
 #include <dbcsr_matrix.hpp>
 #include <dbcsr_tensor.hpp>
 #include <limits>
+
 
 template <class T>
 using MatrixX = Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic>;
@@ -125,7 +126,7 @@ matrix<T> eigen_to_matrix(MatrixX<T>& mat, world& w, std::string name, vec<int>&
 	
 }
 
-#ifdef USE_SCALAPACK
+//#ifdef USE_SCALAPACK
 
 template <typename T = double>
 scalapack::distmat<T> matrix_to_scalapack(matrix<T>& mat_in, std::string nameint, int nsplitrow, int nsplitcol, int ori_row, int ori_col) {
@@ -134,7 +135,7 @@ scalapack::distmat<T> matrix_to_scalapack(matrix<T>& mat_in, std::string nameint
 	
 	int nrows = mat_in.nfullrows_total();
 	int ncols = mat_in.nfullcols_total();	
-	
+
 	// make distvecs
 	vec<int> rowsizes = split_range(nrows, nsplitrow);
 	vec<int> colsizes = split_range(ncols, nsplitcol);
@@ -158,10 +159,11 @@ scalapack::distmat<T> matrix_to_scalapack(matrix<T>& mat_in, std::string nameint
 	//dbcsr::print(mat_out);
 	scalapack::distmat<double> scamat(nrows,ncols,nsplitrow,nsplitcol,ori_row,ori_col);
 	
-	dbcsr::iterator iter(mat_out);
+	
 
 #pragma omp parallel
 {
+	dbcsr::iterator iter(mat_out);
 	iter.start();
 	
 	while (iter.blocks_left()) {
@@ -174,6 +176,7 @@ scalapack::distmat<T> matrix_to_scalapack(matrix<T>& mat_in, std::string nameint
 		for (int j = 0; j != iter.col_size(); ++j) {
 			for (int i = 0; i != iter.row_size(); ++i) {
 				// use global indices for scamat
+				//std::cout << iter(i,j) << std::endl;
 				scamat.global_access(i + ioff, j + joff) = iter(i,j);
 			}
 		}
@@ -215,11 +218,10 @@ matrix<T> scalapack_to_matrix(scalapack::distmat<T>& sca_mat_in, std::string nam
 		.type(dbcsr_type_no_symmetry);
 	
 	mat_cyclic.reserve_all();
-	
-	dbcsr::iterator iter(mat_cyclic);
 
 #pragma omp parallel
 {
+	dbcsr::iterator iter(mat_cyclic);
 	iter.start();
 	
 	while (iter.blocks_left()) {
@@ -255,7 +257,7 @@ matrix<T> scalapack_to_matrix(scalapack::distmat<T>& sca_mat_in, std::string nam
 	
 }
 
-#endif // USE_SCALAPACK
+//#endif // USE_SCALAPACK
 
 template <typename T = double>
 MatrixX<T> tensor_to_eigen(dbcsr::tensor<2,T>& array, int l = 0) {
@@ -398,6 +400,7 @@ MatrixX<double> block_norms(matrix<T>& m_in) {
 
 //#pragma omp parallel
 //{
+
 	iter.start();
 	
 	while (iter.blocks_left()) {

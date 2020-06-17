@@ -72,7 +72,7 @@ public:
     typedef T value_type;
     
     template <typename D>
-    friend class multiply;
+    friend class multiply_base;
     
 	template <typename D>
 	friend void copy_tensor_to_matrix(tensor<2,D>& t_in, matrix<D>& m_out, std::optional<bool> summation);

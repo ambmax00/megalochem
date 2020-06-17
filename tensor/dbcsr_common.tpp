@@ -97,7 +97,7 @@ template <typename T>
 using smatrix = std::shared_ptr<matrix<T>>;
 
 template <typename T = double>
-class multiply;
+class multiply_base;
 
 // ---------------------------------------------------------------------
 //                     forward declarations (tensor) 
@@ -116,9 +116,9 @@ template <int N, typename T = double>
 using stensor = std::shared_ptr<tensor<N,T>>;
 
 template <int N1, int N2, int N3, typename T = double>
-class contract;
+class contract_base;
 template <int N1, typename T = double>
-class copy;
+class copy_base;
 
 // other 
 
@@ -132,7 +132,7 @@ static inline double filter_eps = 1e-9;
 static inline bool filter_use_absolute = true;
 
 
-static auto default_dist = 
+inline auto default_dist = 
 	[](int nel, int nbin, vec<int> weights) {
 		
 		std::vector<int> distvec(weights.size(),0);
@@ -164,7 +164,7 @@ static auto default_dist =
 		
 };
 
-auto split_range = [](int n, int split) {
+inline auto split_range = [](int n, int split) {
 	
 	// number of intervals
 	int nblock = n%split == 0 ? n/split : n/split + 1;
@@ -181,7 +181,7 @@ auto split_range = [](int n, int split) {
 	
 };
 	
-auto cyclic_dist = [](int dist_size, int nbins) {
+inline auto cyclic_dist = [](int dist_size, int nbins) {
   
 	std::vector<int> distv(dist_size);
 	for(int i=0; i < dist_size; i++)

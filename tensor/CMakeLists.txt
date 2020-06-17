@@ -35,13 +35,11 @@ target_link_libraries(
 	INTERFACE
 	Eigen3::Eigen
 	MPI::MPI_CXX
+	OpenMP::OpenMP_CXX
 	PkgConfig::deps
         DBCSR::dbcsr_c
+	${SCALAPACK_LIBRARIES}
 )
-
-if (SCALAPACK_LIB)
-	target_link_libraries(chem_tensor INTERFACE ${SCALAPACK_LIB})
-endif()
 
 target_include_directories(
 	chem_tensor

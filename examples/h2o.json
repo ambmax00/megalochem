@@ -19,15 +19,15 @@
 	"hf": 
 	{
 		"diis": true,
-		"guess": "SAD",
+		"guess": "core",
 		"scf_thresh": 1e-6,
 		"diis_start": 0, 
 		"build_J": "df",
 		"build_K": "df",
-		"print": 0,
+		"print": 9999,
 		"SAD_diis": true, 
 		"dfbasis": "cc-pvdz-ri", 
-		"skip": true
+		"skip": false
 	},
 	"mp": 
 	{

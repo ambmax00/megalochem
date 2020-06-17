@@ -162,7 +162,7 @@ void pivinc_cd::compute(int nb) {
 	// chol mat
 	scalapack::distmat<double> L(N,N,nb,nb,0,0);
 	
-	auto printp = [](int* p, int n) {
+	auto printp = [&_grid](int* p, int n) {
 		for (int ir = 0; ir != _grid.nprow(); ++ir) {
 			for (int ic = 0; ic != _grid.npcol(); ++ic) {
 				if (ir == _grid.myprow() && ic == _grid.mypcol()) {

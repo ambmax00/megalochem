@@ -162,10 +162,10 @@ public:
     friend class iterator_t<N,T>;
     
 	template <int N1, int N2, int N3, typename D>
-    friend class contract;
+    friend class contract_base;
     
     template <int M, typename D>
-	friend class copy;
+	friend class copy_base;
 	
 	template <typename D>
 	friend void copy_tensor_to_matrix(tensor<2,D>& t_in, matrix<D>& m_out, std::optional<bool> summation);

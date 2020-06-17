@@ -10,5 +10,5 @@ target_link_libraries(
 	chem_math_linalg
 	chem_math_solvers
         chem_tensor
-        ${SCALAPACK_LIB}	
+        ${SCALAPACK_LIBRARIES}	
 )

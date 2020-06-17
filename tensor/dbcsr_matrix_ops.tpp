@@ -7,7 +7,7 @@
 namespace dbcsr {
 
 template <typename T>
-class multiply {
+class multiply_base {
 
 #:set list = [ &
     ['alpha', 'T', 'optional', 'val'],&
@@ -22,7 +22,7 @@ class multiply {
     ['filter_eps', 'double', 'optional', 'val'],&
     ['flop', 'long long int', 'optional', 'ref']] 
     
-    ${make_param('multiply',list)}$
+    ${make_param('multiply_base',list)}$
     
 private:
 
@@ -33,10 +33,10 @@ private:
     
 public:
 
-    multiply(char transa, char transb, matrix<T>& A, matrix<T>& B, matrix<T>& C) :
+    multiply_base(char transa, char transb, matrix<T>& A, matrix<T>& B, matrix<T>& C) :
         m_transa(transa), m_transb(transb), m_A(A), m_B(B), m_C(C) {}
     
-    ~multiply() {}
+    ~multiply_base() {}
 
     void perform() {
         
@@ -59,7 +59,12 @@ public:
 };
 
 template <typename T>
-multiply(char transa, char transb, matrix<T>& A, matrix<T>& B, matrix<T>& C) -> multiply<typename matrix<T>::value_type>;
+multiply_base(char transa, char transb, matrix<T>& A, matrix<T>& B, matrix<T>& C) -> multiply_base<typename matrix<T>::value_type>;
+
+template <typename T>
+inline auto multiply(char transa, char transb, matrix<T>& A, matrix<T>& B, matrix<T>& C) -> multiply_base<T> {
+	return multiply_base(transa,transb,A,B,C);
+}
 
 } // end nmespace
 

@@ -73,11 +73,20 @@ public:
 	
 	options() {}
 	
-	options(options& opt) {
+	options(const options& opt) {
 		m_map = opt.m_map;
 		m_prefix = opt.m_prefix;
 	}
 	
+	options& operator=(const options& opt) {
+		
+		if (this == &opt) return *this;
+		
+		m_map = opt.m_map;
+		m_prefix = opt.m_prefix;
+		return *this;
+	}
+		
 	~options() {}
 	
 	options subtext(std::string root) {

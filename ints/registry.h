@@ -116,7 +116,7 @@ public:
 			out = dbcsr::make_stensor<N,T>(typename dbcsr::tensor<N,T>::create_template(*data)
 				.name(newname).map1(map1).map2(map2));
 			
-			dbcsr::copy<N,T>(*data,*out).move_data(move).perform();
+			dbcsr::copy(*data,*out).move_data(move).perform();
 			
 			this->insert_tensor<N,T>(newname,out);
 			if (move) m_map.erase(iter);

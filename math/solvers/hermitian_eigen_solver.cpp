@@ -1,18 +1,18 @@
 #include "math/solvers/hermitian_eigen_solver.h"
 #include <dbcsr_matrix_ops.hpp>
 
-#ifdef USE_SCALAPACK
+//#ifdef USE_SCALAPACK
 #include "extern/scalapack.h"
-#else
-#include <Eigen/Eigenvalues>
-#endif
+//#else
+//#include <Eigen/Eigenvalues>
+//#endif
 
 #include <dbcsr_conversions.hpp>
 #include <cmath>
 
 namespace math {
 	
-#ifdef USE_SCALAPACK
+//#ifdef USE_SCALAPACK
 
 void hermitian_eigen_solver::compute(int scalapack_blksize) {
 	
@@ -98,8 +98,9 @@ void hermitian_eigen_solver::compute(int scalapack_blksize) {
 	return;
 }
 
-#else 
+//#else 
 
+/*
 void hermitian_eigen_solver::compute(int scalapack_blksize) {
 	
 	LOG.os<>("Running SelfAdjointEigenSolver from EIGEN.\n");
@@ -155,6 +156,7 @@ void hermitian_eigen_solver::compute(int scalapack_blksize) {
 }
 
 #endif // SCALAPACK
+*/
 
 smatrix hermitian_eigen_solver::inverse() {
 	

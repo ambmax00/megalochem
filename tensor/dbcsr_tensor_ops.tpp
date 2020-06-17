@@ -19,14 +19,14 @@ D* unfold_bounds(vec<vec<D>>& v) {
 }
 
 template <int N, typename T>
-class copy {
+class copy_base {
 
     #:set list = [ &
         ['order','vec<int>','optional','val'],&
         ['sum','bool','optional','val'],&
         ['bounds','vec<vec<int>>', 'optional', 'ref'],&
         ['move_data','bool','optional','val']]
-    ${make_param('copy',list)}$
+    ${make_param('copy_base',list)}$
         
 private:
 
@@ -35,7 +35,7 @@ private:
     
 public:
 
-    copy(tensor<N,T>& t1, tensor<N,T>& t2) : c_t_in(t1), c_t_out(t2) {}
+    copy_base(tensor<N,T>& t1, tensor<N,T>& t2) : c_t_in(t1), c_t_out(t2) {}
     
     void perform() {
         
@@ -51,10 +51,16 @@ public:
 };
 
 template <int N, typename T>
-copy(tensor<N,T>& t1, tensor<N,T>& t2) -> copy<tensor<N,T>::dim, typename tensor<N,T>::value_type>;
+copy_base(tensor<N,T>& t1, tensor<N,T>& t2) -> copy_base<tensor<N,T>::dim, typename tensor<N,T>::value_type>;
+
+template <typename tensortype>
+inline copy_base<tensortype::dim, typename tensortype::value_type>
+copy(tensortype& t1, tensortype& t2) {
+	return copy_base(t1,t2);
+}
 
 template <int N1, int N2, int N3, typename T>
-class contract {
+class contract_base {
 
     #:set list = [ &
         ['alpha','T','optional','val'],&
@@ -74,7 +80,7 @@ class contract {
         ['retain_sparsity','bool','optional','val'],&
         ['print','bool','optional','val'],&
         ['log','bool','optional','val']]
-    ${make_param('contract',list)}$
+    ${make_param('contract_base',list)}$
 
 private:
 
@@ -84,7 +90,7 @@ private:
     
 public:
     
-    contract(dbcsr::tensor<N1,T>& t1, dbcsr::tensor<N2,T>& t2, dbcsr::tensor<N3,T>& t3) 
+    contract_base(dbcsr::tensor<N1,T>& t1, dbcsr::tensor<N2,T>& t2, dbcsr::tensor<N3,T>& t3) 
         : c_t1(t1), c_t2(t2), c_t3(t3) {}
     
     void perform() {
@@ -265,8 +271,15 @@ public:
 };
 
 template <int N1, int N2, int N3, typename T>
-contract(tensor<N1,T>& t1, tensor<N2,T>& t2, tensor<N3,T>& t3) 
--> contract<tensor<N1,T>::dim,tensor<N2,T>::dim,tensor<N3,T>::dim, T>;
+contract_base(tensor<N1,T>& t1, tensor<N2,T>& t2, tensor<N3,T>& t3) 
+-> contract_base<tensor<N1,T>::dim,tensor<N2,T>::dim,tensor<N3,T>::dim, T>;
+
+template <typename tensor1, typename tensor2, typename tensor3>
+inline contract_base<tensor1::dim,tensor2::dim,tensor3::dim,typename tensor1::value_type> 
+contract(tensor1& t1, tensor2& t2, tensor3& t3) 
+{
+	return contract_base(t1,t2,t3);
+}
 
 template <typename T = double>
 void copy_2Dtensor_to_3Dtensor(tensor<2,T>& t2, tensor<3,T>& t3, bool sum = false) {
