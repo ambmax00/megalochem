@@ -46,6 +46,8 @@ public:
             (c_sum) ? &*c_sum : nullptr, fbounds,
             (c_move_data) ? &*c_move_data : nullptr, nullptr);
             
+        if (fbounds) delete [] fbounds;
+            
     }
             
 };

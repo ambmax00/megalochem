@@ -18,6 +18,9 @@
 #include "ints/aofactory.h"
 //#include "math/solvers/hermitian_eigen_solver.h"
 
+
+#include "disktensor.h"
+
 template <int N>
 void fill_random(dbcsr::tensor<N,double>& t_in, arrvec<int,N>& nz) {
 	
@@ -136,10 +139,70 @@ int main(int argc, char** argv) {
 	
 	desc::shf_wfn myhfwfn = std::make_shared<desc::hf_wfn>();
 	hf::hfmod myhf(mol,hfopt,wrd);
+
+
+/////////////////////////////////////////////////////
 	
-	std::cout << "HERE" << std::endl;
-	if (opt.present("hf/skip")) std::cout << "IN HERE." << std::endl;
-	if (hfopt.present("skip")) std::cout << "ALSO IN HERE" << std::endl;
+	ints::aofactory aofac(mol,wrd);
+	
+	//auto eri = aofac.ao_3c2e(vec<int>{0},vec<int>{1,2});
+	
+	//dbcsr::print(*eri);
+	
+	auto eri = aofac.ao_3c2e_setup(vec<int>{0},vec<int>{1,2});
+	
+	dbcsr::disktensor dt(eri,212);
+	
+	dt.set_batch_dim(vec<int>{0});
+	
+	int nbatch = dt.nbatches();
+	
+	dt.create_file();
+	
+	for (int i = 0; i != nbatch; ++i) {
+		
+		vec<vec<int>> bounds(3);
+		
+		bounds[0] = dt.bounds_blk(i,0);
+		bounds[1] = dt.bounds_blk(i,1);
+		bounds[2] = dt.bounds_blk(i,2);
+		
+		LOG.os<>("BOUNDS0: ", bounds[0][0], " ", bounds[0][1], '\n');
+		LOG.os<>("BOUNDS1: ", bounds[1][0], " ", bounds[1][1], '\n');
+		LOG.os<>("BOUNDS2: ", bounds[2][0], " ", bounds[2][1], '\n');
+		
+		aofac.ao_3c2e_fill(eri,bounds,nullptr);
+
+		dt.write(i);
+	
+		eri->clear();
+		
+	}
+	
+	//dt.delete_file();
+	
+	dt.set_batch_dim(vec<int>{1,2});
+	
+	for (int i = 0; i != nbatch; ++i) {
+		
+		LOG.os<>("BATCH ", i, '\n');
+		
+		dt.read(i);
+		
+		//dbcsr::print(*eri);
+		
+		eri->clear();
+		
+	}
+	
+	dt.delete_file();
+	
+	exit(0);
+	
+
+/////////////////////////////////////////////////////
+
+
 	
 	bool skip_hf = hfopt.get<bool>("skip", false);
 	
@@ -180,7 +243,7 @@ int main(int argc, char** argv) {
 	time.print_info();
 	*/
 	/*
-	//ints::aofactory ao(mol, MPI_COMM_WORLD);
+	//
 	
 	//auto s = ao.compute<2>({.op = "overlap", .bas = "bb", .name = "S", .map1 = {0}, .map2 = {1}});
 	

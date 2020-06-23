@@ -47,6 +47,9 @@ public:
 	dbcsr::smatrix<double> ao_schwarz();
 	dbcsr::smatrix<double> ao_3cschwarz();
 	
+	dbcsr::stensor<3> ao_3c2e_setup(vec<int> map1, vec<int> map2);
+	void ao_3c2e_fill(dbcsr::stensor<3,double>& t_in, vec<vec<int>>& blkbounds, screener* scr);
+	
 	static double precision;
 		
 }; // end class aofactory

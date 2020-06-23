@@ -414,7 +414,7 @@ public:
 #:for idim in range(2,MAXDIM+1)
     template <int M = N>
     typename std::enable_if<M == ${idim}$>::type
-	reserve(arrvec<int,N> nzblks) {
+	reserve(arrvec<int,N>& nzblks) {
 			
 		if (nzblks[0].size() == 0) return;
 		if (!(nzblks[0].size() == nzblks[1].size()
@@ -474,6 +474,10 @@ public:
 			
 	}
 	
+	void put_block(const index<N>& idx, T* data, const index<N>& size) {
+		c_dbcsr_t_put_block(m_tensor_ptr, idx.data(), size.data(), data, nullptr, nullptr);
+	}
+	
 	block<N,T> get_block(const index<N>& idx, const index<N>& blk_size, bool& found) {
         
 		block<N,T> blk_out(blk_size);
@@ -483,6 +487,12 @@ public:
 			
 		return blk_out;
 			
+	}
+	
+	void get_block(T* data_ptr, const index<N>& idx, const index<N>& blk_size, bool& found) {
+		
+		c_dbcsr_t_get_block(m_tensor_ptr, idx.data(), blk_size.data(), data_ptr, &found);
+		
 	}
 	
 	int proc(index<N>& idx) {
@@ -515,6 +525,10 @@ public:
 	
 	long long int num_blocks_total() const {
 		return c_dbcsr_t_get_num_blocks_total(m_tensor_ptr);
+	}
+	
+	int num_nze() {
+		return c_dbcsr_t_get_nze(m_tensor_ptr);
 	}
 	
 	long long int num_nze_total() const {

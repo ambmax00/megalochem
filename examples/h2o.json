@@ -11,7 +11,7 @@
           0.00000,        0.75545,       -0.47116,
           0.00000,       -0.75545,       -0.47116
 		],
-		"symbols": ["O", "H", "H"],
+		"symbols": ["O", "H", "F"],
 		"basis": "cc-pvdz",
 		"ao_split_method": "shell",
 		"reorder": false

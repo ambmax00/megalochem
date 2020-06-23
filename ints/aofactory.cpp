@@ -112,6 +112,23 @@ public:
 		libint2::finalize();
 	}
 	
+	template <int N, typename T = double>
+	dbcsr::stensor<N,T> setup_tensor(vec<int> map1, vec<int> map2) {
+		
+		dbcsr::pgrid<N> grid(m_world.comm()); 
+		arrvec<int,N> blksizes; 
+		for (int i = 0; i != N; ++i) { 
+			blksizes[i] = m_basvec[i].cluster_sizes(); 
+		} 
+			
+		dbcsr::stensor<N,T> t_out = dbcsr::make_stensor<N,T>(
+			typename dbcsr::tensor<N,T>::create().name(m_intname) 
+			.ngrid(grid).map1(map1).map2(map2).blk_sizes(blksizes));
+			
+		return t_out;
+		
+	}
+	
 	dbcsr::smatrix<double> compute() {
 		
 		auto rowsizes = m_basvec[0].cluster_sizes();
@@ -277,6 +294,68 @@ public:
 		return out;
 	}
 	
+	void compute_3(dbcsr::stensor<3>& t_in, vec<vec<int>>& blkbounds,
+		screener* scr) {
+			
+		auto blksizes = t_in->blk_sizes(); 
+	
+		//if (scr) {
+			
+			size_t x_nblks = blksizes[0].size();
+			size_t b_nblks = blksizes[1].size();
+			
+			size_t ntot = x_nblks*b_nblks*b_nblks;
+			
+			arrvec<int,3> res;
+			res[0].reserve(ntot);
+			res[1].reserve(ntot);
+			res[2].reserve(ntot);
+			
+			size_t totblk = 0;
+			
+			auto blk_idx_loc = t_in->blks_local();
+			
+			int blk_mu, blk_nu, blk_x;
+			
+			for (int i = 0; i != blk_idx_loc[1].size(); ++i) {
+				
+				blk_mu = blk_idx_loc[1][i];
+				if (blk_mu < blkbounds[1][0] || blk_mu > blkbounds[1][1]) continue;
+				 
+				for (int j = 0; j != blk_idx_loc[2].size(); ++j) {
+					
+					blk_nu = blk_idx_loc[2][j];
+					if (blk_nu < blkbounds[2][0] || blk_nu > blkbounds[2][1]) continue;
+					
+					for (int x = 0; x != blk_idx_loc[0].size(); ++x) {
+						blk_x = blk_idx_loc[0][x];
+						
+						if (blk_x < blkbounds[0][0] || blk_x > blkbounds[0][1]) continue;
+						if (scr && scr->skip_block(blk_x,blk_mu,blk_nu)) {
+							++totblk;
+							continue;
+						}
+						
+						res[0].push_back(blk_x);
+						res[1].push_back(blk_mu);
+						res[2].push_back(blk_nu);
+						
+					}
+				}
+			}
+			
+			t_in->reserve(res);
+			
+		//} else {
+		
+		//	t_ints.reserve_all();
+			
+		//}	
+		
+		calc_ints(*t_in, m_eng_pool, m_basvec); 
+		
+	}
+	
 	dbcsr::stensor<4,double> compute_4(vec<int>& map1, vec<int>& map2) {
 		
 		dbcsr::pgrid<4> grid(m_world.comm()); 
@@ -390,6 +469,24 @@ dbcsr::stensor<3,double> aofactory::ao_3c2e(vec<int> map1, vec<int> map2, screen
 	pimpl->setup_calc();
 	return pimpl->compute_3(map1,map2,scr);
 }
+
+dbcsr::stensor<3,double> aofactory::ao_3c2e_setup(vec<int> map1, vec<int> map2) {
+	auto name = m_mol->name() + "_i_xbb_" + pimpl->m_reg.map_to_string(map1,map2);
+	pimpl->set_name(name);
+	pimpl->set_braket("xbb");
+	pimpl->set_operator("coulomb");
+	pimpl->setup_calc();
+	
+	return pimpl->setup_tensor<3>(map1,map2);
+	
+}
+
+void aofactory::ao_3c2e_fill(dbcsr::stensor<3,double>& t_in, vec<vec<int>>& blkbounds, screener* scr) {
+	
+	pimpl->compute_3(t_in,blkbounds,scr);
+	
+}
+	
 
 dbcsr::stensor<4,double> aofactory::ao_eri(vec<int> map1, vec<int> map2) {
 	
