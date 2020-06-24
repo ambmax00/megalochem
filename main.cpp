@@ -19,7 +19,7 @@
 //#include "math/solvers/hermitian_eigen_solver.h"
 
 
-#include "disktensor.h"
+//#include "tensor/batchtensor.h"
 
 template <int N>
 void fill_random(dbcsr::tensor<N,double>& t_in, arrvec<int,N>& nz) {
@@ -141,7 +141,7 @@ int main(int argc, char** argv) {
 	hf::hfmod myhf(mol,hfopt,wrd);
 
 
-/////////////////////////////////////////////////////
+/*
 	
 	ints::aofactory aofac(mol,wrd);
 	
@@ -151,13 +151,14 @@ int main(int argc, char** argv) {
 	
 	auto eri = aofac.ao_3c2e_setup(vec<int>{0},vec<int>{1,2});
 	
-	dbcsr::disktensor dt(eri,212);
+	tensor::batchtensor dt(eri,212,999);
 	
+	dt.create_file();
+	
+	dt.setup_batch();
 	dt.set_batch_dim(vec<int>{0});
 	
 	int nbatch = dt.nbatches();
-	
-	dt.create_file();
 	
 	for (int i = 0; i != nbatch; ++i) {
 		
@@ -175,6 +176,8 @@ int main(int argc, char** argv) {
 
 		dt.write(i);
 	
+		dbcsr::print(*eri);
+	
 		eri->clear();
 		
 	}
@@ -189,7 +192,7 @@ int main(int argc, char** argv) {
 		
 		dt.read(i);
 		
-		//dbcsr::print(*eri);
+		dbcsr::print(*eri);
 		
 		eri->clear();
 		
@@ -199,10 +202,7 @@ int main(int argc, char** argv) {
 	
 	exit(0);
 	
-
-/////////////////////////////////////////////////////
-
-
+*/
 	
 	bool skip_hf = hfopt.get<bool>("skip", false);
 	

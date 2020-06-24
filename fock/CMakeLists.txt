@@ -12,5 +12,5 @@ target_link_libraries(
 	chem_desc
 	chem_ints
 	chem_math_solvers
-	chem_tensor
+	chem_dbcsrx
 )

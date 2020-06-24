@@ -27,11 +27,11 @@ endforeach()
 
 add_custom_target(fypped ALL DEPENDS ${FYPP_OUT})
 
-add_library(chem_tensor INTERFACE)
-add_dependencies(chem_tensor fypped)
+add_library(chem_dbcsrx INTERFACE)
+add_dependencies(chem_dbcsrx fypped)
 
 target_link_libraries(
-	chem_tensor 
+	chem_dbcsrx
 	INTERFACE
 	Eigen3::Eigen
 	MPI::MPI_CXX
@@ -42,7 +42,7 @@ target_link_libraries(
 )
 
 target_include_directories(
-	chem_tensor
+	chem_dbcsrx
 	INTERFACE 
 	${CMAKE_CURRENT_BINARY_DIR}
 	${CMAKE_CURRENT_SOURCE_DIR}

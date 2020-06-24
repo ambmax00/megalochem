@@ -1,5 +1,5 @@
-#ifndef DISK_TENSOR_H
-#define DISK_TENSOR_H
+#ifndef BATCHTENSOR_H
+#define BATCHTENSOR_H
 
 #include <dbcsr_tensor_ops.hpp>
 #include "utils/mpi_time.h"
@@ -8,70 +8,90 @@
 #include <mpi.h>
 #include <cstdlib>
 
-namespace dbcsr {
+namespace tensor {
 
 template <int N, typename T>
-class disktensor {
+class batchtensor {
 private:
 
 	MPI_Comm m_comm;
 	util::mpi_log LOG;
 	int m_mpirank;
 	int m_mpisize;
-	stensor<N,T> m_stensor;
+	
+	dbcsr::stensor<N,T> m_stensor;
+	// underlying shared tensor
 	
 	std::string m_filename;
+	// root name for files
 	
-	// static tensor char.
+	/* ========== static tensor variables ========== */
 	
 	arrvec<int,N> m_blksizes;
 	arrvec<int,N> m_blkoffsets;
 	std::array<int,N> m_blkstot;
 	std::array<int,N> m_fulltot;
 	
-	// dynamic tensor char.
+	/* ========== dynamic tensor variables ========== */
 	
-	int m_nblkloc; // number of local blocks
-	int m_nzeloc; // number of local non-zero elements 
-	int64_t m_nblktot; // total number of blocks
-	int64_t m_nzetot; // total number of non-zero elements
-	arrvec<int,N> m_locblkidx;  // local block-indices
-	vec<MPI_Aint> m_locblkoff; // local block-offsets in file
+	int m_nblkloc; 
+	// number of local blocks
+	int m_nzeloc; 
+	// number of local non-zero elements 
+	int64_t m_nblktot; 
+	// total number of blocks
+	int64_t m_nzetot; 
+	// total number of non-zero elements
+	arrvec<int,N> m_locblkidx;  
+	// local block-indices
+	vec<MPI_Aint> m_locblkoff; 
+	// local block-offsets in file (in multiples of T)
 	
-	// batching info
+	/* ======== BATCHING INFO ========== */
 	
+	double m_batch_size;
 	int64_t m_maxblk_per_node;
+	// maximum number of blocks allowed per process (per batch)
 	int64_t m_maxnblk_tot;
+	// maximum number of blocks allowed on all processes
 	int m_nbatches;
+	// number of batches the tensor is subdivided into
 	
-	vec<int> m_current_batchdim;
-	vec<int> m_stored_batchdim;
+	vec<int> m_current_batchdim; 
+	// what dimensions are currently being used for batching
+	
+	vec<int> m_stored_batchdim; 
+	// what dimensions have been used for writing the tensor
 	
 	vec<vec<std::array<int,2>>> m_boundsblk; 
+	/* lower(0) and upper(1) bound for blocks per tensor dimension per batch
+	 * upper bound is INCLUDED. */
 	
-	// write
-	vec<vec<int>> m_nblksprocbatch; // number of blocks per process per batch
-	vec<vec<int>> m_nzeprocbatch; // number of nonzero elements per process per batch
+	
+	vec<vec<int>> m_nblksprocbatch; 
+	// number of blocks per process per batch
+	vec<vec<int>> m_nzeprocbatch; 
+	// number of nonzero elements per process per batch
 	
 public:
 
-	/* batchsize in MB */
-	disktensor(stensor<N,T>& stensor_in, double batchsize) : 
+	/* batchsize: given in MB */
+	batchtensor(dbcsr::stensor<N,T>& stensor_in, double batchsize, int print = -1) : 
 		m_stensor(stensor_in),
+		m_batch_size(batchsize),
 		m_comm(stensor_in->comm()),
+		m_blksizes(m_stensor->blk_sizes()),
+		m_blkoffsets(m_stensor->blk_offsets()),
+		m_fulltot(m_stensor->nfull_total()),
+		m_blkstot(m_stensor->nblks_total()),
+		m_filename(stensor_in->name()),
 		m_mpirank(-1), m_mpisize(-1),
-		LOG(stensor_in->comm(),0),
+		LOG(stensor_in->comm(),print),
 		m_nblktot(0), m_nzetot(0)
 	{
 		
 		MPI_Comm_rank(m_comm, &m_mpirank);
 		MPI_Comm_size(m_comm, &m_mpisize);
-		
-		m_blksizes = m_stensor->blk_sizes();
-		m_blkoffsets = m_stensor->blk_offsets();
-		m_fulltot = m_stensor->nfull_total();
-		m_blkstot = m_stensor->nblks_total();
-		
 		
 		LOG.os<>("Setting up tensor information.\n");
 		
@@ -85,7 +105,10 @@ public:
 			LOG.os<>(x, " ");
 		} LOG.os<>('\n');
 		
-		m_filename = stensor_in->name();
+	}
+	
+	/* sets up the preliminary batching information. */
+	void setup_batch() {
 		
 		// determine how many blocks per batch are allowed
 		// this makes the following assumptions:
@@ -104,14 +127,14 @@ public:
 		}
 		
 		LOG.os<>("-- Total number of blocks: ", m_nblktot, '\n');
-		LOG.os<>("-- MEAN SIZE: ", mean, '\n');
-		LOG.os<>("-- BLOCK SIZES: ");
+		LOG.os<>("-- Mean total block size: ", mean, '\n');
+		LOG.os<>("-- Mean block sizes: ");
 		for (int i = 0; i != N; ++i) {
 			LOG.os<>(meansizes[i], " ");
 		} LOG.os<>('\n');
 		
 		// determine blocks held per rank per batch
-		m_maxblk_per_node = batchsize * 1000 / (mean * 8);
+		m_maxblk_per_node = m_batch_size * 1000 / (mean * 8);
 		
 		LOG.os<>("-- Holding at most ", m_maxblk_per_node, " blocks per node.\n");
 		
@@ -119,12 +142,11 @@ public:
 		
 		LOG.os<>("-- Holding ", m_maxnblk_tot, " at most on all nodes.\n");
 		
-		//m_nbatches = m_nblktot / m_maxnblk_tot + (m_nblktot % m_maxnblk_tot != 0);
-		
-		//LOG.os<>("Tensor divided up into ", m_nbatches, " batches.\n");
-		
 	}
 	
+	/* function to set up the batches along the dimension(s) specified in ndim 
+	 * Only supports two dimensions at the moment */
+	 
 	void set_batch_dim(std::vector<int> ndim) {
 		
 		LOG.os<>("Setting up batching information.\n");
@@ -133,10 +155,9 @@ public:
 			if (n >= N || n < 0) throw std::runtime_error("Invalid batch dimension.");
 		}
 		
-		m_current_batchdim = ndim;
+		if (ndim.size() > 2) throw std::runtime_error("Batching for more than two dimensions NYI.");
 		
-		// if we have blk indices available, reorder them
-		//if (m_locblkidx.size() != 0) reorder_blk_idx(ndim);
+		m_current_batchdim = ndim;
 				
 		// set up bounds - again, we presume blocks are distributed homogeneously
 		
@@ -176,7 +197,7 @@ public:
 		
 		max_idx_super -= 1;
 		
-		LOG.os<>("MAX super idx: ", max_idx_super, '\n');
+		LOG.os<>("Maximum super iindex: ", max_idx_super, '\n');
 		
 		m_boundsblk.resize(m_nbatches);
 		
@@ -189,8 +210,8 @@ public:
 			int64_t high_super = (idxblkoff <= max_idx_super) ? 
 				idxblkoff - 1 : max_idx_super;
 				
-			LOG.os<>("Batch ", ibatch, '\n');
-			LOG.os<>("Low/high superidx ", low_super, " ", high_super, '\n');
+			//LOG.os<>("Batch ", ibatch, '\n');
+			//LOG.os<>("Low/high superidx ", low_super, " ", high_super, '\n');
 			
 			// unroll super index
 			std::vector<int> sizes(ndim.size());
@@ -201,11 +222,11 @@ public:
 			auto low = unroll_index(low_super,sizes);
 			auto high = unroll_index(high_super,sizes);
 			
-			LOG.os<>("Unrolled: \n");
+			/*LOG.os<>("Unrolled: \n");
 			for (auto l : low) LOG.os<>(l, " ");
 			LOG.os<>('\n');
 			for (auto h : high) LOG.os<>(h, " ");
-			LOG.os<>('\n');
+			LOG.os<>('\n');*/
 			
 			for (int i = 0; i != ndim.size(); ++i) {
 				m_boundsblk[ibatch][i][0] = low[i];
@@ -214,7 +235,7 @@ public:
 			
 		}
 		
-		LOG.os<>("Bounds: \n");
+		LOG.os<1>("Bounds: \n");
 		for (auto b : m_boundsblk) {
 			for (int i = 0; i != b.size(); ++i) {
 				LOG.os<>(b[i][0], " -> ", b[i][1], " ");
@@ -223,6 +244,7 @@ public:
 		
 	}
 	
+	/* transforms a (flat) superindex into multiple tensor indices */ 
 	std::vector<int> unroll_index(int64_t idx, std::vector<int> sizes) {
 		
 		int M = sizes.size();
@@ -257,7 +279,11 @@ public:
 		
 	}
 	
+	/* Create all necessary files. 
+	 * !!! Deletes previous files and resets all variables !!! */
 	void create_file() {
+		
+		delete_file();
 		
 		MPI_File fh;
 		
@@ -268,24 +294,15 @@ public:
 		
 		int rc = MPI_File_open(m_comm,data_fname.c_str(),MPI_MODE_CREATE|MPI_MODE_WRONLY,
 			MPI_INFO_NULL,&fh);
-			
-		if (rc) std::cout << "UNABLE TO OPEN FILE." << std::endl;
 		
 		MPI_File_close(&fh);
 		
-		//rc = MPI_File_open(m_comm,idx_fname.c_str(),MPI_MODE_CREATE|MPI_MODE_WRONLY,
-		//	MPI_INFO_NULL,&fh);
-			
-		//if (rc) std::cout << "UNABLE TO OPEN FILE." << std::endl;
 		
-		//MPI_File_close(&fh);
-		m_nblktot = 0;
-		m_nzetot = 0;
-		m_nblkloc = 0;
-		m_nzeloc = 0;
 		
 	}
-		
+	
+	/* Deletes all files asscoiated with tensor. 
+	 * !!! Resets variables !!! */
 	void delete_file() {
 		
 		std::string data_fname = m_filename + ".dat";
@@ -294,13 +311,35 @@ public:
 		int rc = MPI_File_delete(data_fname.c_str(),MPI_INFO_NULL);
 		//int rc = MPI_File_delete(idx_fname.c_str(),MPI_INFO_NULL);
 		
-		// reset variables
-		m_nblktot = 0;
-		m_nzetot = 0;
+		reset_var();
 		
 	}
-		
 	
+	void reset_var() {
+		
+		m_nblktot = 0;
+		m_nblkloc = 0; 
+		m_nzeloc = 0; 
+		m_nblktot = 0; 
+		m_nzetot = 0; 
+		m_maxblk_per_node = 0;
+		m_maxnblk_tot = 0;
+		m_nbatches = 0;
+		
+		for (auto& v : m_locblkidx) {
+			v.clear();
+		}
+		
+		m_current_batchdim.clear();
+		m_stored_batchdim.clear();
+		
+		m_boundsblk.clear();
+		m_nblksprocbatch.clear();
+		m_nzeprocbatch.clear();
+	
+	}	
+			
+	/* ... */
 	void write(int ibatch) {
 		
 		m_stored_batchdim = m_current_batchdim;
@@ -316,12 +355,11 @@ public:
 		
 		// allocate data
 		
-		LOG.os<>("Writing data of tensor ", m_filename, " to files.\n");
+		LOG.os<>("Writing data of tensor ", m_filename, " to file.\n");
 		LOG.os<>("Batch ", ibatch, '\n');
 		
 		int nze = m_stensor->num_nze();
 		int nblocks = m_stensor->num_blocks();
-		T* data = new T[nze]();
 		
 		m_nblksprocbatch.resize(m_nbatches);
 		m_nzeprocbatch.resize(m_nbatches);
@@ -383,9 +421,6 @@ public:
 			
 			int ntot = std::accumulate(size.begin(),size.end(),1,std::multiplies<int>());
 			
-			bool found = false;
-			m_stensor->get_block(&data[offset], idx, size, found);
-			
 			blkoffbatch[iblk++] = offset;
 			
 			offset += ntot;
@@ -397,12 +432,10 @@ public:
 		// filenames
 		
 		std::string data_fname = m_filename + ".dat";
-		//std::string idx_fname = m_filename + ".info";
 		
 		LOG.os<>("Computing offsets...\n");
 	
 		// offsets
-		//MPI_Offset idx_batch_offset = 0;
 		MPI_Offset data_batch_offset = 0;
 		
 		//int64_t nblkprev = 0;
@@ -410,29 +443,22 @@ public:
 		
 		// global batch offset
 		for (int i = 0; i != ibatch; ++i) {
-			//nblkprev += std::accumulate(m_nblksprocbatch[i].begin(),
-			//	m_nblksprocbatch[i].end(),int64_t(0));
 				
 			ndataprev += std::accumulate(m_nzeprocbatch[i].begin(),
 				m_nzeprocbatch[i].end(),int64_t(0));
 			
 		}
 		
-		//LOG.os<>("Blocks in previous batch: ", nblkprev, '\n');
-		
 		// local processor dependent offset
 		for (int i = 0; i < m_mpirank; ++i) {
-			//nblkprev += m_nblksprocbatch[ibatch][i];
 			ndataprev += m_nzeprocbatch[ibatch][i];
 		}
 		
-		//idx_batch_offset = nblkprev * (N * sizeof(int) + sizeof(MPI_Offset));	
 		data_batch_offset = ndataprev;
 		
 		// add it to blkoffsets
 		for (auto& off : blkoffbatch) {
-			off = off + data_batch_offset;
-			
+			off += data_batch_offset;
 		}
 		
 		// concatenate indices and offsets
@@ -440,48 +466,20 @@ public:
 		
 		for (int i = 0; i != N; ++i) {
 			m_locblkidx[i].insert(m_locblkidx[i].end(),
-				std::make_move_iterator(blkidxbatch[i].begin()),
-				std::make_move_iterator(blkidxbatch[i].end()));
-			
+				blkidxbatch[i].begin(),blkidxbatch[i].end());
+			blkidxbatch[i].clear();
 		}
 		
 		m_locblkoff.insert(m_locblkoff.end(),
-			std::make_move_iterator(blkoffbatch.begin()),
-			std::make_move_iterator(blkoffbatch.end()));
-		
-		/*
-		LOG.os<>("Writing to .info file...\n");
-		LOG.os<>("Offset: ", idx_batch_offset, '\n', 
-			"Size: ", nblocks, '\n');
-		
-		// write to info file
-		MPI_File fh_idx;
-		
-		int rc = MPI_File_open(m_comm,idx_fname.c_str(),MPI_MODE_WRONLY,
-			MPI_INFO_NULL,&fh_idx);
-		
-		 first write inidices
-		
-		MPI_File_write_at(fh_idx,idx_batch_offset,idxdata,
-			N*nblocks,MPI_INT,MPI_STATUS_IGNORE);
-			
-		idx_batch_offset += N*nblocks*sizeof(int);		
-		
-		// then offsets
-			
-		MPI_File_write_at(fh_idx,idx_batch_offset,blk_offsets.data(),
-		nblocks,MPI_OFFSET,MPI_STATUS_IGNORE);
-			
-		MPI_File_close(&fh_idx);
-		
-		*/
-		
+			blkoffbatch.begin(),blkoffbatch.end());
+		blkoffbatch.clear();
+	
 		// write data to file 
 		
 		LOG.os<>("Writing tensor data...\n");
 		
-		//std::cout << "OFFSET: " << data_batch_offset << std::endl;
-		//std::cout << "NZE: " << nze << std::endl;
+		long long int datasize;
+		T* data = m_stensor->data(datasize);
 		
 		MPI_File fh_data;
 		
@@ -493,20 +491,18 @@ public:
 			
 		MPI_File_close(&fh_data);
 		
-		for (auto i : m_locblkidx) {
-			for (auto n : i) {
-				std::cout << n << " ";
+		std::cout << "LOC BLK IDX." << std::endl;
+		for (auto n : m_locblkidx) {
+			for (auto i : n) {
+				std::cout << i << " "; 
 			} std::cout << std::endl;
 		}
-		
-		// deallocate
-		
-		delete [] data;
 		
 		LOG.os<>("Done with batch ", ibatch, '\n');
 		
 	}
 	
+	/* ... */
 	void read(int ibatch) {
 		
 		LOG.os<>("Reading batch ", ibatch, '\n');
@@ -549,13 +545,8 @@ public:
 			// === Reading from file ===
 			//// Allocating
 			
-			T* data = new T[nze];
-			
 			//// Offset
 			MPI_Offset data_batch_offset = m_locblkoff[blkoff];
-			//std::cout << "AINT: " << m_locblkoff[blkoff] << std::endl;
-			//std::cout << "BLKOFFSET: " << blkoff << std::endl;
-			//std::cout << "OFFSET: " << data_batch_offset << std::endl;
 			
 			//// Opening File
 			std::string fname = m_filename + ".dat";
@@ -566,41 +557,13 @@ public:
 				MPI_INFO_NULL,&fh_data);
 		
 			//// Reading
+			long long int datasize;
+			T* data = m_stensor->data(datasize);
+			
 			MPI_File_read_at(fh_data,data_batch_offset*sizeof(T),data,
 				nze,MPI_DOUBLE,MPI_STATUS_IGNORE);
 			
 			MPI_File_close(&fh_data);
-			
-			// === Putting into tensor ===
-			int offset = 0;
-			
-			dbcsr::iterator_t<N,T> iter(*m_stensor);
-		
-			iter.start();
-			
-			while (iter.blocks_left()) {
-				
-				iter.next();
-				
-				auto& size = iter.size();
-				auto& idx = iter.idx();
-				
-				int ntot = std::accumulate(size.begin(),size.end(),1,std::multiplies<int>());
-				
-				bool found = false;
-				m_stensor->put_block(idx,&data[offset],size);
-				
-				offset += ntot;
-				
-			}
-			
-			iter.stop();
-
-			for (int i = 0; i != nze; ++i) {
-				std::cout << data[i] << "\n";
-			} std::cout << std::endl;
-
-			delete [] data;
 		
 		// needs special offsets
 		} else {
@@ -628,8 +591,6 @@ public:
 				res[i].reserve(m_maxblk_per_node);
 			}
 			blkoff.reserve(m_maxblk_per_node);
-			
-			std::cout << "BLOCKS: " << m_nblkloc << " " << m_nblktot << std::endl;
 			
 			switch (ndimsize) {
 				case 1 :
@@ -668,7 +629,7 @@ public:
 							for (int j = 0; j != N; ++j) {
 								res[j].push_back(m_locblkidx[j][i]);
 							}
-							blkoff.push_back(m_locblkoff[i]);
+							blkoff.push_back(m_locblkoff[i]*sizeof(T));
 						}
 					}
 					break;
@@ -699,6 +660,11 @@ public:
 			
 			LOG.os<>("Creating MPI TYPE.\n");
 			
+			std::cout << "BLOCK SIZES + OFF: " << std::endl;
+			for (int i = 0; i != nblk; ++i) {
+				std::cout << blksizes[i] << " " << blkoff[i] << std::endl;
+			}
+			
 			MPI_Datatype MPI_HINDEXED;
 			
 			MPI_Type_create_hindexed(nblk,blksizes.data(),blkoff.data(),MPI_DOUBLE,&MPI_HINDEXED);
@@ -713,7 +679,8 @@ public:
 			
 			MPI_File_set_view(fh_data, 0, MPI_DOUBLE, MPI_HINDEXED, "native", MPI_INFO_NULL);
 			
-			T* data = new T[nze];
+			long long int datasize;
+			T* data = m_stensor->data(datasize);
 			
 			LOG.os<>("Reading from file...\n");
 			
@@ -723,17 +690,14 @@ public:
 			
 			LOG.os<>("Done!!\n");
 			
-			for (int i = 0; i != nze; ++i) {
-				std::cout << data[i] << " ";
-			} std::cout << std::endl;
-			
-			exit(0);
-			
 		} // end if
 	}
 		
 		
 	int nbatches() { return m_nbatches; }
+	
+	/* returns bounds for batch ibatch and tensor dimension idim
+	 * for use in dbcsr_copy, dbcsr_contract etc. ... */
 	vec<int> bounds(int ibatch, int idim) { 
 		
 		vec<int> bblk = this->bounds_blk(ibatch,idim);
@@ -746,6 +710,7 @@ public:
 			
 	}
 	
+	/* returns the BLOCK bounds */
 	vec<int> bounds_blk(int ibatch, int idim) { 
 		
 		vec<int> out(2);
@@ -766,10 +731,7 @@ public:
 			
 	}
 	
-			
-		
-	
-}; //end class disktensor
+}; //end class batchtensor
 	
 } //end namespace
 

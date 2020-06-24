@@ -21,7 +21,7 @@ target_include_directories(
 target_link_libraries(
 	chem_ints
 	chem_desc
-	chem_tensor
+	chem_dbcsrx
 	#chem_math_linalg
 	OpenMP::OpenMP_CXX
 	Libint2::cxx

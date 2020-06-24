@@ -30,7 +30,7 @@ include_directories(
 	${LIBINT2_INCLUDE_DIRS} ${CMAKE_CURRENT_BINARY_DIR} ${CMAKE_CURRENT_SOURCE_DIR}
 )
 
-add_subdirectory(tensor)
+add_subdirectory(dbcsrx)
 add_subdirectory(math)
 add_subdirectory(desc)
 add_subdirectory(input)
@@ -49,7 +49,7 @@ add_executable(
 target_link_libraries(
 	chem
 	PUBLIC
-	chem_tensor
+	chem_dbcsrx
 	chem_input
 	#	chem_math_laplace
 	MPI::MPI_CXX	

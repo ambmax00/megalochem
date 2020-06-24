@@ -501,6 +501,17 @@ public:
 		return p;
 	}
 	
+	T* data(long long int& data_size) {
+		
+		T* data_ptr;
+		T data_type = T();
+		
+		c_dbcsr_t_get_data_p(m_tensor_ptr, &data_ptr, &data_size, data_type, nullptr, nullptr);
+		
+		return data_ptr;
+		
+	}
+	
 	void clear() {
 		c_dbcsr_t_clear(m_tensor_ptr);
 	}
