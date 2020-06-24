@@ -232,8 +232,8 @@ public:
 				std::optional<int> method = std::nullopt, 
                 std::optional<bool> use_absolute = std::nullopt, 
                 std::optional<bool> filter_diag = std::nullopt) {
-        c_dbcsr_filter(m_matrix_ptr, (eps) ? &*eps : &filter_eps, (method) ? &*method : nullptr, 
-                        (use_absolute) ? &*use_absolute : &filter_use_absolute, 
+        c_dbcsr_filter(m_matrix_ptr, (eps) ? &*eps : &global::filter_eps, (method) ? &*method : nullptr, 
+                        (use_absolute) ? &*use_absolute : &global::filter_use_absolute, 
                         (filter_diag) ? &*filter_diag : nullptr);
     }
 

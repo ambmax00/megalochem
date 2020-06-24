@@ -10,6 +10,10 @@
 
 namespace tensor {
 
+struct global {
+	inline static double default_batchsize = -1.0;
+};
+
 template <int N, typename T>
 class batchtensor {
 private:
@@ -24,6 +28,10 @@ private:
 	
 	std::string m_filename;
 	// root name for files
+	
+	bool m_onebatch;
+	/* if everything can be held in core memory
+	 * if true, we do not write or read files. */
 	
 	/* ========== static tensor variables ========== */
 	
@@ -87,7 +95,7 @@ public:
 		m_filename(stensor_in->name()),
 		m_mpirank(-1), m_mpisize(-1),
 		LOG(stensor_in->comm(),print),
-		m_nblktot(0), m_nzetot(0)
+		m_nblktot(0), m_nzetot(0), m_onebatch(false)
 	{
 		
 		MPI_Comm_rank(m_comm, &m_mpirank);
@@ -109,6 +117,11 @@ public:
 	
 	/* sets up the preliminary batching information. */
 	void setup_batch() {
+		
+		if (m_batch_size < 0) {
+			LOG.os<>("-- Tensor is held in core memory. No I/O.");
+			m_onebatch = true;
+		}
 		
 		// determine how many blocks per batch are allowed
 		// this makes the following assumptions:
@@ -142,12 +155,22 @@ public:
 		
 		LOG.os<>("-- Holding ", m_maxnblk_tot, " at most on all nodes.\n");
 		
+		if (m_maxnblk_tot > m_nblktot) {
+			LOG.os<>("-- Tensor is held in core memory. No I/O.");
+			m_onebatch = true;
+		}
+		
 	}
 	
 	/* function to set up the batches along the dimension(s) specified in ndim 
 	 * Only supports two dimensions at the moment */
 	 
 	void set_batch_dim(std::vector<int> ndim) {
+		
+		if (m_onebatch) {
+			m_nbatches = 1;
+			return;
+		}
 		
 		LOG.os<>("Setting up batching information.\n");
 		
@@ -197,7 +220,7 @@ public:
 		
 		max_idx_super -= 1;
 		
-		LOG.os<>("Maximum super iindex: ", max_idx_super, '\n');
+		LOG.os<>("Maximum super index: ", max_idx_super, '\n');
 		
 		m_boundsblk.resize(m_nbatches);
 		
@@ -283,6 +306,8 @@ public:
 	 * !!! Deletes previous files and resets all variables !!! */
 	void create_file() {
 		
+		if (m_onebatch) return;
+		
 		delete_file();
 		
 		MPI_File fh;
@@ -304,6 +329,8 @@ public:
 	/* Deletes all files asscoiated with tensor. 
 	 * !!! Resets variables !!! */
 	void delete_file() {
+		
+		if (m_onebatch) return;
 		
 		std::string data_fname = m_filename + ".dat";
 		//std::string idx_fname = m_filename + ".info";
@@ -341,6 +368,8 @@ public:
 			
 	/* ... */
 	void write(int ibatch) {
+		
+		if (m_onebatch) return;
 		
 		m_stored_batchdim = m_current_batchdim;
 				
@@ -504,6 +533,8 @@ public:
 	
 	/* ... */
 	void read(int ibatch) {
+		
+		if (m_onebatch) return;
 		
 		LOG.os<>("Reading batch ", ibatch, '\n');
 		
@@ -693,6 +724,7 @@ public:
 		} // end if
 	}
 		
+	dbcsr::stensor<N,T> get_stensor() { return m_stensor; }
 		
 	int nbatches() { return m_nbatches; }
 	
@@ -714,6 +746,12 @@ public:
 	vec<int> bounds_blk(int ibatch, int idim) { 
 		
 		vec<int> out(2);
+		
+		if (m_onebatch) {
+			out[0] = 0;
+			out[1] = m_blkstot[idim] - 1;
+			return out;
+		}
 		
 		auto iter = std::find(m_current_batchdim.begin(),
 			m_current_batchdim.end(),idim);

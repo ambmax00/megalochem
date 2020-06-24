@@ -117,7 +117,7 @@ public:
             c_map2->data(), c_map2->size(), 
             f_b1, f_b2, f_b3,
             nullptr, nullptr, nullptr, nullptr, 
-            (c_filter) ? &*c_filter : &filter_eps,
+            (c_filter) ? &*c_filter : &global::filter_eps,
             (c_flop) ? &*c_flop : nullptr,
             (c_move) ? &*c_move : nullptr,
             (c_retain_sparsity) ? &*c_retain_sparsity : nullptr,

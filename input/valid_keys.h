@@ -7,6 +7,10 @@ using json = nlohmann::json;
 static const json valid_keys = 
 {
 	{"name", "string"},
+	{"global", {
+		{"batchsize", 1000}, // batch size for tensors, in megabytes
+		{"block_threshold", 1e-9} // block threshold for dbcsr
+	}},
 	{"molecule", {
 		{"file", "string"}, 
 		{"name", "string"}, // filename.xyz

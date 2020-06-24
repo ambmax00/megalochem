@@ -550,8 +550,8 @@ public:
         std::optional<int> method = std::nullopt, 
         std::optional<bool> use_absolute = std::nullopt) {
         
-		c_dbcsr_t_filter(m_tensor_ptr, (ieps) ? *ieps : filter_eps,
-            (method) ? &*method : nullptr, (use_absolute) ? &*use_absolute : &filter_use_absolute);
+		c_dbcsr_t_filter(m_tensor_ptr, (ieps) ? *ieps : global::filter_eps,
+            (method) ? &*method : nullptr, (use_absolute) ? &*use_absolute : &global::filter_use_absolute);
 		
 	}
 	

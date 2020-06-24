@@ -17,7 +17,7 @@ protected:
 	std::shared_ptr<aofactory> p_fac;
 	std::string m_method;
 	
-	double m_blk_threshold = dbcsr::filter_eps;
+	double m_blk_threshold = dbcsr::global::filter_eps;
 	double m_int_threshold = aofactory::precision;
 	
 public:

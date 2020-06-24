@@ -52,7 +52,7 @@ public:
                         (c_first_k) ? &*c_first_k : nullptr,
                         (c_last_k) ? &*c_last_k : nullptr,
                         (c_retain_sparsity) ? &*c_retain_sparsity : nullptr,
-                        (c_filter_eps) ? &*c_filter_eps : &dbcsr::filter_eps, 
+                        (c_filter_eps) ? &*c_filter_eps : &global::filter_eps, 
                         (c_flop) ? &*c_flop : nullptr);
     }
 

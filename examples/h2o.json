@@ -1,5 +1,9 @@
 {
 	"name": "test",
+	"global": 
+	{
+		"block_threshold": 1e-9
+	},
 	"molecule": 
 	{	
 		"name": "H2O",
