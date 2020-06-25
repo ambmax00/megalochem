@@ -197,9 +197,13 @@ scalapack::distmat<T> matrix_to_scalapack(matrix<T>& mat_in, std::string nameint
 
 template <typename T = double>
 matrix<T> scalapack_to_matrix(scalapack::distmat<T>& sca_mat_in, std::string nameint, 
-								world& world_in, vec<int>& rowblksizes, vec<int>& colblksizes) 
+								world& world_in, vec<int>& rowblksizes, vec<int>& colblksizes, 
+								std::string type = "") 
 {
 	// form block-cyclic distribution
+	
+	bool sym = (type == "symmetric") ? true : false;
+	bool lowtriang = (type == "lowtriang") ? true : false;
 	
 	int nfullrow = std::accumulate(rowblksizes.begin(),rowblksizes.end(),0,std::plus<int>());
 	int nfullcol = std::accumulate(colblksizes.begin(),colblksizes.end(),0,std::plus<int>());
@@ -213,11 +217,17 @@ matrix<T> scalapack_to_matrix(scalapack::distmat<T>& sca_mat_in, std::string nam
 	
 	dist cycdist = dist::create().set_world(world_in).row_dist(rowdist).col_dist(coldist);
 	
+	char symtype = (sym) ? dbcsr_type_symmetric : dbcsr_type_no_symmetry;
+	
 	matrix<T> mat_cyclic = typename matrix<T>::create().name(nameint + "cyclic")
 		.set_dist(cycdist).row_blk_sizes(rowcycsizes).col_blk_sizes(colcycsizes)
 		.type(dbcsr_type_no_symmetry);
 	
-	mat_cyclic.reserve_all();
+	if (sym) {
+		mat_cyclic.reserve_sym();
+	} else {
+		mat_cyclic.reserve_all();
+	}
 
 #pragma omp parallel
 {
@@ -228,14 +238,31 @@ matrix<T> scalapack_to_matrix(scalapack::distmat<T>& sca_mat_in, std::string nam
 		
 		iter.next_block();
 		
+		int row = iter.row();
+		int col = iter.col();
+		
 		int ioff = iter.row_offset();
 		int joff = iter.col_offset();
 		
-		for (int j = 0; j != iter.col_size(); ++j) {
+		if (lowtriang && col > row) continue;
+			
+		if (lowtriang && row == col) {
+			
 			for (int i = 0; i != iter.row_size(); ++i) {
-				// use global indices for scamat
-				iter(i,j) = sca_mat_in.global_access(i + ioff, j + joff);
+				for (int j = 0; j != i+1; ++j) {
+					iter(i,j) = sca_mat_in.global_access(i+ioff,j+joff);
+				}
+			}	
+			
+		} else {
+		
+			for (int j = 0; j != iter.col_size(); ++j) {
+				for (int i = 0; i != iter.row_size(); ++i) {
+					// use global indices for scamat
+					iter(i,j) = sca_mat_in.global_access(i + ioff, j + joff);
+				}
 			}
+			
 		}
 		
 	}

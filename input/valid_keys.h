@@ -36,6 +36,7 @@ static const json valid_keys =
 		{"diis_beta", true}, // whether to use separate coeficients for beta
 		{"build_J", "exact"},
 		{"build_K", "exact"},
+		{"direct", true},
 		{"print", 0}, // print level (0, 1 or 2 at the moment, -1 for silent output)
 		{"skip", false}, // skip hartree fock and read from files
 		{"max_iter", 10},

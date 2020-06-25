@@ -2,7 +2,9 @@ set (sources
 	orthogonalizer.h
 	orthogonalizer.cpp
 	piv_cd.h
-	piv_cd.cpp	
+	piv_cd.cpp
+	LLT.h
+	LLT.cpp	
 )
 
 add_library(chem_math_linalg ${sources})

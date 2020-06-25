@@ -332,6 +332,28 @@ public:
         c_dbcsr_reserve_all_blocks(m_matrix_ptr);
     }
     
+    void reserve_sym() {
+		
+		int nrowblk = this->nblkrows_total();
+		int ncolblk = this->nblkcols_total();
+		
+		if (nrowblk != ncolblk) throw std::runtime_error("Cannot allocate matrix blocks in a symmatric fashion.");
+		
+		vec<int> resrows, rescols;
+		
+		for (int j = 0; j != ncolblk; ++j) {
+			for (int i = 0; i <= j; ++i) {
+				if (this->m_world.rank()) {
+					resrows.push_back(i);
+					rescols.push_back(j);
+				}
+			}
+		}
+		
+		this->reserve_blocks(resrows,rescols);
+		
+	}
+    
     // reserve block 2d
     
     void put_block(const int row, const int col, block<2,T>& blk, std::optional<bool> sum = std::nullopt,

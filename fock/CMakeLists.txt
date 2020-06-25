@@ -11,6 +11,7 @@ target_link_libraries(
 	chem_fock
 	chem_desc
 	chem_ints
+	chem_math_linalg
 	chem_math_solvers
 	chem_dbcsrx
 )

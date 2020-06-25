@@ -38,6 +38,9 @@ extern "C" {
 		double* a, int* ia, int* ja, int* desca, double* b, int* ib, int* jb, 
 		int* descb, double* beta, double* c, int* ic, int* jc, int* desc);
 	
+	void pdtrmm_(char* side, char* uplo, char* transa, char* diag, int* m, int* n, double* alpha,
+		double* a, int* ia, int* ja, int* desca, double* b, int* ib, int* jb, int* descb);
+	
 	void pdsyev_(char* jobz, char* uplo, int* n, double* a, int* ia, int* ja,
 		int* desca, double* w, double* z, int* iz, int* jz, int* descz, 
 		double* work, int* lwork, int* info);
@@ -45,6 +48,10 @@ extern "C" {
 	void pdlapiv_(char* direc, char* rowcol, char* pivroc, int* m, int* n, 
 		double* a, int* ia, int* ja, int* desca, int* ipiv, int* ip, int* jp,
 		int* descip, int* iwork);
+		
+	void pdpotrf_(char* uplo, int* n, double* a, int* ia, int* ja, int* desca, int* info);
+	
+	void pdtrtri_(char* uplo, char* diag, int* n, double* a, int* ia, int* ja, int* desca, int* info);
 		
 	void Cigebs2d(int ConTxt, char *scope, char *top, int m, int n, int *A, int lda);
 	void Cigebr2d(int ConTxt, char *scope, char *top, int m, int n, int *A,
@@ -164,6 +171,23 @@ inline void c_pdlapiv(char direc, char rowcol, char pivroc, int m, int n,
 		descip, iwork);
 };
 
+inline void c_pdpotrf(char uplo, int n, double* a, int ia, int ja, 
+	int* desca, int* info)
+{
+	int f_ia = ia + 1;
+	int f_ja = ja + 1;
+	pdpotrf_(&uplo, &n, a, &f_ia, &f_ja, desca, info);
+}
+
+inline void c_pdtrtri(char uplo, char diag, int n, double* a, int ia, int ja, int* desca, int* info)
+{
+	int f_ia = ia + 1;
+	int f_ja = ja + 1;
+
+	pdtrtri_(&uplo, &diag, &n, a, &f_ia, &f_ja, desca, info);
+}
+
+// sub( C ) := beta*sub( C ) + alpha*op( sub( A ) )
 inline void c_pdgeadd(char trans, int m, int n, double alpha, double* a, int ia, int ja,
 		int* desca, double beta, double* c, int ic, int jc, int* desc)
 {
@@ -174,6 +198,7 @@ inline void c_pdgeadd(char trans, int m, int n, double alpha, double* a, int ia,
 	pdgeadd_(&trans,&m,&n,&alpha,a,&f_ia,&f_ja,desca,&beta,c,&f_ic,&f_jc,desc);
 }
 
+// sub(C) := alpha*op(sub(A))*op(sub(B)) + beta*sub(C)
 inline void c_pdgemm(char transa, char transb, int m, int n, int k, double alpha,
 		double* a, int ia, int ja, int* desca, double* b, int ib, int jb, 
 		int* descb, double beta, double* c, int ic, int jc, int* desc)
@@ -190,7 +215,26 @@ inline void c_pdgemm(char transa, char transb, int m, int n, int k, double alpha
 
 };
 
+// sub(B) = alpha * op(sub(A)) * B + B
+// sub(B) = alpha * B * op(sub(A)) + B 
+inline void c_pdtrmm(char side, char uplo, char transa, char diag, int m, int n, double alpha,
+		double* a, int ia, int ja, int* desca, double* b, int ib, int jb, int* descb)
+{
+	
+	int f_ia = ia + 1;
+	int f_ja = ja + 1;
+	int f_ib = ib + 1;
+	int f_jb = jb + 1;
+		
+	pdtrmm_(&side, &uplo, &transa, &diag, &m, &n, &alpha, a, &f_ia, &f_ja, 
+		desca, b, &f_ib, &f_jb, descb);
+}
+
 namespace scalapack {
+	
+struct global {
+	inline static int block_size = 5;
+};
 	
 class grid {
 private: 
@@ -408,6 +452,9 @@ public:
 	
 	int rowblk_size() { return m_rowblk_size; }
 	int colblk_size() { return m_colblk_size; }
+	
+	int rsrc() { return m_rsrc; }
+	int csrc() { return m_csrc; }
 	
 };
 

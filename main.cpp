@@ -16,6 +16,7 @@
 //#endif
 
 #include "ints/aofactory.h"
+#include "math/linalg/LLT.h"
 //#include "math/solvers/hermitian_eigen_solver.h"
 
 
@@ -139,8 +140,31 @@ int main(int argc, char** argv) {
 	
 	desc::shf_wfn myhfwfn = std::make_shared<desc::hf_wfn>();
 	hf::hfmod myhf(mol,hfopt,wrd);
-
-
+/*
+	ints::aofactory aofac(mol,wrd);
+	auto xx = aofac.ao_3coverlap();
+	
+	math::LLT chol(xx,0);
+	
+	chol.compute();
+	
+	auto x = mol->dims().x();
+	auto L = chol.L(x);
+	
+	dbcsr::print(*L);
+	
+	auto invsqrt = chol.L_inv(x);
+	
+	dbcsr::print(*invsqrt);
+	
+	dbcsr::mat_d unity = dbcsr::mat_d::create_template(*invsqrt).name("HEY").type(dbcsr_type_no_symmetry);
+	
+	dbcsr::multiply('N', 'N', *L,*invsqrt,unity).perform();
+	
+	dbcsr::print(unity);
+	
+	exit(0);
+*/
 /*
 	
 	ints::aofactory aofac(mol,wrd);

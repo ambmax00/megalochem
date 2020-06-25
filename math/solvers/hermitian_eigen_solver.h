@@ -43,7 +43,7 @@ public:
 		LOG(m_world.comm(), (print) ? 0 : -1),
 		m_jobz(jobz) {}
 
-	void compute(int scalapack_blksize = 10);
+	void compute();
 	
 	vec<double>& eigvals() {
 		return m_eigval;

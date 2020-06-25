@@ -92,7 +92,7 @@ void pivinc_cd::reorder_and_reduce(scalapack::distmat<double>& L) {
 	
 }
 
-void pivinc_cd::compute(int nb) {
+void pivinc_cd::compute() {
 	
 	// convert input mat to scalapack format
 	
@@ -106,6 +106,7 @@ void pivinc_cd::compute(int nb) {
 	char scopeR = 'R';
 	char scopeC = 'C';
 	char top = ' ';
+	int nb = scalapack::global::block_size;
 	
 	auto& _grid = scalapack::global_grid;
 	

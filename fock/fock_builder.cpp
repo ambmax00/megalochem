@@ -1,6 +1,6 @@
 #include "fock/fockmod.h"
 #include "ints/screening.h"
-#include "math/solvers/hermitian_eigen_solver.h"
+#include "math/linalg/LLT.h"
 #include "fock/fock_defaults.h"
 
 namespace fock {
@@ -30,11 +30,13 @@ void fockmod::init() {
 	
 	std::string j_method = m_opt.get<std::string>("build_J", FOCK_BUILD_J);
 	std::string k_method = m_opt.get<std::string>("build_K", FOCK_BUILD_K);
+	bool direct = m_opt.get<bool>("direct", FOCK_DIRECT);
 	
 	bool compute_eris = false;
 	bool compute_3c2e = false;
 	bool compute_s_xx = false;
 	bool compute_s_xx_inv = false;
+	bool compute_s_xx_invsqrt = false;
 	
 	// set J
 	if (j_method == "exact") {
@@ -49,7 +51,7 @@ void fockmod::init() {
 		J* builder = new DF_J(m_world, m_opt);
 		m_J_builder.reset(builder);
 		
-		compute_3c2e = true;
+		if (!direct) compute_3c2e = true;
 		compute_s_xx = true;
 		compute_s_xx_inv = true;
 		
@@ -68,9 +70,9 @@ void fockmod::init() {
 		K* builder = new DF_K(m_world,m_opt);
 		m_K_builder.reset(builder);
 		
-		compute_3c2e = true;
+		if (!direct) compute_3c2e = true;
 		compute_s_xx = true;
-		compute_s_xx_inv = true;
+		compute_s_xx_invsqrt = true;
 		
 	}
 	
@@ -140,31 +142,55 @@ void fockmod::init() {
 		
 	}
 	
-	if (compute_s_xx_inv) {
+	if (compute_s_xx_inv || compute_s_xx_invsqrt) {
 		
 		auto& t_inv = TIME.sub("Inverting metric");
 		
 		t_inv.start();
 		
 		auto s_xx = reg.get_matrix<double>(m_mol->name() + "_s_xx");
-		math::hermitian_eigen_solver solver(s_xx, 'V');
 		
-		solver.compute();
+		math::LLT chol(s_xx, LOG.global_plev());
+		chol.compute();
 		
-		auto inv = solver.inverse();
-		
-		std::string name = m_mol->name() + "_s_xx_inv_(0|1)";
+		auto x = m_mol->dims().x();
+		auto Linv = chol.L_inv(x);
 		
 		dbcsr::pgrid<2> grid2(m_world.comm());
 		arrvec<int,2> xx = {m_mol->dims().x(), m_mol->dims().x()};
 		
-		dbcsr::stensor2_d out = dbcsr::make_stensor<2>(
-			dbcsr::tensor2_d::create().name(name).ngrid(grid2)
-			.map1({0}).map2({1}).blk_sizes(xx));
+		if (compute_s_xx_inv) {
+			dbcsr::mat_d s = dbcsr::mat_d::create_template(*Linv)
+				.name("mat").type(dbcsr_type_symmetric);
+			auto s_xx_inv = s.get_smatrix();
 			
-		dbcsr::copy_matrix_to_tensor(*inv,*out);
+			dbcsr::multiply('T', 'N', *Linv, *Linv, *s_xx_inv).perform();
+			
+			std::string name = m_mol->name() + "_s_xx_inv_(0|1)";
+			
+			dbcsr::stensor2_d s_xx_inv_01 = dbcsr::make_stensor<2>(
+				dbcsr::tensor2_d::create().name(name).ngrid(grid2)
+				.map1({0}).map2({1}).blk_sizes(xx));
+				
+			dbcsr::copy_matrix_to_tensor(*s_xx_inv, *s_xx_inv_01); 
+			
+			reg.insert_tensor<2,double>(name, s_xx_inv_01);
+			
+		}
 		
-		reg.insert_tensor<2,double>(name, out);
+		if (compute_s_xx_invsqrt) {
+
+			std::string name = m_mol->name() + "_s_xx_invsqrt_(0|1)";
+			
+			dbcsr::stensor2_d s_xx_invsqrt_01 = dbcsr::make_stensor<2>(
+				dbcsr::tensor2_d::create().name(name).ngrid(grid2)
+				.map1({0}).map2({1}).blk_sizes(xx));
+			
+			dbcsr::copy_matrix_to_tensor(*Linv, *s_xx_invsqrt_01);
+			
+			reg.insert_tensor<2,double>(name, s_xx_invsqrt_01);
+			
+		}
 		
 		t_inv.finish();
 		

@@ -12,23 +12,29 @@
 		],
 		"symbols": ["H", "H"],
 		"basis": "cc-pvdz",
-		"dfbasis": "cc-pvdz-ri"
-	},
-	"hf": 
-	{
-		"diis": true,
-		"guess": "core",
-		"use_df": true,
-		"print": 999,
-		"scf_thresh": 1e-6,
-		"skip": false
-	},
-	"adc":
-	{
-		"nroots": 1,
-		"order": 2,
-		"use_sos": true,
-		"print": 10,
-		"diag_order": 1 
-	}
+	       	"ao_split_method": "shell",
+                "reorder": false
+        },
+        "hf":
+        {
+                "diis": true,
+                "guess": "SAD",
+                "scf_thresh": 1e-6,
+                "diis_start": 0,
+                "build_J": "df",
+                "build_K": "df",
+                "print": 9999,
+                "SAD_diis": true,
+                "dfbasis": "cc-pvdz-ri",
+                "skip": false
+        },
+        "mp":
+        {
+                "dfbasis": "cc-pvdz-ri",
+                "print": 2
+        },
+        "adc":
+        {
+                "nroots": 1
+        }
 }

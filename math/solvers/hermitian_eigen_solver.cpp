@@ -14,12 +14,12 @@ namespace math {
 	
 //#ifdef USE_SCALAPACK
 
-void hermitian_eigen_solver::compute(int scalapack_blksize) {
+void hermitian_eigen_solver::compute() {
 	
 	int lwork;
 	
 	int n = m_mat_in->nfullrows_total();
-	int nb = scalapack_blksize;
+	int nb = scalapack::global::block_size;
 	int nprow = m_world.dims()[0];
 	int npcol = m_world.dims()[1];
 	

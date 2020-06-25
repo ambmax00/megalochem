@@ -28,7 +28,7 @@
 		"diis_start": 0, 
 		"build_J": "df",
 		"build_K": "df",
-		"print": 9999,
+		"print": 0,
 		"SAD_diis": true, 
 		"dfbasis": "cc-pvdz-ri", 
 		"skip": false
