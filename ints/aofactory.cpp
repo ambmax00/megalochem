@@ -18,10 +18,13 @@ protected:
 	desc::smolecule m_mol;
 	dbcsr::world m_world;
 	
+	const desc::cluster_basis m_cbas;
+	std::optional<const desc::cluster_basis> m_xbas;
+	
 	libint2::Operator m_Op = libint2::Operator::invalid;
 	libint2::BraKet m_BraKet = libint2::BraKet::invalid;
 	
-	vec<desc::cluster_basis> m_basvec;
+	vec<const desc::cluster_basis*> m_basvec;
 	util::ShrPool<libint2::Engine> m_eng_pool;
 	
 	std::string m_intname = "";
@@ -31,7 +34,13 @@ public:
 	registry m_reg;
 	
 	impl(desc::smolecule mol, dbcsr::world w) :
-		m_mol(mol), m_world(w) { init(); }
+		m_mol(mol), 
+		m_world(w),
+		m_cbas(m_mol->c_basis()),
+		m_xbas((m_mol->c_dfbasis()) ? 
+			std::make_optional<const desc::cluster_basis>(*m_mol->c_dfbasis()) :
+			std::nullopt)
+		{ init(); }
 	
 	void init() {
 		libint2::initialize();
@@ -59,19 +68,16 @@ public:
 	
 	void set_braket(std::string dim) {
 		
-		auto cbas = m_mol->c_basis();
-		auto xbas = m_mol->c_dfbasis();
-		
 		if (dim == "bb") { 
-			m_basvec = {cbas,cbas};
+			m_basvec = {&m_cbas,&m_cbas};
 		} else if (dim == "xx") {
-			m_basvec = {*xbas, *xbas};
+			m_basvec = {&*m_xbas, &*m_xbas};
 			m_BraKet = libint2::BraKet::xs_xs;
 		} else if (dim == "xbb") {
-			m_basvec = {*xbas, cbas, cbas};
+			m_basvec = {&*m_xbas, &m_cbas, &m_cbas};
 			m_BraKet = libint2::BraKet::xs_xx;
 		} else if (dim == "bbbb") {
-			m_basvec = {cbas, cbas, cbas, cbas};
+			m_basvec = {&m_cbas, &m_cbas, &m_cbas, &m_cbas};
 			m_BraKet = libint2::BraKet::xx_xx;
 		} else {
 			throw std::runtime_error("Unsupported basis set specifications: "+ dim);
@@ -89,8 +95,8 @@ public:
 		int max_l = 0;
 		
 		for (int i = 0; i != m_basvec.size(); ++i) {
-			max_nprim = std::max(m_basvec[i].max_nprim(), max_nprim);
-			max_l = std::max(m_basvec[i].max_l(), max_l);
+			max_nprim = std::max(m_basvec[i]->max_nprim(), max_nprim);
+			max_l = std::max(m_basvec[i]->max_l(), max_l);
 		}
 		
 		libint2::Engine eng(m_Op, max_nprim, max_l, 0, std::numeric_limits<double>::epsilon());
@@ -118,7 +124,7 @@ public:
 		dbcsr::pgrid<N> grid(m_world.comm()); 
 		arrvec<int,N> blksizes; 
 		for (int i = 0; i != N; ++i) { 
-			blksizes[i] = m_basvec[i].cluster_sizes(); 
+			blksizes[i] = m_basvec[i]->cluster_sizes(); 
 		} 
 			
 		dbcsr::stensor<N,T> t_out = dbcsr::make_stensor<N,T>(
@@ -131,8 +137,8 @@ public:
 	
 	dbcsr::smatrix<double> compute() {
 		
-		auto rowsizes = m_basvec[0].cluster_sizes();
-		auto colsizes = m_basvec[1].cluster_sizes();
+		auto rowsizes = m_basvec[0]->cluster_sizes();
+		auto colsizes = m_basvec[1]->cluster_sizes();
 		
 		dbcsr::mat_d m_ints = dbcsr::mat_d::create()
 			.name(m_intname)
@@ -219,7 +225,7 @@ public:
 		dbcsr::pgrid<2> grid(m_world.comm()); 
 		arrvec<int,2> blksizes;
 		for (int i = 0; i != 2; ++i) { 
-			blksizes[i] = m_basvec[i].cluster_sizes(); 
+			blksizes[i] = m_basvec[i]->cluster_sizes(); 
 		} 
 		dbcsr::tensor<2> t_ints = dbcsr::tensor<2>::create().name(m_intname) 
 			.ngrid(grid).map1(map1).map2(map2).blk_sizes(blksizes); 
@@ -234,7 +240,7 @@ public:
 		dbcsr::pgrid<3> grid(m_world.comm()); 
 		arrvec<int,3> blksizes; 
 		for (int i = 0; i != 3; ++i) { 
-			blksizes[i] = m_basvec[i].cluster_sizes(); 
+			blksizes[i] = m_basvec[i]->cluster_sizes(); 
 		} 
 		
 		dbcsr::tensor<3> t_ints = dbcsr::tensor<3>::create().name(m_intname) 
@@ -361,7 +367,7 @@ public:
 		dbcsr::pgrid<4> grid(m_world.comm()); 
 		arrvec<int,4> blksizes; 
 		for (int i = 0; i != 4; ++i) { 
-			blksizes[i] = m_basvec[i].cluster_sizes(); 
+			blksizes[i] = m_basvec[i]->cluster_sizes(); 
 		} 
 		
 		dbcsr::tensor<4> t_ints = dbcsr::tensor<4>::create().name(m_intname) 
@@ -470,13 +476,17 @@ dbcsr::stensor<3,double> aofactory::ao_3c2e(vec<int> map1, vec<int> map2, screen
 	return pimpl->compute_3(map1,map2,scr);
 }
 
-dbcsr::stensor<3,double> aofactory::ao_3c2e_setup(vec<int> map1, vec<int> map2) {
-	auto name = m_mol->name() + "_i_xbb_" + pimpl->m_reg.map_to_string(map1,map2);
-	pimpl->set_name(name);
+void aofactory::ao_3c2e_setup() {
+	
 	pimpl->set_braket("xbb");
 	pimpl->set_operator("coulomb");
 	pimpl->setup_calc();
 	
+}
+
+dbcsr::stensor<3,double> aofactory::ao_3c2e_setup_tensor(vec<int> map1, vec<int> map2) {
+	auto name = m_mol->name() + "_i_xbb_" + pimpl->m_reg.map_to_string(map1,map2);
+	pimpl->set_name(name);
 	return pimpl->setup_tensor<3>(map1,map2);
 	
 }

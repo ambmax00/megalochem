@@ -155,6 +155,24 @@ public:
 	
 };
 
+/*
+class BATCHED_DF_J : public J {
+private:
+	
+	dbcsr::stensor3_d m_J_bbd;
+	dbcsr::stensor3_d m_ptot_bbd;
+	dbcsr::stensor2_d m_gp_xd;
+	dbcsr::stensor2_d m_gq_xd;
+	dbcsr::stensor2_d m_inv;
+
+public:
+
+	BATCHED_DF_J(dbcsr::world& w, desc::options& opt);
+	void compute_J() override;
+	void init_tensors() override;
+	
+};*/
+
 } // end namespace
 
 #endif 

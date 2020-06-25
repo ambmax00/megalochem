@@ -4,6 +4,7 @@
 #include <any>
 #include <map>
 #include <dbcsr_tensor_ops.hpp>
+#include "tensor/batchtensor.h"
 
 namespace ints {
 	
@@ -42,12 +43,18 @@ public:
 		m_map[name] = in;
 	};
 	
+	template <int N, typename T>
+	void insert_btensor(std::string name, tensor::sbatchtensor<N,T>& t) {
+		std::any in = std::any(t);
+		m_map[name] = in;
+	}; 
+	
 	template <typename T>
 	dbcsr::smatrix<T> get_matrix(std::string intname) {
 		dbcsr::smatrix<T> out;
 		if (m_map.find(intname) != m_map.end()) {
 			if (typeid(out).name() != m_map[intname].type().name()) {
-				throw std::runtime_error("Registry: Bas cast.");
+				throw std::runtime_error("Registry: Bad cast.");
 			}
 			out = std::any_cast<dbcsr::smatrix<T>>(m_map[intname]);
 		}
@@ -125,6 +132,18 @@ public:
 		
 		return out;
 		
+	}
+	
+	template <int N, typename T>
+	tensor::sbatchtensor<N,T> get_btensor(std::string intname) {
+		tensor::sbatchtensor<N,T> out;
+		if (m_map.find(intname) != m_map.end()) {
+			if (typeid(out).name() != m_map[intname].type().name()) {
+				throw std::runtime_error("Registry: Bad cast.");
+			}
+			out = std::any_cast<tensor::sbatchtensor<N,T>>(m_map[intname]);
+		}
+		return out;
 	}
 	
 	void clear() {

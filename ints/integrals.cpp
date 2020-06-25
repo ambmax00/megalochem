@@ -9,12 +9,12 @@
 namespace ints {
 
 void calc_ints(dbcsr::mat_d& m_out, util::ShrPool<libint2::Engine>& engine,
-	std::vector<desc::cluster_basis>& basvec) {
+	std::vector<const desc::cluster_basis*>& basvec) {
 
 	auto my_world = m_out.get_world();
 	
-	auto& cbas1 = basvec[0];
-	auto& cbas2 = basvec[1];
+	const auto& cbas1 = *basvec[0];
+	const auto& cbas2 = *basvec[1];
 	
 	#pragma omp parallel 
 	{	
@@ -30,8 +30,8 @@ void calc_ints(dbcsr::mat_d& m_out, util::ShrPool<libint2::Engine>& engine,
 			
 			iter.next_block();		
 						
-			std::vector<libint2::Shell>& c1 = cbas1[iter.row()];
-			std::vector<libint2::Shell>& c2 = cbas2[iter.col()];
+			const auto& c1 = cbas1[iter.row()];
+			const auto& c2 = cbas2[iter.col()];
 			
 			//block lower bounds
 			int lb1 = iter.row_offset();
@@ -46,12 +46,12 @@ void calc_ints(dbcsr::mat_d& m_out, util::ShrPool<libint2::Engine>& engine,
 						
 			for (int s1 = 0; s1!= c1.size(); ++s1) {
 							
-				auto& sh1 = c1[s1];
+				const auto& sh1 = c1[s1];
 				toff1 += locblkoff1;
 					
 				for (int s2 = 0; s2 != c2.size(); ++s2) {
 					
-					auto& sh2 = c2[s2];
+					const auto& sh2 = c2[s2];
 					toff2 += locblkoff2;
 					
 					//std::cout << "Tensor offsets: " << toff1 << " " << toff2 << std::endl;
@@ -104,7 +104,7 @@ void calc_ints(dbcsr::mat_d& m_out, util::ShrPool<libint2::Engine>& engine,
 }
 
 void calc_ints(dbcsr::tensor<2>& t_out, util::ShrPool<libint2::Engine>& engine,
-	std::vector<desc::cluster_basis>& basvec) {
+	std::vector<const desc::cluster_basis*>& basvec) {
 
 	int myrank = 0;
 	int mpi_size = 0;
@@ -112,8 +112,8 @@ void calc_ints(dbcsr::tensor<2>& t_out, util::ShrPool<libint2::Engine>& engine,
 	MPI_Comm_rank(t_out.comm(), &myrank); 
 	MPI_Comm_size(t_out.comm(), &mpi_size);
 	
-	auto& cbas1 = basvec[0];
-	auto& cbas2 = basvec[1];
+	const auto& cbas1 = *basvec[0];
+	const auto& cbas2 = *basvec[1];
 	
 	#pragma omp parallel 
 	{	
@@ -133,8 +133,8 @@ void calc_ints(dbcsr::tensor<2>& t_out, util::ShrPool<libint2::Engine>& engine,
 			auto size = iter.size();
 			auto off = iter.offset();		
 						
-			std::vector<libint2::Shell>& c1 = cbas1[idx[0]];
-			std::vector<libint2::Shell>& c2 = cbas2[idx[1]];
+			const auto& c1 = cbas1[idx[0]];
+			const auto& c2 = cbas2[idx[1]];
 			
 			//std::cout << "WE ARE IN BLOCK: " << i1 << i2 << std::endl;
 						
@@ -153,12 +153,12 @@ void calc_ints(dbcsr::tensor<2>& t_out, util::ShrPool<libint2::Engine>& engine,
 						
 			for (int s1 = 0; s1!= c1.size(); ++s1) {
 							
-				auto& sh1 = c1[s1];
+				const auto& sh1 = c1[s1];
 				toff1 += locblkoff1;
 					
 				for (int s2 = 0; s2 != c2.size(); ++s2) {
 					
-					auto& sh2 = c2[s2];
+					const auto& sh2 = c2[s2];
 					toff2 += locblkoff2;
 					
 					//std::cout << "Tensor offsets: " << toff1 << " " << toff2 << std::endl;
@@ -214,7 +214,7 @@ void calc_ints(dbcsr::tensor<2>& t_out, util::ShrPool<libint2::Engine>& engine,
 }
 
 void calc_ints(dbcsr::tensor<3>& t_out, util::ShrPool<libint2::Engine>& engine,
-	std::vector<desc::cluster_basis>& basvec) {
+	std::vector<const desc::cluster_basis*>& basvec) {
 	
 	int myrank = 0;
 	int mpi_size = 0;
@@ -222,9 +222,9 @@ void calc_ints(dbcsr::tensor<3>& t_out, util::ShrPool<libint2::Engine>& engine,
 	MPI_Comm_rank(t_out.comm(), &myrank); 
 	MPI_Comm_size(t_out.comm(), &mpi_size);
 
-	auto& cbas1 = basvec[0];
-	auto& cbas2 = basvec[1];
-	auto& cbas3 = basvec[2];
+	const auto& cbas1 = *basvec[0];
+	const auto& cbas2 = *basvec[1];
+	const auto& cbas3 = *basvec[2];
 	
 	#pragma omp parallel 
 	{	
@@ -243,9 +243,9 @@ void calc_ints(dbcsr::tensor<3>& t_out, util::ShrPool<libint2::Engine>& engine,
 			auto& size = iter.size();
 			auto& off = iter.offset();
 			
-			std::vector<libint2::Shell>& c1 = cbas1[idx[0]];
-			std::vector<libint2::Shell>& c2 = cbas2[idx[1]];
-			std::vector<libint2::Shell>& c3 = cbas3[idx[2]];
+			const auto& c1 = cbas1[idx[0]];
+			const auto& c2 = cbas2[idx[1]];
+			const auto& c3 = cbas3[idx[2]];
 			
 			dbcsr::block<3> blk(size); 
 			
@@ -266,17 +266,17 @@ void calc_ints(dbcsr::tensor<3>& t_out, util::ShrPool<libint2::Engine>& engine,
 			
 			for (int s1 = 0; s1!= c1.size(); ++s1) {
 				
-				auto& sh1 = c1[s1];
+				const auto& sh1 = c1[s1];
 				toff1 += locblkoff1;
 		
 				for (int s2 = 0; s2 != c2.size(); ++s2) {
 					
-					auto& sh2 = c2[s2];
+					const auto& sh2 = c2[s2];
 					toff2 += locblkoff2;
 					
 					for (int s3 = 0; s3 != c3.size(); ++s3) {
 						
-						auto& sh3 = c3[s3];
+						const auto& sh3 = c3[s3];
 						toff3 += locblkoff3;
 								
 						loc_eng.compute(sh1,sh2,sh3);
@@ -318,7 +318,7 @@ void calc_ints(dbcsr::tensor<3>& t_out, util::ShrPool<libint2::Engine>& engine,
 }
 
 void calc_ints(dbcsr::tensor<4>& t_out, util::ShrPool<libint2::Engine>& engine,
-	std::vector<desc::cluster_basis>& basvec) {
+	std::vector<const desc::cluster_basis*>& basvec) {
 	
 	int myrank = 0;
 	int mpi_size = 0;
@@ -326,10 +326,10 @@ void calc_ints(dbcsr::tensor<4>& t_out, util::ShrPool<libint2::Engine>& engine,
 	MPI_Comm_rank(t_out.comm(), &myrank); 
 	MPI_Comm_size(t_out.comm(), &mpi_size);
 
-	auto& cbas1 = basvec[0];
-	auto& cbas2 = basvec[1];
-	auto& cbas3 = basvec[2];
-	auto& cbas4 = basvec[3];
+	const auto& cbas1 = *basvec[0];
+	const auto& cbas2 = *basvec[1];
+	const auto& cbas3 = *basvec[2];
+	const auto& cbas4 = *basvec[3];
 	
 	size_t nblks = 0;
 
@@ -350,10 +350,10 @@ void calc_ints(dbcsr::tensor<4>& t_out, util::ShrPool<libint2::Engine>& engine,
 			auto size = iter.size();
 			auto off = iter.offset();
 			
-			std::vector<libint2::Shell>& c1 = cbas1[idx[0]];
-			std::vector<libint2::Shell>& c2 = cbas2[idx[1]];
-			std::vector<libint2::Shell>& c3 = cbas3[idx[2]];
-			std::vector<libint2::Shell>& c4 = cbas4[idx[3]];
+			const auto& c1 = cbas1[idx[0]];
+			const auto& c2 = cbas2[idx[1]];
+			const auto& c3 = cbas3[idx[2]];
+			const auto& c4 = cbas4[idx[3]];
 			
 			dbcsr::block<4> blk(size); //= t.get_block({.idx = IDX, .blk_size = blkdim, .found = found});
 			
@@ -380,22 +380,22 @@ void calc_ints(dbcsr::tensor<4>& t_out, util::ShrPool<libint2::Engine>& engine,
 			
 			for (int s1 = 0; s1!= c1.size(); ++s1) {
 		
-				auto& sh1 = c1[s1];
+				const auto& sh1 = c1[s1];
 				toff1 += locblkoff1;
 
 				for (int s2 = 0; s2 != c2.size(); ++s2) {
 					
-					auto& sh2 = c2[s2];
+					const auto& sh2 = c2[s2];
 					toff2 += locblkoff2;
 					
 					for (int s3 = 0; s3 != c3.size(); ++s3) {
 						
-						auto& sh3 = c3[s3];
+						const auto& sh3 = c3[s3];
 						toff3 += locblkoff3;
 						
 						for (int s4 = 0; s4 != c4.size(); ++s4) {
 							
-							auto& sh4 = c4[s4];
+							const auto& sh4 = c4[s4];
 							toff4 += locblkoff4;
 							
 							//if (is_canonical(toff1,toff2,toff3,toff4) && brablk(s1,s2)*ketblk(s3,s4) > screening_threshold) {
@@ -454,12 +454,12 @@ void calc_ints(dbcsr::tensor<4>& t_out, util::ShrPool<libint2::Engine>& engine,
 }
 
 void calc_ints_schwarz_mn(dbcsr::mat_d& m_out, util::ShrPool<libint2::Engine>& engine,
-	std::vector<desc::cluster_basis>& basvec) {
+	std::vector<const desc::cluster_basis*>& basvec) {
 
 	auto my_world = m_out.get_world();
 	
-	auto& cbas1 = basvec[0];
-	auto& cbas2 = basvec[1];
+	const auto& cbas1 = *basvec[0];
+	const auto& cbas2 = *basvec[1];
 	
 	#pragma omp parallel 
 	{	
@@ -475,8 +475,8 @@ void calc_ints_schwarz_mn(dbcsr::mat_d& m_out, util::ShrPool<libint2::Engine>& e
 			
 			iter.next_block();		
 						
-			std::vector<libint2::Shell>& c1 = cbas1[iter.row()];
-			std::vector<libint2::Shell>& c2 = cbas2[iter.col()];
+			const auto& c1 = cbas1[iter.row()];
+			const auto& c2 = cbas2[iter.col()];
 			
 			//block lower bounds
 			int lb1 = iter.row_offset();
@@ -491,13 +491,13 @@ void calc_ints_schwarz_mn(dbcsr::mat_d& m_out, util::ShrPool<libint2::Engine>& e
 						
 			for (int s1 = 0; s1!= c1.size(); ++s1) {
 							
-				auto& sh1 = c1[s1];
+				const auto& sh1 = c1[s1];
 				auto sh1size = sh1.size();
 				toff1 += locblkoff1;
 					
 				for (int s2 = 0; s2 != c2.size(); ++s2) {
 					
-					auto& sh2 = c2[s2];
+					const auto& sh2 = c2[s2];
 					auto sh2size = sh2.size();
 					toff2 += locblkoff2;
 					
@@ -556,11 +556,11 @@ void calc_ints_schwarz_mn(dbcsr::mat_d& m_out, util::ShrPool<libint2::Engine>& e
 }
 
 void calc_ints_schwarz_x(dbcsr::mat_d& m_out, util::ShrPool<libint2::Engine>& engine,
-	std::vector<desc::cluster_basis>& basvec) {
+	std::vector<const desc::cluster_basis*>& basvec) {
 
 	auto my_world = m_out.get_world();
 	
-	auto& cbas1 = basvec[0];
+	const auto& cbas1 = *basvec[0];
 	
 	#pragma omp parallel 
 	{	
@@ -576,7 +576,7 @@ void calc_ints_schwarz_x(dbcsr::mat_d& m_out, util::ShrPool<libint2::Engine>& en
 			
 			iter.next_block();		
 						
-			std::vector<libint2::Shell>& c1 = cbas1[iter.row()];
+			const auto& c1 = cbas1[iter.row()];
 			
 			//block lower bounds
 			int lb1 = iter.row_offset();
@@ -588,7 +588,7 @@ void calc_ints_schwarz_x(dbcsr::mat_d& m_out, util::ShrPool<libint2::Engine>& en
 						
 			for (int s1 = 0; s1!= c1.size(); ++s1) {
 							
-				auto& sh1 = c1[s1];
+				const auto& sh1 = c1[s1];
 				auto sh1size = sh1.size();
 				toff1 += locblkoff1;
 						

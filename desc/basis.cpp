@@ -81,7 +81,7 @@ cluster_basis::cluster_basis(vshell& basis, std::string method) : m_basis(basis)
 	
 }
 
-size_t cluster_basis::max_nprim() {
+size_t cluster_basis::max_nprim() const {
 	
 	size_t n = 0;
 	for (int i = 0; i != m_clusters.size(); ++i) {
@@ -90,7 +90,7 @@ size_t cluster_basis::max_nprim() {
 	return n;	
 }
 
-size_t cluster_basis::nbf() {
+size_t cluster_basis::nbf() const {
 	
 	size_t nbas = 0;
 	for (int i = 0; i != m_clusters.size(); ++i) {
@@ -99,7 +99,7 @@ size_t cluster_basis::nbf() {
 	return nbas;
 }
 
-int cluster_basis::max_l() {
+int cluster_basis::max_l() const {
 	
 	int l = 0;
 		for (int i = 0; i != m_clusters.size(); ++i) {
@@ -108,7 +108,7 @@ int cluster_basis::max_l() {
 	return l;	
 }
 
-std::vector<int> cluster_basis::cluster_sizes() {
+std::vector<int> cluster_basis::cluster_sizes() const {
 	return m_cluster_sizes;
 }
 

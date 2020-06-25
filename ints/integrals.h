@@ -13,22 +13,22 @@
 namespace ints {
 
 void calc_ints(dbcsr::mat_d& m_out, util::ShrPool<libint2::Engine>& engine,
-	std::vector<desc::cluster_basis>& basvec);
+	std::vector<const desc::cluster_basis*>& basvec);
 
 void calc_ints(dbcsr::tensor<2>& t_out, util::ShrPool<libint2::Engine>& eng,
-	std::vector<desc::cluster_basis>& basvec);
+	std::vector<const desc::cluster_basis*>& basvec);
 	
 void calc_ints(dbcsr::tensor<3>& t_out, util::ShrPool<libint2::Engine>& eng,
-	std::vector<desc::cluster_basis>& basvec);
+	std::vector<const desc::cluster_basis*>& basvec);
 	
 void calc_ints(dbcsr::tensor<4>& t_out, util::ShrPool<libint2::Engine>& eng,
-	std::vector<desc::cluster_basis>& basvec);
+	std::vector<const desc::cluster_basis*>& basvec);
 	
 void calc_ints_schwarz_mn(dbcsr::mat_d& m_out, util::ShrPool<libint2::Engine>& engine,
-	std::vector<desc::cluster_basis>& basvec);
+	std::vector<const desc::cluster_basis*>& basvec);
 	
 void calc_ints_schwarz_x(dbcsr::mat_d& m_out, util::ShrPool<libint2::Engine>& engine,
-	std::vector<desc::cluster_basis>& basvec);
+	std::vector<const desc::cluster_basis*>& basvec);
 
 	
 }

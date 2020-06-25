@@ -7,6 +7,7 @@
 #include <map>
 #include <mpi.h>
 #include <cstdlib>
+#include <memory>
 
 namespace tensor {
 
@@ -770,6 +771,9 @@ public:
 	}
 	
 }; //end class batchtensor
+
+template <int N, typename T>
+using sbatchtensor = std::shared_ptr<batchtensor<N,T>>;
 	
 } //end namespace
 

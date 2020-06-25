@@ -35,7 +35,7 @@ public:
 		return *this;
 	}
 	
-	vshell libint_basis() {
+	vshell libint_basis() const {
 		return m_basis;
 	}
 	
@@ -43,17 +43,21 @@ public:
 		return m_clusters[i];
 	}
 	
-	size_t max_nprim();
-
-	size_t nbf();
-
-	int max_l();
+	const vshell& operator[](int i) const {
+		return m_clusters[i];
+	}
 	
-	size_t size() {
+	size_t max_nprim() const;
+
+	size_t nbf() const;
+
+	int max_l() const;
+	
+	size_t size() const {
 		return m_clusters.size();
 	}
 	
-	std::vector<int> cluster_sizes();
+	std::vector<int> cluster_sizes() const;
 
 };
 

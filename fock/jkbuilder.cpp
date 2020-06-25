@@ -339,7 +339,80 @@ void DF_K::compute_K() {
 			
 	
 }
-		
-		
+
+/*BATCHED_DF_J::BATCHED_DF_J(dbcsr::world& w, desc::options& iopt) : J(w,iopt) {} 
+
+void BATCHED_DF_J::init_tensors() {
 	
+	// initialize tensors
+	dbcsr::pgrid<2> grid2(m_world.comm());
+	dbcsr::pgrid<3> grid3(m_world.comm());
+	
+	auto b = m_mol->dims().b();
+	auto x = m_mol->dims().x();
+	vec<int> d = {1};
+	
+	arrvec<int,3> bbd = {b,b,d};
+	arrvec<int,2> xd = {x,d};
+	
+	m_gp_xd = dbcsr::make_stensor<2>(dbcsr::tensor2_d::create().ngrid(grid2).name("c_x")
+		.map1({0}).map2({1}).blk_sizes(xd));
+	
+	m_gq_xd = dbcsr::make_stensor<2>(dbcsr::tensor2_d::create_template(*m_c_xd).name("c2_x"));
+	
+	m_J_bbd = dbcsr::make_stensor<3>(dbcsr::tensor3_d::create().ngrid(grid3).name("J dummy")
+		.map1({0,1}).map2({2}).blk_sizes(bbd));
+	
+	m_ptot_bbd = dbcsr::make_stensor<3>(dbcsr::tensor3_d::create_template(*m_J_bbd).name("ptot dummy"));
+	
+	m_inv = m_reg.get_tensor<2,double>(m_mol->name() + "_s_xx_inv_(0|1)");
+	
+}
+
+void DF_J::compute_J() {
+	
+	// fetch integrals
+	
+	LOG.os<1>("Fetching integrals.\n");
+	
+	auto i_xbb_012 = m_reg.get_tensor<3,double>(m_mol->name() + "_i_xbb_(0|12)",true,true);
+
+	// copy over density
+	
+	LOG.os<1>("Copy over density.\n");
+	
+	dbcsr::copy_matrix_to_3Dtensor<double>(*m_p_A, *m_ptot_bbd, false, true);
+	
+	if (!m_p_B) {
+		m_ptot_bbd->scale(2.0);
+	} else {
+		dbcsr::copy_matrix_to_3Dtensor<double>(*m_p_B, *m_ptot_bbd, true, true);
+	}
+	
+	LOG.os<1>("XMN, MN_ -> X_\n");
+	
+	dbcsr::contract(*i_xbb_012, *m_ptot_bbd, *m_c_xd).perform("XMN, MN_ -> X_");
+	
+	LOG.os<1>("X_, XY -> Y_\n");
+	
+	dbcsr::contract(*m_c_xd, *m_inv, *m_c2_xd).perform("X_, XY -> Y_");
+	
+	LOG.os<1>("X, XMN -> MN\n");
+	
+	dbcsr::contract(*m_c2_xd, *i_xbb_012, *m_J_bbd).perform("X_, XMN -> MN_");
+	
+	LOG.os<1>("Copy over...\n");
+	
+	dbcsr::copy_3Dtensor_to_2Dtensor(*m_J_bbd, *m_J, false);
+	
+	m_c_xd->clear();
+	m_c2_xd->clear();
+	m_J_bbd->clear();
+	
+	if (LOG.global_plev() >= 2) {
+		dbcsr::print(*m_J);
+	}
+	
+}*/
+		
 } // end namespace
