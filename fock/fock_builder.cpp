@@ -34,9 +34,11 @@ void fockmod::init() {
 	
 	bool compute_eris = false;
 	bool compute_3c2e = false;
+	bool compute_3c2e_batched = false;
 	bool compute_s_xx = false;
 	bool compute_s_xx_inv = false;
 	bool compute_s_xx_invsqrt = false;
+	bool setup_btensor = false;
 	
 	// set J
 	if (j_method == "exact") {
@@ -51,11 +53,22 @@ void fockmod::init() {
 		J* builder = new DF_J(m_world, m_opt);
 		m_J_builder.reset(builder);
 		
-		if (!direct) compute_3c2e = true;
+		compute_3c2e = true;
 		compute_s_xx = true;
 		compute_s_xx_inv = true;
 		
+	} else if (j_method == "batchdf") {
+		
+		J* builder = new BATCHED_DF_J(m_world, m_opt);
+		m_J_builder.reset(builder);
+		
+		compute_s_xx = true;
+		compute_s_xx_inv = true;
+		setup_btensor = true;
+		if (!direct) compute_3c2e_batched = true;
+		
 	}
+		
 	
 	// set K
 	if (k_method == "exact") {
@@ -70,7 +83,7 @@ void fockmod::init() {
 		K* builder = new DF_K(m_world,m_opt);
 		m_K_builder.reset(builder);
 		
-		if (!direct) compute_3c2e = true;
+		compute_3c2e = true;
 		compute_s_xx = true;
 		compute_s_xx_invsqrt = true;
 		
@@ -128,6 +141,56 @@ void fockmod::init() {
 		delete scr;
 		
 	}
+	
+	if (compute_3c2e_batched) {
+		
+		auto& t_screen = TIME.sub("3c2e screening");
+		
+		t_screen.start();
+		
+		ints::screener* scr = new ints::schwarz_screener(aofac);
+		scr->compute();
+		
+		t_screen.finish();
+		
+		auto& t_eri_batched = TIME.sub("3c2e integrals batched");
+		
+		aofac->ao_3c2e_setup();
+		
+		auto eri = aofac->ao_3c2e_setup_tensor(vec<int>{0}, vec<int>{1,2});
+		
+		tensor::sbatchtensor<3,double> eribatch = 
+			std::make_shared<tensor::batchtensor<3,double>>(eri,1000,999);
+		
+		eribatch->create_file();
+		eribatch->setup_batch();
+		eribatch->set_batch_dim(vec<int>{2});
+		
+		int nbatches = eribatch->nbatches();
+		
+		vec<vec<int>> bounds(3);
+		for (int i = 0; i != nbatches; ++i) {
+			
+			bounds[0] = eribatch->bounds_blk(i,0);
+			bounds[1] = eribatch->bounds_blk(i,1);
+			bounds[2] = eribatch->bounds_blk(i,2);
+			
+			std::cout << bounds[0][0] << " " << bounds[0][1] << std::endl;
+			std::cout << bounds[1][0] << " " << bounds[1][1] << std::endl;
+			std::cout << bounds[2][0] << " " << bounds[2][1] << std::endl;
+			
+			aofac->ao_3c2e_fill(eri,bounds,scr);
+			
+			eribatch->write(i);
+			
+			eribatch->clear_batch();
+			
+		}
+		
+		reg.insert_btensor<3,double>(m_mol->name() + "_i_xbb_(0|12)_batched", eribatch);
+			
+	}	
+	
 	
 	if (compute_s_xx) {
 		
@@ -226,14 +289,16 @@ void fockmod::compute(bool SAD_iter) {
 	m_K_builder->compute_K();
 	t_k.finish();
 	
-	auto Jtensor = m_J_builder->get_J();
+	auto Jmat = m_J_builder->get_J();
 	
-	auto KtensorA = m_K_builder->get_K_A();
-	auto KtensorB = m_K_builder->get_K_B();
+	auto KmatA = m_K_builder->get_K_A();
+	auto KmatB = m_K_builder->get_K_B();
 	
 	m_f_bb_A->add(0.0,1.0,*m_core);
-	dbcsr::copy_tensor_to_matrix(*Jtensor,*m_f_bb_A,true);
-	dbcsr::copy_tensor_to_matrix(*KtensorA,*m_f_bb_A,true);
+	m_f_bb_A->add(1.0,1.0,*Jmat);
+	m_f_bb_A->add(1.0,1.0,*KmatA);
+	//dbcsr::copy_tensor_to_matrix(*Jtensor,*m_f_bb_A,true);
+	//dbcsr::copy_tensor_to_matrix(*KtensorA,*m_f_bb_A,true);
 	
 	if (LOG.global_plev() >= 2) {
 		dbcsr::print(*m_f_bb_A);
@@ -241,8 +306,10 @@ void fockmod::compute(bool SAD_iter) {
 	
 	if (m_f_bb_B) {
 		m_f_bb_B->add(0.0,1.0,*m_core);
-		dbcsr::copy_tensor_to_matrix(*Jtensor,*m_f_bb_B,true);
-		dbcsr::copy_tensor_to_matrix(*KtensorB,*m_f_bb_B,true);
+		m_f_bb_B->add(1.0,1.0,*Jmat);
+		m_f_bb_B->add(1.0,1.0,*KmatB);
+		//dbcsr::copy_tensor_to_matrix(*Jtensor,*m_f_bb_B,true);
+		//dbcsr::copy_tensor_to_matrix(*KtensorB,*m_f_bb_B,true);
 		
 		if (LOG.global_plev() >= 2) {
 			dbcsr::print(*m_f_bb_B);

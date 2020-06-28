@@ -6,6 +6,7 @@
 #include "desc/molecule.h"
 #include "desc/options.h"
 #include "utils/mpi_time.h"
+#include "tensor/batchtensor.h"
 #include <dbcsr_matrix.hpp>
 
 namespace fock {
@@ -53,7 +54,7 @@ public:
 class J : public JK_common {
 protected: 
 
-	dbcsr::stensor2_d m_J;
+	dbcsr::smat_d m_J;
 	std::shared_ptr<J> m_builder;
 	
 public:
@@ -65,15 +66,15 @@ public:
 	
 	void init();
 	
-	dbcsr::stensor2_d get_J() { return m_J; }	
+	dbcsr::smat_d get_J() { return m_J; }	
 		
 };
 
 class K : public JK_common {
 protected:
 
-	dbcsr::stensor2_d m_K_A;
-	dbcsr::stensor2_d m_K_B;
+	dbcsr::smat_d m_K_A;
+	dbcsr::smat_d m_K_B;
 	
 public:
 	
@@ -84,8 +85,8 @@ public:
 	
 	void init();
 	
-	dbcsr::stensor2_d get_K_A() { return m_K_A; }
-	dbcsr::stensor2_d get_K_B() { return m_K_B; }
+	dbcsr::smat_d get_K_A() { return m_K_A; }
+	dbcsr::smat_d get_K_B() { return m_K_B; }
 	
 };
 
@@ -137,7 +138,8 @@ public:
 
 class DF_K : public K {
 private:
-
+	
+	dbcsr::stensor2_d m_K_01;
 	dbcsr::stensor3_d m_HT_01_2;
 	dbcsr::stensor3_d m_HT_0_12;
 	dbcsr::stensor3_d m_HT_02_1;
@@ -155,7 +157,6 @@ public:
 	
 };
 
-/*
 class BATCHED_DF_J : public J {
 private:
 	
@@ -164,14 +165,17 @@ private:
 	dbcsr::stensor2_d m_gp_xd;
 	dbcsr::stensor2_d m_gq_xd;
 	dbcsr::stensor2_d m_inv;
+	bool m_direct = false;;
 
 public:
 
 	BATCHED_DF_J(dbcsr::world& w, desc::options& opt);
+	void set_direct(bool i) { m_direct = i; }
 	void compute_J() override;
 	void init_tensors() override;
+	void fetch_integrals(tensor::sbatchtensor<3,double>& btensor, int ibatch);
 	
-};*/
+};
 
 } // end namespace
 

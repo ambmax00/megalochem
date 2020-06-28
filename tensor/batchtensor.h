@@ -47,6 +47,8 @@ private:
 	// number of local blocks
 	int m_nzeloc; 
 	// number of local non-zero elements 
+	int64_t m_nblktot_global;
+	// total number of blocks in non-sparse tensor
 	int64_t m_nblktot; 
 	// total number of blocks
 	int64_t m_nzetot; 
@@ -132,15 +134,15 @@ public:
 		// get average block size:
 		std::array<double,N> meansizes;
 		double mean = 1.0;
-		m_nblktot = 1.0;
+		m_nblktot_global = 1.0;
 		
 		for (int i = 0; i != N; ++i) {
 			meansizes[i] = (double)m_fulltot[i]/(double)m_blkstot[i];
 			mean *= meansizes[i];
-			m_nblktot *= m_blkstot[i];
+			m_nblktot_global *= m_blkstot[i];
 		}
 		
-		LOG.os<>("-- Total number of blocks: ", m_nblktot, '\n');
+		LOG.os<>("-- Total number of blocks: ", m_nblktot_global, '\n');
 		LOG.os<>("-- Mean total block size: ", mean, '\n');
 		LOG.os<>("-- Mean block sizes: ");
 		for (int i = 0; i != N; ++i) {
@@ -156,7 +158,7 @@ public:
 		
 		LOG.os<>("-- Holding ", m_maxnblk_tot, " at most on all nodes.\n");
 		
-		if (m_maxnblk_tot > m_nblktot) {
+		if (m_maxnblk_tot > m_nblktot_global) {
 			LOG.os<>("-- Tensor is held in core memory. No I/O.");
 			m_onebatch = true;
 		}
@@ -201,7 +203,7 @@ public:
 		
 		if (nblk_ndim_per_batch < 1.0) throw std::runtime_error("Insufficient memory."); 
 		
-		m_nbatches = std::ceil((double)m_nblktot / (nblk_ndim_per_batch * (double)nblk_per_ndim));
+		m_nbatches = std::ceil((double)m_nblktot_global / (nblk_ndim_per_batch * (double)nblk_per_ndim));
 		
 		LOG.os<>("-- Dividing dimension(s)");
 		for (auto n : ndim) {
@@ -541,6 +543,8 @@ public:
 		
 		// if reading is done in same way as writing
 		if (m_stored_batchdim == m_current_batchdim) {
+			
+			LOG.os<>("Same dimensions for writing and reading.\n");
 		
 			int nze = m_nzeprocbatch[ibatch][m_mpirank];
 			int nblk = m_nblksprocbatch[ibatch][m_mpirank];
@@ -557,16 +561,24 @@ public:
 			int64_t blkoff = 0;
 			
 			for (int i = 0; i < ibatch; ++i) {
-				blkoff += m_nblksprocbatch[ibatch][m_mpirank];
+				blkoff += m_nblksprocbatch[i][m_mpirank];
 			}
 				
 			arrvec<int,N> locblkidx;
 			
+			LOG.os<>("Offset: ", blkoff, '\n');
+			LOG.os<>("NBLKTOTBATCH: ", nblktotbatch, '\n');
 			//// setting
 			for (int i = 0; i != N; ++i) {
 				locblkidx[i].insert(locblkidx[i].end(),
 					m_locblkidx[i].begin() + blkoff,
 					m_locblkidx[i].begin() + blkoff + nblktotbatch);
+			}
+			
+			for (auto a : locblkidx) {
+				for (auto l : a) {
+					std::cout << l << " ";
+				} std::cout << std::endl;
 			}
 			
 			//// reserving
@@ -768,6 +780,13 @@ public:
 		
 		return out;
 			
+	}
+	
+	void clear_batch() {
+		
+		if (m_onebatch) return;
+		m_stensor->clear();
+		
 	}
 	
 }; //end class batchtensor

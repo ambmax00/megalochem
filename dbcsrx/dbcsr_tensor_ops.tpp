@@ -468,6 +468,586 @@ void copy_matrix_to_3Dtensor(matrix<T>& m, tensor<3,T>& t, bool sum = false, boo
 }
 
 template <typename T>
+void copy_matrix_to_3Dtensor_new(matrix<T>& m, tensor<3,T>& t, bool sym = false) {
+	
+	auto w = m.get_world();
+	
+	int mpirank = w.rank();
+	int mpisize = w.size();
+	auto comm = w.comm();
+	
+	vec<int> send_nblk_p(mpisize,0);
+	vec<int> send_nze_p(mpisize,0);
+	vec<vec<int>> send_idx0_p(mpisize);
+	vec<vec<int>> send_idx1_p(mpisize);
+	
+	matrix<T>* m_ptr;
+	
+	if (sym) { 
+		m_ptr = new matrix<T>(m.desymmetrize());
+	} else {
+		m_ptr = &m;
+	}
+	
+	iterator iter(*m_ptr);
+	idx3 idxt = {0,0,0};
+	
+	iter.start();
+	
+	while (iter.blocks_left()) {
+		
+		iter.next_block();
+		
+		idxt[0] = iter.row();
+		idxt[1] = iter.col();
+		
+		int nze = iter.row_size() * iter.col_size();
+	
+		int dest_p = t.proc(idxt);
+		
+		send_nblk_p[dest_p] += 1;
+		send_nze_p[dest_p] += nze;
+		send_idx0_p[dest_p].push_back(idxt[0]);
+		send_idx1_p[dest_p].push_back(idxt[1]);
+		
+	}
+	
+	iter.stop();
+	
+	vec<int> recv_nblk_p(mpisize);
+	vec<int> recv_nze_p(mpisize);
+	
+	// send info around
+	
+	/*for (int i = 0; i != mpisize; ++i) {
+		
+		if (i == mpirank) {
+			for (auto m : send_nblk_p) {
+				std::cout << m << " "; 
+			} std::cout << '\n';
+			for (auto m : send_nze_p) {
+				std::cout << m << " "; 
+			} std::cout << std::endl;
+		}
+		
+		MPI_Barrier(comm);	
+		
+	}*/
+	
+	for (int ip = 0; ip != mpisize; ++ip) {
+		
+		MPI_Gather(&send_nblk_p[ip],1,MPI_INT,recv_nblk_p.data(),1,
+			MPI_INT,ip,comm);
+			
+		MPI_Gather(&send_nze_p[ip],1,MPI_INT,recv_nze_p.data(),1,
+			MPI_INT,ip,comm);
+			
+	}
+	/*
+	for (int i = 0; i != mpisize; ++i) {
+		
+		if (i == mpirank) {
+			for (auto m : recv_nblk_p) {
+				std::cout << m << " "; 
+			} std::cout << '\n';
+			for (auto m : recv_nze_p) {
+				std::cout << m << " "; 
+			} std::cout << std::endl;
+		}
+		
+		MPI_Barrier(comm);	
+		
+	}*/
+	
+	// allocate space on sender
+	
+	vec<vec<double>> send_blk_data(mpisize);
+	vec<int> send_blk_offset(mpisize,0);
+	
+	for (int ip = 0; ip != mpisize; ++ip) {
+		send_blk_data[ip].resize(send_nze_p[ip]);
+	}
+	
+	// copy blocks
+	
+	iter.start();
+	
+	while (iter.blocks_left()) {
+		
+		iter.next_block();
+		
+		idxt[0] = iter.row();
+		idxt[1] = iter.col();
+		
+		int rsize = iter.row_size();
+		int csize = iter.col_size();
+		
+		int nze = rsize*csize;
+		int dest_p = t.proc(idxt);
+		
+		std::copy(iter.data(),iter.data()+nze,
+			send_blk_data[dest_p].begin() + send_blk_offset[dest_p]);
+			
+		send_blk_offset[dest_p] += nze;
+		
+	}
+	
+	
+	/*for (int i = 0; i != mpisize; ++i) {
+		
+		if (i == mpirank) {
+			std::cout << "RANK " << i << std::endl;
+			for (auto m : send_blk_data) {
+				for (auto s : m) {
+					std::cout << s << " ";
+				} std::cout << std::endl;
+			}
+		}
+		
+		MPI_Barrier(comm);	
+		
+	}*/
+	
+	iter.stop();
+		
+	// allocate space on receiver 
+	
+	int recv_blktot = std::accumulate(recv_nblk_p.begin(),recv_nblk_p.end(),0);
+	int recv_nzetot = std::accumulate(recv_nze_p.begin(),recv_nze_p.end(),0);
+	
+	vec<int> recv_blk_offset(mpisize);
+	vec<int> recv_nze_offset(mpisize);
+	
+	int blkoffset = 0;
+	int nzeoffset = 0;
+	
+	for (int ip = 0; ip != mpisize; ++ip) {
+		recv_blk_offset[ip] = blkoffset;
+		recv_nze_offset[ip] = nzeoffset;
+		
+		blkoffset += recv_nblk_p[ip];
+		nzeoffset += recv_nze_p[ip];
+	}
+	
+	arrvec<int,3> recv_blkidx;
+	vec<double> recv_blk_data(recv_nzetot);
+	
+	for (auto& v : recv_blkidx) {
+		v.resize(recv_blktot);
+	}
+	
+	// send over block indices
+	
+	for (int ip = 0; ip != mpisize; ++ip) {
+	
+		MPI_Gatherv(send_idx0_p[ip].data(),send_nblk_p[ip],MPI_INT,
+			recv_blkidx[0].data(),recv_nblk_p.data(),recv_blk_offset.data(),MPI_INT,ip,comm);
+			
+		MPI_Gatherv(send_idx1_p[ip].data(),send_nblk_p[ip],MPI_INT,
+			recv_blkidx[1].data(),recv_nblk_p.data(),recv_blk_offset.data(),MPI_INT,ip,comm);
+			
+	}
+	
+	/*for (int i = 0; i != mpisize; ++i) {
+		
+		if (i == mpirank) {
+			std::cout << "RANK " << i << std::endl;
+			for (auto m : recv_blkidx) {
+				for (auto s : m) {
+					std::cout << s << " ";
+				} std::cout << std::endl;
+			}
+		}
+		
+		MPI_Barrier(comm);	
+		
+	}*/
+	
+	// send over block data
+	
+	for (int ip = 0; ip != mpisize; ++ip) {
+		
+		MPI_Gatherv(send_blk_data[ip].data(),send_nze_p[ip],MPI_DOUBLE,
+			recv_blk_data.data(),recv_nze_p.data(),recv_nze_offset.data(),
+			MPI_DOUBLE,ip,comm);
+			
+	}
+	
+	/*for (int i = 0; i != mpisize; ++i) {
+		
+		if (i == mpirank) {
+			std::cout << "RANK " << i << std::endl;
+			for (auto m : recv_blk_data) {
+					std::cout << m << " ";
+			} std::cout << std::endl;
+		}
+		
+		MPI_Barrier(comm);	
+		
+	}*/
+	
+	//std::cout << "0 " << recv_blk_data[0] << std::endl;
+	
+	// allocate blocks
+	
+	t.reserve(recv_blkidx);
+	
+	nzeoffset = 0;
+	
+	auto rowblksizes = m_ptr->row_blk_sizes();
+	auto colblksizes = m_ptr->col_blk_sizes();
+	
+	idx3 sizes = {1,1,1};
+	
+	for (int iblk = 0; iblk != recv_blkidx[0].size(); ++iblk) {
+		
+		idxt[0] = recv_blkidx[0][iblk];
+		idxt[1] = recv_blkidx[1][iblk];
+		
+		//std::cout << idxt[0] << " " << idxt[1] << std::endl;
+		
+		sizes[0] = rowblksizes[idxt[0]];
+		sizes[1] = colblksizes[idxt[1]];
+		
+		T* ptr = recv_blk_data.data() + nzeoffset;
+		
+		t.put_block(idxt, ptr, sizes);
+		
+		nzeoffset += sizes[0]*sizes[1];
+		
+	}
+	
+	//dbcsr::print(*m_ptr);
+	//dbcsr::print(t);
+	
+	//exit(0);
+		
+}
+
+template <typename T>
+void copy_3Dtensor_to_matrix_new(tensor<3,T>& t, matrix<T>& m) {
+	
+	auto w = m.get_world();
+	
+	int mpirank = w.rank();
+	int mpisize = w.size();
+	auto comm = w.comm();
+	
+	vec<int> send_nblk_p(mpisize,0);
+	vec<int> send_nze_p(mpisize,0);
+	vec<vec<int>> send_idx0_p(mpisize);
+	vec<vec<int>> send_idx1_p(mpisize);
+	
+	iterator_t<3,T> itert(t);
+	
+	itert.start();
+	
+	while (itert.blocks_left()) {
+		
+		itert.next();
+		auto& idxt = itert.idx();
+		auto& size = itert.size();
+		
+		int nze = size[0] * size[1];
+	
+		int dest_p = m.proc(idxt[0],idxt[1]);
+		
+		send_nblk_p[dest_p] += 1;
+		send_nze_p[dest_p] += nze;
+		send_idx0_p[dest_p].push_back(idxt[0]);
+		send_idx1_p[dest_p].push_back(idxt[1]);
+		
+	}
+	
+	itert.stop();
+	
+	vec<int> recv_nblk_p(mpisize);
+	vec<int> recv_nze_p(mpisize);
+	
+	// send info around
+	
+	/*MPI_Barrier(comm);
+	
+	for (int i = 0; i != mpisize; ++i) {
+		
+		if (i == mpirank) {
+			std::cout << "RANK " << i << std::endl;
+			std::cout << "IDX" << std::endl;
+			for (auto m : send_idx0_p) {
+				for (auto s : m) {
+					std::cout << s << " ";
+				} std::cout << std::endl;
+			}
+			for (auto m : send_idx1_p) {
+				for (auto s : m) {
+					std::cout << s << " ";
+				} std::cout << std::endl;
+			}
+		}
+		
+		MPI_Barrier(comm);	
+		
+	}
+	
+	MPI_Barrier(comm);
+	
+	for (int i = 0; i != mpisize; ++i) {
+		
+		if (i == mpirank) {
+			for (auto m : send_nblk_p) {
+				std::cout << m << " "; 
+			} std::cout << '\n';
+			for (auto m : send_nze_p) {
+				std::cout << m << " "; 
+			} std::cout << std::endl;
+		}
+		
+		MPI_Barrier(comm);	
+		
+	}*/
+	
+	for (int ip = 0; ip != mpisize; ++ip) {
+		
+		MPI_Gather(&send_nblk_p[ip],1,MPI_INT,recv_nblk_p.data(),1,
+			MPI_INT,ip,comm);
+			
+		MPI_Gather(&send_nze_p[ip],1,MPI_INT,recv_nze_p.data(),1,
+			MPI_INT,ip,comm);
+			
+	}
+	
+	/*for (int i = 0; i != mpisize; ++i) {
+		
+		if (i == mpirank) {
+			for (auto m : recv_nblk_p) {
+				std::cout << m << " "; 
+			} std::cout << '\n';
+			for (auto m : recv_nze_p) {
+				std::cout << m << " "; 
+			} std::cout << std::endl;
+		}
+		
+		MPI_Barrier(comm);	
+		
+	}*/
+	
+	// allocate space on sender
+	
+	vec<vec<double>> send_blk_data(mpisize);
+	vec<int> send_blk_offset(mpisize,0);
+	
+	for (int ip = 0; ip != mpisize; ++ip) {
+		send_blk_data[ip].resize(send_nze_p[ip]);
+	}
+	
+	// copy blocks
+	
+	itert.start();
+	
+	while (itert.blocks_left()) {
+		
+		itert.next();
+		
+		auto& idxt = itert.idx();
+		auto& size = itert.size();
+		
+		int nze = size[0] * size[1];
+		int dest_p = m.proc(idxt[0],idxt[1]);
+		
+		bool found;
+		auto blk = t.get_block(idxt,size,found);
+		
+		std::copy(blk.data(),blk.data()+nze,
+			send_blk_data[dest_p].begin() + send_blk_offset[dest_p]);
+			
+		send_blk_offset[dest_p] += nze;
+		
+	}
+	
+	
+	/*for (int i = 0; i != mpisize; ++i) {
+		
+		if (i == mpirank) {
+			std::cout << "RANK " << i << std::endl;
+			for (auto m : send_blk_data) {
+				for (auto s : m) {
+					std::cout << s << " ";
+				} std::cout << std::endl;
+			}
+		}
+		
+		MPI_Barrier(comm);	
+		
+	}*/
+	
+	itert.stop();
+		
+	// allocate space on receiver 
+	
+	int recv_blktot = std::accumulate(recv_nblk_p.begin(),recv_nblk_p.end(),0);
+	int recv_nzetot = std::accumulate(recv_nze_p.begin(),recv_nze_p.end(),0);
+	
+	vec<int> recv_blk_offset(mpisize);
+	vec<int> recv_nze_offset(mpisize);
+	
+	int blkoffset = 0;
+	int nzeoffset = 0;
+	
+	for (int ip = 0; ip != mpisize; ++ip) {
+		recv_blk_offset[ip] = blkoffset;
+		recv_nze_offset[ip] = nzeoffset;
+		
+		blkoffset += recv_nblk_p[ip];
+		nzeoffset += recv_nze_p[ip];
+	}
+	
+	/*MPI_Barrier(comm);
+	
+	std::cout << "OFFSETS" << std::endl;
+	for (int i = 0; i != mpisize; ++i) {
+		
+		if (i == mpirank) {
+			std::cout << "RANK " << i << std::endl;
+			for (auto m : recv_blk_offset) {
+					std::cout << m << " ";
+			} std::cout << std::endl;
+		}
+		
+		MPI_Barrier(comm);	
+		
+	}*/
+	
+	arrvec<int,2> recv_blkidx;
+	vec<double> recv_blk_data(recv_nzetot);
+	
+	for (auto& v : recv_blkidx) {
+		v.resize(recv_blktot);
+	}
+	
+	// send over block indices
+	
+	for (int ip = 0; ip != mpisize; ++ip) {
+	
+		MPI_Gatherv(send_idx0_p[ip].data(),send_nblk_p[ip],MPI_INT,
+			recv_blkidx[0].data(),recv_nblk_p.data(),recv_blk_offset.data(),MPI_INT,ip,comm);
+			
+		MPI_Gatherv(send_idx1_p[ip].data(),send_nblk_p[ip],MPI_INT,
+			recv_blkidx[1].data(),recv_nblk_p.data(),recv_blk_offset.data(),MPI_INT,ip,comm);
+			
+	}
+	
+	/*MPI_Barrier(comm);
+	
+	for (int i = 0; i != mpisize; ++i) {
+		
+		if (i == mpirank) {
+			std::cout << "RANK " << i << std::endl;
+			for (auto m : recv_blkidx) {
+				for (auto s : m) {
+					std::cout << s << " ";
+				} std::cout << std::endl;
+			}
+		}
+		
+		MPI_Barrier(comm);	
+		
+	}
+	
+	MPI_Barrier(comm);*/
+	
+	// send over block data
+	
+	for (int ip = 0; ip != mpisize; ++ip) {
+		
+		MPI_Gatherv(send_blk_data[ip].data(),send_nze_p[ip],MPI_DOUBLE,
+			recv_blk_data.data(),recv_nze_p.data(),recv_nze_offset.data(),
+			MPI_DOUBLE,ip,comm);
+			
+	}
+	
+	/*MPI_Barrier(comm);
+	
+	for (int i = 0; i != mpisize; ++i) {
+		
+		if (i == mpirank) {
+			std::cout << "RANK " << i << std::endl;
+			for (auto m : recv_blk_data) {
+					std::cout << m << " ";
+			} std::cout << std::endl;
+		}
+		
+		MPI_Barrier(comm);	
+		
+	}
+	
+	MPI_Barrier(comm);*/
+	
+	//std::cout << "0 " << recv_blk_data[0] << std::endl;
+	
+	// allocate blocks
+	// check if symmetric
+	
+	vec<int> rowres, colres;
+	
+	bool sym = (m.matrix_type() == dbcsr_type_symmetric) ? true : false;
+	
+	if (sym) {
+		
+		rowres.reserve(recv_blkidx[0].size());
+		colres.reserve(recv_blkidx[1].size());
+		
+		for (int i = 0; i != recv_blkidx[0].size(); ++i) {
+			int ix = recv_blkidx[0][i];
+			int jx = recv_blkidx[1][i];
+			
+			if (ix <= jx) {
+				rowres.push_back(ix);
+				colres.push_back(jx);
+			}
+			
+		}
+		
+	} else {
+		
+		rowres.resize(recv_blkidx[0].size());
+		colres.resize(recv_blkidx[1].size());
+		
+		std::copy(recv_blkidx[0].begin(),recv_blkidx[0].end(),
+			rowres.begin());
+		std::copy(recv_blkidx[1].begin(),recv_blkidx[1].end(),
+			colres.begin());
+		
+	}
+	
+	m.reserve_blocks(rowres,colres);
+	nzeoffset = 0;
+	
+	auto rowblksizes = m.row_blk_sizes();
+	auto colblksizes = m.col_blk_sizes();
+	
+	for (int iblk = 0; iblk != recv_blkidx[0].size(); ++iblk) {
+		
+		int ix = recv_blkidx[0][iblk];
+		int jx = recv_blkidx[1][iblk];
+		
+		int rowsize = rowblksizes[ix];
+		int colsize = colblksizes[jx];
+		
+		T* ptr = recv_blk_data.data() + nzeoffset;
+		nzeoffset += rowsize * colsize;
+		
+		if (sym && ix > jx) continue;
+		
+		m.put_block_p(ix, jx, ptr, rowsize, colsize);
+		
+	}
+	
+	//dbcsr::print(t);
+	//dbcsr::print(m);
+		
+}	
+
+template <typename T>
 void copy_3Dtensor_to_matrix(tensor<3,T>& t, matrix<T>& m, bool sum = false) {
 	
 	if (sum) m.clear();
@@ -511,6 +1091,8 @@ void copy_3Dtensor_to_matrix(tensor<3,T>& t, matrix<T>& m, bool sum = false) {
     m.finalize();
 	
 }
+
+
 
 template <int N>
 double dot(tensor<N,double>& t1, tensor<N,double>& t2) {

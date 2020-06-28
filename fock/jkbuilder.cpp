@@ -12,23 +12,26 @@ JK_common::JK_common(dbcsr::world& w, desc::options opt) :
 void J::init() {
 	
 	// set up J
-	dbcsr::pgrid<2> grid2(m_world.comm());
 	auto b = m_p_A->row_blk_sizes();
-	arrvec<int,2> bb = {b,b};
-	m_J = dbcsr::make_stensor<2>(dbcsr::tensor2_d::create().name("J_bb")
-		.ngrid(grid2).map1({0}).map2({1}).blk_sizes(bb));
+	
+	m_J = std::make_shared<dbcsr::mat_d>(
+		dbcsr::mat_d::create().name("J_bb").set_world(m_world)
+		.row_blk_sizes(b).col_blk_sizes(b).type(dbcsr_type_symmetric));
 	
 }
 
 void K::init() {
 	
 	// set up K's
-	dbcsr::pgrid<2> grid2(m_world.comm());
 	auto b = m_p_A->row_blk_sizes();
-	arrvec<int,2> bb = {b,b};
-	m_K_A = dbcsr::make_stensor<2>(dbcsr::tensor2_d::create().name("K_bb_A")
-		.ngrid(grid2).map1({0}).map2({1}).blk_sizes(bb));
-	if (m_p_B) m_K_B = dbcsr::make_stensor<2>(dbcsr::tensor2_d::create_template(*m_K_A).name("K_bb_B"));
+	
+	m_K_A = std::make_shared<dbcsr::mat_d>(
+		dbcsr::mat_d::create().name("K_bb_A").set_world(m_world)
+		.row_blk_sizes(b).col_blk_sizes(b).type(dbcsr_type_symmetric));
+		
+	if (m_p_B) m_K_B = std::make_shared<dbcsr::mat_d>(
+		dbcsr::mat_d::create().name("K_bb_B").set_world(m_world)
+		.row_blk_sizes(b).col_blk_sizes(b).type(dbcsr_type_symmetric));
 	
 }
 
@@ -68,14 +71,19 @@ void EXACT_K::init_tensors() {
 void EXACT_J::compute_J() {
 	
 	// copy P 
+	
+	dbcsr::mat_d ptot = dbcsr::mat_d::create_template(*m_p_A).name("ptot");
+	
 	if (m_p_A && !m_p_B) {
-		std::cout << "SCALING." << std::endl;
-		dbcsr::copy_matrix_to_3Dtensor<double>(*m_p_A,*m_ptot_bbd,false,true);
-		m_ptot_bbd->scale(2.0);
+		ptot.copy_in(*m_p_A);
+		ptot.scale(2.0);
+		dbcsr::copy_matrix_to_3Dtensor_new(ptot,*m_ptot_bbd,true);
+		ptot.clear();
 	} else {
-		std::cout << "ADDING" << std::endl;
-		dbcsr::copy_matrix_to_3Dtensor<double>(*m_p_A,*m_ptot_bbd,false,true);
-		dbcsr::copy_matrix_to_3Dtensor<double>(*m_p_B,*m_ptot_bbd,true,true);
+		ptot.copy_in(*m_p_A);
+		ptot.add(1.0, 1.0, *m_p_B);
+		dbcsr::copy_matrix_to_3Dtensor_new<double>(ptot,*m_ptot_bbd,true);
+		ptot.clear();
 	}
 	
 	if (LOG.global_plev() >= 3) {
@@ -91,7 +99,7 @@ void EXACT_J::compute_J() {
 		dbcsr::print(*m_J_bbd);
 	}
 
-	dbcsr::copy_3Dtensor_to_2Dtensor<double>(*m_J_bbd,*m_J,false);
+	dbcsr::copy_3Dtensor_to_matrix_new<double>(*m_J_bbd,*m_J);
 	
 	m_ptot_bbd->clear();
 	m_J_bbd->clear();
@@ -106,15 +114,15 @@ void EXACT_K::compute_K() {
 	
 	auto eris = m_reg.get_tensor<4,double>(m_mol->name() + "_i_bbbb_(02|13)", true, true);
 	
-	auto compute_K_single = [&](dbcsr::smat_d& p, dbcsr::stensor2_d& k, std::string x) {
+	auto compute_K_single = [&](dbcsr::smat_d& p, dbcsr::smat_d& k, std::string x) {
 		
-		dbcsr::copy_matrix_to_3Dtensor<double>(*p,*m_p_bbd,false,true);
+		dbcsr::copy_matrix_to_3Dtensor_new<double>(*p,*m_p_bbd,true);
 		
 		LOG.os<1>("Computing exchange term (", x, ") ... \n");
 			
 		dbcsr::contract(*m_p_bbd, *eris, *m_K_bbd).alpha(-1.0).perform("LS_, MLSN -> MN_");
 
-		dbcsr::copy_3Dtensor_to_2Dtensor(*m_K_bbd,*k);
+		dbcsr::copy_3Dtensor_to_matrix_new(*m_K_bbd,*k);
 		
 		dbcsr::print(*m_K_bbd);
 		
@@ -174,21 +182,35 @@ void DF_J::compute_J() {
 	
 	LOG.os<1>("Copy over density.\n");
 	
-	dbcsr::copy_matrix_to_3Dtensor<double>(*m_p_A, *m_ptot_bbd, false, true);
+	dbcsr::mat_d ptot = dbcsr::mat_d::create_template(*m_p_A).name("ptot");
 	
-	if (!m_p_B) {
-		m_ptot_bbd->scale(2.0);
+	if (m_p_A && !m_p_B) {
+		ptot.copy_in(*m_p_A);
+		ptot.scale(2.0);
+		dbcsr::copy_matrix_to_3Dtensor_new(ptot,*m_ptot_bbd,true);
+		ptot.clear();
 	} else {
-		dbcsr::copy_matrix_to_3Dtensor<double>(*m_p_B, *m_ptot_bbd, true, true);
+		ptot.copy_in(*m_p_A);
+		ptot.add(1.0, 1.0, *m_p_B);
+		dbcsr::copy_matrix_to_3Dtensor_new<double>(ptot,*m_ptot_bbd,true);
+		ptot.clear();
 	}
 	
 	LOG.os<1>("XMN, MN_ -> X_\n");
 	
 	dbcsr::contract(*i_xbb_012, *m_ptot_bbd, *m_c_xd).perform("XMN, MN_ -> X_");
 	
+	if (LOG.global_plev() >= 2) {
+		dbcsr::print(*m_c_xd);
+	}
+	
 	LOG.os<1>("X_, XY -> Y_\n");
 	
 	dbcsr::contract(*m_c_xd, *m_inv, *m_c2_xd).perform("X_, XY -> Y_");
+	
+	if (LOG.global_plev() >= 2) {
+		dbcsr::print(*m_c2_xd);
+	}
 	
 	LOG.os<1>("X, XMN -> MN\n");
 	
@@ -196,7 +218,7 @@ void DF_J::compute_J() {
 	
 	LOG.os<1>("Copy over...\n");
 	
-	dbcsr::copy_3Dtensor_to_2Dtensor(*m_J_bbd, *m_J, false);
+	dbcsr::copy_3Dtensor_to_matrix_new(*m_J_bbd, *m_J);
 	
 	m_c_xd->clear();
 	m_c2_xd->clear();
@@ -211,6 +233,14 @@ void DF_J::compute_J() {
 void DF_K::init_tensors() {
 		
 	m_inv = m_reg.get_tensor<2,double>(m_mol->name() + "_s_xx_inv_(0|1)");
+	
+	auto b = m_p_A->row_blk_sizes();
+	arrvec<int,2> bb = {b,b};
+	
+	dbcsr::pgrid<2> grid2(m_world.comm());
+	
+	m_K_01 = dbcsr::make_stensor<2>(dbcsr::tensor2_d::create().ngrid(grid2).name("K_01")
+		.map1({0}).map2({1}).blk_sizes(bb));
 		
 }
 
@@ -219,7 +249,7 @@ void DF_K::compute_K() {
 	auto b = m_mol->dims().b();
 	auto X = m_mol->dims().x();
 	
-	auto compute_K_single = [&](dbcsr::smat_d& c_bm, dbcsr::stensor2_d& k_bb, std::string x) {
+	auto compute_K_single = [&](dbcsr::smat_d& c_bm, dbcsr::smat_d& k_bb, std::string x) {
 				
 			LOG.os<1>("Computing exchange term (", x, ") ... \n");
 			
@@ -269,6 +299,8 @@ void DF_K::compute_K() {
 			m_D_02_1 = dbcsr::make_stensor<3>(
 				dbcsr::tensor3_d::create_template(*m_HT_01_2).name("D_02_1")
 				.map1({0,2}).map2({1}));
+				
+			dbcsr::copy_matrix_to_tensor(*k_bb, *m_K_01, false);
 			
 			reo_int_1.start();
 				
@@ -320,16 +352,18 @@ void DF_K::compute_K() {
 			reo_D_1.finish();
 			
 			con3.start();
-			dbcsr::contract(*m_HT_02_1, *m_D_02_1, *k_bb).move(true).alpha(-1.0).perform("XMi, XNi -> MN");
+			dbcsr::contract(*m_HT_02_1, *m_D_02_1, *m_K_01).move(true).alpha(-1.0).perform("XMi, XNi -> MN");
 			con3.finish();
 			
 			if (LOG.global_plev() >= 2) {
-				dbcsr::print(*k_bb);
+				dbcsr::print(*m_K_01);
 			}
 			
 			reo_int_2.start();
 			dbcsr::copy(*m_INTS_01_2,*INTS_0_12).move_data(true).perform();
 			reo_int_2.finish();
+			
+			dbcsr::copy_tensor_to_matrix(*m_K_01, *k_bb, false);
 
 	};
 	
@@ -340,7 +374,7 @@ void DF_K::compute_K() {
 	
 }
 
-/*BATCHED_DF_J::BATCHED_DF_J(dbcsr::world& w, desc::options& iopt) : J(w,iopt) {} 
+BATCHED_DF_J::BATCHED_DF_J(dbcsr::world& w, desc::options& iopt) : J(w,iopt) {} 
 
 void BATCHED_DF_J::init_tensors() {
 	
@@ -358,7 +392,7 @@ void BATCHED_DF_J::init_tensors() {
 	m_gp_xd = dbcsr::make_stensor<2>(dbcsr::tensor2_d::create().ngrid(grid2).name("c_x")
 		.map1({0}).map2({1}).blk_sizes(xd));
 	
-	m_gq_xd = dbcsr::make_stensor<2>(dbcsr::tensor2_d::create_template(*m_c_xd).name("c2_x"));
+	m_gq_xd = dbcsr::make_stensor<2>(dbcsr::tensor2_d::create_template(*m_gp_xd).name("c2_x"));
 	
 	m_J_bbd = dbcsr::make_stensor<3>(dbcsr::tensor3_d::create().ngrid(grid3).name("J dummy")
 		.map1({0,1}).map2({2}).blk_sizes(bbd));
@@ -369,50 +403,95 @@ void BATCHED_DF_J::init_tensors() {
 	
 }
 
-void DF_J::compute_J() {
+void BATCHED_DF_J::fetch_integrals(tensor::sbatchtensor<3,double>& btensor, int ibatch) {
 	
-	// fetch integrals
+	btensor->read(ibatch);
 	
-	LOG.os<1>("Fetching integrals.\n");
-	
-	auto i_xbb_012 = m_reg.get_tensor<3,double>(m_mol->name() + "_i_xbb_(0|12)",true,true);
+}
 
+void BATCHED_DF_J::compute_J() {
+	
+	// fetch batchtensor
+	
+	auto eri_batched = m_reg.get_btensor<3,double>(m_mol->name() + "_i_xbb_(0|12)_batched");
+	
+	eri_batched->set_batch_dim(vec<int>{2});
+	int nbatches = eri_batched->nbatches();
+	
 	// copy over density
 	
-	LOG.os<1>("Copy over density.\n");
+	dbcsr::mat_d ptot = dbcsr::mat_d::create_template(*m_p_A).name("ptot");
 	
-	dbcsr::copy_matrix_to_3Dtensor<double>(*m_p_A, *m_ptot_bbd, false, true);
-	
-	if (!m_p_B) {
-		m_ptot_bbd->scale(2.0);
+	if (m_p_A && !m_p_B) {
+		ptot.copy_in(*m_p_A);
+		ptot.scale(2.0);
+		dbcsr::copy_matrix_to_3Dtensor_new(ptot,*m_ptot_bbd,true);
+		ptot.clear();
 	} else {
-		dbcsr::copy_matrix_to_3Dtensor<double>(*m_p_B, *m_ptot_bbd, true, true);
+		ptot.copy_in(*m_p_A);
+		ptot.add(1.0, 1.0, *m_p_B);
+		dbcsr::copy_matrix_to_3Dtensor_new<double>(ptot,*m_ptot_bbd,true);
+		ptot.clear();
 	}
 	
-	LOG.os<1>("XMN, MN_ -> X_\n");
+	dbcsr::print(*m_ptot_bbd);
 	
-	dbcsr::contract(*i_xbb_012, *m_ptot_bbd, *m_c_xd).perform("XMN, MN_ -> X_");
+	for (int ibatch = 0; ibatch != nbatches; ++ibatch) {
+		
+		LOG.os<1>("J builder (1), batch nr. ", ibatch, '\n');
+		// Fetch integrals
+		
+		fetch_integrals(eri_batched,ibatch);
+		
+		auto i_xbb_0_12 = eri_batched->get_stensor();
+		//dbcsr::print(*i_xbb_0_12);
+		
+		LOG.os<1>("XMN, MN_ -> X_\n");
+	
+		dbcsr::contract(*i_xbb_0_12, *m_ptot_bbd, *m_gp_xd).beta(1.0).perform("XMN, MN_ -> X_");
+		eri_batched->clear_batch();
+		
+	}
+		
+	dbcsr::print(*m_gp_xd);
 	
 	LOG.os<1>("X_, XY -> Y_\n");
 	
-	dbcsr::contract(*m_c_xd, *m_inv, *m_c2_xd).perform("X_, XY -> Y_");
+	dbcsr::contract(*m_gp_xd, *m_inv, *m_gq_xd).perform("X_, XY -> Y_");
 	
-	LOG.os<1>("X, XMN -> MN\n");
+	dbcsr::print(*m_gq_xd);
 	
-	dbcsr::contract(*m_c2_xd, *i_xbb_012, *m_J_bbd).perform("X_, XMN -> MN_");
+	for (int ibatch = 0; ibatch != nbatches; ++ibatch) {
+		
+		LOG.os<1>("J builder (2), batch nr. ", ibatch, '\n');
+		// Fetch integrals
+		
+		fetch_integrals(eri_batched,ibatch);
+		
+		auto i_xbb_0_12 = eri_batched->get_stensor();
+		
+		LOG.os<1>("X, XMN -> MN\n");
+	
+		dbcsr::contract(*m_gq_xd, *i_xbb_0_12, *m_J_bbd).beta(1.0).perform("X_, XMN -> MN_");
+		
+		dbcsr::print(*m_J_bbd);
+		
+		eri_batched->clear_batch();
+		
+	}
 	
 	LOG.os<1>("Copy over...\n");
 	
-	dbcsr::copy_3Dtensor_to_2Dtensor(*m_J_bbd, *m_J, false);
+	dbcsr::copy_3Dtensor_to_matrix_new(*m_J_bbd, *m_J);
 	
-	m_c_xd->clear();
-	m_c2_xd->clear();
 	m_J_bbd->clear();
+	m_gp_xd->clear();
+	m_gq_xd->clear();
 	
 	if (LOG.global_plev() >= 2) {
 		dbcsr::print(*m_J);
 	}
 	
-}*/
+}
 		
 } // end namespace

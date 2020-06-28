@@ -3,6 +3,7 @@
 
 #include "desc/molecule.h"
 #include "desc/options.h"
+#include "tensor/batchtensor.h"
 #include "utils/mpi_time.h"
 #include "fock/jkbuilder.h"
 

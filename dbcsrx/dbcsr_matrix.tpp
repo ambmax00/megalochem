@@ -358,7 +358,15 @@ public:
     
     void put_block(const int row, const int col, block<2,T>& blk, std::optional<bool> sum = std::nullopt,
                     std::optional<T> scale = std::nullopt) {
+						
         c_dbcsr_put_block2d(m_matrix_ptr, row, col, blk.data(), blk.size()[0], blk.size()[1], 
+                            (sum) ? &*sum : nullptr, (scale) ? &*scale : nullptr);
+    }
+    
+    void put_block_p(const int row, const int col, T* data, const int rowsize, const int colsize,
+					std::optional<bool> sum = std::nullopt, std::optional<T> scale = std::nullopt) {
+						
+        c_dbcsr_put_block2d(m_matrix_ptr, row, col, data, rowsize, colsize, 
                             (sum) ? &*sum : nullptr, (scale) ? &*scale : nullptr);
     }
     
@@ -653,10 +661,11 @@ void print(matrix<T>& mat) {
 				} std::cout << "}" << std::endl;
 				
 			}
-		}
-		
-		if (nblk == 0) {
-			std::cout << "Rank: " << irank << " " << "{empty}" << std::endl;
+			
+			if (nblk == 0) {
+				std::cout << "Rank: " << irank << " " << "{empty}" << std::endl;
+			}
+			
 		}
 		
 		MPI_Barrier(w.comm());

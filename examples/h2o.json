@@ -23,7 +23,7 @@
 	"hf": 
 	{
 		"diis": true,
-		"guess": "SAD",
+		"guess": "core",
 		"scf_thresh": 1e-6,
 		"diis_start": 0, 
 		"build_J": "df",
