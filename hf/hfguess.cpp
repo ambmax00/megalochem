@@ -370,6 +370,11 @@ void hfmod::compute_guess() {
 		
 			math::hermitian_eigen_solver solver(m_p_bb_A, 'V', (LOG.global_plev() >= 2) ? true : false);
 			
+			m_SAD_rank = m_mol->c_basis().nbf();
+			auto m = dbcsr::split_range(m_SAD_rank,m_mol->mo_split());
+			
+			solver.eigvec_colblks(m);
+			
 			solver.compute();
 			
 			auto eigvals = solver.eigvals();
@@ -392,9 +397,9 @@ void hfmod::compute_guess() {
 			
 			cd.compute();
 			
-			int rank = cd.rank();
+			m_SAD_rank = cd.rank();
 			
-			auto m = m_c_bm_A->col_blk_sizes();
+			auto m = dbcsr::split_range(m_SAD_rank,m_mol->mo_split());
 			auto b = m_mol->dims().b(); 
 			
 			m_c_bm_A = cd.L(b,m);

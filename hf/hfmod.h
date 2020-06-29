@@ -39,6 +39,9 @@ private:
 	double m_nuc_energy;
 	double m_scf_energy;
 	
+	// other
+	int m_SAD_rank;
+	
 	smat_d m_s_bb, //overlap
 		  m_v_bb, // nuclear reulsion
 		  m_t_bb, // kinetic

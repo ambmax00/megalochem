@@ -2,6 +2,7 @@
 	"name": "test",
 	"global": 
 	{
+		"batchsize": 10000,
 		"block_threshold": 1e-9
 	},
 	"molecule": 
@@ -16,7 +17,7 @@
           0.00000,       -0.75545,       -0.47116
 		],
 		"symbols": ["O", "H", "H"],
-		"basis": "cc-pvdz",
+		"basis": "cc-pvtz",
 		"ao_split_method": "shell",
 		"reorder": false
 	},
@@ -26,16 +27,16 @@
 		"guess": "core",
 		"scf_thresh": 1e-6,
 		"diis_start": 0, 
-		"build_J": "df",
-		"build_K": "df",
-		"print": 0,
+		"build_J": "batchdf",
+		"build_K": "batchdf",
+		"print": 999,
 		"SAD_diis": true, 
-		"dfbasis": "cc-pvdz-ri", 
+		"dfbasis": "cc-pvtz-ri", 
 		"skip": false
 	},
 	"mp": 
 	{
-		"dfbasis": "cc-pvdz-ri",
+		"dfbasis": "cc-pvtz-ri",
 		"print": 2
 	},
 	"adc":

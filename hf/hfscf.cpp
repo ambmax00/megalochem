@@ -281,8 +281,9 @@ void hfmod::compute() {
 		// form fock matrix
 		
 		bool SAD_iter = ((iter == 0) && (m_guess == "SAD" || m_guess == "SADNO")) ? true : false;
+		int rank = ((iter == 0) && (m_guess == "SAD" || m_guess == "SADNO")) ? m_SAD_rank : 0;
 		
-		fbuilder.compute(SAD_iter);
+		fbuilder.compute(SAD_iter,rank);
 		
 		m_f_bb_A = fbuilder.get_f_A();
 		m_f_bb_B = fbuilder.get_f_B();

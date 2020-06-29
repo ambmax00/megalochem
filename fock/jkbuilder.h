@@ -29,6 +29,7 @@ protected:
 	dbcsr::smat_d m_c_B;
 	
 	bool m_SAD_iter;
+	int m_SAD_rank;
 	
 	std::shared_ptr<ints::aofactory> m_factory;
 	
@@ -43,7 +44,10 @@ public:
 		m_factory = ifac; 
 		m_mol = m_factory->mol();
 	}
-	void set_SAD(bool SAD) { m_SAD_iter = SAD; }
+	void set_SAD(bool SAD, int rank) { 
+		m_SAD_iter = SAD; 
+		m_SAD_rank = rank;
+	}
 	
 	~JK_common() {}
 	
@@ -174,6 +178,30 @@ public:
 	void compute_J() override;
 	void init_tensors() override;
 	void fetch_integrals(tensor::sbatchtensor<3,double>& btensor, int ibatch);
+	
+};
+
+class BATCHED_DF_K : public K {
+private:
+
+	tensor::sbatchtensor<3,double> m_dummy_batched_xbo_01_2;
+	dbcsr::stensor3_d m_dummy_xbo_01_2;
+	
+	dbcsr::stensor3_d m_INTS_01_2;
+	dbcsr::stensor3_d m_HT1_xbm_01_2;
+	dbcsr::stensor3_d m_HT1_xbm_0_12;
+	dbcsr::stensor3_d m_HT2_xbm_0_12;
+	dbcsr::stensor3_d m_HT2_xbm_01_2;
+	
+	dbcsr::stensor2_d m_c_bm;
+	dbcsr::stensor2_d m_K_01;
+	dbcsr::stensor2_d m_invsqrt;
+	
+public:
+
+	BATCHED_DF_K(dbcsr::world& w, desc::options& opt);
+	void compute_K() override;
+	void init_tensors() override;
 	
 };
 

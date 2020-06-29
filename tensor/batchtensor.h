@@ -196,6 +196,8 @@ public:
 			nblk_per_ndim *= m_blkstot[i];
 		}
 		
+		LOG.os<>("-- Available RAM for tensor per node: ", m_batch_size);
+		
 		LOG.os<>("-- Blocks per ndim slice: ", nblk_per_ndim, '\n');
 		
 		double nblk_ndim_per_batch = m_maxnblk_tot / nblk_per_ndim;

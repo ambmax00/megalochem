@@ -47,7 +47,7 @@ public:
 	
 	void init();
 	
-	void compute(bool SAD_iter = false);
+	void compute(bool SAD_iter = false, int rank = 0);
 	
 	dbcsr::smat_d get_f_A() { return m_f_bb_A; }
 	dbcsr::smat_d get_f_B() { return m_f_bb_B; }

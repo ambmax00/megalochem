@@ -365,8 +365,8 @@ dbcsr::tensor<2,T> eigen_to_tensor(MatrixX<T>& M, std::string name,
 		
 	out.reserve_all();
 	
-	#pragma omp parallel 
-	{
+	//#pragma omp parallel 
+	//{
 		dbcsr::iterator_t<2> iter(out);
 		iter.start();
 	
@@ -388,7 +388,7 @@ dbcsr::tensor<2,T> eigen_to_tensor(MatrixX<T>& M, std::string name,
 		
 		out.finalize();
 		iter.stop();
-	}	
+	//}	
 	
 	return out;
 

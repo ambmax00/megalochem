@@ -87,6 +87,16 @@ void fockmod::init() {
 		compute_s_xx = true;
 		compute_s_xx_invsqrt = true;
 		
+	} else if (k_method == "batchdf") {
+		
+		K* builder = new BATCHED_DF_K(m_world,m_opt);
+		m_K_builder.reset(builder);
+		
+		compute_s_xx = true;
+		compute_s_xx_invsqrt = true;
+		setup_btensor = true;
+		if (!direct) compute_3c2e_batched = true;
+		
 	}
 	
 	LOG.os<>("Setting up JK builder.\n");
@@ -160,7 +170,7 @@ void fockmod::init() {
 		auto eri = aofac->ao_3c2e_setup_tensor(vec<int>{0}, vec<int>{1,2});
 		
 		tensor::sbatchtensor<3,double> eribatch = 
-			std::make_shared<tensor::batchtensor<3,double>>(eri,1000,999);
+			std::make_shared<tensor::batchtensor<3,double>>(eri,tensor::global::default_batchsize,999);
 		
 		eribatch->create_file();
 		eribatch->setup_batch();
@@ -174,10 +184,6 @@ void fockmod::init() {
 			bounds[0] = eribatch->bounds_blk(i,0);
 			bounds[1] = eribatch->bounds_blk(i,1);
 			bounds[2] = eribatch->bounds_blk(i,2);
-			
-			std::cout << bounds[0][0] << " " << bounds[0][1] << std::endl;
-			std::cout << bounds[1][0] << " " << bounds[1][1] << std::endl;
-			std::cout << bounds[2][0] << " " << bounds[2][1] << std::endl;
 			
 			aofac->ao_3c2e_fill(eri,bounds,scr);
 			
@@ -245,11 +251,19 @@ void fockmod::init() {
 
 			std::string name = m_mol->name() + "_s_xx_invsqrt_(0|1)";
 			
+			dbcsr::print(*Linv);
+			
+			dbcsr::mat_d Linv_t = dbcsr::mat_d::transpose(*Linv);
+			
 			dbcsr::stensor2_d s_xx_invsqrt_01 = dbcsr::make_stensor<2>(
 				dbcsr::tensor2_d::create().name(name).ngrid(grid2)
 				.map1({0}).map2({1}).blk_sizes(xx));
 			
-			dbcsr::copy_matrix_to_tensor(*Linv, *s_xx_invsqrt_01);
+			dbcsr::copy_matrix_to_tensor(Linv_t, *s_xx_invsqrt_01);
+			Linv_t.clear();
+			
+			dbcsr::print(*s_xx_invsqrt_01);
+			
 			
 			reg.insert_tensor<2,double>(name, s_xx_invsqrt_01);
 			
@@ -269,12 +283,12 @@ void fockmod::init() {
 	
 }
 
-void fockmod::compute(bool SAD_iter) {
+void fockmod::compute(bool SAD_iter, int rank) {
 	
 	TIME.start();
 	
-	m_J_builder->set_SAD(SAD_iter);
-	m_K_builder->set_SAD(SAD_iter);
+	m_J_builder->set_SAD(SAD_iter,rank);
+	m_K_builder->set_SAD(SAD_iter,rank);
 	
 	auto& t_j = TIME.sub("J builder");
 	auto& t_k = TIME.sub("K builder");

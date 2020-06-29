@@ -493,5 +493,175 @@ void BATCHED_DF_J::compute_J() {
 	}
 	
 }
+
+BATCHED_DF_K::BATCHED_DF_K(dbcsr::world& w, desc::options& opt) : K(w,opt) {}
+
+void BATCHED_DF_K::init_tensors() {
+	
+	auto b = m_p_A->row_blk_sizes();
+	arrvec<int,2> bb = {b,b};
+	
+	dbcsr::pgrid<2> grid2(m_world.comm());
+	
+	m_K_01 = dbcsr::make_stensor<2>(dbcsr::tensor2_d::create().ngrid(grid2).name("K_01")
+		.map1({0}).map2({1}).blk_sizes(bb));
+		
+	m_invsqrt = m_reg.get_tensor<2,double>(m_mol->name() + "_s_xx_invsqrt_(0|1)");
+	
+}
+
+void BATCHED_DF_K::compute_K() {
+	
+	auto b = m_mol->dims().b();
+	auto X = m_mol->dims().x();
+	
+	dbcsr::pgrid<2> grid2(m_world.comm());
+	dbcsr::pgrid<3> grid3(m_world.comm());
+	
+	auto compute_K_single = 
+	[&] (dbcsr::smat_d& c_bm, dbcsr::smat_d& k_bb, std::string x) {
+		
+		vec<int> o, m;
+		k_bb->clear();
+		
+		if (m_SAD_iter) {
+			m = c_bm->col_blk_sizes();
+			o = m;
+		} else {
+			m = c_bm->col_blk_sizes();
+			o = (x == "A") ? m_mol->dims().oa() : m_mol->dims().ob();
+		}
+		
+		arrvec<int,2> bm = {b,m};
+		arrvec<int,3> xbm = {X,b,m};
+		arrvec<int,3> xbo = {X,b,o};
+		arrvec<int,3> xbb = {X,b,b};
+		
+		auto eri_batched = m_reg.get_btensor<3,double>(m_mol->name() + "_i_xbb_(0|12)_batched");
+		
+		eri_batched->set_batch_dim({2});
+		
+		m_c_bm = dbcsr::make_stensor<2>(
+			dbcsr::tensor2_d::create().ngrid(grid2)
+			.name("c_bm_" + x + "_0_1").map1({0}).map2({1})
+			.blk_sizes(bm));
+			
+		dbcsr::copy_matrix_to_tensor(*c_bm, *m_c_bm);
+			
+		//dbcsr::print(*c_bm);
+		//dbcsr::print(*m_c_bm);	
+			
+		m_INTS_01_2 = dbcsr::make_stensor<3>(
+			dbcsr::tensor3_d::create().name("INTS_xbb_01_2")
+			.ngrid(grid3).map1({0,1}).map2({2}).blk_sizes(xbb));
+				
+		m_HT1_xbm_01_2 = dbcsr::make_stensor<3>(
+			dbcsr::tensor3_d::create().name("HT1_xbm_01_2_" + x)
+			.ngrid(grid3).map1({0,1}).map2({2}).blk_sizes(xbm));
+			
+		m_HT1_xbm_0_12 = dbcsr::make_stensor<3>(
+			dbcsr::tensor3_d::create().name("HT1_xbm_0_12_" + x)
+			.ngrid(grid3).map1({0}).map2({1,2}).blk_sizes(xbm));
+			
+		m_HT2_xbm_0_12 = dbcsr::make_stensor<3>(
+			dbcsr::tensor3_d::create().name("HT2_xbm_0_12_" + x)
+			.ngrid(grid3).map1({0}).map2({1,2}).blk_sizes(xbm));
+			
+		m_HT2_xbm_01_2 = dbcsr::make_stensor<3>(
+			dbcsr::tensor3_d::create().name("HT2_xbm_01_2_" + x)
+			.ngrid(grid3).map1({0,2}).map2({1}).blk_sizes(xbm));
+			
+		m_dummy_xbo_01_2 = dbcsr::make_stensor<3>(
+			dbcsr::tensor3_d::create().name("dummy_xbo_01_2_" + x)
+			.ngrid(grid3).map1({0,1}).map2({2}).blk_sizes(xbo));
+			
+		m_dummy_batched_xbo_01_2 = std::make_shared<tensor::batchtensor<3,double>>
+			(m_dummy_xbo_01_2,tensor::global::default_batchsize,20);
+			
+		m_dummy_batched_xbo_01_2->setup_batch();
+		m_dummy_batched_xbo_01_2->set_batch_dim(vec<int>{2});
+		
+		int n_batches_o = m_dummy_batched_xbo_01_2->nbatches();
+		int n_batches_m = eri_batched->nbatches();
+		
+		//std::cout << "INVSQRT" << std::endl;
+		//dbcsr::print(*m_invsqrt);
+		
+		// LOOP OVER BATCHES OF OCCUPIED ORBITALS
+		
+		auto eri_ptr = eri_batched->get_stensor();
+		
+		if (n_batches_m == 1) {
+			dbcsr::copy(*eri_ptr,*m_INTS_01_2).move_data(true).perform();
+		}
+		
+		for (int I = 0; I != n_batches_o; ++I) {
+			std::cout << "IBATCH: " << I << std::endl;
+			
+			auto boundso = m_dummy_batched_xbo_01_2->bounds(I,2);
+			
+			//std::cout << "BOUNDSO: " << boundso[0] << " " << boundso[1] << std::endl;
+			
+			vec<vec<int>> bounds(1);
+			bounds[0] = boundso;
+			
+			for (int M = 0; M != n_batches_m; ++M) {
+				
+				//std::cout << "MBATCH: " << M << std::endl;
+				
+				eri_batched->read(M);
+				
+				//dbcsr::print(*eri_ptr);
+				
+				if (n_batches_m != 1) 
+				 dbcsr::copy(*eri_ptr,*m_INTS_01_2).move_data(true).perform();
+				
+				dbcsr::contract(*m_INTS_01_2,*m_c_bm,*m_HT1_xbm_01_2)
+					.bounds3(bounds).beta(1.0).perform("XMN, Ni -> XMi");
+				
+				//dbcsr::print(*m_HT1_xbm_01_2);
+				
+				if (n_batches_m != 1) m_INTS_01_2->clear();
+				
+			}
+			
+			// end for M
+			
+			dbcsr::copy(*m_HT1_xbm_01_2,*m_HT1_xbm_0_12).move_data(true).perform();
+			
+			dbcsr::contract(*m_HT1_xbm_0_12,*m_invsqrt,*m_HT2_xbm_0_12).perform("XMi, XY -> YMi");
+			m_HT1_xbm_0_12->clear();
+			
+			//dbcsr::print(*m_HT2_xbm_0_12);
+			
+			dbcsr::copy(*m_HT2_xbm_0_12,*m_HT2_xbm_01_2).move_data(true).perform();
+			
+			dbcsr::contract(*m_HT2_xbm_01_2,*m_HT2_xbm_01_2,*m_K_01).move(true)
+				.beta(1.0).perform("Xmi, Xni -> mn"); 
+				
+			//dbcsr::print(*m_K_01);
+				
+		} // end for I
+		
+		if (n_batches_m == 1) {
+			dbcsr::copy(*m_INTS_01_2, *eri_ptr).move_data(true).perform();
+		}
+		
+		dbcsr::copy_tensor_to_matrix(*m_K_01,*k_bb);
+		m_K_01->clear();
+		k_bb->scale(-1.0);
+		
+	}; // end lambda function
+	
+	compute_K_single(m_c_A, m_K_A, "A");
+	
+	if (m_K_B) compute_K_single(m_c_B, m_K_B, "B");
+	
+	//dbcsr::print(*m_K_A);
+		
+}
+		
+		   
+	
 		
 } // end namespace
