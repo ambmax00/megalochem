@@ -2,7 +2,7 @@
 	"name": "test",
 	"global": 
 	{
-		"batchsize": 10000,
+		"batchsize": 1000,
 		"block_threshold": 1e-9
 	},
 	"molecule": 

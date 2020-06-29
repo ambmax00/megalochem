@@ -568,19 +568,31 @@ public:
 				
 			arrvec<int,N> locblkidx;
 			
-			LOG.os<>("Offset: ", blkoff, '\n');
-			LOG.os<>("NBLKTOTBATCH: ", nblktotbatch, '\n');
+			LOG(-1).os<>("Offset: ", blkoff, '\n');
+			LOG(-1).os<>("NBLKTOTBATCH: ", nblktotbatch, '\n');
 			//// setting
 			for (int i = 0; i != N; ++i) {
 				locblkidx[i].insert(locblkidx[i].end(),
 					m_locblkidx[i].begin() + blkoff,
-					m_locblkidx[i].begin() + blkoff + nblktotbatch);
+					m_locblkidx[i].begin() + blkoff + nblk);
 			}
 			
-			for (auto a : locblkidx) {
-				for (auto l : a) {
-					std::cout << l << " ";
-				} std::cout << std::endl;
+			MPI_Barrier(m_comm);
+			
+			for (int i = 0; i != m_mpisize; ++i) {
+			
+			if (i == m_mpirank) {
+			
+				for (auto a : locblkidx) {
+					for (auto l : a) {
+						std::cout << l << " ";
+					} std::cout << std::endl;
+				}
+				
+			}
+			
+			MPI_Barrier(m_comm);
+			
 			}
 			
 			//// reserving
