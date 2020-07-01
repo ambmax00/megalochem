@@ -182,6 +182,8 @@ void hfmod::compute_guess() {
 			int atprint = LOG.global_plev() - 2;
 			at_opt.set<int>("print", atprint);
 			at_opt.set<std::string>("guess", m_opt.get<std::string>("SAD_guess", HF_SAD_GUESS));
+			at_opt.set<std::string>("build_J", "exact");
+			at_opt.set<std::string>("build_K", "exact");
 			at_opt.set<bool>("diis", m_opt.get<bool>("SAD_diis", HF_SAD_SCF_DIIS));
 			at_opt.set<bool>("use_df", m_opt.get<bool>("SAD_use_df", HF_SAD_USE_DF));
 			at_opt.set<double>("scf_thresh",m_opt.get<double>("SAD_scf_thresh", HF_SAD_SCF_THRESH));

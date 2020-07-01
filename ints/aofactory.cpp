@@ -59,6 +59,7 @@ public:
 		} else if (op == "nuclear") {
 			m_Op = libint2::Operator::nuclear;
 		} else if (op == "erfc_coulomb") {
+			std::cout << "ERROR" << std::endl;
 			m_Op = libint2::Operator::erfc_coulomb;
 		}
 		
@@ -304,6 +305,8 @@ public:
 		screener* scr) {
 			
 		auto blksizes = t_in->blk_sizes(); 
+		
+		if (m_Op == libint2::Operator::erfc_coulomb) { std::cout << "COMP ERR:" << std::endl; }
 	
 		//if (scr) {
 			
@@ -434,6 +437,17 @@ dbcsr::smatrix<double> aofactory::ao_3coverlap() {
 	return pimpl->compute();
 }
 
+dbcsr::smatrix<double> aofactory::ao_3coverlap_erfc() {
+	
+	std::string intname = m_mol->name() + "_s_xx_erfc";
+	
+	pimpl->set_name("s_xx_erfc");
+	pimpl->set_braket("xx");
+	pimpl->set_operator("erfc_coulomb");
+	pimpl->setup_calc();
+	return pimpl->compute();
+}
+
 /*
 dbcsr::smatrix<double> ao_3coverlap_inv() {
 	
@@ -484,8 +498,23 @@ void aofactory::ao_3c2e_setup() {
 	
 }
 
+void aofactory::ao_3c2e_erfc_setup() {
+	
+	pimpl->set_braket("xbb");
+	pimpl->set_operator("erfc_coulomb");
+	pimpl->setup_calc();
+	
+}
+
 dbcsr::stensor<3,double> aofactory::ao_3c2e_setup_tensor(vec<int> map1, vec<int> map2) {
 	auto name = m_mol->name() + "_i_xbb_" + pimpl->m_reg.map_to_string(map1,map2);
+	pimpl->set_name(name);
+	return pimpl->setup_tensor<3>(map1,map2);
+	
+}
+
+dbcsr::stensor<3,double> aofactory::ao_3c2e_erfc_setup_tensor(vec<int> map1, vec<int> map2) {
+	auto name = m_mol->name() + "_erfc_xbb_" + pimpl->m_reg.map_to_string(map1,map2);
 	pimpl->set_name(name);
 	return pimpl->setup_tensor<3>(map1,map2);
 	

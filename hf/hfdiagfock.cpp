@@ -38,7 +38,8 @@ void hfmod::diag_fock() {
 		
 		math::hermitian_eigen_solver solver(XFXs, 'V', (LOG.global_plev() >= 2) ? true : false);
 		
-		auto m = c_bm->col_blk_sizes();
+		vec<int> m = (x == "A") ? m_mol->dims().ma() : m_mol->dims().mb();
+		
 		solver.eigvec_colblks(m).compute();
 		
 		auto eigval = solver.eigvals();
@@ -58,6 +59,9 @@ void hfmod::diag_fock() {
 		if (LOG.global_plev() >= 3) {
 			dbcsr::print(*c_bm_x);
 		}
+		
+		dbcsr::mat_d new_c_bm = dbcsr::mat_d::create_template(*c_bm_x).name(c_bm_x->name());
+		*c_bm = std::move(new_c_bm); 
 	
 		//Transform back
 		dbcsr::multiply('N','N',*m_x_bb,*c_bm_x,*c_bm).perform();

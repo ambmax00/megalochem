@@ -434,7 +434,7 @@ void BATCHED_DF_J::compute_J() {
 		ptot.clear();
 	}
 	
-	dbcsr::print(*m_ptot_bbd);
+	//dbcsr::print(*m_ptot_bbd);
 	
 	for (int ibatch = 0; ibatch != nbatches; ++ibatch) {
 		
@@ -453,13 +453,13 @@ void BATCHED_DF_J::compute_J() {
 		
 	}
 		
-	dbcsr::print(*m_gp_xd);
+	//dbcsr::print(*m_gp_xd);
 	
 	LOG.os<1>("X_, XY -> Y_\n");
 	
 	dbcsr::contract(*m_gp_xd, *m_inv, *m_gq_xd).perform("X_, XY -> Y_");
 	
-	dbcsr::print(*m_gq_xd);
+	//dbcsr::print(*m_gq_xd);
 	
 	for (int ibatch = 0; ibatch != nbatches; ++ibatch) {
 		
@@ -474,7 +474,7 @@ void BATCHED_DF_J::compute_J() {
 	
 		dbcsr::contract(*m_gq_xd, *i_xbb_0_12, *m_J_bbd).beta(1.0).perform("X_, XMN -> MN_");
 		
-		dbcsr::print(*m_J_bbd);
+		//dbcsr::print(*m_J_bbd);
 		
 		eri_batched->clear_batch();
 		

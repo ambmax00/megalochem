@@ -250,7 +250,7 @@ int main(int argc, char** argv) {
 	
 	mp::mpmod mymp(myhfwfn,mpopt,wrd);
 	
-	mymp.compute();
+	mymp.compute_batch();
 	
 	/*
 	

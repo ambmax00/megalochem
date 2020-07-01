@@ -51,6 +51,8 @@ private:
 		std::vector<int> m_occ_beta_sizes;
 		std::vector<int> m_vir_alpha_sizes;
 		std::vector<int> m_vir_beta_sizes;
+		std::vector<int> m_tot_alpha_sizes;
+		std::vector<int> m_tot_beta_sizes;
 		std::vector<int> m_bas_sizes;
 		std::vector<int> m_shell_sizes;
 		optional<std::vector<int>,val> m_dfbas_sizes;
@@ -67,6 +69,15 @@ private:
 			m_vir_alpha_sizes = split_range(mol.m_nvir_alpha,nsplit);
 			m_vir_beta_sizes = split_range(mol.m_nvir_beta,nsplit);
 			
+			m_tot_alpha_sizes = m_occ_alpha_sizes;
+			m_tot_beta_sizes = m_occ_beta_sizes;
+			
+			m_tot_alpha_sizes.insert(m_tot_alpha_sizes.end(),
+				m_vir_alpha_sizes.begin(),m_vir_alpha_sizes.end());
+				
+			m_tot_beta_sizes.insert(m_tot_beta_sizes.end(),
+				m_vir_beta_sizes.begin(),m_vir_beta_sizes.end());
+			
 			m_bas_sizes = mol.m_cluster_basis.cluster_sizes();
 			
 			for (int i = 0; i != mol.m_cluster_basis.size(); ++i) {
@@ -82,6 +93,8 @@ private:
 		std::vector<int> ob() { return m_occ_beta_sizes; }
 		std::vector<int> va() { return m_vir_alpha_sizes; }
 		std::vector<int> vb() { return m_vir_beta_sizes; }
+		std::vector<int> ma() { return m_tot_alpha_sizes; }
+		std::vector<int> mb() { return m_tot_beta_sizes; }
 		std::vector<int> b() { return m_bas_sizes; }
 		std::vector<int> x() { 
 			if (m_dfbas_sizes) {

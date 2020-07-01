@@ -33,6 +33,8 @@ private:
 	bool m_onebatch;
 	/* if everything can be held in core memory
 	 * if true, we do not write or read files. */
+	bool m_setup;
+	/* wether batching has been set up */
 	
 	/* ========== static tensor variables ========== */
 	
@@ -121,9 +123,13 @@ public:
 	/* sets up the preliminary batching information. */
 	void setup_batch() {
 		
+		LOG.os<>("Setting up preliminary batching info for ", m_stensor->name(), '\n');
+		m_setup = true;
+		
 		if (m_batch_size < 0) {
 			LOG.os<>("-- Tensor is held in core memory. No I/O.");
 			m_onebatch = true;
+			return;
 		}
 		
 		// determine how many blocks per batch are allowed
@@ -159,9 +165,11 @@ public:
 		LOG.os<>("-- Holding ", m_maxnblk_tot, " at most on all nodes.\n");
 		
 		if (m_maxnblk_tot > m_nblktot_global) {
-			LOG.os<>("-- Tensor is held in core memory. No I/O.");
+			LOG.os<>("-- Tensor is held in core memory. No I/O.\n");
 			m_onebatch = true;
 		}
+		
+		LOG.os<>("Finished setting up preliminary batching info.\n");
 		
 	}
 	
@@ -170,12 +178,14 @@ public:
 	 
 	void set_batch_dim(std::vector<int> ndim) {
 		
+		if (!m_setup) throw std::runtime_error("Batching has not yet been setup!");
+		
 		if (m_onebatch) {
 			m_nbatches = 1;
 			return;
 		}
 		
-		LOG.os<>("Setting up batching information.\n");
+		LOG.os<>("Setting up batching dimensions for ", m_stensor->name(), "\n");
 		
 		for (auto n : ndim) {
 			if (n >= N || n < 0) throw std::runtime_error("Invalid batch dimension.");
@@ -225,7 +235,7 @@ public:
 		
 		max_idx_super -= 1;
 		
-		LOG.os<>("Maximum super index: ", max_idx_super, '\n');
+		LOG.os<>("-- Maximum super index: ", max_idx_super, '\n');
 		
 		m_boundsblk.resize(m_nbatches);
 		
@@ -263,12 +273,14 @@ public:
 			
 		}
 		
-		LOG.os<1>("Bounds: \n");
+		LOG.os<1>("-- Bounds: \n");
 		for (auto b : m_boundsblk) {
 			for (int i = 0; i != b.size(); ++i) {
 				LOG.os<>(b[i][0], " -> ", b[i][1], " ");
 			}
 		} LOG.os<>('\n');
+		
+		LOG.os<>("Finished setting up all batching info.\n");
 		
 	}
 	
@@ -525,11 +537,14 @@ public:
 			
 		MPI_File_close(&fh_data);
 		
-		std::cout << "LOC BLK IDX." << std::endl;
-		for (auto n : m_locblkidx) {
-			for (auto i : n) {
-				std::cout << i << " "; 
-			} std::cout << std::endl;
+		if (LOG.global_plev() >= 10) {
+			std::cout << "LOC BLK IDX AND OFFSET." << std::endl;
+			for (int i = 0; i != m_locblkidx[0].size(); ++i) {
+				for (int j = 0; j != N; ++j) {
+					std::cout << m_locblkidx[j][i] << " ";
+				}
+				std::cout << m_locblkoff[i] << std::endl;
+			}
 		}
 		
 		LOG.os<>("Done with batch ", ibatch, '\n');
@@ -626,6 +641,8 @@ public:
 		// needs special offsets
 		} else {
 			
+			LOG.os<>("Different dimension.\n");
+			
 			int i = 0;
 			
 			// === First we need to figure out the block indices
@@ -642,6 +659,8 @@ public:
 			
 			arrvec<int,N> res;
 			vec<MPI_Aint> blkoff;
+			
+			LOG.os<1>("Maxblk per node: ", m_maxblk_per_node, '\n');
 			
 			int nzeloc = 0;
 			
@@ -662,7 +681,7 @@ public:
 							for (int j = 0; j != N; ++j) {
 								res[j].push_back(m_locblkidx[j][i]);
 							}
-							blkoff.push_back(m_locblkoff[i]);
+							blkoff.push_back(m_locblkoff[i]*sizeof(T));
 						}
 					}
 					break;
@@ -694,6 +713,18 @@ public:
 				}
 			}
 			
+			if (LOG.global_plev() >= 10) {
+			
+				std::cout << "READ LOC BLK IDX AND OFFSET." << std::endl;
+				for (int i = 0; i != res[0].size(); ++i) {
+					for (int j = 0; j != N; ++j) {
+						std::cout << res[j][i] << " ";
+					}
+					std::cout << blkoff[i] << std::endl;
+				}
+				
+			}
+			
 			int nblk = res[0].size();
 			vec<int> blksizes(nblk);
 			
@@ -718,9 +749,13 @@ public:
 			
 			LOG.os<>("Creating MPI TYPE.\n");
 			
-			std::cout << "BLOCK SIZES + OFF: " << std::endl;
-			for (int i = 0; i != nblk; ++i) {
-				std::cout << blksizes[i] << " " << blkoff[i] << std::endl;
+			if (LOG.global_plev() >= 10) {
+			
+				std::cout << "BLOCK SIZES + OFF: " << std::endl;
+				for (int i = 0; i != nblk; ++i) {
+					std::cout << blksizes[i] << " " << blkoff[i] << std::endl;
+				}
+				
 			}
 			
 			MPI_Datatype MPI_HINDEXED;

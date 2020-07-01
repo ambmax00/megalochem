@@ -40,6 +40,7 @@ public:
 	dbcsr::smatrix<double> ao_nuclear();
 	
 	dbcsr::smatrix<double> ao_3coverlap();
+	dbcsr::smatrix<double> ao_3coverlap_erfc();
 	
 	dbcsr::stensor<3,double> ao_3c2e(vec<int> map1, vec<int> map2, screener* scr = nullptr);
 	dbcsr::stensor<4,double> ao_eri(vec<int> map1, vec<int> map2);
@@ -48,7 +49,11 @@ public:
 	dbcsr::smatrix<double> ao_3cschwarz();
 	
 	void ao_3c2e_setup();
+	void ao_3c2e_erfc_setup();
+	
 	dbcsr::stensor<3,double> ao_3c2e_setup_tensor(vec<int> map1, vec<int> map2);
+	dbcsr::stensor<3,double> ao_3c2e_erfc_setup_tensor(vec<int> map1, vec<int> map2);
+	
 	void ao_3c2e_fill(dbcsr::stensor<3,double>& t_in, vec<vec<int>>& blkbounds, screener* scr);
 	
 	static double precision;

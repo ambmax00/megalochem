@@ -42,7 +42,6 @@ static const json valid_keys =
 		{"max_iter", 10},
 		{"SAD_guess", "core"},
 		{"SAD_diis", true},
-		{"SAD_use_df", true},
 		{"SAD_spin_average", true},
 		{"dfbasis", "string"} 
 	}},

@@ -69,6 +69,18 @@ public:
 		m.m_matrix_ptr = nullptr;
 	}
 
+	matrix& operator=(matrix&& m) {
+		
+		if (&m == this) return *this;
+		
+		m_matrix_ptr = m.m_matrix_ptr;
+		m_world = m.m_world;
+		
+		m.m_matrix_ptr = nullptr;
+		return *this;
+		
+	}
+
     typedef T value_type;
     
     template <typename D>
@@ -196,7 +208,7 @@ public:
      
     T trace() const {
         T out;
-        c_dbcsr_trace(m_matrix_ptr, out);
+        c_dbcsr_trace(m_matrix_ptr, &out);
         return out;
     }
     

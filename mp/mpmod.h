@@ -25,7 +25,8 @@ public:
 	
 	void compute();
 	
-
+	void compute_batch();
+	
 };
 
 }

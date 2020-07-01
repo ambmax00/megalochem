@@ -251,7 +251,7 @@ void fockmod::init() {
 
 			std::string name = m_mol->name() + "_s_xx_invsqrt_(0|1)";
 			
-			dbcsr::print(*Linv);
+			//dbcsr::print(*Linv);
 			
 			dbcsr::mat_d Linv_t = dbcsr::mat_d::transpose(*Linv);
 			
@@ -262,9 +262,7 @@ void fockmod::init() {
 			dbcsr::copy_matrix_to_tensor(Linv_t, *s_xx_invsqrt_01);
 			Linv_t.clear();
 			
-			dbcsr::print(*s_xx_invsqrt_01);
-			
-			
+			//dbcsr::print(*s_xx_invsqrt_01);
 			reg.insert_tensor<2,double>(name, s_xx_invsqrt_01);
 			
 		}

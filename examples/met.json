@@ -1,12 +1,17 @@
 {
-	"name": "test",
+        "name": "test",
+        "global":
+        {
+                "batchsize": 1000,
+                "block_threshold": 1e-9
+        },
 	"molecule": 
-	{	
-		"name": "MetOH",
-		"mult": 1,
-		"charge": 0,
-		"unit": "angstrom",
-		"geometry": [
+	{
+	       "name": "MetOH",
+                "mult": 1,
+                "charge": 0,
+                "unit": "angstrom",
+                "geometry": [
          -2.0801425360,     0.4329727646,     0.0722817289,
          -1.2129704155,    -0.2295285634,    -0.0097156258,
          -1.2655910941,    -0.9539857247,     0.8097953440,
@@ -16,24 +21,32 @@
           1.2473876659,    -0.8998737590,     0.6150681570,
           0.1316093068,     1.2841805400,    -0.7645223601,
          -1.2737541560,    -0.7748626513,    -0.9540587845
-		],
-		"symbols": ["H", "C", "H", "C", "O", "H", "H", "H", "H"],
-		"basis": "cc-pvdz",
-		"dfbasis": "cc-pvdz-ri",
-		"reorder": false
-	},
-	"hf": 
-	{
-		"diis": true,
-		"guess": "SAD",
-		"scf_thresh": 1e-6,
-		"diis_start": 0,
-		"use_df": false,
-		"print": 2,
-		"SAD_diis": true
-	},
-	"adc":
-	{
-		"nroots": 1
-	}
+                ],
+                "symbols": ["H", "C", "H", "C", "O", "H", "H", "H", "H"],
+                "basis": "cc-pvdz",
+                "ao_split_method": "shell",
+                "reorder": false
+        },
+        "hf":
+        {
+                "diis": true,
+                "guess": "SAD",
+                "scf_thresh": 1e-6,
+                "diis_start": 0,
+                "build_J": "batchdf",
+                "build_K": "batchdf",
+                "print": 0,
+                "SAD_diis": true,
+                "dfbasis": "cc-pvdz-ri",
+                "skip": false
+        },
+        "mp":
+        {
+                "dfbasis": "cc-pvdz-ri",
+                "print": 2
+        },
+        "adc":
+        {
+                "nroots": 1
+        }
 }
