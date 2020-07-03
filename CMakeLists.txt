@@ -20,7 +20,6 @@ find_package(MPI REQUIRED)
 find_package(DBCSR 2.0.0 CONFIG REQUIRED)
 find_package(PkgConfig)
 pkg_check_modules(deps REQUIRED IMPORTED_TARGET GLOBAL libxsmmf)
-find_package(TBB REQUIRED)
 find_package(Libint2 2.6.0 CONFIG REQUIRED)
 find_package(SCALAPACK REQUIRED)
 

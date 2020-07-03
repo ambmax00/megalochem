@@ -1,46 +1,44 @@
-/* Taken from MPQC by the Valeev group
-   Slightly modified
+/* Adapted from MPQC by the Valeev group
 */
 
 #ifndef POOL_H
 #define POOL_H
 
+#include <vector>
 #include <memory>
-
-#include <tbb/enumerable_thread_specific.h>
+#include "omp.h"
 
 namespace util {
-
-/// A pool of thread-specific objects
+	
 template <typename Item>
-class TSPool {
-  public:
-    /// Don't allow copies or default initialization.
-    TSPool() = delete;
-    TSPool(TSPool const &) = delete;
-    TSPool &operator=(TSPool const &) = delete;
+class Pool {
+private:
 
-    TSPool &operator=(TSPool &&) = default;
-    TSPool(TSPool &&a) = default;
+	std::vector<Item> m_items;
+	
+public:
 
-    /// Initializes the pool with a single @c Item
-    explicit TSPool(Item e)
-        : item_(std::move(e)), items_(item_) {}
-    /// @return reference to the thread-local @c Item instance.
-    Item &local() { return items_.local(); }
-
-  private:
-    Item item_;
-    tbb::enumerable_thread_specific<Item> items_;
+	Pool() = delete;
+	Pool(Pool const&) = delete;
+	Pool &operator=(Pool const&) = delete;
+	
+	Pool &operator=(Pool &&) = default;
+    Pool(Pool &&a) = default;
+    
+    explicit Pool(Item e) : 
+		m_items(omp_get_max_threads(), e) {}
+	
+	Item &local() { return m_items[omp_get_thread_num()]; }
+	
 };
 
 template <typename Item>
-std::shared_ptr<TSPool<Item>> make_pool(Item e) {
-    return std::make_shared<TSPool<Item>>(std::move(e));
+std::shared_ptr<Pool<Item>> make_pool(Item e) {
+    return std::make_shared<Pool<Item>>(e);
 }
 
 template <typename E>
-using ShrPool = std::shared_ptr<TSPool<E>>;
+using ShrPool = std::shared_ptr<Pool<E>>;
 
 } // end namespace
 
