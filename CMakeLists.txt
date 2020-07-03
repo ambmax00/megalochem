@@ -10,7 +10,7 @@ set(CMAKE_MODULE_PATH ${CMAKE_SOURCE_DIR}/cmake/modules)
 
 find_package(Eigen3 REQUIRED NO_MODULE)
 
-get_target_property(dir Eigen3::Eigen INTERFACE_INCLUDE_DIRECTORIES)
+#get_target_property(dir Eigen3::Eigen INTERFACE_INCLUDE_DIRECTORIES)
 
 include_directories(${dir})
 
