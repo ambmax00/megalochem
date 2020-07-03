@@ -1,6 +1,7 @@
 # MEGALOCHEM
 
-A quantum chemistry software package designed for computing excitation energies of large molecules using ADC, using sparse matrix algebra. 
+WORK IN PROGRESS!
+A quantum chemistry software package that is being designed for computing excitation energies of large molecules using ADC, using sparse matrix algebra. 
 
 ## Getting Started
 
@@ -38,6 +39,12 @@ cmake
 Cmake recipie will be improved.
 
 Compilers need MPI/OpenMP support. C++ needs to have at least C++17 standard.
+
+## Implemented
+
+* Hartree Fock (exact/df/df-mem)
+* MP2 (AOMP2)
+* ADC (RI-ADC1, RI-ADC2, SOS-RI-ADC2)
 
 ## License
 
