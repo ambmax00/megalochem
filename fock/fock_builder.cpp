@@ -170,7 +170,8 @@ void fockmod::init() {
 		auto eri = aofac->ao_3c2e_setup_tensor(vec<int>{0}, vec<int>{1,2});
 		
 		tensor::sbatchtensor<3,double> eribatch = 
-			std::make_shared<tensor::batchtensor<3,double>>(eri,tensor::global::default_batchsize,999);
+			std::make_shared<tensor::batchtensor<3,double>>
+				(eri,tensor::global::default_batchsize,LOG.global_plev());
 		
 		eribatch->create_file();
 		eribatch->setup_batch();

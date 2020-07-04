@@ -381,7 +381,7 @@ public:
 		calc_ints(t_ints, m_eng_pool, m_basvec); 
 		auto out = t_ints.get_stensor();
 		
-		dbcsr::print(*out);
+		//dbcsr::print(*out);
 		
 		return out;
 	}

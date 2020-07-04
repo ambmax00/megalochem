@@ -6,6 +6,8 @@
 #include <exception>
 
 namespace util {
+	
+class mpi_time;
 
 class mpi_time {
 

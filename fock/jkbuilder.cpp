@@ -93,7 +93,7 @@ void EXACT_J::compute_J() {
 	// grab integrals
 	auto eris = m_reg.get_tensor<4,double>(m_mol->name() + "_i_bbbb_(01|23)", true, true);
 	
-	dbcsr::contract(*m_ptot_bbd, *eris, *m_J_bbd).print(true).perform("LS_, MNLS -> MN_");
+	dbcsr::contract(*m_ptot_bbd, *eris, *m_J_bbd).print(false).perform("LS_, MNLS -> MN_");
 	
 	if (LOG.global_plev() >= 3) {
 		dbcsr::print(*m_J_bbd);
@@ -124,7 +124,7 @@ void EXACT_K::compute_K() {
 
 		dbcsr::copy_3Dtensor_to_matrix_new(*m_K_bbd,*k);
 		
-		dbcsr::print(*m_K_bbd);
+		//dbcsr::print(*m_K_bbd);
 		
 		m_K_bbd->clear();
 		m_p_bbd->clear();
@@ -411,6 +411,13 @@ void BATCHED_DF_J::fetch_integrals(tensor::sbatchtensor<3,double>& btensor, int 
 
 void BATCHED_DF_J::compute_J() {
 	
+	auto& con1 = TIME.sub("first contraction");
+	auto& con2 = TIME.sub("second contraction");
+	auto& fetch1 = TIME.sub("fetch ints (1)");
+	auto& fetch2 = TIME.sub("fetch ints (2)");
+	
+	TIME.start();
+	
 	// fetch batchtensor
 	
 	auto eri_batched = m_reg.get_btensor<3,double>(m_mol->name() + "_i_xbb_(0|12)_batched");
@@ -441,15 +448,21 @@ void BATCHED_DF_J::compute_J() {
 		LOG.os<1>("J builder (1), batch nr. ", ibatch, '\n');
 		// Fetch integrals
 		
+		fetch1.start();
 		fetch_integrals(eri_batched,ibatch);
+		fetch1.finish();
 		
 		auto i_xbb_0_12 = eri_batched->get_stensor();
 		//dbcsr::print(*i_xbb_0_12);
 		
 		LOG.os<1>("XMN, MN_ -> X_\n");
+		
+		con1.start();
 	
 		dbcsr::contract(*i_xbb_0_12, *m_ptot_bbd, *m_gp_xd).beta(1.0).perform("XMN, MN_ -> X_");
 		eri_batched->clear_batch();
+		
+		con1.finish();
 		
 	}
 		
@@ -466,17 +479,23 @@ void BATCHED_DF_J::compute_J() {
 		LOG.os<1>("J builder (2), batch nr. ", ibatch, '\n');
 		// Fetch integrals
 		
+		fetch2.start();
 		fetch_integrals(eri_batched,ibatch);
+		fetch2.finish();
 		
 		auto i_xbb_0_12 = eri_batched->get_stensor();
 		
 		LOG.os<1>("X, XMN -> MN\n");
+		
+		con2.start();
 	
 		dbcsr::contract(*m_gq_xd, *i_xbb_0_12, *m_J_bbd).beta(1.0).perform("X_, XMN -> MN_");
 		
 		//dbcsr::print(*m_J_bbd);
 		
 		eri_batched->clear_batch();
+		
+		con2.finish();
 		
 	}
 	
@@ -491,6 +510,8 @@ void BATCHED_DF_J::compute_J() {
 	if (LOG.global_plev() >= 2) {
 		dbcsr::print(*m_J);
 	}
+	
+	TIME.finish();
 	
 }
 
@@ -512,6 +533,8 @@ void BATCHED_DF_K::init_tensors() {
 
 void BATCHED_DF_K::compute_K() {
 	
+	TIME.start();
+	
 	auto b = m_mol->dims().b();
 	auto X = m_mol->dims().x();
 	
@@ -520,6 +543,16 @@ void BATCHED_DF_K::compute_K() {
 	
 	auto compute_K_single = 
 	[&] (dbcsr::smat_d& c_bm, dbcsr::smat_d& k_bb, std::string x) {
+		
+		auto& fetch1 = TIME.sub("Fetch ints (1) " + x);
+		auto& fetch2 = TIME.sub("Fetch ints (2) " + x);
+		auto& con1 = TIME.sub("Contraction (1) " + x);
+		auto& con2 = TIME.sub("Contraction (2) " + x);
+		auto& con3 = TIME.sub("Contraction (3) " + x);
+		auto& reo1 = TIME.sub("Reordering (1) " + x);
+		auto& reo2 = TIME.sub("Reordering (2) " + x);
+		auto& reo3 = TIME.sub("Reordering (3) " + x);
+		auto& reo4 = TIME.sub("Reordering (4) " + x);
 		
 		vec<int> o, m;
 		k_bb->clear();
@@ -576,7 +609,7 @@ void BATCHED_DF_K::compute_K() {
 			.ngrid(grid3).map1({0,1}).map2({2}).blk_sizes(xbo));
 			
 		m_dummy_batched_xbo_01_2 = std::make_shared<tensor::batchtensor<3,double>>
-			(m_dummy_xbo_01_2,tensor::global::default_batchsize,20);
+			(m_dummy_xbo_01_2,tensor::global::default_batchsize,LOG.global_plev());
 			
 		m_dummy_batched_xbo_01_2->setup_batch();
 		m_dummy_batched_xbo_01_2->set_batch_dim(vec<int>{2});
@@ -592,11 +625,13 @@ void BATCHED_DF_K::compute_K() {
 		auto eri_ptr = eri_batched->get_stensor();
 		
 		if (n_batches_m == 1) {
+			reo1.start();
 			dbcsr::copy(*eri_ptr,*m_INTS_01_2).move_data(true).perform();
+			reo1.finish();
 		}
 		
 		for (int I = 0; I != n_batches_o; ++I) {
-			std::cout << "IBATCH: " << I << std::endl;
+			//std::cout << "IBATCH: " << I << std::endl;
 			
 			auto boundso = m_dummy_batched_xbo_01_2->bounds(I,2);
 			
@@ -609,15 +644,22 @@ void BATCHED_DF_K::compute_K() {
 				
 				//std::cout << "MBATCH: " << M << std::endl;
 				
+				fetch1.start();
 				eri_batched->read(M);
+				fetch1.finish();
 				
 				//dbcsr::print(*eri_ptr);
 				
-				if (n_batches_m != 1) 
-				 dbcsr::copy(*eri_ptr,*m_INTS_01_2).move_data(true).perform();
+				if (n_batches_m != 1) {
+					reo1.start();
+					dbcsr::copy(*eri_ptr,*m_INTS_01_2).move_data(true).perform();
+					reo1.finish();
+				}
 				
+				con1.start();
 				dbcsr::contract(*m_INTS_01_2,*m_c_bm,*m_HT1_xbm_01_2)
 					.bounds3(bounds).beta(1.0).perform("XMN, Ni -> XMi");
+				con1.finish();
 				
 				//dbcsr::print(*m_HT1_xbm_01_2);
 				
@@ -626,25 +668,34 @@ void BATCHED_DF_K::compute_K() {
 			}
 			
 			// end for M
-			
+			reo2.start();
 			dbcsr::copy(*m_HT1_xbm_01_2,*m_HT1_xbm_0_12).move_data(true).perform();
+			reo2.finish();
 			
+			con2.start();
 			dbcsr::contract(*m_HT1_xbm_0_12,*m_invsqrt,*m_HT2_xbm_0_12).perform("XMi, XY -> YMi");
+			con2.finish();
 			m_HT1_xbm_0_12->clear();
 			
 			//dbcsr::print(*m_HT2_xbm_0_12);
 			
+			reo3.start();
 			dbcsr::copy(*m_HT2_xbm_0_12,*m_HT2_xbm_01_2).move_data(true).perform();
+			reo3.finish();
 			
+			con3.start();
 			dbcsr::contract(*m_HT2_xbm_01_2,*m_HT2_xbm_01_2,*m_K_01).move(true)
 				.beta(1.0).perform("Xmi, Xni -> mn"); 
-				
+			con3.finish();
+			
 			//dbcsr::print(*m_K_01);
 				
 		} // end for I
 		
 		if (n_batches_m == 1) {
+			reo4.start();
 			dbcsr::copy(*m_INTS_01_2, *eri_ptr).move_data(true).perform();
+			reo4.finish();
 		}
 		
 		dbcsr::copy_tensor_to_matrix(*m_K_01,*k_bb);
@@ -658,10 +709,9 @@ void BATCHED_DF_K::compute_K() {
 	if (m_K_B) compute_K_single(m_c_B, m_K_B, "B");
 	
 	//dbcsr::print(*m_K_A);
+	
+	TIME.finish();
 		
 }
-		
-		   
-	
 		
 } // end namespace

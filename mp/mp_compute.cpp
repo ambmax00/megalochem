@@ -37,6 +37,7 @@ mpmod::mpmod(desc::shf_wfn& wfn_in, desc::options& opt_in, dbcsr::world& w_in) :
 	
 }
 
+/*
 void mpmod::compute() {
 	
 	LOG.banner<>("CD-LT-SOS-RI-MP2", 50, '*');
@@ -328,13 +329,33 @@ void mpmod::compute() {
 	LOG.os<>("Final MP2 energy: ", mp2_energy, '\n');
 
 }
+* */
 
 void mpmod::compute_batch() {
 	
 	LOG.banner<>("Batched CD-LT-SOS-RI-MP2", 50, '*');
 	
+	auto& laptime = TIME.sub("Computing laplace points");
+	auto& scrtime = TIME.sub("Computing screener");
+	auto& invtime = TIME.sub("Inverting metric");
+	auto& intstime = TIME.sub("Computing 3c2e ints");
+	auto& pseudotime = TIME.sub("Forming pseudo densities");
+	auto& pcholtime = TIME.sub("Pivoted cholesky decomposition");
+	auto& firsttran = TIME.sub("First transform");
+	auto& sectran = TIME.sub("Second transform");
+	auto& fintran = TIME.sub("Final transform");
+	auto& reo1 = TIME.sub("Reordering (1)");
+	auto& reo2 = TIME.sub("Reordering (2)");
+	auto& reo3 = TIME.sub("Reordering (3)");
+	auto& reo4 = TIME.sub("Reordering (4)");
+	auto& readtime = TIME.sub("Reading");
+	auto& writetime = TIME.sub("Writing");
+	auto& formZ = TIME.sub("Forming Z");
+	auto& formZtilde = TIME.sub("Forming Z tilde");
+	auto& redtime = TIME.sub("Reduction");
+	
 	// to do:
-	// 1. Insert Screening
+	// 1. Insert Screening -> done
 	// 2. Impose sparsity on B_XBB
 	// 3. LOGging and TIMEing
 	
@@ -363,7 +384,9 @@ void mpmod::compute_batch() {
 	
 	math::laplace lp(nlap, emin, ehomo, elumo, emax);
 	
+	laptime.start();
 	lp.compute();
+	laptime.finish();
 	
 	auto lp_omega = lp.omega();
 	auto lp_alpha = lp.alpha();
@@ -374,15 +397,20 @@ void mpmod::compute_batch() {
 	
 	// screening
 	ints::screener* scr = new ints::schwarz_screener(aofac);
+	
+	scrtime.start();
 	scr->compute();
+	scrtime.finish();
 	
 	aofac->ao_3c2e_erfc_setup();
 	
 	auto B_xbb_1_02 = aofac->ao_3c2e_erfc_setup_tensor(vec<int>{1},vec<int>{0,2});
 	auto B_xbb_0_12 = aofac->ao_3c2e_erfc_setup_tensor(vec<int>{0},vec<int>{1,2});
 	
-	tensor::batchtensor<3,double> B_xbb_1_02_direct(B_xbb_1_02,tensor::global::default_batchsize,100);
-	tensor::batchtensor<3,double> B_xbb_0_12_direct(B_xbb_0_12,tensor::global::default_batchsize,100);
+	tensor::batchtensor<3,double> B_xbb_1_02_direct(B_xbb_1_02,tensor::global::default_batchsize,LOG.global_plev());
+	tensor::batchtensor<3,double> B_xbb_0_12_direct(B_xbb_0_12,tensor::global::default_batchsize,LOG.global_plev());
+	
+	invtime.start();
 	
 	auto C_xx = aofac->ao_3coverlap();
 	auto S_erfc_xx = aofac->ao_3coverlap_erfc();
@@ -426,6 +454,8 @@ void mpmod::compute_batch() {
 	auto Ctilde_xx = solver2.inverse();
 	
 	Ctilde_inv_xx->release();
+	
+	invtime.finish();
 	
 	// load coefficient matrices
 	auto p_occ = m_hfwfn->po_bb_A();
@@ -492,7 +522,7 @@ void mpmod::compute_batch() {
 	stensor3_d B_xBB_0_12 = dbcsr::make_stensor<3>(
 		tensor3_d::create_template(*B_xbb_1_02).name("B_XBB_0_12").map1({0}).map2({1,2}));
 		
-	tensor::batchtensor<3,double> B_xBB_0_12_batched(B_xBB_0_12,tensor::global::default_batchsize,100);
+	tensor::batchtensor<3,double> B_xBB_0_12_batched(B_xBB_0_12,tensor::global::default_batchsize,LOG.global_plev());
 	
 	double mp2_energy = 0.0;
 	
@@ -502,6 +532,8 @@ void mpmod::compute_batch() {
 		LOG.os<>("LAPLACE POINT ", ilap, '\n');
 		
 		LOG.os<>("Forming pseudo densities.\n");
+		
+		pseudotime.start();
 		
 		std::vector<double> exp_occ = *eps_o;
 		std::vector<double> exp_vir = *eps_v;
@@ -533,6 +565,8 @@ void mpmod::compute_batch() {
 		dbcsr::multiply('N', 'T', *c_occ_exp, *c_occ_exp, *pseudo_occ).alpha(pow(omega,0.25)).perform();
 		dbcsr::multiply('N', 'T', *c_vir_exp, *c_vir_exp, *pseudo_vir).alpha(pow(omega,0.25)).perform();
 		
+		pseudotime.finish();
+		
 		//if (LOG.global_plev() >= 2) {
 			//dbcsr::print(*pseudo_occ);
 			//dbcsr::print(*pseudo_vir);
@@ -540,6 +574,7 @@ void mpmod::compute_batch() {
 		
 		// make chol decomposition
 		
+		pcholtime.start();
 		math::pivinc_cd chol(pseudo_occ, 0);
 		
 		chol.compute();
@@ -552,6 +587,7 @@ void mpmod::compute_batch() {
 		
 		//copy over
 		dbcsr::copy_matrix_to_tensor(*L_bo, *L_bo_0_1);
+		pcholtime.finish();
 		
 		B_xbb_1_02_direct.setup_batch();
 		B_xbb_1_02_direct.set_batch_dim(vec<int>{0});
@@ -577,42 +613,55 @@ void mpmod::compute_batch() {
 			xbounds[1] = B_xbb_1_02_direct.bounds_blk(IBATCH_X, 1);
 			xbounds[2] = B_xbb_1_02_direct.bounds_blk(IBATCH_X, 2);
 			
-			std::cout << xbounds[0][0] << " " << xbounds[0][1] << std::endl;
+			//std::cout << xbounds[0][0] << " " << xbounds[0][1] << std::endl;
 			
 			LOG.os<1>("-- Filling ao ints...\n");
+			intstime.start();
 			// compute AO integrals
 			aofac->ao_3c2e_erfc_setup();
 			aofac->ao_3c2e_fill(B_xbb_1_02, xbounds, scr);
+			intstime.finish();
 			
 			//dbcsr::print(*B_xbb_1_02);
 			
 			// first transform 
 		    LOG.os<1>("-- First transform.\n");
+		    
+		    firsttran.start();
 		    dbcsr::contract(*L_bo_0_1, *B_xbb_1_02, *B_xob_1_02).perform("mi, Xmn -> Xin");
 		    if (!onebatch) B_xbb_1_02->clear();
+		    firsttran.finish();
 		    
 		    // reorder
 			LOG.os<1>("-- Reordering B_xob.\n");
+			reo1.start();
 			dbcsr::copy(*B_xob_1_02, *B_xob_2_01).move_data(true).perform();
+			reo1.finish();
 			
 			//copy over vir density
 			dbcsr::copy_matrix_to_tensor(*pseudo_vir, *pseudo_vir_0_1);
 		
 			// second transform
 			LOG.os<1>("-- Second transform.\n");
+			sectran.start();
 			dbcsr::contract(*pseudo_vir_0_1, *B_xob_2_01, *B_xoB_2_01).print(false).perform("Nn, Xin -> XiN");
 			B_xob_2_01->clear();
+			sectran.finish();
 			
 			// reorder
 			LOG.os<1>("-- Reordering B_xoB.\n");
+			reo2.start();
 			dbcsr::copy(*B_xoB_2_01, *B_xob_1_02).move_data(true).perform();
+			reo2.finish();
 		
 			// final contraction
 			//B_xBB_1_02->reserve_template(*B_xbb_1_02);
 			
 			LOG.os<1>("-- Final transform.\n");
+			fintran.start();
 			dbcsr::contract(*L_bo_0_1, *B_xob_1_02, *B_xBB_1_02)
 				/*.retain_sparsity(true)*/.print(false).perform("Mi, XiN -> XMN");
+			fintran.finish();
 		
 			B_xob_1_02->clear();
 		
@@ -620,12 +669,16 @@ void mpmod::compute_batch() {
 		
 			// reorder
 			LOG.os<1>("-- B_xBB.\n");
+			reo3.start();
 			dbcsr::copy(*B_xBB_1_02, *B_xBB_0_12).move_data(true).perform();
+			reo3.finish();
 			
 			//dbcsr::print(*B_xBB_0_12);
 			
 			LOG.os<1>("-- Writing B_xBB to disk.\n");
+			writetime.start();
 			B_xBB_0_12_batched.write(IBATCH_X);
+			writetime.finish();
 			
 			if (!onebatch) B_xBB_0_12->clear();
 			
@@ -655,30 +708,39 @@ void mpmod::compute_batch() {
 			LOG.os<>("-- Computing AO integrals.\n");
 			
 			// grab integrals
+			intstime.start();
 			if (!onebatch) {
 				aofac->ao_3c2e_erfc_setup();
 				aofac->ao_3c2e_fill(B_xbb_0_12, mubounds, scr);
 			} else {
 				dbcsr::copy(*B_xbb_1_02,*B_xbb_0_12).move_data(true).perform();
 			}
+			intstime.finish();
 			
 			LOG.os<>("-- Reading B_xBB.\n");
 			
 			// grab other
+			readtime.start();
 			B_xBB_0_12_batched.read(IBATCH_MU);
+			readtime.finish();
 			
 			//dbcsr::print(*B_xbb_0_12);
 			//dbcsr::print(*B_xBB_0_12);
 			
 			// form Z
 			LOG.os<1>("-- Forming Z.\n");
+			
+			formZ.start();
 			dbcsr::contract(*B_xBB_0_12, *B_xbb_0_12, *Z_XX_0_1)
 				.print(false).beta(1.0).perform("Mmn, Nmn -> MN");
+			formZ.finish();
 			
 			if (!onebatch) {
 				B_xbb_0_12->clear();
 			} else {
+				reo4.start();
 				dbcsr::copy(*B_xbb_0_12,*B_xbb_1_02).move_data(true).perform();
+				reo4.finish();
 			}
 				
 			B_xBB_0_12->clear();
@@ -689,6 +751,8 @@ void mpmod::compute_batch() {
 		
 		B_xBB_0_12_batched.delete_file();
 		
+		formZtilde.start();
+		
 		// copy
 		dbcsr::copy_tensor_to_matrix(*Z_XX_0_1, *Z_XX);
 		Z_XX_0_1->clear();
@@ -697,7 +761,11 @@ void mpmod::compute_batch() {
 		LOG.os<1>("Ztilde = Z * Jinv\n");
 		dbcsr::multiply('N', 'N', *Z_XX, *Ctilde_xx, *Ztilde_XX).perform();
 		
+		formZtilde.finish();
+		
 		//dbcsr::print(*Ztilde_XX);
+		
+		redtime.start();
 		
 		LOG.os<1>("Local reduction.\n");
 		
@@ -746,6 +814,8 @@ void mpmod::compute_batch() {
 			}
 		}
 
+		redtime.finish();
+
 		double total = 0.0;
 		LOG.os<1>("Global reduction.\n");
 
@@ -760,6 +830,10 @@ void mpmod::compute_batch() {
 	//mp2_energy *= c_os;
 	
 	LOG.os<>("Final MP2 energy: ", mp2_energy, '\n');
+	
+	TIME.finish();
+	
+	TIME.print_info();
 	
 }
 

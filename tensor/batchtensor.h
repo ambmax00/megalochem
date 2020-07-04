@@ -106,28 +106,28 @@ public:
 		MPI_Comm_rank(m_comm, &m_mpirank);
 		MPI_Comm_size(m_comm, &m_mpisize);
 		
-		LOG.os<>("Setting up tensor information.\n");
+		LOG.os<1>("Setting up tensor information.\n");
 		
-		LOG.os<>("-- Number of blocks per dimension:\n");
+		LOG.os<1>("-- Number of blocks per dimension:\n");
 		for (auto x : m_blkstot) {
-			LOG.os<>(x, " ");
-		} LOG.os<>('\n');
+			LOG.os<1>(x, " ");
+		} LOG.os<1>('\n');
 		
-		LOG.os<>("-- Number of elements per dimension:\n");
+		LOG.os<1>("-- Number of elements per dimension:\n");
 		for (auto x : m_fulltot) {
-			LOG.os<>(x, " ");
-		} LOG.os<>('\n');
+			LOG.os<1>(x, " ");
+		} LOG.os<1>('\n');
 		
 	}
 	
 	/* sets up the preliminary batching information. */
 	void setup_batch() {
 		
-		LOG.os<>("Setting up preliminary batching info for ", m_stensor->name(), '\n');
+		LOG.os<1>("Setting up preliminary batching info for ", m_stensor->name(), '\n');
 		m_setup = true;
 		
 		if (m_batch_size < 0) {
-			LOG.os<>("-- Tensor is held in core memory. No I/O.");
+			LOG.os<1>("-- Tensor is held in core memory. No I/O.");
 			m_onebatch = true;
 			return;
 		}
@@ -148,28 +148,28 @@ public:
 			m_nblktot_global *= m_blkstot[i];
 		}
 		
-		LOG.os<>("-- Total number of blocks: ", m_nblktot_global, '\n');
-		LOG.os<>("-- Mean total block size: ", mean, '\n');
-		LOG.os<>("-- Mean block sizes: ");
+		LOG.os<1>("-- Total number of blocks: ", m_nblktot_global, '\n');
+		LOG.os<1>("-- Mean total block size: ", mean, '\n');
+		LOG.os<1>("-- Mean block sizes: ");
 		for (int i = 0; i != N; ++i) {
-			LOG.os<>(meansizes[i], " ");
-		} LOG.os<>('\n');
+			LOG.os<1>(meansizes[i], " ");
+		} LOG.os<1>('\n');
 		
 		// determine blocks held per rank per batch
 		m_maxblk_per_node = m_batch_size * 1000 / (mean * 8);
 		
-		LOG.os<>("-- Holding at most ", m_maxblk_per_node, " blocks per node.\n");
+		LOG.os<1>("-- Holding at most ", m_maxblk_per_node, " blocks per node.\n");
 		
 		m_maxnblk_tot = m_mpisize * m_maxblk_per_node;
 		
-		LOG.os<>("-- Holding ", m_maxnblk_tot, " at most on all nodes.\n");
+		LOG.os<1>("-- Holding ", m_maxnblk_tot, " at most on all nodes.\n");
 		
 		if (m_maxnblk_tot > m_nblktot_global) {
-			LOG.os<>("-- Tensor is held in core memory. No I/O.\n");
+			LOG.os<1>("-- Tensor is held in core memory. No I/O.\n");
 			m_onebatch = true;
 		}
 		
-		LOG.os<>("Finished setting up preliminary batching info.\n");
+		LOG.os<1>("Finished setting up preliminary batching info.\n");
 		
 	}
 	
@@ -185,7 +185,7 @@ public:
 			return;
 		}
 		
-		LOG.os<>("Setting up batching dimensions for ", m_stensor->name(), "\n");
+		LOG.os<1>("Setting up batching dimensions for ", m_stensor->name(), "\n");
 		
 		for (auto n : ndim) {
 			if (n >= N || n < 0) throw std::runtime_error("Invalid batch dimension.");
@@ -206,9 +206,9 @@ public:
 			nblk_per_ndim *= m_blkstot[i];
 		}
 		
-		LOG.os<>("-- Available RAM for tensor per node: ", m_batch_size);
+		LOG.os<1>("-- Available RAM for tensor per node: ", m_batch_size);
 		
-		LOG.os<>("-- Blocks per ndim slice: ", nblk_per_ndim, '\n');
+		LOG.os<1>("-- Blocks per ndim slice: ", nblk_per_ndim, '\n');
 		
 		double nblk_ndim_per_batch = m_maxnblk_tot / nblk_per_ndim;
 		int nblk_ndim_per_batch_last = m_maxnblk_tot % nblk_per_ndim;
@@ -217,11 +217,11 @@ public:
 		
 		m_nbatches = std::ceil((double)m_nblktot_global / (nblk_ndim_per_batch * (double)nblk_per_ndim));
 		
-		LOG.os<>("-- Dividing dimension(s)");
+		LOG.os<1>("-- Dividing dimension(s)");
 		for (auto n : ndim) {
-			LOG.os<>(" ", n);
+			LOG.os<1>(" ", n);
 		}
-		LOG.os<>(" into ", m_nbatches, " batches, with ", 
+		LOG.os<1>(" into ", m_nbatches, " batches, with ", 
 			nblk_ndim_per_batch, " blocks along that/those dimension(s).\n");
 			
 		int64_t idxblkoff = 0;
@@ -235,7 +235,7 @@ public:
 		
 		max_idx_super -= 1;
 		
-		LOG.os<>("-- Maximum super index: ", max_idx_super, '\n');
+		LOG.os<1>("-- Maximum super index: ", max_idx_super, '\n');
 		
 		m_boundsblk.resize(m_nbatches);
 		
@@ -273,14 +273,16 @@ public:
 			
 		}
 		
-		LOG.os<1>("-- Bounds: \n");
-		for (auto b : m_boundsblk) {
-			for (int i = 0; i != b.size(); ++i) {
-				LOG.os<>(b[i][0], " -> ", b[i][1], " ");
-			}
-		} LOG.os<>('\n');
+		if (LOG.global_plev() >= 1) {
+			LOG.os<1>("-- Bounds: \n");
+			for (auto b : m_boundsblk) {
+				for (int i = 0; i != b.size(); ++i) {
+					LOG.os<>(b[i][0], " -> ", b[i][1], " ");
+				}
+			} LOG.os<1>('\n');
+		}
 		
-		LOG.os<>("Finished setting up all batching info.\n");
+		LOG.os<1>("Finished setting up all batching info.\n");
 		
 	}
 	
@@ -329,7 +331,7 @@ public:
 		
 		MPI_File fh;
 		
-		LOG.os<>("Creating files for ", m_filename, '\n');
+		LOG.os<1>("Creating files for ", m_filename, '\n');
 		
 		std::string data_fname = m_filename + ".dat";
 		//std::string idx_fname = m_filename + ".info";
@@ -401,8 +403,8 @@ public:
 		
 		// allocate data
 		
-		LOG.os<>("Writing data of tensor ", m_filename, " to file.\n");
-		LOG.os<>("Batch ", ibatch, '\n');
+		LOG.os<1>("Writing data of tensor ", m_filename, " to file.\n");
+		LOG.os<1>("Batch ", ibatch, '\n');
 		
 		int nze = m_stensor->num_nze();
 		int nblocks = m_stensor->num_blocks();
@@ -415,7 +417,7 @@ public:
 				
 		// communicate nzes + blks to other processes
 		
-		LOG.os<>("Gathering nze and nblocks...\n");
+		LOG.os<1>("Gathering nze and nblocks...\n");
 		
 		MPI_Allgather(&nze,1,MPI_INT,m_nzeprocbatch[ibatch].data(),1,MPI_INT,m_comm);
 		MPI_Allgather(&nblocks,1,MPI_INT,m_nblksprocbatch[ibatch].data(),1,MPI_INT,m_comm);
@@ -433,13 +435,13 @@ public:
 			
 		m_nzetot += nzetotbatch;
 		
-		LOG(-1).os<>("Local number of blocks: ", m_nblkloc, '\n');
-		LOG.os<>("Total number of blocks: ", nblktotbatch, " out of ", m_maxnblk_tot, '\n');
-		LOG.os<>("Total number of nze: ", nzetotbatch, '\n');
+		LOG(-1).os<1>("Local number of blocks: ", m_nblkloc, '\n');
+		LOG.os<1>("Total number of blocks: ", nblktotbatch, " out of ", m_maxnblk_tot, '\n');
+		LOG.os<1>("Total number of nze: ", nzetotbatch, '\n');
 		
 		// read blocks
 
-		LOG.os<>("Writing blocks...\n");
+		LOG.os<1>("Writing blocks...\n");
 
 		dbcsr::iterator_t<N,T> iter(*m_stensor);
 		
@@ -479,7 +481,7 @@ public:
 		
 		std::string data_fname = m_filename + ".dat";
 		
-		LOG.os<>("Computing offsets...\n");
+		LOG.os<1>("Computing offsets...\n");
 	
 		// offsets
 		MPI_Offset data_batch_offset = 0;
@@ -508,7 +510,7 @@ public:
 		}
 		
 		// concatenate indices and offsets
-		LOG.os<>("Adding offsets to vector...\n");
+		LOG.os<1>("Adding offsets to vector...\n");
 		
 		for (int i = 0; i != N; ++i) {
 			m_locblkidx[i].insert(m_locblkidx[i].end(),
@@ -522,7 +524,7 @@ public:
 	
 		// write data to file 
 		
-		LOG.os<>("Writing tensor data...\n");
+		LOG.os<1>("Writing tensor data...\n");
 		
 		long long int datasize;
 		T* data = m_stensor->data(datasize);
@@ -547,7 +549,7 @@ public:
 			}
 		}
 		
-		LOG.os<>("Done with batch ", ibatch, '\n');
+		LOG.os<1>("Done with batch ", ibatch, '\n');
 		
 	}
 	
@@ -556,12 +558,12 @@ public:
 		
 		if (m_onebatch) return;
 		
-		LOG.os<>("Reading batch ", ibatch, '\n');
+		LOG.os<1>("Reading batch ", ibatch, '\n');
 		
 		// if reading is done in same way as writing
 		if (m_stored_batchdim == m_current_batchdim) {
 			
-			LOG.os<>("Same dimensions for writing and reading.\n");
+			LOG.os<1>("Same dimensions for writing and reading.\n");
 		
 			int nze = m_nzeprocbatch[ibatch][m_mpirank];
 			int nblk = m_nblksprocbatch[ibatch][m_mpirank];
@@ -583,8 +585,8 @@ public:
 				
 			arrvec<int,N> locblkidx;
 			
-			LOG(-1).os<>("Offset: ", blkoff, '\n');
-			LOG(-1).os<>("NBLKTOTBATCH: ", nblktotbatch, '\n');
+			LOG(-1).os<1>("Offset: ", blkoff, '\n');
+			LOG(-1).os<1>("NBLKTOTBATCH: ", nblktotbatch, '\n');
 			//// setting
 			for (int i = 0; i != N; ++i) {
 				locblkidx[i].insert(locblkidx[i].end(),
@@ -592,22 +594,26 @@ public:
 					m_locblkidx[i].begin() + blkoff + nblk);
 			}
 			
-			MPI_Barrier(m_comm);
+			if (LOG.global_plev() >= 10) {
 			
-			for (int i = 0; i != m_mpisize; ++i) {
-			
-			if (i == m_mpirank) {
-			
-				for (auto a : locblkidx) {
-					for (auto l : a) {
-						std::cout << l << " ";
-					} std::cout << std::endl;
+				MPI_Barrier(m_comm);
+				
+				for (int i = 0; i != m_mpisize; ++i) {
+				
+					if (i == m_mpirank) {
+					
+						for (auto a : locblkidx) {
+							for (auto l : a) {
+								std::cout << l << " ";
+							} std::cout << std::endl;
+						}
+						
+					}
+				
+				MPI_Barrier(m_comm);
+				
 				}
 				
-			}
-			
-			MPI_Barrier(m_comm);
-			
 			}
 			
 			//// reserving
@@ -641,7 +647,7 @@ public:
 		// needs special offsets
 		} else {
 			
-			LOG.os<>("Different dimension.\n");
+			LOG.os<1>("Different dimension.\n");
 			
 			int i = 0;
 			
@@ -728,7 +734,7 @@ public:
 			int nblk = res[0].size();
 			vec<int> blksizes(nblk);
 			
-			LOG.os<>("Computing block sizes.\n");
+			LOG.os<1>("Computing block sizes.\n");
 			
 			for (int i = 0; i != nblk; ++i) {
 				int size = 1;
@@ -738,7 +744,7 @@ public:
 				blksizes[i] = size;
 			}
 			
-			LOG.os<>("Reserving.\n");
+			LOG.os<1>("Reserving.\n");
 			
 			m_stensor->reserve(res);
 			
@@ -747,7 +753,7 @@ public:
 			// now adjust the file view
 			int nze = m_stensor->num_nze();
 			
-			LOG.os<>("Creating MPI TYPE.\n");
+			LOG.os<1>("Creating MPI TYPE.\n");
 			
 			if (LOG.global_plev() >= 10) {
 			
@@ -768,20 +774,20 @@ public:
 			
 			MPI_File_open(m_comm,fname.c_str(),MPI_MODE_RDONLY,MPI_INFO_NULL,&fh_data);
 			
-			LOG.os<>("Setting file view.\n");
+			LOG.os<1>("Setting file view.\n");
 			
 			MPI_File_set_view(fh_data, 0, MPI_DOUBLE, MPI_HINDEXED, "native", MPI_INFO_NULL);
 			
 			long long int datasize;
 			T* data = m_stensor->data(datasize);
 			
-			LOG.os<>("Reading from file...\n");
+			LOG.os<1>("Reading from file...\n");
 			
 			MPI_File_read_at(fh_data,0,data,nze,MPI_DOUBLE,MPI_STATUS_IGNORE);
 			
 			MPI_File_close(&fh_data);
 			
-			LOG.os<>("Done!!\n");
+			LOG.os<1>("Done!!\n");
 			
 		} // end if
 	}
