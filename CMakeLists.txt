@@ -29,6 +29,7 @@ include_directories(
 	${LIBINT2_INCLUDE_DIRS} ${CMAKE_CURRENT_BINARY_DIR} ${CMAKE_CURRENT_SOURCE_DIR}
 )
 
+add_subdirectory(extern)
 add_subdirectory(dbcsrx)
 add_subdirectory(math)
 add_subdirectory(desc)
@@ -55,6 +56,7 @@ target_link_libraries(
 	chem_hf
 	chem_mp
 	#chem_desc
+	laplace_minimax
 	chem_ints
 	chem_math_linalg
 	#	chem_math_solvers
