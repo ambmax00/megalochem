@@ -18,7 +18,7 @@ protected:
 	std::string m_method;
 	
 	double m_blk_threshold = dbcsr::global::filter_eps;
-	double m_int_threshold = aofactory::precision;
+	double m_int_threshold = global::precision;
 	
 public:
 

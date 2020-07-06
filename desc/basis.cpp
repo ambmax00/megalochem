@@ -77,7 +77,20 @@ cluster_basis::cluster_basis(vshell& basis, std::string method) : m_basis(basis)
 	
 	for (auto c : m_clusters) {
 		m_cluster_sizes.push_back(libint2::nbf(c));
-	}		
+	}
+	
+	int off = 0;
+	m_shell_offsets.resize(m_clusters.size());
+	
+	for (int i = 0; i != m_shell_offsets.size(); ++i) {
+		m_shell_offsets[i] = off;
+		off += m_clusters[i].size();
+	}
+	
+	std::cout << "OFFS: " << std::endl;
+	for (auto s : m_shell_offsets) {
+		std::cout << s << " ";
+	} std::cout << std::endl;
 	
 }
 

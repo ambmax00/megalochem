@@ -31,7 +31,7 @@ void hfmod::diag_fock() {
 		
 		FX.release();
 		
-		if (LOG.global_plev() >= 1) 
+		if (LOG.global_plev() >= 2) 
 			dbcsr::print(XFX);
 		
 		auto XFXs = XFX.get_smatrix();
@@ -67,8 +67,10 @@ void hfmod::diag_fock() {
 		dbcsr::multiply('N','N',*m_x_bb,*c_bm_x,*c_bm).perform();
 		//dbcsr::einsum<2,2,2>({"IJ, Ji -> Ii", *m_x_bb, c_bm_x, c_bm, .unit_nr = u, .log = log});
 		
-		if (LOG.global_plev() >= 1) 
+		if (LOG.global_plev() >= 2) 
 			dbcsr::print(*c_bm);
+			
+		c_bm->filter();
 		
 		XFXs->release();
 		c_bm_x->release();
@@ -85,8 +87,10 @@ void hfmod::diag_fock() {
 		
 		dbcsr::multiply('N', 'T', *c_bm, *c_bm, *p_bb).first_k(0).last_k(limit).perform();
 		
-		if (LOG.global_plev() >= 1) 
+		if (LOG.global_plev() >= 2) 
 			dbcsr::print(*p_bb);
+			
+		p_bb->filter();
 		
 	};
 	
@@ -138,7 +142,7 @@ void hfmod::diag_fock() {
 		m_p_bb_B = p_bb_B.get_smatrix();
 		m_p_bb_B->set(0.0);
 		
-		if (LOG.global_plev() >= 1) 
+		if (LOG.global_plev() >= 2) 
 			dbcsr::print(*m_p_bb_B);
 		
 	}

@@ -661,6 +661,8 @@ void BATCHED_DF_K::compute_K() {
 					.bounds3(bounds).beta(1.0).perform("XMN, Ni -> XMi");
 				con1.finish();
 				
+				//m_HT1_xbm_01_2->filter();
+				
 				//dbcsr::print(*m_HT1_xbm_01_2);
 				
 				if (n_batches_m != 1) m_INTS_01_2->clear();

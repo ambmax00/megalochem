@@ -18,6 +18,7 @@
 #include <libint2/basis.h>
 #include <dbcsr_common.hpp>
 #include "tensor/batchtensor.h"
+#include "ints/aofactory.h"
 
 
 
@@ -272,6 +273,10 @@ reader::reader(MPI_Comm comm, std::string filename, int print) : m_comm(comm), L
 		if (jglob.find("block_threshold") != jglob.end()) {
 			dbcsr::global::filter_eps = jglob["block_threshold"];
 		}
+		
+		if (jglob.find("integral_precision") != jglob.end()) {
+			ints::global::precision = jglob["integral_precision"];
+		}
 	}
 	
 	json& jmol = data["molecule"];
@@ -363,11 +368,18 @@ reader::reader(MPI_Comm comm, std::string filename, int print) : m_comm(comm), L
 	
 	desc::options opt;
 	
-	unpack(data, opt, "hf");
+	auto read_section = [&](std::string r)
+	{
+		if (data.find(r) != data.end()) {
+			unpack(data, opt, r);
+		} else {
+			opt.set<bool>("do_"+r, false);
+		}
+	};
 	
-	unpack(data, opt, "mp");
-	
-	unpack(data, opt, "adc");
+	read_section("hf");
+	read_section("mp");
+	read_section("adc");
 	
 	//std::cout << opt.get<bool>("hf/diis") << std::endl;
 	//std::cout << opt.get<double>("hf/conv") << std::endl;

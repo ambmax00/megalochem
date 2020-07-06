@@ -18,6 +18,10 @@ using eigen_smat_f = std::shared_ptr<Eigen::MatrixXf>;
 
 namespace ints {
 	
+struct global {
+	static inline double precision = std::numeric_limits<double>::epsilon();
+};
+	
 class screener;
 
 class aofactory {
@@ -55,12 +59,8 @@ public:
 	dbcsr::stensor<3,double> ao_3c2e_erfc_setup_tensor(vec<int> map1, vec<int> map2);
 	
 	void ao_3c2e_fill(dbcsr::stensor<3,double>& t_in, vec<vec<int>>& blkbounds, screener* scr);
-	
-	static double precision;
 		
 }; // end class aofactory
-
-inline double aofactory::precision = std::numeric_limits<double>::epsilon();
 
 } // end namespace ints
 			

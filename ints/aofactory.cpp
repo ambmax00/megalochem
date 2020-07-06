@@ -90,7 +90,7 @@ public:
 		m_intname = istr;
 	}
 	
-	void setup_calc() {
+	void setup_calc(bool screen = false) {
 		
 		size_t max_nprim = 0;
 		int max_l = 0;
@@ -110,6 +110,12 @@ public:
 		}
 		
 		eng.set(m_BraKet);
+		
+		if (screen) {
+			eng.set_precision(pow(global::precision,2));
+		} else {
+			eng.set_precision(global::precision);
+		}
 			
 		m_eng_pool = util::make_pool<libint2::Engine>(eng);
 				
@@ -295,7 +301,7 @@ public:
 			
 		}	
 		
-		calc_ints(t_ints, m_eng_pool, m_basvec); 
+		calc_ints(t_ints, m_eng_pool, m_basvec, scr); 
 		auto out = t_ints.get_stensor();
 		
 		return out;
@@ -361,7 +367,7 @@ public:
 			
 		//}	
 		
-		calc_ints(*t_in, m_eng_pool, m_basvec); 
+		calc_ints(*t_in, m_eng_pool, m_basvec, scr); 
 		
 	}
 	
@@ -542,7 +548,7 @@ dbcsr::smatrix<double> aofactory::ao_schwarz() {
 	pimpl->set_name("Z_mn");
 	pimpl->set_braket("bbbb");
 	pimpl->set_operator("coulomb");
-	pimpl->setup_calc();
+	pimpl->setup_calc(true);
 	return pimpl->compute_screen("schwarz", "bbbb");
 }
 	
@@ -550,7 +556,7 @@ dbcsr::smatrix<double> aofactory::ao_3cschwarz() {
 	pimpl->set_name("Z_x");
 	pimpl->set_braket("xx");
 	pimpl->set_operator("coulomb");
-	pimpl->setup_calc();
+	pimpl->setup_calc(true);
 	return pimpl->compute_screen("schwarz", "xx");
 }
 		

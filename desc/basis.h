@@ -13,6 +13,7 @@ private:
 	vshell m_basis;
 	std::vector<vshell> m_clusters;
 	std::vector<int> m_cluster_sizes;
+	std::vector<int> m_shell_offsets;
 	
 public:
 
@@ -23,13 +24,15 @@ public:
 	cluster_basis(const cluster_basis& cbasis) : 
 		m_basis(cbasis.m_basis),
 		m_clusters(cbasis.m_clusters),
-		m_cluster_sizes(cbasis.m_cluster_sizes) {}
+		m_cluster_sizes(cbasis.m_cluster_sizes),
+		m_shell_offsets(cbasis.m_shell_offsets) {}
 		
 	cluster_basis& operator =(const cluster_basis& cbasis) {
 		if (this != &cbasis) {
 			m_basis = cbasis.m_basis;
 			m_clusters = cbasis.m_clusters;
 			m_cluster_sizes = cbasis.m_cluster_sizes;
+			m_shell_offsets = cbasis.m_shell_offsets;
 		}
 		
 		return *this;
@@ -58,6 +61,10 @@ public:
 	}
 	
 	std::vector<int> cluster_sizes() const;
+	
+	int shell_offset(int i) const {
+		return m_shell_offsets[i];
+	}
 
 };
 

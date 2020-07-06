@@ -6,6 +6,7 @@
 #include "utils/pool.h"
 #include "utils/params.hpp"
 #include "desc/basis.h"
+#include "ints/screening.h"
 #include <vector>
 #include <mpi.h>
 #include <libint2.hpp>
@@ -19,7 +20,7 @@ void calc_ints(dbcsr::tensor<2>& t_out, util::ShrPool<libint2::Engine>& eng,
 	std::vector<const desc::cluster_basis*>& basvec);
 	
 void calc_ints(dbcsr::tensor<3>& t_out, util::ShrPool<libint2::Engine>& eng,
-	std::vector<const desc::cluster_basis*>& basvec);
+	std::vector<const desc::cluster_basis*>& basvec, screener* scr = nullptr);
 	
 void calc_ints(dbcsr::tensor<4>& t_out, util::ShrPool<libint2::Engine>& eng,
 	std::vector<const desc::cluster_basis*>& basvec);

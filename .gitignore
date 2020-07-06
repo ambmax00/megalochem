@@ -1,3 +1,6 @@
 build/
 examples/*dat
 examples/*out
+bench/*out
+bench/*dat
+bench/*json

@@ -229,8 +229,9 @@ int main(int argc, char** argv) {
 */
 	
 	bool skip_hf = hfopt.get<bool>("skip", false);
+	bool do_hf = opt.get<bool>("do_hf", true);
 	
-	if (!skip_hf) {
+	if (do_hf && !skip_hf) {
 	
 		myhf.compute();
 		myhfwfn = myhf.wfn();
@@ -248,141 +249,18 @@ int main(int argc, char** argv) {
 	
 	auto mpopt = opt.subtext("mp");
 	
-	mp::mpmod mymp(myhfwfn,mpopt,wrd);
+	bool do_mp = opt.get<bool>("do_mp");
 	
-	mymp.compute_batch();
+	if (do_mp) {
 	
-	/*
-	
-	auto adcopt = opt.subtext("adc");
-	
-	std::cout << adcopt.get<int>("nroots") << std::endl;
-	
-	adc::adcmod myadc(myhfwfn,adcopt,MPI_COMM_WORLD);
-	
-	myadc.compute();
+		mp::mpmod mymp(myhfwfn,mpopt,wrd);
+		mymp.compute_batch();
+		
+	}
 	
 	time.finish();
 	
 	time.print_info();
-	*/
-	/*
-	//
-	
-	//auto s = ao.compute<2>({.op = "overlap", .bas = "bb", .name = "S", .map1 = {0}, .map2 = {1}});
-	
-	//dbcsr::print(s);
-	
-	
-	dbcsr::pgrid<3> pgrid3d(MPI_COMM_WORLD);
-	dbcsr::pgrid<4> pgrid4d(MPI_COMM_WORLD);
-							 
-	vec<int> blk1 = {3, 9, 12, 1};
-    vec<int> blk2 = {4, 2, 3, 1, 9, 2, 32, 10, 5, 8, 7};
-    vec<int> blk3 = {7, 3, 8, 7, 9, 5, 10, 23, 2};
-    vec<int> blk4 = {8, 1, 4, 13, 6};
-    vec<int> blk5 = {4, 2, 22};
-    
-	vec<int> map11 = {0, 2};
-	vec<int> map12 = {1};
-	vec<int> map21 = {3, 2};
-	vec<int> map22 = {1, 0};
-	vec<int> map31 = {0};
-	vec<int> map32 = {1, 2};
-	
-	arrvec<int,3> sizes1 = {blk1,blk2,blk3}; 
-	arrvec<int,4> sizes2 = {blk1,blk2,blk4,blk5};
-	arrvec<int,3> sizes3 = {blk3,blk4,blk5};
-	
-	auto tensor1 = dbcsr::make_stensor<2>(dbcsr::tensor<3>::create().name("(13|2)")
-		.ngrid(pgrid3d).map1(map11).map2(map12).blk_sizes(sizes1).get_stensor());
-		
-	dbcsr::tensor<4> tensor2 = dbcsr::tensor<4>::create().name("(54|21)")
-		.ngrid(pgrid4d).map1(map21).map2(map22).blk_sizes(sizes2);
-		
-	dbcsr::tensor<3> tensor3 = dbcsr::tensor<3>::create().name("(3|45)")
-		.ngrid(pgrid3d).map1(map31).map2(map32).blk_sizes(sizes3);
-	
-	/*
-	//dbcsr::tensor<3,double> tensortest({.name="test", .pgridN = pgrid3d, .map1 = map11,
-	//	.map2 = map12, .blk_sizes = sizes1});
-						   
-	std::cout << "Tensors created." << std::endl;
-	
-	vec<int> nz11 = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 
-		    0, 1, 1, 1, 1, 1, 1, 1, 2, 2, 
-		    2, 2, 2, 2, 2, 2, 2, 3, 3, 3, 
-		    3, 3};
-	vec<int> nz12 = {2, 4, 4, 4, 5, 5, 6, 7, 9,10,10, 
-		    0, 0, 3, 6, 6, 8, 9 ,1, 1, 4, 5, 
-		    7, 7, 8,10,10, 1 ,3, 4, 4, 7};
-    vec<int> nz13 = {6, 2, 4, 8, 5, 7, 1, 7, 2, 1, 2, 
-			0, 3, 5, 1, 6, 4, 7, 2, 6, 0, 3, 
-			2, 6, 7, 4, 7, 8, 5, 0, 1, 6};
-	
-	vec<int> nz21 = { 0, 0, 0, 0, 0, 1, 1, 1,  1,  1, 
-             1, 1, 1, 1, 1, 1, 1, 1,  1,  1, 
-             2, 2, 2, 2, 2, 2, 2, 2,  2,  2, 
-             3, 3, 3, 3, 3, 3 };
-    vec<int> nz22 = { 0, 2, 3, 5, 9,  1, 1, 3,  4,  4, 
-             5, 5, 5, 6,  6,  8, 8, 8, 9, 10, 
-             0, 2, 2, 3,  4,  5, 7, 8, 10, 10, 
-             0, 2, 3, 5, 9, 10 };
-	vec<int> nz24 = { 2, 4, 1, 2,  1,  2, 4, 0,  0,  3, 
-             1, 2, 3, 0,  3,  2, 3, 3,  1,  0, 
-             2, 0, 0, 2,  3,  2, 3, 1,  1,  2, 
-             0, 0, 2, 1,  4,  4 };
-    vec<int> nz25 = { 0, 2, 1, 0,  0,  1, 2,  0,  2, 0, 
-             1, 2, 1, 0,  2,  1, 2,  1,  0, 1, 
-             2, 0, 1, 2,  1,  1, 1,  2,  0, 1, 
-             0, 2, 1, 0,  2,  1 };		
-             
-    vec<int> nz33 = { 1, 3, 4, 4, 4, 5, 5, 7 };
-    vec<int> nz34 = { 2, 1, 0, 0, 2, 1, 3, 4 };
-    vec<int> nz35 = { 2, 1, 0, 1, 2, 1, 0, 0 };
-   
-    arrvec<int,3> nz1 = {nz11,nz12,nz13};
-    arrvec<int,4> nz2 = {nz21,nz22,nz24,nz25};
-    arrvec<int,3> nz3 = {nz33,nz34,nz35};
-    
-    fill_random<3>(tensor1,nz1);
-    fill_random<4>(tensor2,nz2);
-	fill_random<3>(tensor3,nz3);
-	
-	int unitnr = 0;
-	
-	
-	if (rank == 0) unitnr = 6;
-	
-	std::cout << "NAME: " << std::endl;
-	std::cout << tensor2.name() << std::endl;
-	
-	//dbcsr::contract<3,4,3>().alpha(1.0).t1(tensor1).t2(tensor2).t3(tensor3).beta(1.0)
-	//	.con1({0,1}).ncon1({2}).con2({0,1}).ncon2({2,3}).map1({0}).map2({1,2}).print(true).log(true).perform();
-	
-	//dbcsr::contract(tensor1,tensor2,tensor3).print(true).perform("ijk, ijlm -> klm");
-	
-	//dbcsr::copy(tensor1,tensor3).perform();
-	
-	arrvec<int,2> sizes0 = {blk1,blk2};
-	
-	dbcsr::pgrid<2> grid2(MPI_COMM_WORLD);
-	dbcsr::tensor<2> t2 = dbcsr::tensor<2>::create().name("TEST").ngrid(grid2).map1({0}).map2({1}).blk_sizes(sizes0);
-	
-	arrvec<int,2> nz00 = {nz11,nz12};
-	
-	fill_random<2>(t2,nz00);
-	
-	dbcsr::print(t2);
-	
-	tensor1.destroy();
-	tensor2.destroy();	
-	tensor3.destroy();
-	
-	pgrid3d.destroy();
-	pgrid4d.destroy();
-
-	*/
 	
 //#ifdef USE_SCALAPACK
 	scalapack::global_grid.free();

@@ -156,7 +156,7 @@ public:
 		} LOG.os<1>('\n');
 		
 		// determine blocks held per rank per batch
-		m_maxblk_per_node = m_batch_size * 1000 / (mean * 8);
+		m_maxblk_per_node = m_batch_size * 1000000 / (mean * 8);
 		
 		LOG.os<1>("-- Holding at most ", m_maxblk_per_node, " blocks per node.\n");
 		

@@ -214,7 +214,7 @@ void calc_ints(dbcsr::tensor<2>& t_out, util::ShrPool<libint2::Engine>& engine,
 }
 
 void calc_ints(dbcsr::tensor<3>& t_out, util::ShrPool<libint2::Engine>& engine,
-	std::vector<const desc::cluster_basis*>& basvec) {
+	std::vector<const desc::cluster_basis*>& basvec, screener* scr) {
 	
 	int myrank = 0;
 	int mpi_size = 0;
@@ -247,6 +247,10 @@ void calc_ints(dbcsr::tensor<3>& t_out, util::ShrPool<libint2::Engine>& engine,
 			const auto& c2 = cbas2[idx[1]];
 			const auto& c3 = cbas3[idx[2]];
 			
+			//int sh1off = cbas1.shell_offset(idx[0]);
+			//int sh2off = cbas2.shell_offset(idx[1]);
+			//int sh3off = cbas3.shell_offset(idx[2]);
+			
 			dbcsr::block<3> blk(size); 
 			
 			//lower bounds
@@ -275,6 +279,10 @@ void calc_ints(dbcsr::tensor<3>& t_out, util::ShrPool<libint2::Engine>& engine,
 					toff2 += locblkoff2;
 					
 					for (int s3 = 0; s3 != c3.size(); ++s3) {
+						
+						//if (scr->skip(sh1off+s1,sh2off+s2,sh3off+s3)) {
+						//	continue;
+						//}
 						
 						const auto& sh3 = c3[s3];
 						toff3 += locblkoff3;
@@ -514,6 +522,8 @@ void calc_ints_schwarz_mn(dbcsr::mat_d& m_out, util::ShrPool<libint2::Engine>& e
 						
 						loc_eng.compute(sh1,sh2,sh1,sh2);										
 						auto ints_shellsets = results[0];
+						
+						//std::cout << "IDX: " << toff1 << " " << toff2 << std::endl;
 											
 						if (ints_shellsets != nullptr) {
 							
@@ -523,7 +533,6 @@ void calc_ints_schwarz_mn(dbcsr::mat_d& m_out, util::ShrPool<libint2::Engine>& e
 								for (int j = 0; j != sh2.size(); ++j) {
 									tot += fabs(ints_shellsets[i*sh2size*sh2size*sh1size
 										+ j*sh1size*sh2size + i*sh2size + j]);
-									//std::cout << i << " " << j << " " << blk(i + locblkoff1, j + locblkoff2) << std::endl;
 							}}
 							
 							iter(s1,s2) = sqrt(tot);
