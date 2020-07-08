@@ -28,8 +28,10 @@ void schwarz_screener::compute() {
 	m_z_mn = dbcsr::matrix_to_eigen(*z_mn_dist);
 	m_z_x = dbcsr::matrix_to_eigen(*z_x_dist);
 	
-	//std::cout << m_z_mn << std::endl;
-	//std::cout << m_z_x << std::endl;
+	std::cout << "SCREENER COMPUTED." << std::endl;
+	
+	std::cout << m_z_mn << std::endl;
+	std::cout << m_z_x << std::endl;
 	
 	z_mn_dist->release();
 	z_x_dist->release();

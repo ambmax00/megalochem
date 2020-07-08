@@ -4,7 +4,9 @@ set (sources
 	piv_cd.h
 	piv_cd.cpp
 	LLT.h
-	LLT.cpp	
+	LLT.cpp
+	SVD.h
+	SVD.cpp	
 )
 
 add_library(chem_math_linalg ${sources})

@@ -103,5 +103,20 @@ dbcsr::smat_d LLT::L_inv(vec<int> blksizes) {
 	return out;
 	
 }
+
+dbcsr::smat_d LLT::inverse(vec<int> blksizes) {
+	
+	auto Linv = this->L_inv(blksizes);
+	dbcsr::mat_d out = dbcsr::mat_d::create_template(*Linv)
+		.name("Cholesky inverse of " + m_mat_in->name())
+		.type(dbcsr_type_symmetric);
+		
+	auto sout = out.get_smatrix();
+	
+	dbcsr::multiply('T', 'N', *Linv, *Linv, *sout).perform();
+	
+	return sout;
+	
+}
 	
 } // end namespace

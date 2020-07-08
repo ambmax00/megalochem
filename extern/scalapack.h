@@ -52,6 +52,10 @@ extern "C" {
 	void pdpotrf_(char* uplo, int* n, double* a, int* ia, int* ja, int* desca, int* info);
 	
 	void pdtrtri_(char* uplo, char* diag, int* n, double* a, int* ia, int* ja, int* desca, int* info);
+	
+	void pdgesvd_(char* jobu, char* jobvt, int* m, int* n, double* a, int* ia, int* ja,
+		int* desca, double* s, double* u, int* iu, int* ju, int* descu, double* vt,
+		int* ivt, int* jvt, int* descvt, double* work, int* lwork, double* rwork, int* info);
 		
 	void Cigebs2d(int ConTxt, char *scope, char *top, int m, int n, int *A, int lda);
 	void Cigebr2d(int ConTxt, char *scope, char *top, int m, int n, int *A,
@@ -228,6 +232,21 @@ inline void c_pdtrmm(char side, char uplo, char transa, char diag, int m, int n,
 		
 	pdtrmm_(&side, &uplo, &transa, &diag, &m, &n, &alpha, a, &f_ia, &f_ja, 
 		desca, b, &f_ib, &f_jb, descb);
+}
+
+inline void c_pdgesvd(char jobu, char jobvt, int m, int n, double* a, int ia, int ja,
+		int* desca, double* s, double* u, int iu, int ju, int* descu, double* vt,
+		int ivt, int jvt, int* descvt, double* work, int lwork, double* rwork, int* info)
+{
+	int f_ia = ia + 1;
+	int f_ja = ja + 1;
+	int f_iu = iu + 1;
+	int f_ju = ju + 1;
+	int f_ivt = ivt + 1;
+	int f_jvt = jvt + 1;
+	
+	pdgesvd_(&jobu, &jobvt, &m, &n, a, &f_ia, &f_ja, desca, s, u, &f_iu, &f_ju, descu, 
+		vt, &f_ivt, &f_jvt, descvt, work, &lwork, rwork, info);
 }
 
 namespace scalapack {

@@ -32,6 +32,8 @@ public:
 	
 	dbcsr::smat_d L_inv(vec<int> b);
 	
+	dbcsr::smat_d inverse(vec<int> b);
+	
 };
 
 } // end namespace

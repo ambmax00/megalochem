@@ -30,6 +30,9 @@ public:
 	virtual bool skip_block(int i, int j, int k);
 	virtual bool skip(int i, int j, int k);
 	
+	virtual double val_x(int i) { return 0; }
+	virtual double val_bb(int i, int j) { return 0; }
+	
 	~screener() {}
 	
 };
@@ -51,6 +54,9 @@ public:
 	
 	bool skip_block(int i, int j, int k) override;
 	bool skip(int i, int j, int k) override;
+	
+	double val_x(int i) override { return m_z_x(i,0); }
+	double val_bb(int i, int j) override  { return m_z_mn(i,j); }
 	
 	~schwarz_screener() {}
 	

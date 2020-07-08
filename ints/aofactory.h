@@ -3,6 +3,7 @@
 
 #include <dbcsr_tensor.hpp>
 #include <dbcsr_conversions.hpp>
+#include "tensor/batchtensor.h"
 #include "desc/molecule.h"
 #include <string>
 #include <limits>
@@ -59,6 +60,11 @@ public:
 	dbcsr::stensor<3,double> ao_3c2e_erfc_setup_tensor(vec<int> map1, vec<int> map2);
 	
 	void ao_3c2e_fill(dbcsr::stensor<3,double>& t_in, vec<vec<int>>& blkbounds, screener* scr);
+	
+	void ao_3c2e_fill(dbcsr::stensor<3,double>& t_in);
+	
+	dbcsr::stensor<3,double> fetch_ao_3c2e(tensor::sbatchtensor<3,double> btensor, 
+		int ibatch, bool direct, dbcsr::stensor<3,double> in = nullptr, screener* scr = nullptr);
 		
 }; // end class aofactory
 

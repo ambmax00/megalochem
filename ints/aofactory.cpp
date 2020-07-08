@@ -371,6 +371,12 @@ public:
 		
 	}
 	
+	void compute_3(dbcsr::stensor<3>& t_in) {
+		
+		calc_ints(*t_in, m_eng_pool, m_basvec, nullptr); 
+		
+	}
+	
 	dbcsr::stensor<4,double> compute_4(vec<int>& map1, vec<int>& map2) {
 		
 		dbcsr::pgrid<4> grid(m_world.comm()); 
@@ -531,6 +537,12 @@ void aofactory::ao_3c2e_fill(dbcsr::stensor<3,double>& t_in, vec<vec<int>>& blkb
 	pimpl->compute_3(t_in,blkbounds,scr);
 	
 }
+
+void aofactory::ao_3c2e_fill(dbcsr::stensor<3,double>& t_in) {
+	
+	pimpl->compute_3(t_in);
+	
+}
 	
 
 dbcsr::stensor<4,double> aofactory::ao_eri(vec<int> map1, vec<int> map2) {
@@ -558,6 +570,37 @@ dbcsr::smatrix<double> aofactory::ao_3cschwarz() {
 	pimpl->set_operator("coulomb");
 	pimpl->setup_calc(true);
 	return pimpl->compute_screen("schwarz", "xx");
+}
+
+dbcsr::stensor<3,double> aofactory::fetch_ao_3c2e(tensor::sbatchtensor<3,double> btensor, 
+		int ibatch, bool direct, dbcsr::stensor<3,double> in, screener* scr)
+{
+	if (direct) {
+		
+		vec<vec<int>> blks(3);
+		blks[0] = btensor->bounds_blk(ibatch,0);
+		blks[1] = btensor->bounds_blk(ibatch,1);
+		blks[2] = btensor->bounds_blk(ibatch,2);
+		
+		dbcsr::stensor<3,double> out = (in) ? in : btensor->get_stensor();
+		
+		this->ao_3c2e_fill(out,blks,scr);
+		
+		return out;
+		
+	} else {
+		
+		auto tptr = btensor->get_stensor();
+		btensor->read(ibatch);
+		if (in) {
+			dbcsr::copy(*tptr,*in).move_data(true).perform();
+			return in;
+		} else {
+			return tptr;
+		}
+		
+	}
+		
 }
 		
 

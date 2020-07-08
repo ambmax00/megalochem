@@ -10,7 +10,7 @@
 #include <dbcsr_matrix.hpp>
 
 namespace fock {
-
+	
 class JK_common {
 protected:
 	
@@ -204,6 +204,37 @@ public:
 	void init_tensors() override;
 	
 };
+/*
+class CADF_K : public K {
+private:
+	
+	dbcsr::stensor2_d m_s_xx_inv;
+	dbcsr::smat_d m_s_xx;
+	
+	tensor::sbatchtensor<3,double> m_fit_batched;
+	tensor::sbatchtensor<3,double> m_eri_batched;
+	
+	std::shared_ptr<ints::screener> m_scr;
+	
+	arrvec<int,3> m_L3;
+	arrvec<int,3> m_LB;
+	
+	vec<int> m_blk_to_atom_x;
+	vec<int> m_blk_to_atom_b;
+	vec<vec<int>> m_atom_to_blk_x;
+	vec<vec<int>> m_atom_to_blk_b;
+	
+	void compute_fit();
+	void compute_L3();
+	void compute_LB();
+	
+public:
+
+	CADF_K(dbcsr::world& w, desc::options& opt);
+	void compute_K() override;
+	void init_tensors() override;
+
+};*/
 
 } // end namespace
 

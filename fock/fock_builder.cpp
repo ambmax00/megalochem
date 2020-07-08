@@ -97,7 +97,18 @@ void fockmod::init() {
 		setup_btensor = true;
 		if (!direct) compute_3c2e_batched = true;
 		
-	}
+	} /*else if (k_method == "cadf") {
+		
+		K* builder = new CADF_K(m_world,m_opt);
+		m_K_builder.reset(builder);
+		
+		compute_s_xx = true;
+		compute_s_xx_inv = true;
+		setup_btensor = true;
+		compute_3c2e_batched = true;
+		
+	}*/
+		
 	
 	LOG.os<>("Setting up JK builder.\n");
 	LOG.os<>("J method: ", j_method, '\n');
@@ -148,8 +159,6 @@ void fockmod::init() {
 		
 		t_eri.finish();
 		
-		delete scr;
-		
 	}
 	
 	if (compute_3c2e_batched) {
@@ -159,7 +168,10 @@ void fockmod::init() {
 		t_screen.start();
 		
 		ints::screener* scr = new ints::schwarz_screener(aofac);
+		std::shared_ptr<ints::screener> scr_s(scr);
 		scr->compute();
+		
+		reg.insert_screener(m_mol->name() + "_schwarz_screener", scr_s);
 		
 		t_screen.finish();
 		
@@ -235,7 +247,8 @@ void fockmod::init() {
 		
 		if (compute_s_xx_inv) {
 			dbcsr::mat_d s = dbcsr::mat_d::create_template(*Linv)
-				.name("mat").type(dbcsr_type_symmetric);
+				.name(m_mol->name() + "_s_xx_inv")
+				.type(dbcsr_type_symmetric);
 			auto s_xx_inv = s.get_smatrix();
 			
 			dbcsr::multiply('T', 'N', *Linv, *Linv, *s_xx_inv).perform();
@@ -245,6 +258,8 @@ void fockmod::init() {
 			dbcsr::stensor2_d s_xx_inv_01 = dbcsr::make_stensor<2>(
 				dbcsr::tensor2_d::create().name(name).ngrid(grid2)
 				.map1({0}).map2({1}).blk_sizes(xx));
+				
+			reg.insert_matrix<double>(s_xx_inv->name(),s_xx_inv);
 				
 			dbcsr::copy_matrix_to_tensor(*s_xx_inv, *s_xx_inv_01); 
 			

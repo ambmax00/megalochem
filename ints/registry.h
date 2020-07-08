@@ -5,6 +5,7 @@
 #include <map>
 #include <dbcsr_tensor_ops.hpp>
 #include "tensor/batchtensor.h"
+#include "ints/screening.h"
 
 namespace ints {
 	
@@ -46,6 +47,11 @@ public:
 	template <int N, typename T>
 	void insert_btensor(std::string name, tensor::sbatchtensor<N,T>& t) {
 		std::any in = std::any(t);
+		m_map[name] = in;
+	}; 
+	
+	void insert_screener(std::string name, std::shared_ptr<ints::screener> scr) {
+		std::any in = std::any(scr);
 		m_map[name] = in;
 	}; 
 	
@@ -142,6 +148,17 @@ public:
 				throw std::runtime_error("Registry: Bad cast.");
 			}
 			out = std::any_cast<tensor::sbatchtensor<N,T>>(m_map[intname]);
+		}
+		return out;
+	}
+	
+	std::shared_ptr<ints::screener> get_screener(std::string name) {
+		std::shared_ptr<ints::screener> out;
+		if (m_map.find(name) != m_map.end()) {
+			if (typeid(out).name() != m_map[name].type().name()) {
+				throw std::runtime_error("Registry: Bad cast.");
+			}
+			out = std::any_cast<std::shared_ptr<ints::screener>>(m_map[name]);
 		}
 		return out;
 	}

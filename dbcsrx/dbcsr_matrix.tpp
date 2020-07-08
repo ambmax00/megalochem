@@ -204,7 +204,12 @@ public:
         c_dbcsr_set_diag(m_matrix_ptr, diag.data(), diag.size());
     }
    
-    //std::vector get_diag(); // TO DO
+    std::vector<T> get_diag() {
+		int diagsize = this->nfullrows_total();
+		std::vector<T> diag(diagsize);
+		c_dbcsr_get_diag (m_matrix_ptr, diag.data(), diagsize);
+		return diag;
+	}
      
     T trace() const {
         T out;
@@ -229,6 +234,15 @@ public:
         c_dbcsr_get_block_p(m_matrix_ptr, row, col, &data, &found, &size[0], &size[1]);
         
         return block<2,T>(size, data);
+    }
+    
+    T* get_block_data(const int row, const int col, bool& found) {
+        T* data = nullptr;
+        std::array<int,2> size = {0,0};
+    
+        c_dbcsr_get_block_p(m_matrix_ptr, row, col, &data, &found, &size[0], &size[1]);
+        
+        return data;
     }
     
     void complete_redistribute(matrix<T>& in, std::optional<bool> keep_sparsity = std::nullopt, 
@@ -546,6 +560,15 @@ public:
 		double out;
 		c_dbcsr_norm_scalar(m_matrix_ptr, method, &out);
 		return out;
+	}
+	
+	void apply(int func, std::optional<double> a0 = std::nullopt, 
+		std::optional<double> a1 = std::nullopt,
+		std::optional<double> a2 = std::nullopt) 
+	{
+			
+		c_dbcsr_function_of_elements(m_matrix_ptr, func,
+			(a0) ? &*a0 : nullptr, (a1) ? &*a1 : nullptr, (a2) ? &*a2 : nullptr);		
 	}
 	
 	smatrix<T> get_smatrix() {

@@ -2,7 +2,10 @@ set(SOURCES
 	fockmod.h
 	fock_builder.cpp
 	jkbuilder.h
-	jkbuilder.cpp
+	jkcommon.cpp
+	jkexact.cpp
+	jkdf.cpp
+	jkcadf.cpp
 )
 
 add_library(chem_fock ${SOURCES})
