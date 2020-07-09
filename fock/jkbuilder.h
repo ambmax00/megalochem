@@ -163,29 +163,37 @@ public:
 
 class BATCHED_DF_J : public J {
 private:
+
+	tensor::sbatchtensor<3,double> m_eri_batched;
+	ints::shared_screener m_scr = nullptr;
 	
 	dbcsr::stensor3_d m_J_bbd;
 	dbcsr::stensor3_d m_ptot_bbd;
 	dbcsr::stensor2_d m_gp_xd;
 	dbcsr::stensor2_d m_gq_xd;
 	dbcsr::stensor2_d m_inv;
-	bool m_direct = false;;
+
+	std::string m_metric;
+	bool m_direct = false;
+	
+	void fetch_integrals(int ibatch);
 
 public:
 
-	BATCHED_DF_J(dbcsr::world& w, desc::options& opt);
-	void set_direct(bool i) { m_direct = i; }
+	BATCHED_DF_J(dbcsr::world& w, desc::options& opt, 
+		std::string metric, bool direct);
 	void compute_J() override;
 	void init_tensors() override;
-	void fetch_integrals(tensor::sbatchtensor<3,double>& btensor, int ibatch);
 	
 };
 
-class BATCHED_DF_K : public K {
+class BATCHED_DFMO_K : public K {
 private:
-
+	
+	tensor::sbatchtensor<3,double> m_eri_batched;
 	tensor::sbatchtensor<3,double> m_dummy_batched_xbo_01_2;
 	dbcsr::stensor3_d m_dummy_xbo_01_2;
+	ints::shared_screener m_scr = nullptr;
 	
 	dbcsr::stensor3_d m_INTS_01_2;
 	dbcsr::stensor3_d m_HT1_xbm_01_2;
@@ -197,9 +205,46 @@ private:
 	dbcsr::stensor2_d m_K_01;
 	dbcsr::stensor2_d m_invsqrt;
 	
+	bool m_direct = false;
+	std::string m_metric;
+	
+	void fetch_integrals(int ibatch, dbcsr::stensor3_d& t);
+	void return_integrals(dbcsr::stensor3_d& reo_ints);
+	
 public:
 
-	BATCHED_DF_K(dbcsr::world& w, desc::options& opt);
+	BATCHED_DFMO_K(dbcsr::world& w, desc::options& opt, 
+		std::string metric, bool direct);
+	void compute_K() override;
+	void init_tensors() override;
+	
+};
+
+class BATCHED_DFAO_K : public K {
+private:
+	
+	tensor::sbatchtensor<3,double> m_eri_batched;
+	tensor::sbatchtensor<3,double> m_c_xbb_batched;
+	
+	ints::shared_screener m_scr = nullptr;
+	
+	dbcsr::stensor<3,double> m_cbar_xbb_01_2;
+	dbcsr::stensor<3,double> m_cbar_xbb_02_1;
+	dbcsr::stensor<3,double> m_eri_01_2;
+	
+	dbcsr::stensor2_d m_K_01;
+	dbcsr::stensor2_d m_p_bb;
+	
+	bool m_direct = false;
+	std::string m_metric;
+	
+	void fetch_integrals(int ibatch, dbcsr::stensor3_d t);
+	void return_integrals(dbcsr::stensor3_d& reo_ints);
+	
+public:
+
+	BATCHED_DFAO_K(dbcsr::world& w, desc::options& opt, 
+		std::string metric, bool direct);
 	void compute_K() override;
 	void init_tensors() override;
 	

@@ -61,7 +61,7 @@ void EXACT_J::compute_J() {
 	}
 	
 	// grab integrals
-	auto eris = m_reg.get_tensor<4,double>(m_mol->name() + "_i_bbbb_(01|23)", true, true);
+	auto eris = m_reg.get_tensor<4,double>(m_mol->name() + "_i_bbbb_(01|23)");
 	
 	dbcsr::contract(*m_ptot_bbd, *eris, *m_J_bbd).print(false).perform("LS_, MNLS -> MN_");
 	
@@ -82,7 +82,7 @@ void EXACT_J::compute_J() {
 
 void EXACT_K::compute_K() {
 	
-	auto eris = m_reg.get_tensor<4,double>(m_mol->name() + "_i_bbbb_(02|13)", true, true);
+	auto eris = m_reg.get_tensor<4,double>(m_mol->name() + "_i_bbbb_(01|23)");
 	
 	auto compute_K_single = [&](dbcsr::smat_d& p, dbcsr::smat_d& k, std::string x) {
 		

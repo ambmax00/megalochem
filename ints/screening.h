@@ -45,9 +45,11 @@ protected:
 	Eigen::MatrixXd m_z_mn;
 	Eigen::MatrixXd m_z_x;
 	
+	std::string m_metric;
+	
 public:
 
-	schwarz_screener(std::shared_ptr<aofactory> ifac) : 
+	schwarz_screener(std::shared_ptr<aofactory> ifac, std::string metric) : 
 		screener(ifac, "schwarz") {}
 		
 	void compute() override;
@@ -61,6 +63,8 @@ public:
 	~schwarz_screener() {}
 	
 };
+
+using shared_screener = std::shared_ptr<screener>;
 
 } // end namespace
 

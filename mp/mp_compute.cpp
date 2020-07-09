@@ -396,24 +396,24 @@ void mpmod::compute_batch() {
 	 = std::make_shared<ints::aofactory>(m_hfwfn->mol(), m_world);
 	
 	// screening
-	ints::screener* scr = new ints::schwarz_screener(aofac);
+	ints::screener* scr = new ints::schwarz_screener(aofac, "erfc_coulomb");
 	
 	scrtime.start();
 	scr->compute();
 	scrtime.finish();
 	
-	aofac->ao_3c2e_erfc_setup();
+	aofac->ao_3c2e_setup("erfc_coulomb");
 	
-	auto B_xbb_1_02 = aofac->ao_3c2e_erfc_setup_tensor(vec<int>{1},vec<int>{0,2});
-	auto B_xbb_0_12 = aofac->ao_3c2e_erfc_setup_tensor(vec<int>{0},vec<int>{1,2});
+	auto B_xbb_1_02 = aofac->ao_3c2e_setup_tensor(vec<int>{1},vec<int>{0,2});
+	auto B_xbb_0_12 = aofac->ao_3c2e_setup_tensor(vec<int>{0},vec<int>{1,2});
 	
 	tensor::batchtensor<3,double> B_xbb_1_02_direct(B_xbb_1_02,tensor::global::default_batchsize,LOG.global_plev());
 	tensor::batchtensor<3,double> B_xbb_0_12_direct(B_xbb_0_12,tensor::global::default_batchsize,LOG.global_plev());
 	
 	invtime.start();
 	
-	auto C_xx = aofac->ao_3coverlap();
-	auto S_erfc_xx = aofac->ao_3coverlap_erfc();
+	auto C_xx = aofac->ao_3coverlap("coulomb");
+	auto S_erfc_xx = aofac->ao_3coverlap("erfc_coulomb");
 	
 	// Ctilde = (S C-1 S)-1
 	
@@ -618,7 +618,7 @@ void mpmod::compute_batch() {
 			LOG.os<1>("-- Filling ao ints...\n");
 			intstime.start();
 			// compute AO integrals
-			aofac->ao_3c2e_erfc_setup();
+			aofac->ao_3c2e_setup("erfc_coulomb");
 			aofac->ao_3c2e_fill(B_xbb_1_02, xbounds, scr);
 			intstime.finish();
 			
@@ -710,7 +710,7 @@ void mpmod::compute_batch() {
 			// grab integrals
 			intstime.start();
 			if (!onebatch) {
-				aofac->ao_3c2e_erfc_setup();
+				aofac->ao_3c2e_setup("erfc_coulomb");
 				aofac->ao_3c2e_fill(B_xbb_0_12, mubounds, scr);
 			} else {
 				dbcsr::copy(*B_xbb_1_02,*B_xbb_0_12).move_data(true).perform();

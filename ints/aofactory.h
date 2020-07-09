@@ -21,6 +21,7 @@ namespace ints {
 	
 struct global {
 	static inline double precision = std::numeric_limits<double>::epsilon();
+	static inline double omega = 1;
 };
 	
 class screener;
@@ -44,27 +45,21 @@ public:
 	dbcsr::smatrix<double> ao_kinetic();
 	dbcsr::smatrix<double> ao_nuclear();
 	
-	dbcsr::smatrix<double> ao_3coverlap();
-	dbcsr::smatrix<double> ao_3coverlap_erfc();
+	dbcsr::smatrix<double> ao_3coverlap(std::string metric);
 	
-	dbcsr::stensor<3,double> ao_3c2e(vec<int> map1, vec<int> map2, screener* scr = nullptr);
+	dbcsr::stensor<3,double> ao_3c2e(vec<int> map1, vec<int> map2, std::string metric, screener* scr = nullptr);
 	dbcsr::stensor<4,double> ao_eri(vec<int> map1, vec<int> map2);
 	
-	dbcsr::smatrix<double> ao_schwarz();
-	dbcsr::smatrix<double> ao_3cschwarz();
+	dbcsr::smatrix<double> ao_schwarz(std::string metric);
+	dbcsr::smatrix<double> ao_3cschwarz(std::string metric);
 	
-	void ao_3c2e_setup();
-	void ao_3c2e_erfc_setup();
+	void ao_3c2e_setup(std::string metric);
 	
 	dbcsr::stensor<3,double> ao_3c2e_setup_tensor(vec<int> map1, vec<int> map2);
-	dbcsr::stensor<3,double> ao_3c2e_erfc_setup_tensor(vec<int> map1, vec<int> map2);
 	
 	void ao_3c2e_fill(dbcsr::stensor<3,double>& t_in, vec<vec<int>>& blkbounds, screener* scr);
 	
 	void ao_3c2e_fill(dbcsr::stensor<3,double>& t_in);
-	
-	dbcsr::stensor<3,double> fetch_ao_3c2e(tensor::sbatchtensor<3,double> btensor, 
-		int ibatch, bool direct, dbcsr::stensor<3,double> in = nullptr, screener* scr = nullptr);
 		
 }; // end class aofactory
 

@@ -10,7 +10,8 @@ static const json valid_keys =
 	{"global", {
 		{"batchsize", 1000}, // batch size for tensors, in megabytes
 		{"block_threshold", 1e-9}, // block threshold for dbcsr
-		{"integral_precision", 1-12} // as the name says
+		{"integral_precision", 1-12}, // as the name says
+		{"omega", 0.1} // omega factor for erfc integrals
 	}},
 	{"molecule", {
 		{"file", "string"}, 
@@ -37,7 +38,8 @@ static const json valid_keys =
 		{"diis_beta", true}, // whether to use separate coeficients for beta
 		{"build_J", "exact"}, // how Coulomb matrix is constructed
 		{"build_K", "exact"}, // how Exchange matrix is constructed
-		{"direct", false}, // wether AO integrals are recomputed
+		{"direct", false}, // wether AO integrals are recomputed in batch methods
+		{"df_metric", "coulomb"}, // which metric to use for batchdf
 		{"print", 0}, // print level (0, 1 or 2 at the moment, -1 for silent output)
 		{"skip", false}, // skip hartree fock and read from files
 		{"max_iter", 10},

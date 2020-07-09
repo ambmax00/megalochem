@@ -105,8 +105,7 @@ public:
 		if (m_Op == libint2::Operator::nuclear) {
 			eng.set_params(make_point_charges(m_mol->atoms())); 
 		} else if (m_Op == libint2::Operator::erfc_coulomb) {
-			double omega = 0.1; //*ctx.get<double>("INT/omega");
-			eng.set_params(omega);
+			eng.set_params(global::omega);
 		}
 		
 		eng.set(m_BraKet);
@@ -438,24 +437,11 @@ dbcsr::smatrix<double> aofactory::ao_nuclear() {
 	return pimpl->compute();
 }
 
-dbcsr::smatrix<double> aofactory::ao_3coverlap() {
+dbcsr::smatrix<double> aofactory::ao_3coverlap(std::string metric) {
 	
-	std::string intname = m_mol->name() + "_s_xx";
-	
-	pimpl->set_name("s_xx");
+	pimpl->set_name("s_xx_"+metric);
 	pimpl->set_braket("xx");
-	pimpl->set_operator("coulomb");
-	pimpl->setup_calc();
-	return pimpl->compute();
-}
-
-dbcsr::smatrix<double> aofactory::ao_3coverlap_erfc() {
-	
-	std::string intname = m_mol->name() + "_s_xx_erfc";
-	
-	pimpl->set_name("s_xx_erfc");
-	pimpl->set_braket("xx");
-	pimpl->set_operator("erfc_coulomb");
+	pimpl->set_operator(metric);
 	pimpl->setup_calc();
 	return pimpl->compute();
 }
@@ -491,42 +477,27 @@ dbcsr::smatrix<double> ao_3coverlap_invsqrt() {
 	
 }
 */
-dbcsr::stensor<3,double> aofactory::ao_3c2e(vec<int> map1, vec<int> map2, screener* scr) {
+dbcsr::stensor<3,double> aofactory::ao_3c2e(vec<int> map1, vec<int> map2, std::string metric, screener* scr) {
 	
 	auto name = m_mol->name() + "_i_xbb_" + pimpl->m_reg.map_to_string(map1,map2);
 	
 	pimpl->set_name(name);
 	pimpl->set_braket("xbb");
-	pimpl->set_operator("coulomb");
+	pimpl->set_operator(metric);
 	pimpl->setup_calc();
 	return pimpl->compute_3(map1,map2,scr);
 }
 
-void aofactory::ao_3c2e_setup() {
+void aofactory::ao_3c2e_setup(std::string metric) {
 	
 	pimpl->set_braket("xbb");
-	pimpl->set_operator("coulomb");
-	pimpl->setup_calc();
-	
-}
-
-void aofactory::ao_3c2e_erfc_setup() {
-	
-	pimpl->set_braket("xbb");
-	pimpl->set_operator("erfc_coulomb");
+	pimpl->set_operator(metric);
 	pimpl->setup_calc();
 	
 }
 
 dbcsr::stensor<3,double> aofactory::ao_3c2e_setup_tensor(vec<int> map1, vec<int> map2) {
 	auto name = m_mol->name() + "_i_xbb_" + pimpl->m_reg.map_to_string(map1,map2);
-	pimpl->set_name(name);
-	return pimpl->setup_tensor<3>(map1,map2);
-	
-}
-
-dbcsr::stensor<3,double> aofactory::ao_3c2e_erfc_setup_tensor(vec<int> map1, vec<int> map2) {
-	auto name = m_mol->name() + "_erfc_xbb_" + pimpl->m_reg.map_to_string(map1,map2);
 	pimpl->set_name(name);
 	return pimpl->setup_tensor<3>(map1,map2);
 	
@@ -556,52 +527,21 @@ dbcsr::stensor<4,double> aofactory::ao_eri(vec<int> map1, vec<int> map2) {
 	return pimpl->compute_4(map1,map2);
 }
 
-dbcsr::smatrix<double> aofactory::ao_schwarz() {
+dbcsr::smatrix<double> aofactory::ao_schwarz(std::string metric) {
 	pimpl->set_name("Z_mn");
 	pimpl->set_braket("bbbb");
-	pimpl->set_operator("coulomb");
+	pimpl->set_operator(metric);
 	pimpl->setup_calc(true);
 	return pimpl->compute_screen("schwarz", "bbbb");
 }
 	
-dbcsr::smatrix<double> aofactory::ao_3cschwarz() {
+dbcsr::smatrix<double> aofactory::ao_3cschwarz(std::string metric) {
 	pimpl->set_name("Z_x");
 	pimpl->set_braket("xx");
-	pimpl->set_operator("coulomb");
+	pimpl->set_operator(metric);
 	pimpl->setup_calc(true);
 	return pimpl->compute_screen("schwarz", "xx");
 }
 
-dbcsr::stensor<3,double> aofactory::fetch_ao_3c2e(tensor::sbatchtensor<3,double> btensor, 
-		int ibatch, bool direct, dbcsr::stensor<3,double> in, screener* scr)
-{
-	if (direct) {
-		
-		vec<vec<int>> blks(3);
-		blks[0] = btensor->bounds_blk(ibatch,0);
-		blks[1] = btensor->bounds_blk(ibatch,1);
-		blks[2] = btensor->bounds_blk(ibatch,2);
-		
-		dbcsr::stensor<3,double> out = (in) ? in : btensor->get_stensor();
-		
-		this->ao_3c2e_fill(out,blks,scr);
-		
-		return out;
-		
-	} else {
-		
-		auto tptr = btensor->get_stensor();
-		btensor->read(ibatch);
-		if (in) {
-			dbcsr::copy(*tptr,*in).move_data(true).perform();
-			return in;
-		} else {
-			return tptr;
-		}
-		
-	}
-		
-}
-		
 
 } // end namespace ints

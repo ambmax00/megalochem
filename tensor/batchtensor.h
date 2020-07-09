@@ -45,15 +45,17 @@ private:
 	
 	/* ========== dynamic tensor variables ========== */
 	
-	int m_nblkloc; 
+	int m_nblkloc = 0; 
 	// number of local blocks
-	int m_nzeloc; 
+	int m_nblkloc_global = 0;
+	// number og local blocks in non-sparse tensor
+	int m_nzeloc = 0; 
 	// number of local non-zero elements 
-	int64_t m_nblktot_global;
+	int64_t m_nblktot_global = 0;
 	// total number of blocks in non-sparse tensor
-	int64_t m_nblktot; 
+	int64_t m_nblktot = 0; 
 	// total number of blocks
-	int64_t m_nzetot; 
+	int64_t m_nzetot = 0; 
 	// total number of non-zero elements
 	arrvec<int,N> m_locblkidx;  
 	// local block-indices
@@ -62,12 +64,12 @@ private:
 	
 	/* ======== BATCHING INFO ========== */
 	
-	double m_batch_size;
-	int64_t m_maxblk_per_node;
+	double m_batch_size = 0.0;
+	int64_t m_maxblk_per_node = 0;
 	// maximum number of blocks allowed per process (per batch)
-	int64_t m_maxnblk_tot;
+	int64_t m_maxnblk_tot = 0;
 	// maximum number of blocks allowed on all processes
-	int m_nbatches;
+	int m_nbatches = 0;
 	// number of batches the tensor is subdivided into
 	
 	vec<int> m_current_batchdim; 
@@ -357,7 +359,7 @@ public:
 		int rc = MPI_File_delete(data_fname.c_str(),MPI_INFO_NULL);
 		//int rc = MPI_File_delete(idx_fname.c_str(),MPI_INFO_NULL);
 		
-		reset_var();
+		//reset_var();
 		
 	}
 	
@@ -384,6 +386,8 @@ public:
 		m_nzeprocbatch.clear();
 	
 	}	
+	
+	~batchtensor() { delete_file(); }
 			
 	/* ... */
 	void write(int ibatch) {
@@ -661,6 +665,7 @@ public:
 			
 			for (int i = 0; i != ndimsize; ++i) {
 				bbounds[i] = this->bounds_blk(ibatch,ndim[i]);
+				LOG.os<1>("Bounds: ", bbounds[i][0], " ", bbounds[i][1], '\n');
 			}
 			
 			arrvec<int,N> res;

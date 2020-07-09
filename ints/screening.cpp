@@ -13,8 +13,10 @@ bool screener::skip(int i, int j, int k) {
 
 void schwarz_screener::compute() {
 	
-	auto z_mn_dist = p_fac->ao_schwarz();
-	auto z_x_dist = p_fac->ao_3cschwarz();
+	m_metric = "coulomb";
+	
+	auto z_mn_dist = p_fac->ao_schwarz(m_metric);
+	auto z_x_dist = p_fac->ao_3cschwarz(m_metric);
 	
 	//dbcsr::print(*z_mn_dist);
 	//dbcsr::print(*z_x_dist); 
@@ -27,11 +29,6 @@ void schwarz_screener::compute() {
 	
 	m_z_mn = dbcsr::matrix_to_eigen(*z_mn_dist);
 	m_z_x = dbcsr::matrix_to_eigen(*z_x_dist);
-	
-	std::cout << "SCREENER COMPUTED." << std::endl;
-	
-	std::cout << m_z_mn << std::endl;
-	std::cout << m_z_x << std::endl;
 	
 	z_mn_dist->release();
 	z_x_dist->release();

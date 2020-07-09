@@ -2,7 +2,7 @@
 	"name": "test",
 	"global": 
 	{
-		"batchsize": 2520000,
+		"batchsize": 1000,
 		"block_threshold": 1e-9
 	},
 	"molecule": 
@@ -28,8 +28,10 @@
 		"scf_thresh": 1e-6,
 		"diis_start": 0, 
 		"build_J": "batchdf",
-		"build_K": "cadf",
-		"print": 0,
+		"build_K": "batchdfmo",
+		"direct": false,
+		"print": 1,
+		"df_metric": "coulomb",
 		"SAD_diis": true, 
 		"dfbasis": "cc-pvdz-ri", 
 		"skip": false

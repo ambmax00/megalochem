@@ -1,6 +1,7 @@
 #include "fock/fockmod.h"
 #include "ints/screening.h"
 #include "math/linalg/LLT.h"
+#include "math/solvers/hermitian_eigen_solver.h"
 #include "fock/fock_defaults.h"
 
 namespace fock {
@@ -30,6 +31,7 @@ void fockmod::init() {
 	
 	std::string j_method = m_opt.get<std::string>("build_J", FOCK_BUILD_J);
 	std::string k_method = m_opt.get<std::string>("build_K", FOCK_BUILD_K);
+	std::string metric = m_opt.get<std::string>("df_metric", FOCK_METRIC);
 	bool direct = m_opt.get<bool>("direct", FOCK_DIRECT);
 	
 	bool compute_eris = false;
@@ -59,7 +61,7 @@ void fockmod::init() {
 		
 	} else if (j_method == "batchdf") {
 		
-		J* builder = new BATCHED_DF_J(m_world, m_opt);
+		J* builder = new BATCHED_DF_J(m_world,m_opt,metric,direct);
 		m_J_builder.reset(builder);
 		
 		compute_s_xx = true;
@@ -87,9 +89,9 @@ void fockmod::init() {
 		compute_s_xx = true;
 		compute_s_xx_invsqrt = true;
 		
-	} else if (k_method == "batchdf") {
+	} else if (k_method == "batchdfmo") {
 		
-		K* builder = new BATCHED_DF_K(m_world,m_opt);
+		K* builder = new BATCHED_DFMO_K(m_world,m_opt,metric,direct);
 		m_K_builder.reset(builder);
 		
 		compute_s_xx = true;
@@ -97,17 +99,17 @@ void fockmod::init() {
 		setup_btensor = true;
 		if (!direct) compute_3c2e_batched = true;
 		
-	} /*else if (k_method == "cadf") {
+	} else if (k_method == "batchdfao") {
 		
-		K* builder = new CADF_K(m_world,m_opt);
+		K* builder = new BATCHED_DFAO_K(m_world,m_opt,metric,direct);
 		m_K_builder.reset(builder);
 		
 		compute_s_xx = true;
 		compute_s_xx_inv = true;
 		setup_btensor = true;
-		compute_3c2e_batched = true;
+		if (!direct) compute_3c2e_batched = true;
 		
-	}*/
+	}   
 		
 	
 	LOG.os<>("Setting up JK builder.\n");
@@ -116,7 +118,9 @@ void fockmod::init() {
 	
 	std::shared_ptr<ints::aofactory> aofac =
 		std::make_shared<ints::aofactory>(m_mol,m_world);
-		
+	
+	//dbcsr::print(*m_p_A);
+	
 	m_J_builder->set_density_alpha(m_p_A);
 	m_J_builder->set_density_beta(m_p_B);
 	m_J_builder->set_coeff_alpha(m_c_A);
@@ -133,97 +137,38 @@ void fockmod::init() {
 	
 	ints::registry reg;
 	
-	if (compute_eris) {
-		
-		auto eris = aofac->ao_eri(vec<int>{0,1},vec<int>{2,3});
-		reg.insert_tensor<4,double>(m_mol->name() + "_i_bbbb_(01|23)", eris);
-		
-	}
-	
-	if (compute_3c2e) {
-		
-		auto& t_screen = TIME.sub("3c2e screening");
-		
-		t_screen.start();
-		
-		ints::screener* scr = new ints::schwarz_screener(aofac);
-		scr->compute();
-		
-		t_screen.finish();
-		
-		auto& t_eri = TIME.sub("3c2e integrals");
-		t_eri.start();
-		
-		auto out = aofac->ao_3c2e(vec<int>{0}, vec<int>{1,2},scr);
-		reg.insert_tensor<3,double>(m_mol->name() + "_i_xbb_(0|12)", out);
-		
-		t_eri.finish();
-		
-	}
-	
-	if (compute_3c2e_batched) {
-		
-		auto& t_screen = TIME.sub("3c2e screening");
-		
-		t_screen.start();
-		
-		ints::screener* scr = new ints::schwarz_screener(aofac);
-		std::shared_ptr<ints::screener> scr_s(scr);
-		scr->compute();
-		
-		reg.insert_screener(m_mol->name() + "_schwarz_screener", scr_s);
-		
-		t_screen.finish();
-		
-		auto& t_eri_batched = TIME.sub("3c2e integrals batched");
-		
-		t_eri_batched.start();
-		
-		aofac->ao_3c2e_setup();
-		
-		auto eri = aofac->ao_3c2e_setup_tensor(vec<int>{0}, vec<int>{1,2});
-		
-		tensor::sbatchtensor<3,double> eribatch = 
-			std::make_shared<tensor::batchtensor<3,double>>
-				(eri,tensor::global::default_batchsize,LOG.global_plev());
-		
-		eribatch->create_file();
-		eribatch->setup_batch();
-		eribatch->set_batch_dim(vec<int>{2});
-		
-		int nbatches = eribatch->nbatches();
-		
-		vec<vec<int>> bounds(3);
-		for (int i = 0; i != nbatches; ++i) {
-			
-			bounds[0] = eribatch->bounds_blk(i,0);
-			bounds[1] = eribatch->bounds_blk(i,1);
-			bounds[2] = eribatch->bounds_blk(i,2);
-			
-			aofac->ao_3c2e_fill(eri,bounds,scr);
-			
-			eribatch->write(i);
-			
-			eribatch->clear_batch();
-			
-		}
-		
-		reg.insert_btensor<3,double>(m_mol->name() + "_i_xbb_(0|12)_batched", eribatch);
-			
-		t_eri_batched.finish();
-		
-	}	
-	
-	
 	if (compute_s_xx) {
 		
 		auto& t_eri = TIME.sub("Metric");
 		
 		t_eri.start();
 		
-		auto out = aofac->ao_3coverlap();
-		reg.insert_matrix<double>(m_mol->name() + "_s_xx", out);
+		if (metric == "coulomb") {
 		
+			auto out = aofac->ao_3coverlap("coulomb");
+			reg.insert_matrix<double>(m_mol->name() + "_s_xx", out);
+			
+		} else {
+			
+			auto coul_metric = aofac->ao_3coverlap("coulomb");
+			auto other_metric = aofac->ao_3coverlap(metric);
+			
+			math::hermitian_eigen_solver solver(coul_metric, 'V');
+			solver.compute();
+			auto coul_inv = solver.inverse();
+			
+			coul_metric->release();
+			
+			dbcsr::mat_d temp = dbcsr::mat_d::create_template(*coul_metric)
+				.name("temp").type(dbcsr_type_no_symmetry);
+				
+			dbcsr::multiply('N', 'N', *other_metric, *coul_inv, temp).perform();
+			dbcsr::multiply('N', 'N', temp, *other_metric, *coul_metric).perform();
+			
+			reg.insert_matrix<double>(m_mol->name() + "_s_xx", coul_metric);
+			
+		}
+			
 		t_eri.finish();
 		
 	}
@@ -290,6 +235,98 @@ void fockmod::init() {
 		t_inv.finish();
 		
 	}
+	
+	if (compute_eris) {
+		
+		auto eris = aofac->ao_eri(vec<int>{0,1},vec<int>{2,3});
+		reg.insert_tensor<4,double>(m_mol->name() + "_i_bbbb_(01|23)", eris);
+		
+	}
+	
+	if (compute_3c2e) {
+		
+		auto& t_screen = TIME.sub("3c2e screening");
+		
+		t_screen.start();
+		
+		ints::screener* scr = new ints::schwarz_screener(aofac, metric);
+		auto shscr = ints::shared_screener(scr);
+		
+		shscr->compute();
+		
+		t_screen.finish();
+		
+		auto& t_eri = TIME.sub("3c2e integrals");
+		t_eri.start();
+		
+		dbcsr::stensor3_d out = aofac->ao_3c2e(vec<int>{0}, vec<int>{1,2},metric,shscr.get());
+		
+		reg.insert_tensor<3,double>(m_mol->name() + "_i_xbb_(0|12)", out);
+		reg.insert_screener(m_mol->name() + "_schwarz_screener",shscr);
+		
+		t_eri.finish();
+		
+	}
+	
+	if (setup_btensor || compute_3c2e_batched) {
+		
+		auto& t_screen = TIME.sub("3c2e screening");
+		
+		t_screen.start();
+		
+		ints::screener* scr = new ints::schwarz_screener(aofac,metric);
+		std::shared_ptr<ints::screener> scr_s(scr);
+		scr->compute();
+		
+		reg.insert_screener(m_mol->name() + "_schwarz_screener", scr_s);
+		
+		t_screen.finish();
+		
+		auto& t_eri_batched = TIME.sub("3c2e integrals batched");
+		
+		aofac->ao_3c2e_setup(metric);
+		
+		auto eri = aofac->ao_3c2e_setup_tensor(vec<int>{0}, vec<int>{1,2});
+		
+		tensor::sbatchtensor<3,double> eribatch = 
+			std::make_shared<tensor::batchtensor<3,double>>
+				(eri,tensor::global::default_batchsize,LOG.global_plev());
+		
+		eribatch->setup_batch();
+		eribatch->set_batch_dim(vec<int>{0});
+		
+		eribatch->create_file();
+		
+		if (compute_3c2e_batched) {
+			
+			t_eri_batched.start();
+		
+			int nbatches = eribatch->nbatches();
+			
+			vec<vec<int>> bounds(3);
+			for (int i = 0; i != nbatches; ++i) {
+				
+				bounds[0] = eribatch->bounds_blk(i,0);
+				bounds[1] = eribatch->bounds_blk(i,1);
+				bounds[2] = eribatch->bounds_blk(i,2);
+				
+				aofac->ao_3c2e_fill(eri,bounds,scr);
+				
+				//dbcsr::print(*eri);
+				
+				eribatch->write(i);
+				
+				eribatch->clear_batch();
+				
+			}
+				
+			t_eri_batched.finish();
+			
+		}
+		
+		reg.insert_btensor<3,double>(m_mol->name() + "_i_xbb_(0|12)_batched", eribatch);
+		
+	}	
 	
 	m_J_builder->init();
 	m_K_builder->init();
