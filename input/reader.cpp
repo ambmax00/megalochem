@@ -277,6 +277,10 @@ reader::reader(MPI_Comm comm, std::string filename, int print) : m_comm(comm), L
 		if (jglob.find("integral_precision") != jglob.end()) {
 			ints::global::precision = jglob["integral_precision"];
 		}
+		
+		if (jglob.find("integral_omega") != jglob.end()) {
+			ints::global::omega = jglob["integral_omega"];
+		}
 	}
 	
 	json& jmol = data["molecule"];

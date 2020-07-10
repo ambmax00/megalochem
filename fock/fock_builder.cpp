@@ -146,6 +146,7 @@ void fockmod::init() {
 		if (metric == "coulomb") {
 		
 			auto out = aofac->ao_3coverlap("coulomb");
+			out->filter();
 			reg.insert_matrix<double>(m_mol->name() + "_s_xx", out);
 			
 		} else {
@@ -157,7 +158,7 @@ void fockmod::init() {
 			solver.compute();
 			auto coul_inv = solver.inverse();
 			
-			coul_metric->release();
+			coul_metric->clear();
 			
 			dbcsr::mat_d temp = dbcsr::mat_d::create_template(*coul_metric)
 				.name("temp").type(dbcsr_type_no_symmetry);
@@ -165,6 +166,7 @@ void fockmod::init() {
 			dbcsr::multiply('N', 'N', *other_metric, *coul_inv, temp).perform();
 			dbcsr::multiply('N', 'N', temp, *other_metric, *coul_metric).perform();
 			
+			coul_metric->filter();
 			reg.insert_matrix<double>(m_mol->name() + "_s_xx", coul_metric);
 			
 		}
@@ -208,6 +210,7 @@ void fockmod::init() {
 				
 			dbcsr::copy_matrix_to_tensor(*s_xx_inv, *s_xx_inv_01); 
 			
+			s_xx_inv_01->filter();
 			reg.insert_tensor<2,double>(name, s_xx_inv_01);
 			
 		}
@@ -228,6 +231,7 @@ void fockmod::init() {
 			Linv_t.clear();
 			
 			//dbcsr::print(*s_xx_invsqrt_01);
+			s_xx_invsqrt_01->filter();
 			reg.insert_tensor<2,double>(name, s_xx_invsqrt_01);
 			
 		}

@@ -576,6 +576,14 @@ public:
     void finalize() {
         c_dbcsr_t_finalize(m_tensor_ptr);
     }
+    
+    void batched_contract_init() {
+		c_dbcsr_t_batched_contract_init(m_tensor_ptr);
+	}
+	
+	void batched_contract_finalize() {
+		c_dbcsr_t_batched_contract_finalize(m_tensor_ptr,nullptr);
+	}
 	
 	stensor<N,T> get_stensor() {
 		

@@ -88,6 +88,8 @@ private:
 	vec<vec<int>> m_nzeprocbatch; 
 	// number of nonzero elements per process per batch
 	
+	const vec<int> m_map_nd;
+	
 public:
 
 	/* batchsize: given in MB */
@@ -102,7 +104,8 @@ public:
 		m_filename(stensor_in->name()),
 		m_mpirank(-1), m_mpisize(-1),
 		LOG(stensor_in->comm(),print),
-		m_nblktot(0), m_nzetot(0), m_onebatch(false)
+		m_nblktot(0), m_nzetot(0), m_onebatch(false),
+		m_map_nd(m_stensor->map_nd())
 	{
 		
 		MPI_Comm_rank(m_comm, &m_mpirank);
@@ -177,7 +180,7 @@ public:
 	
 	/* function to set up the batches along the dimension(s) specified in ndim 
 	 * Only supports two dimensions at the moment */
-	 
+	
 	void set_batch_dim(std::vector<int> ndim) {
 		
 		if (!m_setup) throw std::runtime_error("Batching has not yet been setup!");
@@ -193,7 +196,7 @@ public:
 			if (n >= N || n < 0) throw std::runtime_error("Invalid batch dimension.");
 		}
 		
-		if (ndim.size() > 2) throw std::runtime_error("Batching for more than two dimensions NYI.");
+		if (ndim.size() > 1) throw std::runtime_error("Batching for more than one dimension NYI.");
 		
 		m_current_batchdim = ndim;
 				
@@ -402,8 +405,6 @@ public:
 		
 		// (batch1)                    (batch2)                .... 
 		// (blks node1)(blks node2)....(blks node1)(blks node2)....
-		
-		// also stores indices and block offsets in .info file
 		
 		// allocate data
 		
@@ -652,6 +653,29 @@ public:
 		} else {
 			
 			LOG.os<1>("Different dimension.\n");
+			
+			// check if dimension is slower
+			if (m_stored_batchdim.size() == 1) {
+				
+				int idx_write = m_stored_batchdim[0];
+				int idx_read = m_current_batchdim[0];
+				
+				auto iter_begin = m_map_nd.begin();
+				auto iter_write = std::find(m_map_nd.begin(),m_map_nd.end(),idx_write);
+				auto iter_read = std::find(m_map_nd.begin(),m_map_nd.end(),idx_read);
+				
+				int pos_write = iter_write - iter_begin;
+				int pos_read = iter_read - iter_begin;
+				
+				if (pos_read < pos_write) {
+					std::string message = "";
+					message += "Batchtensor " + m_stensor->name() + ": \n";
+					message += "Read index is faster than write index!\n";
+					message += "This case is NYI!";
+					throw std::runtime_error(message);
+				}
+				
+			}
 			
 			int i = 0;
 			

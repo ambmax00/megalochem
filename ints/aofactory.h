@@ -21,7 +21,7 @@ namespace ints {
 	
 struct global {
 	static inline double precision = std::numeric_limits<double>::epsilon();
-	static inline double omega = 1;
+	static inline double omega = 0.1;
 };
 	
 class screener;

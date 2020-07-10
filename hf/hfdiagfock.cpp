@@ -92,6 +92,10 @@ void hfmod::diag_fock() {
 			
 		p_bb->filter();
 		
+		//dbcsr::print(*p_bb);
+		
+		LOG.os<>("Occupancy of ", p_bb->name(), " : ", p_bb->occupation()*100, "%\n"); 
+		
 	};
 	
 	diagonalize(m_f_bb_A, m_c_bm_A, *m_eps_A, "A");

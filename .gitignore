@@ -4,3 +4,4 @@ examples/*out
 bench/*out
 bench/*dat
 bench/*json
+bench/*txt

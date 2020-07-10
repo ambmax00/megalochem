@@ -11,7 +11,7 @@ static const json valid_keys =
 		{"batchsize", 1000}, // batch size for tensors, in megabytes
 		{"block_threshold", 1e-9}, // block threshold for dbcsr
 		{"integral_precision", 1-12}, // as the name says
-		{"omega", 0.1} // omega factor for erfc integrals
+		{"integral_omega", 0.1} // omega factor for erfc integrals
 	}},
 	{"molecule", {
 		{"file", "string"}, 
