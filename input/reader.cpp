@@ -376,6 +376,7 @@ reader::reader(MPI_Comm comm, std::string filename, int print) : m_comm(comm), L
 	{
 		if (data.find(r) != data.end()) {
 			unpack(data, opt, r);
+			opt.set<bool>("do_"+r, true);
 		} else {
 			opt.set<bool>("do_"+r, false);
 		}

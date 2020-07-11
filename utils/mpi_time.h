@@ -39,7 +39,7 @@ public:
 	void start() {
 		
 		if (has_started) {
-			throw std::runtime_error("Timer has already been started!");
+			throw std::runtime_error("Timer " + proc_name  + " has already been started!");
 		}
 		
 		MPI_Barrier(m_comm);
@@ -57,7 +57,7 @@ public:
 		MPI_Barrier(m_comm);
 		
 		if (!has_started) {
-			throw std::runtime_error("Timer has not been started yet!");
+			throw std::runtime_error("Timer " + proc_name  + " has not been started yet!");
 		}
 		
 		time_fin = MPI_Wtime();

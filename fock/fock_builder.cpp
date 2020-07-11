@@ -179,6 +179,8 @@ void fockmod::init() {
 		
 		auto& t_inv = TIME.sub("Inverting metric");
 		
+		LOG.os<1>("Computing metric cholesky decomposition...\n");
+		
 		t_inv.start();
 		
 		auto s_xx = reg.get_matrix<double>(m_mol->name() + "_s_xx");
@@ -193,6 +195,9 @@ void fockmod::init() {
 		arrvec<int,2> xx = {m_mol->dims().x(), m_mol->dims().x()};
 		
 		if (compute_s_xx_inv) {
+			
+			LOG.os<1>("Computing metric inverse...\n");
+			
 			dbcsr::mat_d s = dbcsr::mat_d::create_template(*Linv)
 				.name(m_mol->name() + "_s_xx_inv")
 				.type(dbcsr_type_symmetric);
@@ -216,6 +221,8 @@ void fockmod::init() {
 		}
 		
 		if (compute_s_xx_invsqrt) {
+			
+			LOG.os<1>("Computing metric inverse square root...\n");
 
 			std::string name = m_mol->name() + "_s_xx_invsqrt_(0|1)";
 			
@@ -251,6 +258,8 @@ void fockmod::init() {
 		
 		auto& t_screen = TIME.sub("3c2e screening");
 		
+		LOG.os<1>("Computing screening.\n");
+		
 		t_screen.start();
 		
 		ints::screener* scr = new ints::schwarz_screener(aofac, metric);
@@ -259,6 +268,8 @@ void fockmod::init() {
 		shscr->compute();
 		
 		t_screen.finish();
+		
+		LOG.os<1>("Computing 3c2e inetgrals...\n");
 		
 		auto& t_eri = TIME.sub("3c2e integrals");
 		t_eri.start();
@@ -275,6 +286,8 @@ void fockmod::init() {
 	if (setup_btensor || compute_3c2e_batched) {
 		
 		auto& t_screen = TIME.sub("3c2e screening");
+		
+		LOG.os<1>("Computing screening.\n");
 		
 		t_screen.start();
 		
@@ -303,6 +316,8 @@ void fockmod::init() {
 		
 		if (compute_3c2e_batched) {
 			
+			LOG.os<1>("Computing batched 3c2e integrals.\n");
+			
 			t_eri_batched.start();
 		
 			int nbatches = eribatch->nbatches();
@@ -323,7 +338,8 @@ void fockmod::init() {
 				eribatch->clear_batch();
 				
 			}
-				
+			
+			LOG.os<1>("Occupancy of 3c2e integrals: ", eri->occupation()*100, "%\n");
 			t_eri_batched.finish();
 			
 		}

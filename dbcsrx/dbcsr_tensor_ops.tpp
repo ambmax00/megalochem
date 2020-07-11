@@ -101,7 +101,10 @@ public:
         int* f_b2 = (c_bounds2) ? unfold_bounds<int>(*c_bounds2) : nullptr;
         int* f_b3 = (c_bounds3) ? unfold_bounds<int>(*c_bounds3) : nullptr;
         
-        int out = 6;
+        int rank = -1;
+        MPI_Comm_rank(c_t1.comm(),&rank);
+        
+        int out = (rank == 0) ? 6 : -1;
         int* unit_nr = (c_print) ? ((*c_print) ? &out : nullptr) : nullptr;  
         
         c_dbcsr_t_contract_r_dp(

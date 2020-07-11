@@ -117,11 +117,13 @@ int main(int argc, char** argv) {
 	
 	std::string filename(argv[1]);
 	
-	time.start();
-	
 	dbcsr::init();
 	
 	dbcsr::world wrd(MPI_COMM_WORLD);
+	
+	time.start();
+	
+	{ // BEGIN MAIN CONTEXT
 	
 //#ifdef USE_SCALAPACK
 	int sysctxt = -1;
@@ -258,14 +260,16 @@ int main(int argc, char** argv) {
 		
 	}
 	
-	time.finish();
-	
-	time.print_info();
-	
 //#ifdef USE_SCALAPACK
 	scalapack::global_grid.free();
 	c_blacs_exit(0);
 //#endif
+
+    } // END MAIN CONTEXT
+    
+    time.finish();
+	
+	time.print_info();
 
 	dbcsr::finalize();
 

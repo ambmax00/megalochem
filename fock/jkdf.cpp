@@ -612,6 +612,8 @@ void BATCHED_DFMO_K::compute_K() {
 				retints.finish();
 			}
 			
+			LOG.os<1>("Occupancy of HTI: ", m_HT1_xbm_01_2->occupation()*100, "%\n");
+			
 			// end for M
 			reo1.start();
 			dbcsr::copy(*m_HT1_xbm_01_2,*m_HT1_xbm_0_12).move_data(true).perform();
@@ -751,6 +753,8 @@ void BATCHED_DFAO_K::init_tensors() {
 		
 	}
 	
+	LOG.os<1>("Occupancy of fitting coefficients: ", c_xbb_1_02->occupation()*100, "%\n");
+	
 	calc_c.finish();
 	
 	LOG.os<1>("Done.\n");
@@ -847,6 +851,8 @@ void BATCHED_DFAO_K::compute_K() {
 			retint.start();
 			return_integrals(m_eri_01_2);
 			retint.finish();
+			
+			LOG.os<1>("Occupancy of (mu,nu|X) P_mu,nu: ", m_cbar_xbb_01_2->occupation()*100, "%\n");
 			
 			//dbcsr::print(*m_cbar_xbb_01_2);
 			

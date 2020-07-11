@@ -129,10 +129,12 @@ void hfmod::compute_guess() {
 		std::vector<libint2::Atom> my_atypes;
 		
 		for (int I = 0; I != atypes.size(); ++I) {
-			if (m_world.rank() == I % m_world.size()) my_atypes.push_back(atypes[I]);
+			//if (m_world.rank() == I % m_world.size()) my_atypes.push_back(atypes[I]);
+			// All om rank 1 for now
+			if (m_world.rank() == 0) my_atypes.push_back(atypes[I]);
 		}
 		
-		if (LOG.global_plev() >= 2) {
+		if (LOG.global_plev() >= 1) {
 			LOG.os<>("Distribution of atom types along processors:\n");
 			for (int i = 0; i != m_world.size(); ++i) {
 				if (m_world.rank() == i) {
