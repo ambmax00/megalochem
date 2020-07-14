@@ -5,22 +5,18 @@
 #include <dbcsr_matrix.hpp>
 #include <dbcsr_conversions.hpp>
 #include <dbcsr_matrix_ops.hpp>
-#include "input/reader.h"
+#include "io/reader.h"
 #include "hf/hfmod.h"
 #include "mp/mpmod.h"
 //#include "adc/adcmod.h"
 #include "utils/mpi_time.h"
 
-//#ifdef USE_SCALAPACK
 #include "extern/scalapack.h"
-//#endif
+
 
 #include "ints/aofactory.h"
 #include "math/linalg/LLT.h"
-//#include "math/solvers/hermitian_eigen_solver.h"
-
-
-//#include "tensor/batchtensor.h"
+#include <filesystem>
 
 template <int N>
 void fill_random(dbcsr::tensor<N,double>& t_in, arrvec<int,N>& nz) {
@@ -98,13 +94,14 @@ int main(int argc, char** argv) {
 
 	MPI_Init(&argc, &argv);
 	
-	if (argc < 2) {
-		throw std::runtime_error("Wrong number of command line inputs.");
-	}
-	
 	util::mpi_time time(MPI_COMM_WORLD, "Megalochem");
 	
 	util::mpi_log LOG(MPI_COMM_WORLD,0);
+	
+	if (argc != 3) {
+		LOG.os<>("Usage: ./chem [filename] [working_directory]\n");
+		exit(0);
+	}
 	
 	std::string s = R"(|  \/  ||  ___|  __ \ / _ \ | |   |  _  /  __ \| | | ||  ___|  \/  |)""\n"
 					R"(| .  . || |__ | |  \// /_\ \| |   | | | | /  \/| |_| || |__ | .  . |)""\n"
@@ -116,6 +113,17 @@ int main(int argc, char** argv) {
 	LOG.banner(s,90,'*');
 	
 	std::string filename(argv[1]);
+	std::string workdir(argv[2]);
+	
+	if (!std::filesystem::exists(workdir))
+		throw std::runtime_error("Working directory does not exist.");
+	
+	//set working directory
+	std::filesystem::current_path(workdir);
+	
+	//create data and batching directory
+	std::filesystem::create_directory("data");
+	std::filesystem::create_directory("batching");
 	
 	dbcsr::init();
 	
@@ -133,7 +141,7 @@ int main(int argc, char** argv) {
 	scalapack::global_grid.set(gridctxt);
 //#endif
 	
-	reader filereader(MPI_COMM_WORLD, filename);
+	filio::reader filereader(MPI_COMM_WORLD, filename);
 	
 	auto mol = std::make_shared<desc::molecule>(filereader.get_mol());
 	auto opt = filereader.get_opt();

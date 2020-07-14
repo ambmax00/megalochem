@@ -8,6 +8,7 @@
 #include <mpi.h>
 #include <cstdlib>
 #include <memory>
+#include <filesystem>
 
 namespace tensor {
 
@@ -42,6 +43,7 @@ private:
 	arrvec<int,N> m_blkoffsets;
 	std::array<int,N> m_blkstot;
 	std::array<int,N> m_fulltot;
+	const vec<int> m_map_nd;
 	
 	/* ========== dynamic tensor variables ========== */
 	
@@ -88,8 +90,6 @@ private:
 	vec<vec<int>> m_nzeprocbatch; 
 	// number of nonzero elements per process per batch
 	
-	const vec<int> m_map_nd;
-	
 public:
 
 	/* batchsize: given in MB */
@@ -101,7 +101,7 @@ public:
 		m_blkoffsets(m_stensor->blk_offsets()),
 		m_fulltot(m_stensor->nfull_total()),
 		m_blkstot(m_stensor->nblks_total()),
-		m_filename(stensor_in->name()),
+		m_filename(),
 		m_mpirank(-1), m_mpisize(-1),
 		LOG(stensor_in->comm(),print),
 		m_nblktot(0), m_nzetot(0), m_onebatch(false),
@@ -122,6 +122,12 @@ public:
 		for (auto x : m_fulltot) {
 			LOG.os<1>(x, " ");
 		} LOG.os<1>('\n');
+		
+		std::string path = std::filesystem::current_path();
+		path += "/batching/";
+		
+		m_filename = path + m_stensor->name() + ".dat";
+		
 		
 	}
 	
@@ -338,10 +344,7 @@ public:
 		
 		LOG.os<1>("Creating files for ", m_filename, '\n');
 		
-		std::string data_fname = m_filename + ".dat";
-		//std::string idx_fname = m_filename + ".info";
-		
-		int rc = MPI_File_open(m_comm,data_fname.c_str(),MPI_MODE_CREATE|MPI_MODE_WRONLY,
+		int rc = MPI_File_open(m_comm,m_filename.c_str(),MPI_MODE_CREATE|MPI_MODE_WRONLY,
 			MPI_INFO_NULL,&fh);
 		
 		MPI_File_close(&fh);
@@ -356,10 +359,7 @@ public:
 		
 		if (m_onebatch) return;
 		
-		std::string data_fname = m_filename + ".dat";
-		//std::string idx_fname = m_filename + ".info";
-		
-		int rc = MPI_File_delete(data_fname.c_str(),MPI_INFO_NULL);
+		int rc = MPI_File_delete(m_filename.c_str(),MPI_INFO_NULL);
 		//int rc = MPI_File_delete(idx_fname.c_str(),MPI_INFO_NULL);
 		
 		//reset_var();
@@ -368,6 +368,7 @@ public:
 	
 	void reset_var() {
 		
+		m_nblkloc_global = 0;
 		m_nblktot = 0;
 		m_nblkloc = 0; 
 		m_nzeloc = 0; 
@@ -380,6 +381,8 @@ public:
 		for (auto& v : m_locblkidx) {
 			v.clear();
 		}
+		
+		m_locblkoff.clear();
 		
 		m_current_batchdim.clear();
 		m_stored_batchdim.clear();
@@ -484,7 +487,7 @@ public:
 		
 		// filenames
 		
-		std::string data_fname = m_filename + ".dat";
+		std::string data_fname = m_filename;
 		
 		LOG.os<1>("Computing offsets...\n");
 	
@@ -633,7 +636,7 @@ public:
 			MPI_Offset data_batch_offset = m_locblkoff[blkoff];
 			
 			//// Opening File
-			std::string fname = m_filename + ".dat";
+			std::string fname = m_filename;
 			
 			MPI_File fh_data;
 			
@@ -798,7 +801,7 @@ public:
 			MPI_Type_create_hindexed(nblk,blksizes.data(),blkoff.data(),MPI_DOUBLE,&MPI_HINDEXED);
 			MPI_Type_commit(&MPI_HINDEXED);
 			
-			std::string fname = m_filename + ".dat";
+			std::string fname = m_filename;
 			MPI_File fh_data;
 			
 			MPI_File_open(m_comm,fname.c_str(),MPI_MODE_RDONLY,MPI_INFO_NULL,&fh_data);

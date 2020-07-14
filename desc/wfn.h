@@ -2,7 +2,7 @@
 #define DESC_WFN_H
 
 #include "desc/molecule.h"
-#include "desc/io.h"
+#include "io/io.h"
 #include <dbcsr_matrix.hpp>
 #include <mpi.h>
 
@@ -78,34 +78,40 @@ public:
 	
 	void write_to_file() {
 		
-		auto mname = m_mol->name();
+		std::string molname = m_mol->name();
+		std::string prefix = "data/" + molname + "_";
+		std::string suffix = ".dat";
+		
+		auto filename = [&](std::string root) {
+			return prefix + root + suffix;
+		};
 		
 		//write_matrix(m_s_bb, mname);
 		
-		write_matrix(m_f_bb_A, mname);
-		write_matrix(m_po_bb_A, mname);
-		write_matrix(m_pv_bb_A, mname);
-		write_matrix(m_c_bo_A, mname);
-		write_matrix(m_c_bv_A, mname);
+		filio::write_matrix(m_f_bb_A, filename("f_bb_A"));
+		filio::write_matrix(m_po_bb_A, filename("po_bb_A"));
+		filio::write_matrix(m_pv_bb_A, filename("pv_bb_A"));
+		filio::write_matrix(m_c_bo_A, filename("c_bo_A"));
+		filio::write_matrix(m_c_bv_A, filename("c_bv_A"));
 		
 		if (m_f_bb_B) {
 	
-			write_matrix(m_f_bb_B, mname);
-			write_matrix(m_po_bb_B, mname);
-			write_matrix(m_pv_bb_B, mname);
-			write_matrix(m_c_bo_B, mname);
-			write_matrix(m_c_bv_B, mname);
+			filio::write_matrix(m_f_bb_B, filename("f_bb_B"));
+			filio::write_matrix(m_po_bb_B, filename("po_bb_B"));
+			filio::write_matrix(m_pv_bb_B, filename("pv_bb_B"));
+			filio::write_matrix(m_c_bo_B, filename("c_bo_B"));
+			filio::write_matrix(m_c_bv_B, filename("c_bv_B"));
 			
 		}
 		
 		MPI_Comm comm = m_f_bb_A->get_world().comm();
 		
-		write_vector(m_eps_occ_A, m_mol->name(), "eps_occ_A", comm);
-		write_vector(m_eps_vir_A, m_mol->name(), "eps_vir_A", comm);
+		filio::write_vector(m_eps_occ_A, filename("eps_occ_A"), comm);
+		filio::write_vector(m_eps_vir_A, filename("eps_vir_A"), comm);
 		
 		if (m_eps_occ_B) {
-			write_vector(m_eps_occ_B, m_mol->name(), "eps_occ_B", comm);
-			write_vector(m_eps_vir_B, m_mol->name(), "eps_vir_B", comm);
+			filio::write_vector(m_eps_occ_B, filename("eps_occ_B"), comm);
+			filio::write_vector(m_eps_vir_B, filename("eps_vir_B"), comm);
 		}
 		
 	}
@@ -113,6 +119,14 @@ public:
 	void read_from_file(smolecule& mol, dbcsr::world& w) {
 		
 		m_mol = mol;
+		
+		std::string molname = m_mol->name();
+		std::string prefix = "data/" + molname + "_";
+		std::string suffix = ".dat";
+		
+		auto filename = [&](std::string root) {
+			return prefix + root + suffix;
+		};
 		
 		auto b = m_mol->dims().b();
 		auto oA = m_mol->dims().oa();
@@ -122,31 +136,31 @@ public:
 
 		//m_s_bb = read_matrix(m_mol->name(), "s_bb", w, b, b, dbcsr_type_symmetric);
 		
-		m_f_bb_A = read_matrix(m_mol->name(), "f_bb_A", w, b, b, dbcsr_type_symmetric);
-		m_po_bb_A = read_matrix(m_mol->name(), "p_bb_A", w, b, b, dbcsr_type_symmetric);
-		m_pv_bb_A = read_matrix(m_mol->name(), "pv_bb_A", w, b, b, dbcsr_type_symmetric);
-		m_c_bo_A = read_matrix(m_mol->name(), "c_bo_A", w, b, oA, dbcsr_type_no_symmetry);
-		m_c_bv_A = read_matrix(m_mol->name(), "c_bv_A", w, b, vA, dbcsr_type_no_symmetry);
+		m_f_bb_A = filio::read_matrix(filename("f_bb_A"), "f_bb_A", w, b, b, dbcsr_type_symmetric);
+		m_po_bb_A = filio::read_matrix(filename("po_bb_A"), "po_bb_A", w, b, b, dbcsr_type_symmetric);
+		m_pv_bb_A = filio::read_matrix(filename("pv_bb_A"), "pv_bb_A", w, b, b, dbcsr_type_symmetric);
+		m_c_bo_A = filio::read_matrix(filename("c_bo_A"), "c_bo_A", w, b, oA, dbcsr_type_no_symmetry);
+		m_c_bv_A = filio::read_matrix(filename("c_bv_A"), "c_bv_A", w, b, vA, dbcsr_type_no_symmetry);
 		
 		bool read_beta = (m_mol->nele_alpha() == m_mol->nele_beta()) ? false : true;
 		
 		if (read_beta) {
 				
-			m_f_bb_B = read_matrix(m_mol->name(), "f_bb_B", w, b, b, dbcsr_type_symmetric);
-			m_po_bb_B = read_matrix(m_mol->name(), "p_bb_B", w, b, b, dbcsr_type_symmetric);
-			m_pv_bb_B = read_matrix(m_mol->name(), "pv_bb_B", w, b, b, dbcsr_type_symmetric);
-			m_c_bo_B = read_matrix(m_mol->name(), "c_bo_B", w, b, oB, dbcsr_type_no_symmetry);
-			m_c_bv_B = read_matrix(m_mol->name(), "c_bv_B", w, b, vB, dbcsr_type_no_symmetry);
+			m_f_bb_B = filio::read_matrix(filename("f_bb_B"), "f_bb_B", w, b, b, dbcsr_type_symmetric);
+			m_po_bb_B = filio::read_matrix(filename("po_bb_B"), "po_bb_B", w, b, b, dbcsr_type_symmetric);
+			m_pv_bb_B = filio::read_matrix(filename("pv_bb_B"), "pv_bb_B", w, b, b, dbcsr_type_symmetric);
+			m_c_bo_B = filio::read_matrix(filename("c_bo_B"), "c_bo_B", w, b, oB, dbcsr_type_no_symmetry);
+			m_c_bv_B = filio::read_matrix(filename("c_bv_B"), "c_bv_B", w, b, vB, dbcsr_type_no_symmetry);
 			
 		}
 		
-		read_vector(m_eps_occ_A, m_mol->name(), "eps_occ_A");
-		read_vector(m_eps_vir_A, m_mol->name(), "eps_vir_A");
+		filio::read_vector(m_eps_occ_A, filename("eps_occ_A"));
+		filio::read_vector(m_eps_vir_A, filename("eps_vir_A"));
 		
 		if (read_beta) {
 		
-			read_vector(m_eps_occ_B, m_mol->name(), "eps_occ_B");
-			read_vector(m_eps_vir_B, m_mol->name(), "eps_vir_B");
+			filio::read_vector(m_eps_occ_B, filename("eps_occ_B"));
+			filio::read_vector(m_eps_vir_B, filename("eps_vir_B"));
 			
 		}
 		

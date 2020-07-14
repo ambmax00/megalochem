@@ -1,5 +1,5 @@
-#ifndef DESC_IO_H
-#define DESC_IO_H
+#ifndef IO_IO_H
+#define IO_IO_H
 
 #include <fstream>
 #include <cstdio>
@@ -8,7 +8,7 @@
 #include <mpi.h>
 #include <dbcsr_conversions.hpp>
 
-namespace desc {
+namespace filio {
 
 template <typename T>
 using svector = std::shared_ptr<std::vector<T>>;
@@ -35,14 +35,14 @@ void read_binary_mat(const char* filename, Matrix& matrix){
     in.close();
 }
 
-void write_matrix(dbcsr::smatrix<double>& m_in, std::string molname);
+void write_matrix(dbcsr::smatrix<double>& m_in, std::string filename);
 
-dbcsr::smatrix<double> read_matrix(std::string molname, std::string matname, 
+dbcsr::smatrix<double> read_matrix(std::string filename, std::string matname, 
 	dbcsr::world wrld, vec<int> rowblksizes, vec<int> colblksizes, char type);
 
-void write_vector(svector<double>& v_in, std::string molname, std::string vecname, MPI_Comm comm);
+void write_vector(svector<double>& v_in, std::string filename, MPI_Comm comm);
 
-void read_vector(svector<double>& v_in, std::string molname, std::string vecname);
+void read_vector(svector<double>& v_in, std::string filename);
 
 } // end namespace
 

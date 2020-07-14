@@ -31,8 +31,8 @@ include_directories(
 
 add_subdirectory(dbcsrx)
 add_subdirectory(math)
+add_subdirectory(io)
 add_subdirectory(desc)
-add_subdirectory(input)
 add_subdirectory(ints)
 add_subdirectory(fock)
 add_subdirectory(hf)
@@ -49,7 +49,7 @@ target_link_libraries(
 	chem
 	PUBLIC
 	chem_dbcsrx
-	chem_input
+	chem_io
 	#	chem_math_laplace
 	MPI::MPI_CXX	
 	chem_hf

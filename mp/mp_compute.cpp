@@ -354,6 +354,8 @@ void mpmod::compute_batch() {
 	auto& formZtilde = TIME.sub("Forming Z tilde");
 	auto& redtime = TIME.sub("Reduction");
 	
+	TIME.start();
+	
 	// to do:
 	// 1. Insert Screening -> done
 	// 2. Impose sparsity on B_XBB
@@ -750,6 +752,7 @@ void mpmod::compute_batch() {
 		LOG.os<1>("Finished batching.\n");
 		
 		B_xBB_0_12_batched.delete_file();
+		B_xBB_0_12_batched.reset_var();
 		
 		formZtilde.start();
 		

@@ -1,6 +1,8 @@
-#ifndef VALID_KEYS_H
-#define VALID_KEYS_H
+#ifndef IO_VALID_KEYS_H
+#define IO_VALID_KEYS_H
 #include "utils/json.hpp"
+
+namespace filio {
 
 using json = nlohmann::json;
 
@@ -66,5 +68,7 @@ static const json valid_keys =
 		{"diag_order", 0} // at which order to compute the ADC diagonal
 	}}	
 };
+
+}
 
 #endif

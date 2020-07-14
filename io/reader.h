@@ -1,5 +1,5 @@
-#ifndef INPUT_READER_H
-#define INPUT_READER_H
+#ifndef IO_READER_H
+#define IO_READER_H
 
 #include <string>
 #include <stdexcept>
@@ -7,6 +7,8 @@
 #include "desc/options.h"
 #include "desc/molecule.h"
 #include "utils/mpi_log.h"
+
+namespace filio {
 
 class reader {
 private:
@@ -29,5 +31,7 @@ public:
 	};
 	
 };
+
+}
 
 #endif

@@ -1,18 +1,17 @@
-#include "desc/io.h"
+#include "io/io.h"
 #include <Eigen/Core>
 
-namespace desc {
-
+namespace filio {
 bool fexists(const std::string& filename) {
 		std::ifstream ifile(filename.c_str());
 		return (bool)ifile;
 }
 
-void write_matrix(dbcsr::smatrix<double>& m_in, std::string molname) {
+void write_matrix(dbcsr::smatrix<double>& m_in, std::string filename) {
 		
 		std::ofstream file;
 				
-		std::string file_name = molname + "_" + m_in->name() + ".dat";
+		std::string file_name = filename;
 		
 		if (fexists(file_name) && m_in->get_world().rank() == 0) std::remove(file_name.c_str());
 		
@@ -22,12 +21,12 @@ void write_matrix(dbcsr::smatrix<double>& m_in, std::string molname) {
 		
 }
 
-dbcsr::smatrix<double> read_matrix(std::string molname, std::string matname, 
+dbcsr::smatrix<double> read_matrix(std::string filename, std::string matname, 
 	dbcsr::world wrld, vec<int> rowblksizes, vec<int> colblksizes, char type) {
 	
 	std::ifstream file;
 	
-	std::string file_name = molname + "_" + matname + ".dat";
+	std::string file_name = filename;
 	
 	if (!fexists(file_name)) throw std::runtime_error("File " + file_name + " does not exist.");
 	
@@ -43,7 +42,7 @@ dbcsr::smatrix<double> read_matrix(std::string molname, std::string matname,
 	
 }
 
-void write_vector(svector<double>& v_in, std::string molname, std::string vecname, MPI_Comm comm) {
+void write_vector(svector<double>& v_in, std::string filename, MPI_Comm comm) {
 	
 		std::ofstream file;
 		
@@ -51,7 +50,7 @@ void write_vector(svector<double>& v_in, std::string molname, std::string vecnam
 		
 		MPI_Comm_rank(comm, &myrank);
 				
-		std::string file_name = molname + "_" + vecname + ".dat";
+		std::string file_name = filename;
 		
 		if (fexists(file_name) && myrank == 0) std::remove(file_name.c_str());
 		
@@ -61,11 +60,11 @@ void write_vector(svector<double>& v_in, std::string molname, std::string vecnam
 		
 }	
 
-void read_vector(svector<double>& v_in, std::string molname, std::string vecname) {
+void read_vector(svector<double>& v_in, std::string filename) {
 	
 	std::ifstream file;
 	
-	std::string file_name = molname + "_" + vecname + ".dat";
+	std::string file_name = filename;
 	
 	if (!fexists(file_name)) throw std::runtime_error("File " + file_name + " does not exist.");
 	

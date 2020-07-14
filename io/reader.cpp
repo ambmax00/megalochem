@@ -3,9 +3,11 @@
 #include <vector>
 #include <sstream>
 #include <utility>
+#include <cstdlib>
 
-#include "input/reader.h"
-#include "input/valid_keys.h"
+#include "io/io.h"
+#include "io/reader.h"
+#include "io/valid_keys.h"
 
 #include "utils/ele_to_int.h"
 #include "utils/constants.h"
@@ -20,7 +22,10 @@
 #include "tensor/batchtensor.h"
 #include "ints/aofactory.h"
 
+#include <sys/types.h>
+#include <sys/stat.h>
 
+namespace filio {
 
 void validate(const json& j, const json& compare) {
 	
@@ -34,12 +39,15 @@ void validate(const json& j, const json& compare) {
 	}
 }
 
-std::vector<libint2::Atom> get_geometry(const json& j, std::string filename) {
+std::vector<libint2::Atom> get_geometry(const json& j, std::string filename, util::mpi_log& LOG) {
 	
 	std::vector<libint2::Atom> out;
 	
 	if (j.find("file") == j.end()) {
 		// reading from input file
+		
+		LOG.os<>("Reading XYZ info from file.\n");
+		
 		auto geometry = j["geometry"];
 		auto symbols = j["symbols"];
 		
@@ -60,8 +68,13 @@ std::vector<libint2::Atom> get_geometry(const json& j, std::string filename) {
 		
 	} else {
 		// read from xyz file
+		
+		std::string xyzfilename = j["file"];
+		
+		LOG.os<>("Reading XYZ info from file ", xyzfilename, '\n');
+		
 		std::ifstream in;
-		in.open(filename+".xyz");
+		in.open(xyzfilename);
 		
 		if (!in) {
 			throw std::runtime_error("XYZ data file not found.");
@@ -118,7 +131,7 @@ std::vector<libint2::Atom> get_geometry(const json& j, std::string filename) {
 	
 }
 
-std::vector<libint2::Shell> read_basis(const json &jbas, std::vector<libint2::Atom> &atoms) {
+std::vector<libint2::Shell> read_basis(const json &jbas, std::vector<libint2::Atom> &atoms, util::mpi_log& LOG) {
 	
 	//libint2::Shell::do_enforce_unit_normalization(false);
 	
@@ -220,7 +233,7 @@ std::vector<libint2::Shell> read_basis(const json &jbas, std::vector<libint2::At
 	
 }
 
-void unpack(const json& j_in, desc::options& opt, std::string root) {
+void unpack(const json& j_in, desc::options& opt, std::string root, util::mpi_log& LOG) {
 	
 	auto j = j_in[root];
 	
@@ -297,7 +310,7 @@ reader::reader(MPI_Comm comm, std::string filename, int print) : m_comm(comm), L
 	}
 	
 	LOG.os<>("Processing atomic coordinates...\n");
-	auto atoms = get_geometry(jmol,filename);
+	auto atoms = get_geometry(jmol,filename,LOG);
 	
 	bool reorder = (jmol.find("reorder") != jmol.end()) 
 		? jmol["reorder"].get<bool>() 
@@ -330,7 +343,7 @@ reader::reader(MPI_Comm comm, std::string filename, int print) : m_comm(comm), L
 		libint2::BasisSet bas(jmol["basis"], atoms);
 		basis = std::move(bas);
 	} else { 
-		basis = read_basis(jmol["gen_basis"],atoms);
+		basis = read_basis(jmol["gen_basis"],atoms,LOG);
 	}
 	
 	optional<std::vector<libint2::Shell>,val> dfbasis;
@@ -375,7 +388,7 @@ reader::reader(MPI_Comm comm, std::string filename, int print) : m_comm(comm), L
 	auto read_section = [&](std::string r)
 	{
 		if (data.find(r) != data.end()) {
-			unpack(data, opt, r);
+			unpack(data, opt, r, LOG);
 			opt.set<bool>("do_"+r, true);
 		} else {
 			opt.set<bool>("do_"+r, false);
@@ -396,4 +409,6 @@ reader::reader(MPI_Comm comm, std::string filename, int print) : m_comm(comm), L
 	m_mol = mol;
 	m_opt = opt;
 	
+}
+
 }
