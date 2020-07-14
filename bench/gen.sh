@@ -2,5 +2,5 @@
 
 molname=$1
 
-cp template.json "$molname".json 
+cp template.in "$molname".json 
 sed -i "s/xxx/$molname/g" "$molname".json
