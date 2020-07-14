@@ -34,7 +34,7 @@ void validate(const json& j, const json& compare) {
 	}
 }
 
-std::vector<libint2::Atom> get_geometry(const json& j) {
+std::vector<libint2::Atom> get_geometry(const json& j, std::string filename) {
 	
 	std::vector<libint2::Atom> out;
 	
@@ -61,7 +61,7 @@ std::vector<libint2::Atom> get_geometry(const json& j) {
 	} else {
 		// read from xyz file
 		std::ifstream in;
-		in.open(j["file"]);
+		in.open(filename+".xyz");
 		
 		if (!in) {
 			throw std::runtime_error("XYZ data file not found.");
@@ -297,7 +297,7 @@ reader::reader(MPI_Comm comm, std::string filename, int print) : m_comm(comm), L
 	}
 	
 	LOG.os<>("Processing atomic coordinates...\n");
-	auto atoms = get_geometry(jmol);
+	auto atoms = get_geometry(jmol,filename);
 	
 	bool reorder = (jmol.find("reorder") != jmol.end()) 
 		? jmol["reorder"].get<bool>() 
