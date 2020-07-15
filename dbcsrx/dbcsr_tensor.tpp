@@ -585,6 +585,15 @@ public:
 		c_dbcsr_t_batched_contract_finalize(m_tensor_ptr,nullptr);
 	}
 	
+	vec<int> idx_speed() {
+		// returns order of speed of indices
+		auto map1 = this->map1_2d();
+		auto map2 = this->map2_2d();
+		map2.insert(map2.end(),map1.begin(),map1.end());
+		
+		return map2;
+	}
+	
 	stensor<N,T> get_stensor() {
 		
 		tensor<N,T>* t = new tensor<N,T>();

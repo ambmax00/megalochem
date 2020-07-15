@@ -310,55 +310,71 @@ public:
 		screener* scr) {
 			
 		auto blksizes = t_in->blk_sizes(); 
-		
-		if (m_Op == libint2::Operator::erfc_coulomb) { std::cout << "COMP ERR:" << std::endl; }
-	
+			
 		//if (scr) {
-			
-			size_t x_nblks = blksizes[0].size();
-			size_t b_nblks = blksizes[1].size();
-			
-			size_t ntot = x_nblks*b_nblks*b_nblks;
-			
-			arrvec<int,3> res;
-			res[0].reserve(ntot);
-			res[1].reserve(ntot);
-			res[2].reserve(ntot);
 			
 			size_t totblk = 0;
 			
 			auto blk_idx_loc = t_in->blks_local();
 			
-			int blk_mu, blk_nu, blk_x;
+			auto idx_speed = t_in->idx_speed();
 			
-			for (int i = 0; i != blk_idx_loc[1].size(); ++i) {
+			const int dim0 = idx_speed[2];
+			const int dim1 = idx_speed[1];
+			const int dim2 = idx_speed[0];
+			
+			int iblk[3]; int sizes[3];
+			
+			size_t x_nblks = blksizes[0].size();
+			size_t b_nblks = blksizes[1].size();
+			
+			sizes[0] = x_nblks;
+			sizes[1] = b_nblks;
+			sizes[2] = b_nblks;
+			
+			size_t ntotbatch = sizes[dim1] * sizes[dim2];
+			
+			arrvec<int,3> res;
+			
+			for (int i0 = 0; i0 != blk_idx_loc[dim0].size(); ++i0) {
 				
-				blk_mu = blk_idx_loc[1][i];
-				if (blk_mu < blkbounds[1][0] || blk_mu > blkbounds[1][1]) continue;
+				res[0].reserve(ntotbatch);
+				res[1].reserve(ntotbatch);
+				res[2].reserve(ntotbatch);
+				
+				iblk[dim0] = blk_idx_loc[dim0][i0];
+				if (iblk[dim0] < blkbounds[dim0][0] || iblk[dim0] > blkbounds[dim0][1]) continue;
 				 
-				for (int j = 0; j != blk_idx_loc[2].size(); ++j) {
+				for (int i1 = 0; i1 != blk_idx_loc[dim1].size(); ++i1) {
 					
-					blk_nu = blk_idx_loc[2][j];
-					if (blk_nu < blkbounds[2][0] || blk_nu > blkbounds[2][1]) continue;
+					iblk[dim1] = blk_idx_loc[dim1][i1];
+					if (iblk[dim1] < blkbounds[dim1][0] || iblk[dim1] > blkbounds[dim1][1]) continue;
 					
-					for (int x = 0; x != blk_idx_loc[0].size(); ++x) {
-						blk_x = blk_idx_loc[0][x];
+					for (int i2 = 0; i2 != blk_idx_loc[dim2].size(); ++i2) {
+						iblk[dim2] = blk_idx_loc[dim2][i2];
 						
-						if (blk_x < blkbounds[0][0] || blk_x > blkbounds[0][1]) continue;
-						if (scr && scr->skip_block(blk_x,blk_mu,blk_nu)) {
+						if (iblk[dim2] < blkbounds[dim2][0] || iblk[dim2] > blkbounds[dim2][1]) continue;
+						
+						if (scr && scr->skip_block(iblk[0],iblk[1],iblk[2])) {
 							++totblk;
 							continue;
 						}
 						
-						res[0].push_back(blk_x);
-						res[1].push_back(blk_mu);
-						res[2].push_back(blk_nu);
+						res[0].push_back(iblk[0]);
+						res[1].push_back(iblk[1]);
+						res[2].push_back(iblk[2]);
 						
 					}
 				}
+				
+				t_in->reserve(res);
+				res[0].clear();
+				res[1].clear();
+				res[2].clear();
+				
 			}
 			
-			t_in->reserve(res);
+			
 			
 		//} else {
 		

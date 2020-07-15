@@ -658,28 +658,32 @@ public:
 			LOG.os<1>("Different dimension.\n");
 			
 			// check if dimension is slower
+			
 			if (m_stored_batchdim.size() == 1) {
+				
+				auto idxspeed = m_stensor->idx_speed();
 				
 				int idx_write = m_stored_batchdim[0];
 				int idx_read = m_current_batchdim[0];
 				
-				auto iter_begin = m_map_nd.begin();
-				auto iter_write = std::find(m_map_nd.begin(),m_map_nd.end(),idx_write);
-				auto iter_read = std::find(m_map_nd.begin(),m_map_nd.end(),idx_read);
+				auto iter_begin = idxspeed.begin();
+				auto iter_end = idxspeed.end();
+				auto iter_write = std::find(iter_begin,iter_end,idx_write);
+				auto iter_read = std::find(iter_begin,iter_end,idx_read);
 				
 				int pos_write = iter_write - iter_begin;
 				int pos_read = iter_read - iter_begin;
 				
-				if (pos_read < pos_write) {
+				if (pos_read > pos_write) {
 					std::string message = "";
 					message += "Batchtensor " + m_stensor->name() + ": \n";
-					message += "Read index is faster than write index!\n";
+					message += "Read index is slower than write index!\n";
 					message += "This case is NYI!";
 					throw std::runtime_error(message);
 				}
 				
 			}
-			
+		
 			int i = 0;
 			
 			// === First we need to figure out the block indices
