@@ -302,7 +302,7 @@ void BATCHED_DF_J::compute_J() {
 	
 	// fetch batchtensor
 		
-	m_eri_batched->set_batch_dim(vec<int>{0});
+	m_eri_batched->set_batch_dim(0);
 	int nbatches = m_eri_batched->nbatches();
 	
 	// copy over density
@@ -371,7 +371,7 @@ void BATCHED_DF_J::compute_J() {
 	
 	//dbcsr::print(*m_gq_xd);
 	
-	m_eri_batched->set_batch_dim(vec<int>{0});
+	m_eri_batched->set_batch_dim(0);
 	
 	m_J_bbd->batched_contract_init();
 	m_gq_xd->batched_contract_init();
@@ -573,8 +573,8 @@ void BATCHED_DFMO_K::compute_K() {
 			
 		// setup batching
 		m_dummy_batched_xbo_01_2->setup_batch();
-		m_dummy_batched_xbo_01_2->set_batch_dim(vec<int>{2});
-		m_eri_batched->set_batch_dim({2});
+		m_dummy_batched_xbo_01_2->set_batch_dim(2);
+		m_eri_batched->set_batch_dim(2);
 		
 		int n_batches_o = m_dummy_batched_xbo_01_2->nbatches();
 		int n_batches_m = m_eri_batched->nbatches();
@@ -713,9 +713,9 @@ void BATCHED_DFAO_K::init_tensors() {
 	
 	m_c_xbb_batched->create_file();
 	m_c_xbb_batched->setup_batch();
-	m_c_xbb_batched->set_batch_dim(vec<int>{1});
+	m_c_xbb_batched->set_batch_dim(1);
 	
-	m_eri_batched->set_batch_dim(vec<int>{1});
+	m_eri_batched->set_batch_dim(1);
 	
 	// C_x,mu,nu -> loop over mu
 	int mu_nbatches = m_c_xbb_batched->nbatches();
@@ -825,8 +825,8 @@ void BATCHED_DFAO_K::compute_K() {
 		auto& fetch2 = TIME.sub("Fetching fitting coeffs/batch " + x);
 		auto& retint = TIME.sub("Returning integrals/batch " + x);
 		
-		m_c_xbb_batched->set_batch_dim(vec<int>{0});
-		m_eri_batched->set_batch_dim(vec<int>{0});
+		m_c_xbb_batched->set_batch_dim(0);
+		m_eri_batched->set_batch_dim(0);
 		
 		auto c_xbb_1_02 = m_c_xbb_batched->get_stensor();
 		

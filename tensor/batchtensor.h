@@ -14,6 +14,7 @@ namespace tensor {
 
 struct global {
 	inline static double default_batchsize = -1.0;
+	inline const static double default_microbsize = 2000;
 };
 
 template <int N, typename T>
@@ -67,10 +68,14 @@ private:
 	/* ======== BATCHING INFO ========== */
 	
 	double m_batch_size = 0.0;
+	// in MB, how large are single batches
 	int64_t m_maxblk_per_node = 0;
 	// maximum number of blocks allowed per process (per batch)
+	int64_t m_maxblk_per_microbatch = 0;
+	// maximum number of blocks allowed per micro batch
 	int64_t m_maxnblk_tot = 0;
 	// maximum number of blocks allowed on all processes
+	int64_t m_maxnblk_tot_per_microbatch = 0;
 	int m_nbatches = 0;
 	// number of batches the tensor is subdivided into
 	
@@ -80,10 +85,13 @@ private:
 	vec<int> m_stored_batchdim; 
 	// what dimensions have been used for writing the tensor
 	
-	vec<vec<std::array<int,2>>> m_boundsblk; 
-	/* lower(0) and upper(1) bound for blocks per tensor dimension per batch
+	vec<std::array<int,2>> m_boundsblk; 
+	/* lower(0) and upper(1) bound for blocks per batch
 	 * upper bound is INCLUDED. */
-	
+	vec<vec<std::array<int,2>>> m_micro_boundsblk;
+	/* lower(0) and upper(1) bound for blocks per micro batch per batch */
+	vec<int> m_micro_nbatches;
+	// number of micro batches per batch
 	
 	vec<vec<int>> m_nblksprocbatch; 
 	// number of blocks per process per batch
@@ -138,7 +146,7 @@ public:
 		m_setup = true;
 		
 		if (m_batch_size < 0) {
-			LOG.os<1>("-- Tensor is held in core memory. No I/O.");
+			LOG.os<1>("-- Tensor is held in core memory. No I/O.\n");
 			m_onebatch = true;
 			return;
 		}
@@ -167,11 +175,15 @@ public:
 		} LOG.os<1>('\n');
 		
 		// determine blocks held per rank per batch
-		m_maxblk_per_node = m_batch_size * 1000000 / (mean * 8);
+		m_maxblk_per_node = m_batch_size * 1e+6 / (mean * 8);
+		
+		m_maxblk_per_microbatch = global::default_microbsize * 1e+6 / (mean * 8);
 		
 		LOG.os<1>("-- Holding at most ", m_maxblk_per_node, " blocks per node.\n");
+		LOG.os<1>("-- Processing at most ", m_maxblk_per_microbatch, " blocks per micro-batch per node.\n");
 		
 		m_maxnblk_tot = m_mpisize * m_maxblk_per_node;
+		m_maxnblk_tot_per_microbatch = m_mpisize * m_maxblk_per_microbatch;
 		
 		LOG.os<1>("-- Holding ", m_maxnblk_tot, " at most on all nodes.\n");
 		
@@ -180,21 +192,22 @@ public:
 			m_onebatch = true;
 		}
 		
+		if (m_maxnblk_tot_per_microbatch > m_maxnblk_tot) {
+			LOG.os<1>("-- No microbatching.\n");
+		}
+		
 		LOG.os<1>("Finished setting up preliminary batching info.\n");
 		
 	}
 	
 	/* function to set up the batches along the dimension(s) specified in ndim 
-	 * Only supports two dimensions at the moment */
+	 * Only supports one dimension at the moment */
 	
-	void set_batch_dim(std::vector<int> ndim) {
+	void set_batch_dim(int idim) {
+		
+		vec<int> ndim = {idim};
 		
 		if (!m_setup) throw std::runtime_error("Batching has not yet been setup!");
-		
-		if (m_onebatch) {
-			m_nbatches = 1;
-			return;
-		}
 		
 		LOG.os<1>("Setting up batching dimensions for ", m_stensor->name(), "\n");
 		
@@ -217,16 +230,23 @@ public:
 			nblk_per_ndim *= m_blkstot[i];
 		}
 		
-		LOG.os<1>("-- Available RAM for tensor per node: ", m_batch_size);
+		LOG.os<1>("-- Available RAM for tensor per node: ", m_batch_size, '\n');
 		
 		LOG.os<1>("-- Blocks per ndim slice: ", nblk_per_ndim, '\n');
 		
-		double nblk_ndim_per_batch = m_maxnblk_tot / nblk_per_ndim;
-		int nblk_ndim_per_batch_last = m_maxnblk_tot % nblk_per_ndim;
+		int64_t nblk_ndim_per_batch = m_maxnblk_tot / nblk_per_ndim;
 		
-		if (nblk_ndim_per_batch < 1.0) throw std::runtime_error("Insufficient memory."); 
+		if (nblk_ndim_per_batch < 1) throw std::runtime_error("Insufficient memory for for holding batch.\n"); 
 		
-		m_nbatches = std::ceil((double)m_nblktot_global / (nblk_ndim_per_batch * (double)nblk_per_ndim));
+		int64_t nblk_ndim_per_microbatch = 
+			std::min(nblk_ndim_per_batch, m_maxblk_per_microbatch / nblk_per_ndim);
+		
+		if (nblk_ndim_per_microbatch < 1.0) throw std::runtime_error("Insufficient memory for microbatches (2GB)\n");
+		
+		m_nbatches = std::ceil((double)m_nblktot_global / ((double)nblk_ndim_per_batch * (double)nblk_per_ndim));
+		
+		int64_t nblk_ndim_per_batch_per_microbatch =
+			nblk_ndim_per_batch / nblk_ndim_per_microbatch;
 		
 		LOG.os<1>("-- Dividing dimension(s)");
 		for (auto n : ndim) {
@@ -234,6 +254,9 @@ public:
 		}
 		LOG.os<1>(" into ", m_nbatches, " batches, with ", 
 			nblk_ndim_per_batch, " blocks along that/those dimension(s).\n");
+			
+		LOG.os<1>("-- Batches subdivided into microbatches of max ", 
+			nblk_ndim_per_batch_per_microbatch, " blocks each along dimension.\n");
 			
 		int64_t idxblkoff = 0;
 		
@@ -249,10 +272,10 @@ public:
 		LOG.os<1>("-- Maximum super index: ", max_idx_super, '\n');
 		
 		m_boundsblk.resize(m_nbatches);
+		m_micro_boundsblk.resize(m_nbatches);
+		m_micro_nbatches.resize(m_nbatches);
 		
 		for (int ibatch = 0; ibatch != m_nbatches; ++ibatch) {
-			
-			m_boundsblk[ibatch].resize(ndim.size());
 			
 			int64_t low_super = idxblkoff;
 			idxblkoff += nblk_ndim_per_batch;
@@ -263,13 +286,16 @@ public:
 			//LOG.os<>("Low/high superidx ", low_super, " ", high_super, '\n');
 			
 			// unroll super index
-			std::vector<int> sizes(ndim.size());
-			for (int i = 0; i != ndim.size(); ++i) {
-				sizes[i] = m_blkstot[ndim[i]];
-			}
+			//std::vector<int> sizes(ndim.size());
+			//for (int i = 0; i != ndim.size(); ++i) {
+			//	sizes[i] = m_blkstot[ndim[i]];
+			//}
 			
-			auto low = unroll_index(low_super,sizes);
-			auto high = unroll_index(high_super,sizes);
+			//auto low = unroll_index(low_super,sizes);
+			//auto high = unroll_index(high_super,sizes);
+			
+			int64_t low = low_super;
+			int64_t high = high_super;
 			
 			/*LOG.os<>("Unrolled: \n");
 			for (auto l : low) LOG.os<>(l, " ");
@@ -277,23 +303,61 @@ public:
 			for (auto h : high) LOG.os<>(h, " ");
 			LOG.os<>('\n');*/
 			
-			for (int i = 0; i != ndim.size(); ++i) {
-				m_boundsblk[ibatch][i][0] = low[i];
-				m_boundsblk[ibatch][i][1] = high[i];
+			m_boundsblk[ibatch][0] = low;
+			m_boundsblk[ibatch][1] = high;
+			
+			// get number of microbatches
+			int64_t nblks = high - low + 1;
+			m_micro_nbatches[ibatch] = std::ceil((double)nblks 
+				/ (double) nblk_ndim_per_batch_per_microbatch);
+				
+			int64_t micro_idxblkoff = low;
+			m_micro_boundsblk[ibatch].resize(m_micro_nbatches[ibatch]);
+				
+			for (int imicbatch = 0; imicbatch != m_micro_nbatches[ibatch];
+				++imicbatch) {
+					
+				int64_t miclow = micro_idxblkoff;
+				micro_idxblkoff += nblk_ndim_per_batch_per_microbatch;
+				int64_t michigh = std::min(high, micro_idxblkoff-1);
+				
+				m_micro_boundsblk[ibatch][imicbatch][0] = miclow;
+				m_micro_boundsblk[ibatch][imicbatch][1] = michigh;	
+				
 			}	
 			
 		}
 		
 		if (LOG.global_plev() >= 1) {
 			LOG.os<1>("-- Bounds: \n");
-			for (auto b : m_boundsblk) {
-				for (int i = 0; i != b.size(); ++i) {
-					LOG.os<>(b[i][0], " -> ", b[i][1], " ");
-				}
+			for (int i = 0; i != m_nbatches; ++i) {
+				
+					LOG.os<>(m_boundsblk[i][0], " -> ", m_boundsblk[i][1], " ");
+				
 			} LOG.os<1>('\n');
+			
+			for (int i = 0; i != m_nbatches; ++i) {
+				
+					auto lim = this->bounds(i,idim);
+					LOG.os<>(lim[0], " -> ", lim[1], " ");
+				
+			} LOG.os<1>('\n');
+			
+		}
+		
+		if (LOG.global_plev() >=1) {
+			LOG.os<1>("-- Microbounds: \n");
+			for (int i = 0; i != m_nbatches; ++i) {
+				for (int m = 0; m != m_micro_nbatches[i]; ++m) {
+					LOG.os<>(m_micro_boundsblk[i][m][0], " -> ",
+						m_micro_boundsblk[i][m][1], " ");
+				} LOG.os<>('\n');
+			}
 		}
 		
 		LOG.os<1>("Finished setting up all batching info.\n");
+		
+		exit(0);
 		
 	}
 	
@@ -846,6 +910,18 @@ public:
 			
 	}
 	
+	vec<int> micro_bounds(int ibatch, int imicrobatch, int idim) {
+		
+		vec<int> bblk = this->micro_bounds_blk(ibatch,imicrobatch,idim);
+		vec<int> out(2);
+		
+		out[0] = m_blkoffsets[idim][bblk[0]];
+		out[1] = m_blkoffsets[idim][bblk[1]] + m_blksizes[idim][bblk[1]] - 1;
+
+		return out;
+		
+	}
+	
 	/* returns the BLOCK bounds */
 	vec<int> bounds_blk(int ibatch, int idim) { 
 		
@@ -861,9 +937,8 @@ public:
 			m_current_batchdim.end(),idim);
 			
 		if (iter != m_current_batchdim.end()) {
-			int pos = iter - m_current_batchdim.begin();
-			out[0] = m_boundsblk[ibatch][pos][0];
-			out[1] = m_boundsblk[ibatch][pos][1];
+			out[0] = m_boundsblk[ibatch][0];
+			out[1] = m_boundsblk[ibatch][1];
 		} else {
 			out[0] = 0;
 			out[1] = m_blkstot[idim] - 1;
@@ -872,6 +947,79 @@ public:
 		return out;
 			
 	}
+	
+	vec<int> micro_bounds_blk(int ibatch, int imicrobatch, int idim) {
+		
+		vec<int> out(2);
+		
+		auto iter = std::find(m_current_batchdim.begin(),
+			m_current_batchdim.end(),idim);
+			
+		if (iter != m_current_batchdim.end()) {
+			out[0] = m_micro_boundsblk[ibatch][imicrobatch][0];
+			out[1] = m_micro_boundsblk[ibatch][imicrobatch][1];
+		} else {
+			out[0] = 0;
+			out[1] = m_blkstot[idim] - 1;
+		}
+		
+		return out;
+		
+	}
+	
+	vec<vec<int>> map_bounds(vec<int>& map, int ibatch) {
+		int mapsize = map.size();
+		
+		vec<vec<int>> out(mapsize,vec<int>{2});
+		
+		for (int idim = 0; idim != mapsize; ++idim) {
+			out[idim] = this->bounds(ibatch,map[idim]);
+		}
+		
+		return out;
+		
+	}
+	
+	vec<vec<int>> map_micro_bounds(vec<int>& map, int ibatch, int imicrobatch) {
+		int mapsize = map.size();
+		
+		vec<vec<int>> out(mapsize,vec<int>{2});
+		
+		for (int idim = 0; idim != mapsize; ++idim) {
+			out[idim] = this->micro_bounds(ibatch,imicrobatch,map[idim]);
+		}
+		
+		return out;
+		
+	}
+	
+	vec<vec<int>> map1_bounds(int ibatch) {
+		
+		auto map1 = m_stensor->map1_2d();
+		return this->map_bounds(map1,ibatch);
+		
+	}
+	
+	vec<vec<int>> map2_bounds(int ibatch) {
+		
+		auto map2 = m_stensor->map2_2d();
+		return this->map_bounds(map2,ibatch);
+		
+	}
+		
+	vec<vec<int>> map1_microbounds(int ibatch, int imicrobatch) {
+		
+		auto map1 = m_stensor->map1_2d();
+		return this->map_micro_bounds(map1,ibatch,imicrobatch);
+		
+	}
+	
+	vec<vec<int>> map2_microbounds(int ibatch, int imicrobatch) {
+		
+		auto map2 = m_stensor->map2_2d();
+		return this->map_micro_bounds(map2,ibatch,imicrobatch);
+		
+	}			
 	
 	void clear_batch() {
 		

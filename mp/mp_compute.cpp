@@ -592,12 +592,12 @@ void mpmod::compute_batch() {
 		pcholtime.finish();
 		
 		B_xbb_1_02_direct.setup_batch();
-		B_xbb_1_02_direct.set_batch_dim(vec<int>{0});
+		B_xbb_1_02_direct.set_batch_dim(0);
 		
 		B_xBB_0_12_batched.create_file();
 		
 		B_xBB_0_12_batched.setup_batch();
-		B_xBB_0_12_batched.set_batch_dim(vec<int>{0});
+		B_xBB_0_12_batched.set_batch_dim(0);
 		
 		int nbatches_x = B_xbb_1_02_direct.nbatches();
 		vec<vec<int>> xbounds(3);
@@ -691,9 +691,9 @@ void mpmod::compute_batch() {
 		xbounds.clear();
 			
 		B_xbb_0_12_direct.setup_batch();
-		B_xbb_0_12_direct.set_batch_dim(vec<int>{1});
+		B_xbb_0_12_direct.set_batch_dim(1);
 		
-		B_xBB_0_12_batched.set_batch_dim(vec<int>{1});
+		B_xBB_0_12_batched.set_batch_dim(1);
 		
 		int nbatches_mu = B_xbb_0_12_direct.nbatches();
 		vec<vec<int>> mubounds(3);
