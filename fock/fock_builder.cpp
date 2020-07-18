@@ -310,7 +310,7 @@ void fockmod::init() {
 				(eri,tensor::global::default_batchsize,LOG.global_plev());
 		
 		eribatch->setup_batch();
-		eribatch->set_batch_dim(0);
+		eribatch->set_batch_dim(vec<int>{0});
 		
 		eribatch->create_file();
 		
