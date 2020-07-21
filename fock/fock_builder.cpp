@@ -310,7 +310,7 @@ void fockmod::init() {
 			std::make_shared<tensor::batchtensor<3,double>>
 				(eri,tensor::global::default_batchsize,LOG.global_plev());
 				
-		dbcsr::btensor<3,double> eris(eri,4,dbcsr::disk,50);
+		dbcsr::btensor<3,double> eris(eri,4,dbcsr::core,50);
 		
 		auto xbounds = eris.bounds(0);
 		auto nubounds = eris.bounds(1);
@@ -343,12 +343,12 @@ void fockmod::init() {
 		
 		eris.compress_finalize();
 		
-		eris.decompress_init(eri,{0,2});
+		eris.decompress_init(eri,{1,2});
 		
-		for (int ix = 0; ix != xbounds.size(); ++ix) {
+		for (int inu = 0; inu != nubounds.size(); ++inu) {
 			for (int imu = 0; imu != mubounds.size(); ++imu) {
 				
-				eris.decompress({ix,imu});
+				eris.decompress({inu,imu});
 				
 				dbcsr::print(*eri);
 				eri->clear();

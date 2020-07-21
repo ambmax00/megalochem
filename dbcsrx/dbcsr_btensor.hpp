@@ -346,6 +346,8 @@ public:
 	
 	void compress_core(vec<int> idx) {
 		
+		LOG.os<1>("Compressing into core memory...\n");
+		
 		vec<vec<int>> b(N);
 		auto& dims = m_wrview.dims;
 		int ibatch = m_write_current_batch;
@@ -354,9 +356,11 @@ public:
 			b[dims[i]] = this->bounds(dims[i])[idx[i]];
 		}
 		
+		LOG.os<1>("Copy bounds.\n");
 		for (int i = 0; i != N; ++i) {
 			auto iter = std::find(dims.begin(),dims.end(),i);
 			b[i] = (iter == dims.end()) ? full_bounds(i) : b[i];
+			LOG.os<1>(b[i][0], " -> ", b[i][1], '\n');
 		}
     
 		copy(*m_write_tensor, *m_stensor).bounds(b)
@@ -767,6 +771,8 @@ public:
 	
 	void decompress_core(vec<int> idx) {
 		
+		LOG.os<1>("Decompressing from core...\n");
+		
 		vec<vec<int>> b(N);
 		auto& dims = m_read_current_dims;	
 		
@@ -774,9 +780,11 @@ public:
 			b[dims[i]] = this->bounds(dims[i])[idx[i]];
 		}
 		
+		LOG.os<1>("Bounds:\n");
 		for (int i = 0; i != N; ++i) {
 			auto iter = std::find(dims.begin(),dims.end(),i);
 			b[i] = (iter == dims.end()) ? full_bounds(i) : b[i];
+			LOG.os<1>(b[i][0], " -> ", b[i][1], '\n');
 		}
     
 		copy(*m_stensor, *m_read_tensor).bounds(b)
@@ -1082,9 +1090,10 @@ public:
 	vec<vec<int>> bounds(int idim) {
 		auto out = this->blk_bounds(idim);
 		auto blkoffs = m_stensor->blk_offsets()[idim];
+		auto blksizes = m_stensor->blk_sizes()[idim];
 		for (int i = 0; i != out.size(); ++i) {
 			out[i][0] = blkoffs[out[i][0]];
-			out[i][1] = blkoffs[out[i][1]];
+			out[i][1] = blkoffs[out[i][1]] + blksizes[out[i][1]] - 1;
 		}
 		return out;
 	}
