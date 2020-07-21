@@ -3,6 +3,7 @@
 #include "math/linalg/LLT.h"
 #include "math/solvers/hermitian_eigen_solver.h"
 #include "fock/fock_defaults.h"
+#include <dbcsr_btensor.hpp>
 
 namespace fock {
 	
@@ -308,6 +309,56 @@ void fockmod::init() {
 		tensor::sbatchtensor<3,double> eribatch = 
 			std::make_shared<tensor::batchtensor<3,double>>
 				(eri,tensor::global::default_batchsize,LOG.global_plev());
+				
+		dbcsr::btensor<3,double> eris(eri,4,dbcsr::disk,50);
+		
+		auto xbounds = eris.bounds(0);
+		auto nubounds = eris.bounds(1);
+		auto mubounds = eris.bounds(2);
+		auto xblkbounds = eris.blk_bounds(0);
+		auto nublkbounds = eris.blk_bounds(1);
+		auto mublkbounds = eris.blk_bounds(2);
+		
+		auto nufullbounds = eris.full_bounds(1);
+		auto nufullblkbounds = eris.full_blk_bounds(1);
+		
+		eris.compress_init(eri, {0,2});
+		
+		vec<vec<int>> bounds(3);
+		
+		for (int ix = 0; ix != xbounds.size(); ++ix) {
+			for (int imu = 0; imu != mubounds.size(); ++imu) {
+				
+				bounds[0] = xblkbounds[ix];
+				bounds[1] = nufullblkbounds;
+				bounds[2] = mublkbounds[imu];
+				
+				aofac->ao_3c2e_fill(eri,bounds,scr);
+				dbcsr::print(*eri);
+				
+				eris.compress({ix,imu});
+				
+			}
+		}
+		
+		eris.compress_finalize();
+		
+		eris.decompress_init(eri,{0,2});
+		
+		for (int ix = 0; ix != xbounds.size(); ++ix) {
+			for (int imu = 0; imu != mubounds.size(); ++imu) {
+				
+				eris.decompress({ix,imu});
+				
+				dbcsr::print(*eri);
+				eri->clear();
+				
+			}
+		}
+		
+		eris.decompress_finalize();
+				
+		exit(0);
 		
 		eribatch->setup_batch();
 		eribatch->set_batch_dim(vec<int>{0});
