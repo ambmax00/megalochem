@@ -33,15 +33,13 @@ void fockmod::init() {
 	std::string j_method = m_opt.get<std::string>("build_J", FOCK_BUILD_J);
 	std::string k_method = m_opt.get<std::string>("build_K", FOCK_BUILD_K);
 	std::string metric = m_opt.get<std::string>("df_metric", FOCK_METRIC);
-	bool direct = m_opt.get<bool>("direct", FOCK_DIRECT);
+	std::string eris_mem = m_opt.get<std::string>("eris", FOCK_ERIS);
 	
 	bool compute_eris = false;
-	bool compute_3c2e = false;
 	bool compute_3c2e_batched = false;
 	bool compute_s_xx = false;
 	bool compute_s_xx_inv = false;
 	bool compute_s_xx_invsqrt = false;
-	bool setup_btensor = false;
 	
 	// set J
 	if (j_method == "exact") {
@@ -51,24 +49,14 @@ void fockmod::init() {
 		
 		compute_eris = true;
 		
-	} else if (j_method == "df") {
-		
-		J* builder = new DF_J(m_world, m_opt);
-		m_J_builder.reset(builder);
-		
-		compute_3c2e = true;
-		compute_s_xx = true;
-		compute_s_xx_inv = true;
-		
 	} else if (j_method == "batchdf") {
 		
-		J* builder = new BATCHED_DF_J(m_world,m_opt,metric,direct);
+		J* builder = new BATCHED_DF_J(m_world,m_opt);
 		m_J_builder.reset(builder);
 		
 		compute_s_xx = true;
 		compute_s_xx_inv = true;
-		setup_btensor = true;
-		if (!direct) compute_3c2e_batched = true;
+		compute_3c2e_batched = true;
 		
 	}
 		
@@ -81,34 +69,14 @@ void fockmod::init() {
 		
 		compute_eris = true;
 		
-	} else if (k_method == "df") {
-		
-		K* builder = new DF_K(m_world,m_opt);
-		m_K_builder.reset(builder);
-		
-		compute_3c2e = true;
-		compute_s_xx = true;
-		compute_s_xx_invsqrt = true;
-		
-	} else if (k_method == "batchdfmo") {
-		
-		K* builder = new BATCHED_DFMO_K(m_world,m_opt,metric,direct);
-		m_K_builder.reset(builder);
-		
-		compute_s_xx = true;
-		compute_s_xx_invsqrt = true;
-		setup_btensor = true;
-		if (!direct) compute_3c2e_batched = true;
-		
 	} else if (k_method == "batchdfao") {
 		
-		K* builder = new BATCHED_DFAO_K(m_world,m_opt,metric,direct);
+		K* builder = new BATCHED_DFAO_K(m_world,m_opt);
 		m_K_builder.reset(builder);
 		
 		compute_s_xx = true;
 		compute_s_xx_inv = true;
-		setup_btensor = true;
-		if (!direct) compute_3c2e_batched = true;
+		compute_3c2e_batched = true;
 		
 	}   
 		
@@ -255,36 +223,8 @@ void fockmod::init() {
 		
 	}
 	
-	if (compute_3c2e) {
-		
-		auto& t_screen = TIME.sub("3c2e screening");
-		
-		LOG.os<1>("Computing screening.\n");
-		
-		t_screen.start();
-		
-		ints::screener* scr = new ints::schwarz_screener(aofac, metric);
-		auto shscr = ints::shared_screener(scr);
-		
-		shscr->compute();
-		
-		t_screen.finish();
-		
-		LOG.os<1>("Computing 3c2e inetgrals...\n");
-		
-		auto& t_eri = TIME.sub("3c2e integrals");
-		t_eri.start();
-		
-		dbcsr::stensor3_d out = aofac->ao_3c2e(vec<int>{0}, vec<int>{1,2},metric,shscr.get());
-		
-		reg.insert_tensor<3,double>(m_mol->name() + "_i_xbb_(0|12)", out);
-		reg.insert_screener(m_mol->name() + "_schwarz_screener",shscr);
-		
-		t_eri.finish();
-		
-	}
 	
-	if (setup_btensor || compute_3c2e_batched) {
+	if (compute_3c2e_batched) {
 		
 		auto& t_screen = TIME.sub("3c2e screening");
 		
@@ -303,26 +243,31 @@ void fockmod::init() {
 		auto& t_eri_batched = TIME.sub("3c2e integrals batched");
 		
 		aofac->ao_3c2e_setup(metric);
-		
 		auto eri = aofac->ao_3c2e_setup_tensor(vec<int>{0}, vec<int>{1,2});
+		auto genfunc = aofac->get_generator(scr_s);
 		
-		tensor::sbatchtensor<3,double> eribatch = 
-			std::make_shared<tensor::batchtensor<3,double>>
-				(eri,tensor::global::default_batchsize,LOG.global_plev());
-				
-		dbcsr::btensor<3,double> eris(eri,4,dbcsr::core,50);
+		dbcsr::btype mytype = dbcsr::core;
 		
-		auto xbounds = eris.bounds(0);
-		auto nubounds = eris.bounds(1);
-		auto mubounds = eris.bounds(2);
-		auto xblkbounds = eris.blk_bounds(0);
-		auto nublkbounds = eris.blk_bounds(1);
-		auto mublkbounds = eris.blk_bounds(2);
+		if (eris_mem == "direct") mytype = dbcsr::direct;
+		if (eris_mem == "disk") mytype = dbcsr::disk; 
 		
-		auto nufullbounds = eris.full_bounds(1);
-		auto nufullblkbounds = eris.full_blk_bounds(1);
+		dbcsr::sbtensor<3,double> eribatch = 
+			std::make_shared<dbcsr::btensor<3,double>>(eri,4,mytype,50);
 		
-		eris.compress_init(eri, {0,2});
+		eribatch->set_generator(genfunc);
+		
+		auto xbounds = eribatch->bounds(0);
+		auto mubounds = eribatch->bounds(1);
+		auto xblkbounds = eribatch->blk_bounds(0);
+		auto mublkbounds = eribatch->blk_bounds(1);
+		
+		auto nufullbounds = eribatch->full_bounds(2);
+		auto nufullblkbounds = eribatch->full_blk_bounds(2);
+		
+		dbcsr::stensor<3> eri_write = dbcsr::make_stensor<3>(
+			dbcsr::tensor<3>::create_template(*eri).name("ERI WRITE"));
+		
+		eribatch->compress_init(eri_write, {0,1});
 		
 		vec<vec<int>> bounds(3);
 		
@@ -330,70 +275,17 @@ void fockmod::init() {
 			for (int imu = 0; imu != mubounds.size(); ++imu) {
 				
 				bounds[0] = xblkbounds[ix];
-				bounds[1] = nufullblkbounds;
-				bounds[2] = mublkbounds[imu];
+				bounds[1] = mublkbounds[imu];
+				bounds[2] = nufullblkbounds;
 				
-				aofac->ao_3c2e_fill(eri,bounds,scr);
-				dbcsr::print(*eri);
+				if (mytype != dbcsr::direct) aofac->ao_3c2e_fill(eri_write,bounds,scr_s);
 				
-				eris.compress({ix,imu});
-				
-			}
-		}
-		
-		eris.compress_finalize();
-		
-		eris.decompress_init(eri,{1,2});
-		
-		for (int inu = 0; inu != nubounds.size(); ++inu) {
-			for (int imu = 0; imu != mubounds.size(); ++imu) {
-				
-				eris.decompress({inu,imu});
-				
-				dbcsr::print(*eri);
-				eri->clear();
+				eribatch->compress({ix,imu});
 				
 			}
 		}
 		
-		eris.decompress_finalize();
-				
-		exit(0);
-		
-		eribatch->setup_batch();
-		eribatch->set_batch_dim(vec<int>{0});
-		
-		eribatch->create_file();
-		
-		if (compute_3c2e_batched) {
-			
-			LOG.os<1>("Computing batched 3c2e integrals.\n");
-			
-			t_eri_batched.start();
-		
-			int nbatches = eribatch->nbatches();
-			
-			vec<vec<int>> bounds(3);
-			for (int i = 0; i != nbatches; ++i) {
-				
-				bounds[0] = eribatch->bounds_blk(i,0);
-				bounds[1] = eribatch->bounds_blk(i,1);
-				bounds[2] = eribatch->bounds_blk(i,2);
-				
-				aofac->ao_3c2e_fill(eri,bounds,scr);
-				
-				//dbcsr::print(*eri);
-				
-				eribatch->write(i);
-				
-				eribatch->clear_batch();
-				
-			}
-			
-			LOG.os<1>("Occupancy of 3c2e integrals: ", eri->occupation()*100, "%\n");
-			t_eri_batched.finish();
-			
-		}
+		eribatch->compress_finalize();
 		
 		reg.insert_btensor<3,double>(m_mol->name() + "_i_xbb_(0|12)_batched", eribatch);
 		

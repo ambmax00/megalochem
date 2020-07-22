@@ -333,6 +333,7 @@ void mpmod::compute() {
 
 void mpmod::compute_batch() {
 	
+	/*
 	LOG.banner<>("Batched CD-LT-SOS-RI-MP2", 50, '*');
 	
 	auto& laptime = TIME.sub("Computing laplace points");
@@ -399,6 +400,7 @@ void mpmod::compute_batch() {
 	
 	// screening
 	ints::screener* scr = new ints::schwarz_screener(aofac, "erfc_coulomb");
+	ints::shared_screener s_scr(scr);
 	
 	scrtime.start();
 	scr->compute();
@@ -621,7 +623,7 @@ void mpmod::compute_batch() {
 			intstime.start();
 			// compute AO integrals
 			aofac->ao_3c2e_setup("erfc_coulomb");
-			aofac->ao_3c2e_fill(B_xbb_1_02, xbounds, scr);
+			aofac->ao_3c2e_fill(B_xbb_1_02, xbounds, s_scr);
 			intstime.finish();
 			
 			//dbcsr::print(*B_xbb_1_02);
@@ -662,7 +664,7 @@ void mpmod::compute_batch() {
 			LOG.os<1>("-- Final transform.\n");
 			fintran.start();
 			dbcsr::contract(*L_bo_0_1, *B_xob_1_02, *B_xBB_1_02)
-				/*.retain_sparsity(true)*/.print(false).perform("Mi, XiN -> XMN");
+				.retain_sparsity(true).print(false).perform("Mi, XiN -> XMN");
 			fintran.finish();
 		
 			B_xob_1_02->clear();
@@ -713,7 +715,7 @@ void mpmod::compute_batch() {
 			intstime.start();
 			if (!onebatch) {
 				aofac->ao_3c2e_setup("erfc_coulomb");
-				aofac->ao_3c2e_fill(B_xbb_0_12, mubounds, scr);
+				aofac->ao_3c2e_fill(B_xbb_0_12, mubounds, s_scr);
 			} else {
 				dbcsr::copy(*B_xbb_1_02,*B_xbb_0_12).move_data(true).perform();
 			}
@@ -836,7 +838,7 @@ void mpmod::compute_batch() {
 	
 	TIME.finish();
 	
-	TIME.print_info();
+	TIME.print_info();*/
 	
 }
 

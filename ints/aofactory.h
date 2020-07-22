@@ -8,6 +8,7 @@
 #include <string>
 #include <limits>
 #include <map>
+#include <functional>
 #include <mpi.h>
 
 /* Loads the AO integrals
@@ -57,9 +58,14 @@ public:
 	
 	dbcsr::stensor<3,double> ao_3c2e_setup_tensor(vec<int> map1, vec<int> map2);
 	
-	void ao_3c2e_fill(dbcsr::stensor<3,double>& t_in, vec<vec<int>>& blkbounds, screener* scr);
+	void ao_3c2e_fill(dbcsr::stensor<3,double>& t_in, vec<vec<int>>& blkbounds, 
+		std::shared_ptr<screener> scr, bool sym = false);
 	
 	void ao_3c2e_fill(dbcsr::stensor<3,double>& t_in);
+	
+	std::function<void(dbcsr::stensor<3>&,vec<vec<int>>&)>
+	get_generator(std::shared_ptr<screener> s_scr);
+	
 		
 }; // end class aofactory
 

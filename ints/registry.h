@@ -4,7 +4,7 @@
 #include <any>
 #include <map>
 #include <dbcsr_tensor_ops.hpp>
-#include "tensor/batchtensor.h"
+#include <dbcsr_btensor.hpp>
 #include "ints/screening.h"
 
 namespace ints {
@@ -57,7 +57,7 @@ public:
 	};
 	
 	template <int N, typename T>
-	void insert_btensor(std::string name, tensor::sbatchtensor<N,T>& t) {
+	void insert_btensor(std::string name, dbcsr::sbtensor<N,T>& t) {
 		std::any in = std::any(t);
 		m_map[name] = in;
 	}; 
@@ -78,8 +78,8 @@ public:
 	}
 	
 	template <int N, typename T>
-	tensor::sbatchtensor<N,T> get_btensor(std::string intname) {
-		return get_item<tensor::sbatchtensor<N,T>>(intname);
+	dbcsr::sbtensor<N,T> get_btensor(std::string intname) {
+		return get_item<dbcsr::sbtensor<N,T>>(intname);
 	}
 	
 	shared_screener get_screener(std::string name) {

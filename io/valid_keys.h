@@ -40,7 +40,8 @@ static const json valid_keys =
 		{"diis_beta", true}, // whether to use separate coeficients for beta
 		{"build_J", "exact"}, // how Coulomb matrix is constructed
 		{"build_K", "exact"}, // how Exchange matrix is constructed
-		{"direct", false}, // wether AO integrals are recomputed in batch methods
+		{"eris", "direct"}, // how eris are held in memory (core/disk/direct)
+		{"intermeds", "core"}, // how intermediates are held in memory (core/disk)
 		{"df_metric", "coulomb"}, // which metric to use for batchdf
 		{"print", 0}, // print level (0, 1 or 2 at the moment, -1 for silent output)
 		{"skip", false}, // skip hartree fock and read from files

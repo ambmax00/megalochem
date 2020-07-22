@@ -242,7 +242,7 @@ public:
 		return t_ints.get_stensor();
 	}
 	
-	dbcsr::stensor<3,double> compute_3(vec<int>& map1, vec<int>& map2, screener* scr) { 
+	dbcsr::stensor<3,double> compute_3_full(vec<int>& map1, vec<int>& map2, screener* scr) { 
 		dbcsr::pgrid<3> grid(m_world.comm()); 
 		arrvec<int,3> blksizes; 
 		for (int i = 0; i != 3; ++i) { 
@@ -306,87 +306,120 @@ public:
 		return out;
 	}
 	
-	void compute_3(dbcsr::stensor<3>& t_in, vec<vec<int>>& blkbounds,
+	void compute_3_partial(dbcsr::stensor<3>& t_in, vec<vec<int>>& blkbounds,
 		screener* scr) {
 			
 		auto blksizes = t_in->blk_sizes(); 
 			
-		//if (scr) {
+		size_t totblk = 0;
+		
+		auto blk_idx_loc = t_in->blks_local();
+		
+		auto idx_speed = t_in->idx_speed();
+		
+		const int dim0 = idx_speed[2];
+		const int dim1 = idx_speed[1];
+		const int dim2 = idx_speed[0];
+		
+		const size_t nblk0 = blkbounds[0][1] - blkbounds[0][0] + 1;
+		const size_t nblk1 = blkbounds[1][1] - blkbounds[1][0] + 1;
+		const size_t nblk2 = blkbounds[2][1] - blkbounds[2][0] + 1;
+		
+		const size_t maxblks = nblk0 * nblk1 * nblk2;
+		
+		int iblk[3];
+		
+		arrvec<int,3> res;
+		
+		for (auto& r : res) r.reserve(maxblks);
+
+		for (int i0 = 0; i0 != blk_idx_loc[dim0].size(); ++i0) {
 			
-			size_t totblk = 0;
-			
-			auto blk_idx_loc = t_in->blks_local();
-			
-			auto idx_speed = t_in->idx_speed();
-			
-			const int dim0 = idx_speed[2];
-			const int dim1 = idx_speed[1];
-			const int dim2 = idx_speed[0];
-			
-			int iblk[3]; int sizes[3];
-			
-			size_t x_nblks = blksizes[0].size();
-			size_t b_nblks = blksizes[1].size();
-			
-			sizes[0] = x_nblks;
-			sizes[1] = b_nblks;
-			sizes[2] = b_nblks;
-			
-			size_t ntotbatch = sizes[dim1] * sizes[dim2];
-			
-			arrvec<int,3> res;
-			
-			for (int i0 = 0; i0 != blk_idx_loc[dim0].size(); ++i0) {
+			iblk[dim0] = blk_idx_loc[dim0][i0];
+			if (iblk[dim0] < blkbounds[dim0][0] || iblk[dim0] > blkbounds[dim0][1]) continue;
+			 
+			for (int i1 = 0; i1 != blk_idx_loc[dim1].size(); ++i1) {
 				
-				res[0].reserve(ntotbatch);
-				res[1].reserve(ntotbatch);
-				res[2].reserve(ntotbatch);
+				iblk[dim1] = blk_idx_loc[dim1][i1];
+				if (iblk[dim1] < blkbounds[dim1][0] || iblk[dim1] > blkbounds[dim1][1]) continue;
 				
-				iblk[dim0] = blk_idx_loc[dim0][i0];
-				if (iblk[dim0] < blkbounds[dim0][0] || iblk[dim0] > blkbounds[dim0][1]) continue;
-				 
-				for (int i1 = 0; i1 != blk_idx_loc[dim1].size(); ++i1) {
+				for (int i2 = 0; i2 != blk_idx_loc[dim2].size(); ++i2) {
+					iblk[dim2] = blk_idx_loc[dim2][i2];
 					
-					iblk[dim1] = blk_idx_loc[dim1][i1];
-					if (iblk[dim1] < blkbounds[dim1][0] || iblk[dim1] > blkbounds[dim1][1]) continue;
+					if (iblk[dim2] < blkbounds[dim2][0] || iblk[dim2] > blkbounds[dim2][1]) continue;
 					
-					for (int i2 = 0; i2 != blk_idx_loc[dim2].size(); ++i2) {
-						iblk[dim2] = blk_idx_loc[dim2][i2];
-						
-						if (iblk[dim2] < blkbounds[dim2][0] || iblk[dim2] > blkbounds[dim2][1]) continue;
-						
-						if (scr && scr->skip_block(iblk[0],iblk[1],iblk[2])) {
-							++totblk;
-							continue;
-						}
-						
-						res[0].push_back(iblk[0]);
-						res[1].push_back(iblk[1]);
-						res[2].push_back(iblk[2]);
-						
+					if (scr->skip_block(iblk[0],iblk[1],iblk[2])) {
+						++totblk;
+						continue;
 					}
+					
+					res[0].push_back(iblk[0]);
+					res[1].push_back(iblk[1]);
+					res[2].push_back(iblk[2]);
+					
 				}
-				
-				t_in->reserve(res);
-				res[0].clear();
-				res[1].clear();
-				res[2].clear();
-				
 			}
 			
-			
-			
-		//} else {
+		}
 		
-		//	t_ints.reserve_all();
-			
-		//}	
+		t_in->reserve(res);
 		
 		calc_ints(*t_in, m_eng_pool, m_basvec, scr); 
 		
 	}
 	
-	void compute_3(dbcsr::stensor<3>& t_in) {
+	void compute_3_partial_sym(dbcsr::stensor<3>& t_in, vec<vec<int>>& blkbounds,
+		screener* scr) {
+			
+		auto blksizes = t_in->blk_sizes(); 
+			
+		size_t totblk = 0;
+		
+		auto blk_idx_loc = t_in->blks_local();
+		
+		const size_t nblk0 = blkbounds[0][1] - blkbounds[0][0] + 1;
+		const size_t nblk1 = blkbounds[1][1] - blkbounds[1][0] + 1;
+		const size_t nblk2 = blkbounds[2][1] - blkbounds[2][0] + 1;
+		
+		const size_t maxblks = nblk0 * nblk1 * nblk2;
+		
+		arrvec<int,3> res;
+		
+		for (auto& r : res) r.reserve(maxblks);
+
+		for (auto const& iblkx : blk_idx_loc[0]) {
+			
+			if (iblkx < blkbounds[0][0] || iblkx > blkbounds[0][1]) continue;
+			 
+			for (auto const& iblknu : blk_idx_loc[2]) {
+				
+				if (iblknu < blkbounds[2][0] || iblknu > blkbounds[2][1]) continue;
+				
+				for (auto const& iblkmu : blk_idx_loc[1]) {
+					
+					if (iblkmu < blkbounds[1][0] || iblkmu > blkbounds[1][1]) continue;
+					
+					if (scr->skip_block(iblkx,iblkmu,iblknu)) {
+						++totblk;
+						continue;
+					}
+					
+					res[0].push_back(iblkx);
+					res[1].push_back(iblkmu);
+					res[2].push_back(iblknu);
+					
+				}
+			}
+			
+		}
+		
+		t_in->reserve(res);
+		
+		calc_ints(*t_in, m_eng_pool, m_basvec, scr); 
+		
+	}
+	
+	void compute_3_simple(dbcsr::stensor<3>& t_in) {
 		
 		calc_ints(*t_in, m_eng_pool, m_basvec, nullptr); 
 		
@@ -412,7 +445,18 @@ public:
 		
 		return out;
 	}
+	
+	std::function<void(dbcsr::stensor<3>&,vec<vec<int>>&)>
+	get_generator(shared_screener s_scr) {
 		
+		using namespace std::placeholders;
+		
+		auto gen = std::bind(&aofactory::impl::compute_3_partial_sym, this, _1, _2, s_scr.get());
+			
+		return gen;
+		
+	}
+	
 };
 
 aofactory::aofactory(desc::smolecule mol, dbcsr::world& w) : m_mol(mol), pimpl(new impl(mol, w))  {}
@@ -501,7 +545,7 @@ dbcsr::stensor<3,double> aofactory::ao_3c2e(vec<int> map1, vec<int> map2, std::s
 	pimpl->set_braket("xbb");
 	pimpl->set_operator(metric);
 	pimpl->setup_calc();
-	return pimpl->compute_3(map1,map2,scr);
+	return pimpl->compute_3_full(map1,map2,scr);
 }
 
 void aofactory::ao_3c2e_setup(std::string metric) {
@@ -519,15 +563,18 @@ dbcsr::stensor<3,double> aofactory::ao_3c2e_setup_tensor(vec<int> map1, vec<int>
 	
 }
 
-void aofactory::ao_3c2e_fill(dbcsr::stensor<3,double>& t_in, vec<vec<int>>& blkbounds, screener* scr) {
+void aofactory::ao_3c2e_fill(dbcsr::stensor<3,double>& t_in, vec<vec<int>>& blkbounds, shared_screener scr, bool sym) {
 	
-	pimpl->compute_3(t_in,blkbounds,scr);
-	
+	if (!sym) {
+		pimpl->compute_3_partial(t_in,blkbounds,scr.get());
+	} else {
+		pimpl->compute_3_partial_sym(t_in,blkbounds,scr.get());
+	}
 }
 
 void aofactory::ao_3c2e_fill(dbcsr::stensor<3,double>& t_in) {
 	
-	pimpl->compute_3(t_in);
+	pimpl->compute_3_simple(t_in);
 	
 }
 	
@@ -557,6 +604,13 @@ dbcsr::smatrix<double> aofactory::ao_3cschwarz(std::string metric) {
 	pimpl->set_operator(metric);
 	pimpl->setup_calc(true);
 	return pimpl->compute_screen("schwarz", "xx");
+}
+
+std::function<void(dbcsr::stensor<3>&,vec<vec<int>>&)>
+	aofactory::get_generator(shared_screener s_scr) {
+		
+		return pimpl->get_generator(s_scr);
+		
 }
 
 

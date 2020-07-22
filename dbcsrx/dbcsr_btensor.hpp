@@ -9,6 +9,7 @@
 #include <cstdlib>
 #include <memory>
 #include <filesystem>
+#include <functional>
 
 namespace dbcsr {
 	
@@ -80,6 +81,11 @@ private:
 	std::map<vec<int>,view> m_rdviewmap;
 	
 	/* =========== FUNCTIONS ========== */
+	
+	using generator_type = 
+	std::function<void(dbcsr::stensor<N,T>&,vec<vec<int>>&)>;
+	
+	generator_type m_generator;
 	
 	vec<vec<int>> make_blk_bounds(std::vector<int> blksizes, 
 		int nbatches) {
@@ -179,40 +185,9 @@ public:
 		
 	}
 	
-	/* transforms a (flat) superindex into multiple tensor indices */ 
-	/*std::vector<int> unroll_index(int64_t idx, std::vector<int> sizes) {
-		
-		int M = sizes.size();
-		std::vector<int> out(M);
-		
-		if (M == 1) {
-			out[0] = idx;
-			return out;
-		}
-		
-		int64_t dim = 1;
-		
-		for (int i = 0; i != M-1; ++i) {
-			dim *= sizes[i];
-		}
-		
-		out[M-1] = (int)(idx/dim);
-		int64_t newidx = idx - out[M-1]*dim;
-		
-		if (M == 2) {
-			out[0] = (int)newidx;
-			return out;
-		} else {
-			std::vector<int> newsizes(M-1);
-			std::copy(sizes.begin(),sizes.end()-1,newsizes.begin());
-			auto newarr = unroll_index(newidx,newsizes);
-			for (int i = 0; i != M-1; ++i) {
-				out[i] = newarr[i];
-			}
-			return out;
-		}
-		
-	}*/
+	void set_generator(generator_type& func) {
+		m_generator = func;
+	}
 	
 	/* Create all necessary files. 
 	 * !!! Deletes previous files and resets all variables !!! */
@@ -761,13 +736,34 @@ public:
 		switch(m_type) {
 			case disk : decompress_disk(idx);
 			break;
-			//case direct : decompress_direct(idx);
-			//break;
+			case direct : decompress_direct(idx);
+			break;
 			case core : decompress_core(idx);
 		}
 		
 	}
 	
+	void decompress_direct(vec<int> idx) {
+		
+		LOG.os<1>("Generating tensor entries...\n");
+		
+		vec<vec<int>> b(N);
+		auto& dims = m_read_current_dims;	
+		
+		for (int i = 0; i != idx.size(); ++i) {
+			b[dims[i]] = this->blk_bounds(dims[i])[idx[i]];
+		}
+		
+		LOG.os<1>("Block Bounds:\n");
+		for (int i = 0; i != N; ++i) {
+			auto iter = std::find(dims.begin(),dims.end(),i);
+			b[i] = (iter == dims.end()) ? full_blk_bounds(i) : b[i];
+			LOG.os<1>(b[i][0], " -> ", b[i][1], '\n');
+		}
+		
+		m_generator(m_read_tensor, b);
+		
+	}
 	
 	void decompress_core(vec<int> idx) {
 		
@@ -1033,52 +1029,8 @@ public:
 		m_read_tensor.reset();
 	}
 		
-	//dbcsr::stensor<N,T> get_stensor() { return m_stensor; }
+	dbcsr::stensor<N,T> get_stensor() { return m_stensor; }
 		
-	//int nbatches() { return m_nbatches; }
-	
-	/* returns bounds for batch ibatch and tensor dimension idim
-	 * for use in dbcsr_copy, dbcsr_contract etc. ... */
-	/*vec<int> bounds(int ibatch, int idim) { 
-		
-		vec<int> bblk = this->bounds_blk(ibatch,idim);
-		vec<int> out(2);
-		
-		out[0] = m_blkoffsets[idim][bblk[0]];
-		out[1] = m_blkoffsets[idim][bblk[1]] + m_blksizes[idim][bblk[1]] - 1;
-
-		return out;
-			
-	}*/
-	
-	/* returns the BLOCK bounds */
-	/*vec<int> bounds_blk(int ibatch, int idim) { 
-		
-		vec<int> out(2);
-		
-		if (m_onebatch) {
-			out[0] = 0;
-			out[1] = m_blkstot[idim] - 1;
-			return out;
-		}
-		
-		auto iter = std::find(m_current_batchdim.begin(),
-			m_current_batchdim.end(),idim);
-			
-		if (iter != m_current_batchdim.end()) {
-			int pos = iter - m_current_batchdim.begin();
-			out[0] = m_boundsblk[ibatch][pos][0];
-			out[1] = m_boundsblk[ibatch][pos][1];
-		} else {
-			out[0] = 0;
-			out[1] = m_blkstot[idim] - 1;
-		}
-		
-		return out;
-			
-	}
-	*/
-	
 	int nbatches_dim(int idim) {
 		return m_nbatches_dim[idim];
 	}

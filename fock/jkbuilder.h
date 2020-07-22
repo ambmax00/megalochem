@@ -6,7 +6,7 @@
 #include "desc/molecule.h"
 #include "desc/options.h"
 #include "utils/mpi_time.h"
-#include "tensor/batchtensor.h"
+#include <dbcsr_btensor.hpp>
 #include <dbcsr_matrix.hpp>
 
 namespace fock {
@@ -123,70 +123,28 @@ public:
 	
 };
 
-class DF_J : public J {
-private:
-	
-	dbcsr::stensor3_d m_J_bbd;
-	dbcsr::stensor3_d m_ptot_bbd;
-	dbcsr::stensor2_d m_c_xd;
-	dbcsr::stensor2_d m_c2_xd;
-	dbcsr::stensor2_d m_inv;
-
-public:
-
-	DF_J(dbcsr::world& w, desc::options& opt);
-	void compute_J() override;
-	void init_tensors() override;
-	
-};
-
-class DF_K : public K {
-private:
-	
-	dbcsr::stensor2_d m_K_01;
-	dbcsr::stensor3_d m_HT_01_2;
-	dbcsr::stensor3_d m_HT_0_12;
-	dbcsr::stensor3_d m_HT_02_1;
-	dbcsr::stensor3_d m_D_0_12;
-	dbcsr::stensor3_d m_D_02_1;
-	dbcsr::stensor3_d m_INTS_01_2;
-	dbcsr::stensor2_d m_inv;
-	dbcsr::stensor2_d m_c_bm;
-
-public:
-
-	DF_K(dbcsr::world& w, desc::options& opt);
-	void compute_K() override;
-	void init_tensors() override;
-	
-};
-
 class BATCHED_DF_J : public J {
 private:
 
-	tensor::sbatchtensor<3,double> m_eri_batched;
+	dbcsr::sbtensor<3,double> m_eri_batched;
 	ints::shared_screener m_scr = nullptr;
 	
 	dbcsr::stensor3_d m_J_bbd;
+	dbcsr::stensor3_d m_eri_xbb;
 	dbcsr::stensor3_d m_ptot_bbd;
 	dbcsr::stensor2_d m_gp_xd;
 	dbcsr::stensor2_d m_gq_xd;
 	dbcsr::stensor2_d m_inv;
 
-	std::string m_metric;
-	bool m_direct = false;
-	
-	void fetch_integrals(int ibatch);
-
 public:
 
-	BATCHED_DF_J(dbcsr::world& w, desc::options& opt, 
-		std::string metric, bool direct);
+	BATCHED_DF_J(dbcsr::world& w, desc::options& opt);
 	void compute_J() override;
 	void init_tensors() override;
 	
 };
 
+/*
 class BATCHED_DFMO_K : public K {
 private:
 	
@@ -219,32 +177,27 @@ public:
 	void init_tensors() override;
 	
 };
+* */
 
 class BATCHED_DFAO_K : public K {
 private:
 	
-	tensor::sbatchtensor<3,double> m_eri_batched;
-	tensor::sbatchtensor<3,double> m_c_xbb_batched;
+	dbcsr::sbtensor<3,double> m_eri_batched;
+	dbcsr::sbtensor<3,double> m_c_xbb_batched;
 	
 	ints::shared_screener m_scr = nullptr;
 	
 	dbcsr::stensor<3,double> m_cbar_xbb_01_2;
 	dbcsr::stensor<3,double> m_cbar_xbb_02_1;
+	dbcsr::stensor<3,double> m_eri_0_12;
 	dbcsr::stensor<3,double> m_eri_01_2;
 	
 	dbcsr::stensor2_d m_K_01;
 	dbcsr::stensor2_d m_p_bb;
 	
-	bool m_direct = false;
-	std::string m_metric;
-	
-	void fetch_integrals(int ibatch, dbcsr::stensor3_d t);
-	void return_integrals(dbcsr::stensor3_d& reo_ints);
-	
 public:
 
-	BATCHED_DFAO_K(dbcsr::world& w, desc::options& opt, 
-		std::string metric, bool direct);
+	BATCHED_DFAO_K(dbcsr::world& w, desc::options& opt);
 	void compute_K() override;
 	void init_tensors() override;
 	
