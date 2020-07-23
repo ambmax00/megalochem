@@ -130,7 +130,6 @@ private:
 	ints::shared_screener m_scr = nullptr;
 	
 	dbcsr::stensor3_d m_J_bbd;
-	dbcsr::stensor3_d m_eri_xbb;
 	dbcsr::stensor3_d m_ptot_bbd;
 	dbcsr::stensor2_d m_gp_xd;
 	dbcsr::stensor2_d m_gq_xd;
@@ -187,10 +186,9 @@ private:
 	
 	ints::shared_screener m_scr = nullptr;
 	
+	dbcsr::stensor<3,double> m_c_xbb_1_02;
 	dbcsr::stensor<3,double> m_cbar_xbb_01_2;
 	dbcsr::stensor<3,double> m_cbar_xbb_02_1;
-	dbcsr::stensor<3,double> m_eri_0_12;
-	dbcsr::stensor<3,double> m_eri_01_2;
 	
 	dbcsr::stensor2_d m_K_01;
 	dbcsr::stensor2_d m_p_bb;

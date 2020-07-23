@@ -251,38 +251,30 @@ void fockmod::init() {
 		if (eris_mem == "direct") mytype = dbcsr::direct;
 		if (eris_mem == "disk") mytype = dbcsr::disk; 
 		
+		int nbatches = m_opt.get<int>("nbatches", 4);
+		
 		dbcsr::sbtensor<3,double> eribatch = 
-			std::make_shared<dbcsr::btensor<3,double>>(eri,4,mytype,50);
+			std::make_shared<dbcsr::btensor<3,double>>(eri,nbatches,mytype,50);
 		
 		eribatch->set_generator(genfunc);
 		
-		auto xbounds = eribatch->bounds(0);
-		auto mubounds = eribatch->bounds(1);
-		auto xblkbounds = eribatch->blk_bounds(0);
-		auto mublkbounds = eribatch->blk_bounds(1);
+		auto xfullblkbounds = eribatch->full_blk_bounds(0);
+		auto mufullblkbounds = eribatch->full_blk_bounds(1);
+		auto nublkbounds = eribatch->blk_bounds(2);
 		
-		auto nufullbounds = eribatch->full_bounds(2);
-		auto nufullblkbounds = eribatch->full_blk_bounds(2);
-		
-		dbcsr::stensor<3> eri_write = dbcsr::make_stensor<3>(
-			dbcsr::tensor<3>::create_template(*eri).name("ERI WRITE"));
-		
-		eribatch->compress_init(eri_write, {0,1});
+		eribatch->compress_init({2});
 		
 		vec<vec<int>> bounds(3);
 		
-		for (int ix = 0; ix != xbounds.size(); ++ix) {
-			for (int imu = 0; imu != mubounds.size(); ++imu) {
+		for (int inu = 0; inu != nublkbounds.size(); ++inu) {
 				
-				bounds[0] = xblkbounds[ix];
-				bounds[1] = mublkbounds[imu];
-				bounds[2] = nufullblkbounds;
+				bounds[0] = xfullblkbounds;
+				bounds[1] = mufullblkbounds;
+				bounds[2] = nublkbounds[inu];
 				
-				if (mytype != dbcsr::direct) aofac->ao_3c2e_fill(eri_write,bounds,scr_s);
+				if (mytype != dbcsr::direct) aofac->ao_3c2e_fill(eri,bounds,scr_s);
 				
-				eribatch->compress({ix,imu});
-				
-			}
+				eribatch->compress({inu}, eri);
 		}
 		
 		eribatch->compress_finalize();

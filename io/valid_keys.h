@@ -44,6 +44,7 @@ static const json valid_keys =
 		{"intermeds", "core"}, // how intermediates are held in memory (core/disk)
 		{"df_metric", "coulomb"}, // which metric to use for batchdf
 		{"print", 0}, // print level (0, 1 or 2 at the moment, -1 for silent output)
+		{"nbatches", 4},
 		{"skip", false}, // skip hartree fock and read from files
 		{"max_iter", 10},
 		{"SAD_guess", "core"},
