@@ -10,7 +10,6 @@ static const json valid_keys =
 {
 	{"name", "string"},
 	{"global", {
-		{"batchsize", 1000}, // batch size for tensors, in megabytes
 		{"block_threshold", 1e-9}, // block threshold for dbcsr
 		{"integral_precision", 1-12}, // as the name says
 		{"integral_omega", 0.1} // omega factor for erfc integrals
@@ -45,6 +44,7 @@ static const json valid_keys =
 		{"df_metric", "coulomb"}, // which metric to use for batchdf
 		{"print", 0}, // print level (0, 1 or 2 at the moment, -1 for silent output)
 		{"nbatches", 4},
+		{"occ_nbatches", 2},
 		{"skip", false}, // skip hartree fock and read from files
 		{"max_iter", 10},
 		{"SAD_guess", "core"},

@@ -19,6 +19,37 @@ enum btype {
 	disk,
 	direct
 };
+
+inline vec<vec<int>> make_blk_bounds(std::vector<int> blksizes, int nbatches) {
+	
+	int nblks = blksizes.size();
+	int nele = std::accumulate(blksizes.begin(),blksizes.end(),0);
+	
+	if (nblks < nbatches) nbatches = nblks;
+			
+	double nele_per_batch = (double) nele / (double) nbatches;
+	
+	vec<vec<int>> out;
+	int current_sum = 0;
+	int ibatch = 1;
+	int first_blk = 0;
+	int last_blk = 0;
+	
+	for (int i = 0; i != nblks; ++i) {
+		current_sum += blksizes[i];
+		
+		if (current_sum >= ibatch * nele_per_batch) {
+			last_blk = i;
+			vec<int> b = {first_blk,last_blk};
+			out.push_back(b);
+			first_blk = i+1;
+			++ibatch;
+		}
+	}
+	
+	return out;
+		
+}
 	
 template <int N, typename T, 
 	typename = typename std::enable_if<(N >= 2 && N <= 4)>::type>
@@ -82,39 +113,7 @@ private:
 	using generator_type = 
 	std::function<void(dbcsr::stensor<N,T>&,vec<vec<int>>&)>;
 	
-	generator_type m_generator;
-	
-	vec<vec<int>> make_blk_bounds(std::vector<int> blksizes, 
-		int nbatches) {
-		
-		int nblks = blksizes.size();
-		int nele = std::accumulate(blksizes.begin(),blksizes.end(),0);
-		
-		if (nblks < nbatches) nbatches = nblks;
-				
-		double nele_per_batch = (double) nele / (double) nbatches;
-		
-		vec<vec<int>> out;
-		int current_sum = 0;
-		int ibatch = 1;
-		int first_blk = 0;
-		int last_blk = 0;
-		
-		for (int i = 0; i != nblks; ++i) {
-			current_sum += blksizes[i];
-			
-			if (current_sum >= ibatch * nele_per_batch) {
-				last_blk = i;
-				vec<int> b = {first_blk,last_blk};
-				out.push_back(b);
-				first_blk = i+1;
-				++ibatch;
-			}
-		}
-		
-		return out;
-		
-	}		
+	generator_type m_generator;		
 	
 public:
 

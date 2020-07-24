@@ -7,7 +7,6 @@
 #include "math/linalg/inverse.h"
 #include "ints/aofactory.h"
 #include "ints/screening.h"
-#include "tensor/batchtensor.h"
 #include <dbcsr_matrix_ops.hpp>
 #include <dbcsr_tensor_ops.hpp>
 

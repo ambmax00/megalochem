@@ -19,7 +19,6 @@
 
 #include <libint2/basis.h>
 #include <dbcsr_common.hpp>
-#include "tensor/batchtensor.h"
 #include "ints/aofactory.h"
 
 #include <sys/types.h>
@@ -278,10 +277,6 @@ reader::reader(MPI_Comm comm, std::string filename, int print) : m_comm(comm), L
 	
 	if (data.find("global") != data.end()) {
 		json& jglob = data["global"];
-	
-		if (jglob.find("batchsize") != jglob.end()) {
-			tensor::global::default_batchsize = jglob["batchsize"];
-		}
 		
 		if (jglob.find("block_threshold") != jglob.end()) {
 			dbcsr::global::filter_eps = jglob["block_threshold"];

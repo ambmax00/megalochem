@@ -78,8 +78,16 @@ void fockmod::init() {
 		compute_s_xx_inv = true;
 		compute_3c2e_batched = true;
 		
-	}   
+	}  else if (k_method == "batchdfmo") {
 		
+		K* builder = new BATCHED_DFMO_K(m_world,m_opt);
+		m_K_builder.reset(builder);
+		
+		compute_s_xx = true;
+		compute_s_xx_invsqrt = true;
+		compute_3c2e_batched = true;
+		
+	}
 	
 	LOG.os<>("Setting up JK builder.\n");
 	LOG.os<>("J method: ", j_method, '\n');

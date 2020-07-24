@@ -143,49 +143,36 @@ public:
 	
 };
 
-/*
+
 class BATCHED_DFMO_K : public K {
 private:
 	
-	tensor::sbatchtensor<3,double> m_eri_batched;
-	tensor::sbatchtensor<3,double> m_dummy_batched_xbo_01_2;
-	dbcsr::stensor3_d m_dummy_xbo_01_2;
-	ints::shared_screener m_scr = nullptr;
+	dbcsr::sbtensor<3,double> m_eri_batched;
 	
-	dbcsr::stensor3_d m_INTS_01_2;
-	dbcsr::stensor3_d m_HT1_xbm_01_2;
-	dbcsr::stensor3_d m_HT1_xbm_0_12;
-	dbcsr::stensor3_d m_HT2_xbm_0_12;
-	dbcsr::stensor3_d m_HT2_xbm_01_2;
+	dbcsr::stensor3_d m_HT1_xmb_02_1;
+	dbcsr::stensor3_d m_HT1_xmb_0_12;
+	dbcsr::stensor3_d m_HT2_xmb_0_12;
+	dbcsr::stensor3_d m_HT2_xmb_01_2;
 	
 	dbcsr::stensor2_d m_c_bm;
 	dbcsr::stensor2_d m_K_01;
 	dbcsr::stensor2_d m_invsqrt;
-	
-	bool m_direct = false;
-	std::string m_metric;
-	
-	void fetch_integrals(int ibatch, dbcsr::stensor3_d& t);
-	void return_integrals(dbcsr::stensor3_d& reo_ints);
+
 	
 public:
 
-	BATCHED_DFMO_K(dbcsr::world& w, desc::options& opt, 
-		std::string metric, bool direct);
+	BATCHED_DFMO_K(dbcsr::world& w, desc::options& opt);
 	void compute_K() override;
 	void init_tensors() override;
 	
 };
-* */
 
 class BATCHED_DFAO_K : public K {
 private:
 	
 	dbcsr::sbtensor<3,double> m_eri_batched;
 	dbcsr::sbtensor<3,double> m_c_xbb_batched;
-	
-	ints::shared_screener m_scr = nullptr;
-	
+		
 	dbcsr::stensor<3,double> m_c_xbb_1_02;
 	dbcsr::stensor<3,double> m_cbar_xbb_01_2;
 	dbcsr::stensor<3,double> m_cbar_xbb_02_1;
