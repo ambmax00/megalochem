@@ -234,7 +234,18 @@ public:
 	
 		m_rdviewmap.clear();
 	
-	}	
+	}
+	
+	void reset() {
+		
+		m_stensor->clear();
+		reset_var();
+		if (m_type == disk) {
+			delete_file();
+			create_file();
+		}
+		
+	}
 	
 	~btensor() { if (m_type == disk) delete_file(); }
 	
@@ -650,6 +661,7 @@ public:
 			nblksprocbatch = vec<vec<int>>(batchsize,vec<int>(m_mpisize));
 			nzeprocbatch = vec<vec<int>>(batchsize,vec<int>(m_mpisize));
 			
+			#pragma omp parallel for
 			for (size_t i = 0; i != superidx.size(); ++i) {	
 									
 					const size_t i0 = wlocblkidx[idxspeed[2]][i];
@@ -673,8 +685,11 @@ public:
 						* sizes[idxspeed[1]][i1]
 						* sizes[idxspeed[0]][i2];
 					
-					nblksprocbatch[batch_idx][m_mpirank]++;
-					nzeprocbatch[batch_idx][m_mpirank]++;
+					#pragma omp critical 
+					{
+						nblksprocbatch[batch_idx][m_mpirank]++;
+						nblksprocbatch[batch_idx][m_mpirank]++;
+					}
 									
 					superidx[i] = batch_idx * nblks
 					 + i0 * blksize2 * blksize1
