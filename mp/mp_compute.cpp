@@ -174,7 +174,7 @@ void mpmod::compute_batch() {
 	
 	auto eri = B_xbb_batch->get_stensor();
 	
-	dbcsr::print(*eri);
+	//dbcsr::print(*eri);
 	
 	B_xbb_batch->compress_finalize();
 	
@@ -362,7 +362,7 @@ void mpmod::compute_batch() {
 		//copy over
 		dbcsr::copy_matrix_to_tensor(*L_bo, *L_bo_0_1);
 		pcholtime.finish();
-		
+				
 		//============== B_X,B,B = B_x,b,b * Lo_o,b * Pv_b,b 
 		
 		B_xbb_batch->decompress_init({0});
@@ -401,7 +401,7 @@ void mpmod::compute_batch() {
 			dbcsr::copy(*B_xob_1_02, *B_xob_2_01).move_data(true).perform();
 			reo1.finish();
 			
-			dbcsr::print(*B_xob_2_01);
+			//dbcsr::print(*B_xob_2_01);
 			
 			//copy over vir density
 			dbcsr::copy_matrix_to_tensor(*pseudo_vir, *pseudo_vir_0_1);
@@ -432,7 +432,7 @@ void mpmod::compute_batch() {
 				dbcsr::copy(*B_xoB_2_01, *B_xob_1_02).move_data(true).perform();
 				reo2.finish();
 				
-				dbcsr::print(*B_xob_1_02);
+				//dbcsr::print(*B_xob_1_02);
 		
 				// final contraction
 				//B_xBB_1_02->reserve_template(*B_xbb_1_02);
@@ -455,7 +455,7 @@ void mpmod::compute_batch() {
 				dbcsr::copy(*B_xBB_1_02, *B_xBB_0_12_wr).move_data(true).perform();
 				reo3.finish();
 				
-				dbcsr::print(*B_xBB_0_12_wr);
+				//dbcsr::print(*B_xBB_0_12_wr);
 				
 				//dbcsr::print(*B_xBB_0_12);
 				
