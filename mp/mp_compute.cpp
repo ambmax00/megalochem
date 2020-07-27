@@ -261,15 +261,10 @@ void mpmod::compute_batch() {
 	smat_d Ztilde_XX = std::make_shared<mat_d>(
 		mat_d::create_template(*Ctilde_xx).name("Ztilde_xx").type(dbcsr_type_no_symmetry));
 	
-	arrvec<int,2> bo = {b,o};
 	arrvec<int,2> bb = {b,b};
 	arrvec<int,2> xx = {x,x};
 	
 	dbcsr::pgrid<2> grid2(m_world.comm());
-	
-	stensor2_d L_bo_0_1 = dbcsr::make_stensor<2>(
-		tensor2_d::create().ngrid(grid2).name("L_bo_0_1")
-		.map1({0}).map2({1}).blk_sizes(bo));
 		
 	stensor2_d pseudo_vir_0_1 = dbcsr::make_stensor<2>(
 		tensor2_d::create().ngrid(grid2).name("pseudo_vir_0_1")
@@ -280,18 +275,6 @@ void mpmod::compute_batch() {
 		.map1({0}).map2({1}).blk_sizes(xx));
 		
 	dbcsr::pgrid<3> grid3(m_world.comm());
-	
-	arrvec<int,3> xob = {x,o,b};
-	
-	stensor3_d B_xob_1_02 = dbcsr::make_stensor<3>(
-		tensor3_d::create().ngrid(grid3).name("B_Xob_1_02").map1({1}).map2({0,2})
-		.blk_sizes(xob));
-		
-	stensor3_d B_xob_2_01 = dbcsr::make_stensor<3>(
-		tensor3_d::create_template(*B_xob_1_02).name("B_Xob_2_01").map1({2}).map2({0,1}));
-		
-	stensor3_d B_xoB_2_01 = dbcsr::make_stensor<3>(
-		tensor3_d::create_template(*B_xob_1_02).name("B_XoB_2_01").map1({2}).map2({0,1}));
 		
 	stensor3_d B_xBB_0_12_wr = dbcsr::make_stensor<3>(
 		tensor3_d::create_template(*B_xbb).name("B_XBB_0_12").map1({0}).map2({1,2}));
@@ -355,12 +338,31 @@ void mpmod::compute_batch() {
 		
 		int rank = chol.rank();
 		
+		auto u = dbcsr::split_range(rank, mol->mo_split());
+		
 		LOG.os<>("Cholesky decomposition rank: ", rank, '\n');
 	
-		auto L_bo = chol.L(b, o);
+		auto L_bu = chol.L(b, u);
+		
+		arrvec<int,2> bu = {b,u};
+		arrvec<int,3> xub = {x,u,b};
+		
+		stensor2_d L_bu_0_1 = dbcsr::make_stensor<2>(
+			tensor2_d::create().ngrid(grid2).name("L_bu_0_1")
+			.map1({0}).map2({1}).blk_sizes(bu));
+	
+		stensor3_d B_xub_1_02 = dbcsr::make_stensor<3>(
+			tensor3_d::create().ngrid(grid3).name("B_Xub_1_02").map1({1}).map2({0,2})
+			.blk_sizes(xub));
+		
+		stensor3_d B_xub_2_01 = dbcsr::make_stensor<3>(
+			tensor3_d::create_template(*B_xub_1_02).name("B_Xub_2_01").map1({2}).map2({0,1}));
+		
+		stensor3_d B_xuB_2_01 = dbcsr::make_stensor<3>(
+			tensor3_d::create_template(*B_xub_1_02).name("B_XuB_2_01").map1({2}).map2({0,1}));
 		
 		//copy over
-		dbcsr::copy_matrix_to_tensor(*L_bo, *L_bo_0_1);
+		dbcsr::copy_matrix_to_tensor(*L_bu, *L_bu_0_1);
 		pcholtime.finish();
 				
 		//============== B_X,B,B = B_x,b,b * Lo_o,b * Pv_b,b 
@@ -391,14 +393,14 @@ void mpmod::compute_batch() {
 			};
 		    
 		    firsttran.start();
-		    dbcsr::contract(*L_bo_0_1, *B_xbb_1_02, *B_xob_1_02)
+		    dbcsr::contract(*L_bu_0_1, *B_xbb_1_02, *B_xub_1_02)
 				.bounds3(x_nu_bounds).perform("mi, Xmn -> Xin");
 		    firsttran.finish();
 		    
 		    // reorder
 			LOG.os<1>("-- Reordering B_xob.\n");
 			reo1.start();
-			dbcsr::copy(*B_xob_1_02, *B_xob_2_01).move_data(true).perform();
+			dbcsr::copy(*B_xub_1_02, *B_xub_2_01).move_data(true).perform();
 			reo1.finish();
 			
 			//dbcsr::print(*B_xob_2_01);
@@ -415,21 +417,21 @@ void mpmod::compute_batch() {
 				LOG.os<1>("---- Second transform.\n");
 				
 				vec<vec<int>> nu_bounds = { B_xBB_batch->bounds(2)[inu] };
-				vec<vec<int>> x_o_bounds = { 
+				vec<vec<int>> x_u_bounds = { 
 					B_xBB_batch->bounds(0)[ix],
-					vec<int>{0, mol->nocc_alpha() - 1}
+					vec<int>{0, rank - 1}
 				};
 				
 				sectran.start();
-				dbcsr::contract(*pseudo_vir_0_1, *B_xob_2_01, *B_xoB_2_01)
-					.bounds2(nu_bounds).bounds3(x_o_bounds)
+				dbcsr::contract(*pseudo_vir_0_1, *B_xub_2_01, *B_xuB_2_01)
+					.bounds2(nu_bounds).bounds3(x_u_bounds)
 					.perform("Nn, Xin -> XiN");
 				sectran.finish();
 			
 				// reorder
 				LOG.os<1>("---- Reordering B_xoB.\n");
 				reo2.start();
-				dbcsr::copy(*B_xoB_2_01, *B_xob_1_02).move_data(true).perform();
+				dbcsr::copy(*B_xuB_2_01, *B_xub_1_02).move_data(true).perform();
 				reo2.finish();
 				
 				//dbcsr::print(*B_xob_1_02);
@@ -445,7 +447,7 @@ void mpmod::compute_batch() {
 				};
 									
 				fintran.start();
-				dbcsr::contract(*L_bo_0_1, *B_xob_1_02, *B_xBB_1_02)
+				dbcsr::contract(*L_bu_0_1, *B_xub_1_02, *B_xBB_1_02)
 					.bounds3(x_nu_bounds).perform("Mi, XiN -> XMN");
 				fintran.finish();
 		
@@ -576,8 +578,8 @@ void mpmod::compute_batch() {
 		//dbcsr::print(*Ztilde_XX);
 		//dbcsr::print(*Ztilde_XX_t);
 		
-		auto loc_rows = Ztilde_XX->local_rows();
-		auto loc_cols = Ztilde_XX->local_cols();
+		const auto loc_rows = Ztilde_XX->local_rows();
+		const auto loc_cols = Ztilde_XX->local_cols();
 
 #pragma omp parallel for collapse(2) reduction(+:sum)
 		for (int i = 0; i != loc_rows.size(); ++i) {

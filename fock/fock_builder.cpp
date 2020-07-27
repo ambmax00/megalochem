@@ -250,6 +250,8 @@ void fockmod::init() {
 		
 		auto& t_eri_batched = TIME.sub("3c2e integrals batched");
 		
+		t_eri_batched.start();
+		
 		aofac->ao_3c2e_setup(metric);
 		auto eri = aofac->ao_3c2e_setup_tensor(vec<int>{0}, vec<int>{1,2});
 		auto genfunc = aofac->get_generator(scr_s);
@@ -286,6 +288,8 @@ void fockmod::init() {
 		}
 		
 		eribatch->compress_finalize();
+		
+		t_eri_batched.finish();
 		
 		reg.insert_btensor<3,double>(m_mol->name() + "_i_xbb_(0|12)_batched", eribatch);
 		
