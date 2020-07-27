@@ -11,4 +11,5 @@ target_link_libraries(chem_io
 	Libint2::int2
 	chem_desc
 	chem_dbcsrx
+	Eigen3::Eigen
 )

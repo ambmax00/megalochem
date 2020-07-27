@@ -314,7 +314,7 @@ reader::reader(MPI_Comm comm, std::string filename, int print) : m_comm(comm), L
 	if (reorder) {
 		LOG.os<>("Reordering atoms...\n");
 		
-		math::rcm<libint2::Atom> sorter(atoms,3.0,
+		math::rcm<libint2::Atom> sorter(atoms,5.0,
 			[](libint2::Atom a1, libint2::Atom a2) -> double {
 				return sqrt(
 					pow(a1.x - a2.x,2) +

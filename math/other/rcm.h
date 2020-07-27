@@ -2,8 +2,10 @@
 #define MATH_RCM_H
 
 #include <vector>
+#include <deque>
 #include <iostream>
 #include <stdexcept>
+#include <Eigen/Core>
 
 namespace math {
 	
@@ -25,48 +27,27 @@ private:
 	const size_t m_dim;
 	
 	std::vector<int> m_index;
-	std::unique_ptr<double[]> m_distmat;
-	std::unique_ptr<int[]> m_conmat;
-	
-	size_t idx(size_t i, size_t j) {
-		return i*m_dim + j;
-	}
-	
-	template <typename T>
-	void print(std::unique_ptr<T>& mat) {
-		
-		
-		for (int i = 0; i != m_dim; ++i) {
-			for (int j = 0; j != m_dim; ++j) {
-				std::cout << mat[idx(i,j)] << " ";
-			}
-			std::cout << std::endl;
-		}
-			
-	}
+	Eigen::MatrixXd m_distmat;
+	Eigen::MatrixXi m_conmat;
 		
 	void compute_distmat() {
-		
-		//std::cout << "Sym size " << m_dim*(m_dim+1)/2 << std::endl;
 		
 		for (int p1 = 0; p1 != m_dim; ++p1) {
 		 for (int p2 = p1; p2 != m_dim; ++p2) {
 			 
-			 m_distmat[idx(p1,p2)] = m_distfunc(m_points[p1], m_points[p2]);
-			 m_distmat[idx(p2,p1)] = m_distmat[idx(p1,p2)];
+			 m_distmat(p1,p2) = m_distfunc(m_points[p1], m_points[p2]);
+			 m_distmat(p2,p1) = m_distmat(p1,p2);
 			 
 		}}	
-	
-		//print(m_distmat);
 	
 	}
 	
 	void compute_conmat() {
 		
-		for (int i = 0; i != m_dim*m_dim; ++i){
-			m_conmat[i] = fabs(m_distmat[i]) >= m_cutoff ? 0 : 1;
+		for (int i = 0; i != m_dim*m_dim; ++i) {
+			m_conmat.data()[i] = fabs(m_distmat.data()[i]) >= m_cutoff ? 0 : 1;
 		}
-		
+
 	}
 	
 	int degree(int node) {
@@ -74,16 +55,16 @@ private:
 		int d = 0;
 	
 		for (int i = 0; i != m_dim; ++i) {
-			d += m_conmat[idx(node,i)];
+			d += m_conmat(node,i);
 		}
 	
 		return d-1;
 		
 	}
 		
-	int start_node() {
-	
-		// First, get the two points, which are at maximum distance from eachother
+	int min_degree(std::vector<int>& R) {
+		// find point with minimum degree (max dist), which is not yet in R
+		
 		double max_dist = 0;
 		int node1 = 0;
 		int node2 = 0;
@@ -91,8 +72,14 @@ private:
 		for (int i = 0; i < m_dim; ++i) {
 			for (int j = i+1; j < m_dim; ++j) {
 			
-				if (m_distmat[idx(i,j)] > max_dist) {
-					max_dist = m_distmat[idx(i,j)];
+				if (m_distmat(i,j) > max_dist) {
+					
+					auto iter_i = std::find(R.begin(), R.end(), i);
+					auto iter_j = std::find(R.begin(), R.end(), j);
+					
+					if (iter_i != R.end() && iter_j != R.end()) continue;
+					
+					max_dist = m_distmat(i,j);
 					node1 = i;
 					node2 = j;
 				}
@@ -107,10 +94,37 @@ private:
 	
 		//std::cout << "Degrees: " << deg1 << " " << deg2 << std::endl;
 	
-		// Return the node with the least amount of bonds (If applicable)
-		if (deg1 > deg2) { return node2;} 
+		// Return the node with the least amount of bonds (If applicable), and
+		// which has not yet been included in R
+		
+		auto iter_1 = std::find(R.begin(), R.end(), node1);
+		auto iter_2 = std::find(R.begin(), R.end(), node2);
+		
+		if ((deg1 > deg2 || iter_1 != R.end()) && iter_2 == R.end()) { return node2;} 
 		else { return node1; }
 	
+	}
+	
+	void add_neighbours(int P, std::deque<int>& Q) {
+		
+		std::vector<int> q;
+		
+		for (int i = 0; i != m_dim; ++i) {
+			if ((m_conmat(P,i) == 1) && (i != P)) {
+				q.push_back(i);
+			}
+		}
+		
+		// SORT IT ACCORDING TO DEGREE
+		auto sortdeg = [&](const int q1, const int q2) 
+		-> bool {
+			return degree(q1) > degree(q2);
+		};	
+	
+		std::sort(q.begin(), q.end(), sortdeg);
+	
+		Q.insert(Q.end(),q.begin(),q.end());
+		
 	}
 	
 	
@@ -119,8 +133,8 @@ public:
 	rcm(std::vector<Point> t_points, double t_cutoff, 
 		func t_distfunc) : m_points(t_points), m_distfunc(t_distfunc), 
 		m_cutoff(t_cutoff), m_index(t_points.size()), m_dim(t_points.size()),
-		m_distmat(new double[m_dim*m_dim]), 
-		m_conmat(new int[m_dim*m_dim]) {};
+		m_distmat(Eigen::MatrixXd::Zero(m_dim,m_dim)), 
+		m_conmat(Eigen::MatrixXi::Zero(m_dim,m_dim)) {};
 
 	~rcm() {};
 	
@@ -129,144 +143,91 @@ public:
 		compute_distmat();
 		compute_conmat();
 		
-		//print(m_distmat);
-		//print(m_conmat);
-		
-		int P = start_node();
-		//std::cout << "Best node to start: " << P << std::endl;
+		//std::cout << m_distmat << std::endl;
+		//std::cout << m_conmat << std::endl;
 	
 		// PREPARE EMTPY QUEUE AND RESULT ARRAY
-		std::vector<int> Q;
+		std::deque<int> Q;
 		std::vector<int> R;
+		
+		while (R.size() != m_dim) {
+			
+			// find object with minimum degree which is not yet in R
+			int P = min_degree(R);
 	
-		// SELECT STARTING NODE
-		R.push_back(P);
+			// add p to R
+			R.push_back(P);	
+			
+			//std::cout << "R" << std::endl;
+			//for (auto r : R) {
+			//	std::cout << r << " ";
+			//} //std::cout << std::endl;
 	
-		// ADD TO THE QUEUE ALL ADJACENT NODES TO P
-		for (int i = 0; i != m_dim; ++i) {
-			if ((m_conmat[idx(P,i)] == 1) && (i != P)) {
-				Q.push_back(i);
+			// ADD TO THE QUEUE ALL ADJACENT NODES TO P
+			add_neighbours(P,Q);
+			
+			/*std::cout << "Q" << std::endl;
+			for (auto r : Q) {
+				std::cout << r << " ";
+			} std::cout << std::endl;*/	
+			
+			while (Q.size()) {
+				
+				// extract first node
+				int Q0 = Q[0];
+				
+				// check if in R
+				auto iter_Q0 = std::find(R.begin(),R.end(),Q0);
+				
+				// if not there, remove and continue
+				if (iter_Q0 != R.end()) {
+					Q.pop_front();
+					continue;
+				}
+				
+				// else add Q0 to R, and neighbours of Q0 to Q
+				R.push_back(Q0);
+				add_neighbours(Q0,Q);
+				
+				Q.pop_front();
+				
+				/*std::cout << "Q" << std::endl;
+				for (auto r : Q) {
+					std::cout << r << " ";
+				} std::cout << std::endl;*/
+				
 			}
+			
+			if (R.size() == m_dim) {
+				break;
+			}
+				
+		}	
+				
+	
+		std::reverse(R.begin(),R.end());
+	
+		/*std::cout << "Here is R " << std::endl;
+		for (int i = 0; i != R.size(); ++i) {
+			std::cout << R[i] << " ";
 		}
-	
-		//std::cout << "PRE SORT" << std::endl;
-		for (int i = 0; i != Q.size(); ++i) {
-			//std::cout << Q[i] << " ";
-		}
-		//std::cout << std::endl;
-	
-		// SORT IT ACCORDING TO DEGREE
-		auto sortdeg = [&](const int q1, const int q2) 
-		-> bool {
-				return degree(q1) < degree(q2);
-		};	
-	
-		std::sort(Q.begin(), Q.end(), sortdeg);
-	
-		//std::cout << "AFTER SORT" << std::endl;
-		for (int i = 0; i != Q.size(); ++i) {
-			//std::cout << Q[i] << " ";
-		}
-		//std::cout << std::endl;
-	
-		int Qi = 0;
-	
-		while ( Q.size() ) {
-	
-			std::vector<int>::iterator it = std::find(R.begin(), R.end(), Q[Qi]);
+		//std::cout << std::endl;*/
 		
-			if (it == R.end()) {
-			
-				//std::cout << Q[Qi] << " not yet in R " << std::endl;
-			
-				R.push_back(Q[Qi]);
-			
-				int newP = Q[Qi];
-			
-				Q.erase(Q.begin() + Qi);
-			
-				int offset = Q.size();
-			
-			// ADD ALL ADJACENT POINTS OF newP to Q, that are not in R
-				for (int i = 0; i != m_dim; ++i) {
-					if ((m_conmat[idx(newP,i)] == 1) && (i != newP) ) {
-					
-						std::vector<int>::iterator it2;
-						it2 = find(R.begin(), R.end(), i);
-					
-						if (it2 == R.end()) Q.push_back(i);
-					}
-				}
-			
-			// SORT
-				std::sort(Q.begin()+offset, Q.end(), sortdeg);
-			
-				//std::cout << "NEW Q: " << std::endl;
-				//for (int i = 0; i != Q.size(); ++i) {
-				//	std::cout << Q[i] << " ";
-				//}
-				//std::cout << std::endl;
-			
-			
-			} else if (Qi < Q.size()) {
-				
-				//std::cout << Q[Qi] << "already in R " << std::endl;
-				Q.erase(Q.begin() + Qi);
-				
-				if (Q.size() == 0) {
-					//std::cout << "Q is zero.. Looking for unexplored nodes..." << std::endl;
-					for (int i = 0; i != m_dim; ++i) {
-						std::vector<int>::iterator it;
-						it = std::find(R.begin(), R.end(), i);
-						if (it == R.end()) {
-							Q.push_back(i);
-							//std::cout << "Found one..." << std::endl;
-							break;
-						}
-					}
-				}
-				
-			} 
-			
-	
-		} // END WHILE
-	
-		//std::cout << "Here is R " << std::endl;
-		//for (int i = 0; i != R.size(); ++i) {
-		//	std::cout << R[i] << " ";
-		//}
-		//std::cout << std::endl;
-		
-		if (R.size() != m_dim) throw std::runtime_error("Error reordering atoms.");
-	
-	
-		//std::cout << "PREVIOUS CON MAT" << std::endl;
-		//print(m_conmat);
-	
-	// REORDER CMAT
-		std::unique_ptr<int[]> CMAT2(new int[m_dim*m_dim]);
+		// REORDER CMAT
+		Eigen::MatrixXi conmat2 = Eigen::MatrixXi::Zero(m_dim,m_dim);
 	
 		for (int j = 0; j != m_dim; ++j) {
 		 for (int i = 0; i != m_dim; ++i) {
-			CMAT2[idx(i,j)] = m_conmat[idx(R[i], R[j])];	
+			conmat2(i,j) = m_conmat(R[i], R[j]);	
 		 }
 		}
 		
-		m_conmat.reset();
-		
-		m_conmat = std::move(CMAT2);
+		m_conmat = std::move(conmat2);
 		
 		//std::cout << "REORDERED CON MAT" << std::endl;
-		//print(m_conmat);
+		//std::cout << m_conmat << std::endl;
 		
 		m_index = R;
-	
-		//std::cout << "Reordered atoms: " << std::endl;
-		//for (int i = 0; i != m_dim; ++i) {
-		//	std::cout << m_index[i] << " ";
-		//}
-	
-		//std::cout << std::endl;
 	
 	}
 	
