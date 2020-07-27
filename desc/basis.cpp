@@ -1,79 +1,180 @@
 #include "desc/basis.h"
 #include <libint2/basis.h>
+#include <list>
 
 namespace desc {
+	
+static 
+	
+vvshell split_atomic(vshell& basis) {
+	
+	vvshell c_out(0);
+	vshell cluster(0);
+	std::list<libint2::Shell> slist(basis.begin(),basis.end());
+	
+	while (slist.size()) {
+		
+		auto fshell = slist.begin();
+		cluster.push_back(*fshell);
+		
+		slist.pop_front();
+		auto it = slist.begin();
+		
+		while (it != slist.end()) {
+			if (it->O == fshell->O) {
+				cluster.push_back(*it);
+				it = slist.erase(it);
+			} else {
+				++it;
+			}
+		}
+				
+		c_out.push_back(cluster);
+		cluster.clear();
+		
+	}
+	
+	return c_out;
+	
+}
+
+vvshell split_shell(vshell& basis) {
+	
+	vvshell c_out(0);
+	vshell cluster(0);
+	std::list<libint2::Shell> slist(basis.begin(),basis.end());
+	
+	while (slist.size()) {
+		
+		auto fshell = slist.begin();
+		cluster.push_back(*fshell);
+		
+		slist.pop_front();
+		auto it = slist.begin();
+		
+		while (it != slist.end()) {
+			if (it->O == fshell->O && it->contr[0].l == fshell->contr[0].l) {
+				cluster.push_back(*it);
+				it = slist.erase(it);
+			} else {
+				++it;
+			}
+		}
+				
+		c_out.push_back(cluster);
+		cluster.clear();
+		
+	}
+	
+	return c_out;
+	
+}	
+
+vvshell split_multi_shell(vshell& basis, int nsplit, bool strict, bool sp) {
+	
+	vvshell c_out(0);
+	vshell cluster(0);
+	std::list slist(basis.begin(),basis.end());
+	
+	while (slist.size()) {
+		
+		auto fshell = slist.begin();
+		cluster.push_back(*fshell);
+		
+		slist.pop_front();
+		auto it = slist.begin();
+		
+		while (it != slist.end()) {
+			
+			int nbf_cluster = libint2::nbf(cluster);
+			int nbf_shell = it->size();
+			
+			bool dont_split = true;
+			
+			if (strict) {
+				
+				int l1 = it->contr[0].l;
+				int l2 = fshell->contr[0].l;
+				
+				//std::cout << "strict: " << l1 << " " << l2 << std::endl;
+				
+				if (sp) {
+					dont_split = (((l1 == 0) || (l1 == 1)) && ((l2 == 0) || (l2 == 1))
+						|| (l1 == l2));
+				} else {
+					dont_split = (l1 == l2);
+				}
+				
+			}
+			
+			//std::cout << ((dont_split) ? "TRUE" : "FALSE") << std::endl;
+			
+			if (it->O == fshell->O 
+				&& (nbf_cluster + nbf_shell <= nsplit || nbf_cluster == 0)
+				&& (dont_split))
+			{
+				cluster.push_back(*it);
+				it = slist.erase(it);
+			} else {
+				++it;
+			}
+			
+		}
+		
+		c_out.push_back(cluster);
+		cluster.clear();
+		
+	}
+	
+	return c_out;
+	
+} 
+	
+	
 
 cluster_basis::cluster_basis(vshell& basis, std::string method) : m_basis(basis) {
 	
-	std::vector<size_t> shell2bf = libint2::BasisSet::compute_shell2bf(basis);
-	
 	int nbas = libint2::nbf(basis);
-	int nsplit = 1; // = (method == "atomic") ? 1 : INT_MAX;
-		
-	int nfunc(0);
-		
-	vshell cluster_part;
-	int n = 1;
-	libint2::Shell prev_shell;
-		
-	auto coord = [&](libint2::Shell& s1, libint2::Shell& s2) {	
-		return (s1.O[0] == s2.O[0]) && (s1.O[1] == s2.O[1]) && (s1.O[2] == s2.O[2]);
-	};
+	int vsize = basis.size();
 	
-	auto angmom = [](libint2::Shell& s1, libint2::Shell& s2) {
-		return (s1.contr.size() == s2.contr.size()) && (s1.contr[0].l == s2.contr[0].l);
-	};
-		
-	for (int i = 0; i != basis.size(); ++i) {
-			
-		//std::cout << "Shell Nr. " << i << std::endl;
-			
-		if (i == 0) {
-				
-			cluster_part.push_back(basis[i]);
-			prev_shell = basis[i];
-				
-		} else {
-			
-			bool push;
-			
-			if (method == "shell") {
-				push = (coord(basis[i], prev_shell) && angmom(basis[i], prev_shell));
-			} else {
-				push = coord(basis[i], prev_shell);
-			}
-			
-			if (push) {
-				
-				//std::cout << "  Same as previous" << std::endl;
-				cluster_part.push_back(basis[i]);
+	//std::cout << "NBAS: " << nbas << std::endl;
+	//std::cout << "VSIZE: " << vsize << std::endl;
 	
-			} else {
-				
-				if ( n < nsplit ) {
-				
-					//std::cout << "...still okay" << std::endl;
-					cluster_part.push_back(basis[i]);
-					n += 1;
+	if (method == "atomic") {
+		
+		m_clusters = split_atomic(basis);
+		
+	} else if (method == "shell") {
+		
+		m_clusters = split_shell(basis);
+	
+	} else if (method == "multi_shell") {
+		
+		m_clusters = split_multi_shell(basis,shell_split,false,false);
+		
+	} else if (method == "multi_shell_strict") {
+		
+		m_clusters = split_multi_shell(basis,shell_split,true,false);
 
-				} else {
-					
-					//std::cout << "...pushing." << std::endl;
-					n = 1;
-					m_clusters.push_back(cluster_part);
-					cluster_part.clear();
-					cluster_part.push_back(basis[i]);
-					
-				}
-			}		
-		}	
+	} else if (method == "multi_shell_strict_sp") {
 		
-		if (i == basis.size() - 1) {
-			m_clusters.push_back(cluster_part);
-		}
-			prev_shell = basis[i];
+		m_clusters = split_multi_shell(basis,shell_split,true,true);
+	
+	} else {
+		
+		throw std::runtime_error("Unknown splitting method.\n");
 		
 	}
+	
+	/*for (auto c : m_clusters) {
+		std::cout << c.size() << " ";
+	} std::cout << std::endl;
+	
+	for (auto c : m_clusters) {
+		std::cout << libint2::nbf(c) << " ";
+	} std::cout << std::endl;
+	
+	exit(0);*/
 	
 	for (auto c : m_clusters) {
 		m_cluster_sizes.push_back(libint2::nbf(c));
@@ -87,10 +188,10 @@ cluster_basis::cluster_basis(vshell& basis, std::string method) : m_basis(basis)
 		off += m_clusters[i].size();
 	}
 	
-	std::cout << "OFFS: " << std::endl;
+	/*std::cout << "OFFS: " << std::endl;
 	for (auto s : m_shell_offsets) {
 		std::cout << s << " ";
-	} std::cout << std::endl;
+	} std::cout << std::endl;*/
 	
 }
 

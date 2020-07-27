@@ -4,6 +4,7 @@
 #include <libint2/shell.h>
 
 using vshell = std::vector<libint2::Shell>;
+using vvshell = std::vector<vshell>;
 
 namespace desc {
 	
@@ -16,6 +17,8 @@ private:
 	std::vector<int> m_shell_offsets;
 	
 public:
+
+	inline static int shell_split = 10;
 
 	cluster_basis() {}
 	

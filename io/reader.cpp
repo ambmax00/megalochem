@@ -333,6 +333,10 @@ reader::reader(MPI_Comm comm, std::string filename, int print) : m_comm(comm), L
 	
 	}
 	
+	if (jmol.find("ao_split") != jmol.end()) {
+		desc::cluster_basis::shell_split = jmol["ao_split"];
+	}
+	
 	std::vector<libint2::Shell> basis;
 	if (jmol.find("basis") != jmol.end()) {	
 		libint2::BasisSet bas(jmol["basis"], atoms);

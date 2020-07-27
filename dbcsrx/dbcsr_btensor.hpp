@@ -363,14 +363,16 @@ public:
 		
 		auto b = get_bounds(idx, m_wrview.dims);
     
-		std::cout << "Copying" << std::endl;
+		LOG.os<1>("Copying\n");
+		
+		m_nzetot += tensor_in->num_nze_total();
     
 		copy(*tensor_in, *m_stensor).bounds(b)
 			.move_data(true).sum(true).perform();
-			
+		
 		tensor_in->clear();
 		
-		std::cout << "DONE." << std::endl;
+		LOG.os<1>("DONE.\n");
 		
 	}
     
@@ -381,7 +383,7 @@ public:
 		int nbatches = m_wrview.nbatches;
 		
 		auto write_tensor = tensor_in;
-				
+						
 		// writes the local blocks of batch ibatch to file
 		// should only be called in order
 		// blocks of a batch are stored as follows:
@@ -1110,6 +1112,16 @@ public:
 		auto full = m_stensor->nfull_total();
 		vec<int> out = {0,full[idim]-1};
 		return out;
+	}
+	
+	double occupation() {
+		
+		auto full = m_stensor->nfull_total();
+		int64_t tot = std::accumulate(full.begin(),full.end(),(int64_t)1,
+			std::multiplies<int64_t>());
+		
+		return (double)m_nzetot / (double) tot;
+		
 	}
 
 	

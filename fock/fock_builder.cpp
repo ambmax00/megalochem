@@ -293,6 +293,8 @@ void fockmod::init() {
 		
 		reg.insert_btensor<3,double>(m_mol->name() + "_i_xbb_(0|12)_batched", eribatch);
 		
+		LOG.os<1>("Occupation of 3c2e integrals: ", eribatch->occupation() * 100, "%\n");
+		
 	}	
 	
 	m_J_builder->init();
