@@ -21,6 +21,8 @@ static const bool HF_DIIS_BETA = true;
 static const bool HF_SAD_USE_DF = false;
 static const bool HF_SAD_SCF_DIIS = false;
 static const bool HF_SAD_SPIN_AVERAGE = true;
+static const bool HF_LOCC = false;
+static const bool HF_LVIR = false;
 
 static const std::string HF_GUESS = "core";
 static const std::string HF_SAD_GUESS = "core";

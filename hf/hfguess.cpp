@@ -189,6 +189,8 @@ void hfmod::compute_guess() {
 			at_opt.set<bool>("diis", m_opt.get<bool>("SAD_diis", HF_SAD_SCF_DIIS));
 			at_opt.set<bool>("use_df", m_opt.get<bool>("SAD_use_df", HF_SAD_USE_DF));
 			at_opt.set<double>("scf_thresh",m_opt.get<double>("SAD_scf_thresh", HF_SAD_SCF_THRESH));
+			at_opt.set<bool>("locc",false);
+			at_opt.set<bool>("lvir",false);
 			
 			int charge = 0;
 			int mult = 0; // will be overwritten

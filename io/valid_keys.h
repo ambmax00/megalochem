@@ -51,7 +51,9 @@ static const json valid_keys =
 		{"SAD_guess", "core"},
 		{"SAD_diis", true},
 		{"SAD_spin_average", true},
-		{"dfbasis", "string"} 
+		{"dfbasis", "string"},
+		{"locc", false},
+		{"lvir", false}
 	}},
 	{"mp", {
 		{"print", 0},

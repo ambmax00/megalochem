@@ -34,6 +34,7 @@ private:
 	std::string m_guess;
 	int m_max_iter;
 	double m_scf_threshold;
+	bool m_locc, m_lvir;
 	
 	// results
 	double m_nuc_energy;

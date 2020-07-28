@@ -2,6 +2,7 @@
 #include <dbcsr_conversions.hpp>
 #include <dbcsr_matrix_ops.hpp>
 #include "math/solvers/hermitian_eigen_solver.h"
+#include "math/linalg/piv_cd.h"
 #include <algorithm> 
 
 namespace hf { 
@@ -94,7 +95,42 @@ void hfmod::diag_fock() {
 		
 		//dbcsr::print(*p_bb);
 		
-		LOG.os<>("Occupancy of ", p_bb->name(), " : ", p_bb->occupation()*100, "%\n"); 
+		LOG.os<1>("Occupancy of ", p_bb->name(), " : ", p_bb->occupation()*100, "%\n"); 
+		
+	};
+	
+	auto localize = [&] (smat_d& p_bb, smat_d& c_bm, std::string x) {
+		
+		LOG.os<1>("Localizing occupied ", x, " MO orbitals.\n");
+		
+		math::pivinc_cd pcd(p_bb, LOG.global_plev());
+		
+		pcd.compute();
+		
+		int rank = pcd.rank();
+		auto o = dbcsr::split_range(rank, m_mol->mo_split());
+		
+		auto m = c_bm->col_blk_sizes();
+		auto b = c_bm->row_blk_sizes();
+		
+		auto L = pcd.L(b,m);
+		
+		// move cvir into L
+		#pragma omp parallel for
+		for (int im = o.size(); im != m.size(); ++im) {
+			for (int ib = 0; ib != b.size(); ++ib) {
+			
+				bool found = false;
+				auto blk_c = c_bm->get_block_p(ib,im,found);
+				if (!found) continue;
+				L->put_block(ib,im,blk_c);
+		
+			}	
+		}
+		
+		*c_bm = std::move(*L);
+		
+		LOG.os<1>("Done with localization.\n");
 		
 	};
 	
@@ -153,6 +189,18 @@ void hfmod::diag_fock() {
 	
 	t_density.finish();
 	
+	if (m_locc) {
+		
+		auto& t_loc = TIME.sub("MO localization");
+		t_loc.start();
+		
+		localize(m_p_bb_A, m_c_bm_A, "A");
+		if (m_p_bb_B) localize(m_p_bb_B, m_c_bm_B, "B");
+		
+		t_loc.finish();
+		
+	}
+	
 }
 
 void hfmod::compute_virtual_density() {
@@ -175,7 +223,10 @@ void hfmod::compute_virtual_density() {
 			upbound = lobound + m_mol->nvir_beta() - 1;
 		}
 		
-		//std::cout << "GOOD" << lobound << " " << upbound << std::endl;
+		auto emat = dbcsr::matrix_to_eigen(*c_bm);
+		std::cout << emat << std::endl;
+		
+		std::cout << "BOUNDS" << lobound << " " << upbound << std::endl;
 		dbcsr::multiply('N','T',*c_bm,*c_bm,*pv_bb).first_k(lobound).last_k(upbound).perform();
 		//std::cout << "OUT" << std::endl;
 		

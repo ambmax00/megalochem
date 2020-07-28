@@ -20,7 +20,9 @@ hfmod::hfmod(desc::smolecule mol, desc::options opt, dbcsr::world& w)
 	  m_diis(m_opt.get<bool>("diis", HF_SCF_DIIS)),
 	  m_diis_beta(m_opt.get<bool>("diis_beta", HF_DIIS_BETA)),
 	  m_scf_energy(0.0),
-	  m_nobetaorb(false)
+	  m_nobetaorb(false),
+	  m_locc(m_opt.get<bool>("locc", HF_LOCC)),
+	  m_lvir(m_opt.get<bool>("lvir", HF_LVIR))
 {
 	
 	m_restricted = (m_mol->nele_alpha() == m_mol->nele_beta()) ? true : false; 
