@@ -270,6 +270,11 @@ void BATCHED_DFMO_K::compute_K() {
 		auto full_nb = m_eri_batched->full_bounds(2);
 		auto batch_nb = m_eri_batched->bounds(2);
 		
+		int64_t nze_HTI = 0;
+		
+		auto full = m_HT1_xmb_02_1->nfull_total();
+		int64_t nze_HTI_tot = (int64_t)full[0] * (int64_t)full[1] * (int64_t)full[2];
+		
 		for (int iocc = 0; iocc != o_bounds.size(); ++iocc) {
 			
 			LOG.os<1>("IOCC = ", iocc, " ", o_bounds[iocc][0],
@@ -304,6 +309,8 @@ void BATCHED_DFMO_K::compute_K() {
 				con1.finish();
 			
 			}
+			
+			nze_HTI += m_HT1_xmb_02_1->num_nze_total();
 			
 			m_c_bm->batched_contract_finalize();
 			
@@ -343,6 +350,9 @@ void BATCHED_DFMO_K::compute_K() {
 			m_HT2_xmb_01_2->clear();
 							
 		} // end for I
+		
+		double HTI_occupancy = (double)nze_HTI / (double)nze_HTI_tot;
+		LOG.os<1>("Occupancy of HTI: ", HTI_occupancy * 100, "%\n");
 		
 		retints.start();
 		m_eri_batched->reorder(vec<int>{0},vec<int>{1,2});
@@ -454,6 +464,9 @@ void BATCHED_DFAO_K::init_tensors() {
 				
 		}
 	}
+	
+	double c_occ = m_c_xbb_batched->occupation() * 100;
+	LOG.os<1>("Occupancy of c_xbb: ", c_occ, "%\n");
 
 	calc_c.finish();
 	
@@ -527,6 +540,10 @@ void BATCHED_DFAO_K::compute_K() {
 		auto mu_full_b = m_c_xbb_batched->full_bounds(1);
 		auto nu_b = m_c_xbb_batched->bounds(2);
 		
+		int64_t nze_cbar = 0;
+		auto full = eri_01_2->nfull_total();
+		int64_t nze_cbar_tot = (int64_t)full[0] * (int64_t)full[1] * (int64_t)full[2];
+		
 		for (int inu = 0; inu != nu_b.size(); ++inu) {
 			
 			// fetch integrals
@@ -548,6 +565,8 @@ void BATCHED_DFAO_K::compute_K() {
 					.bounds1(n_bounds).bounds2(xm_bounds)
 					.perform("XML, LS -> XMS");
 				con_1_batch.finish();
+			
+				nze_cbar += m_cbar_xbb_01_2->num_nze_total();
 			
 				vec<vec<int>> copy_bounds = {
 					x_b[ix],
@@ -585,6 +604,9 @@ void BATCHED_DFAO_K::compute_K() {
 			}
 			
 		}
+		
+		double occ_cbar = (double) nze_cbar / (double) nze_cbar_tot;
+		LOG.os<1>("Occupancy of cbar: ", occ_cbar, "%\n");
 		
 		retint.start();
 		m_eri_batched->reorder(vec<int>{0},vec<int>{1,2});

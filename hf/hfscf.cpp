@@ -91,6 +91,14 @@ hfmod::hfmod(desc::smolecule mol, desc::options opt, dbcsr::world& w)
 		libint2::BasisSet bas(basname,m_mol->atoms());
 		std::vector<libint2::Shell> vecbas = std::move(bas);
 		m_mol->set_dfbasis(vecbas);
+		
+		auto x = m_mol->dims().x();
+		if (LOG.global_plev() >= 1) {
+			for (auto i : x) {
+				LOG.os<1>(i, " ");
+			} LOG.os<1>("\n");
+		}
+		
 	}
 	
 	LOG.os<>("Options: \n");

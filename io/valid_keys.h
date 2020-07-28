@@ -60,7 +60,9 @@ static const json valid_keys =
 		{"nlap", 5}, // number of laplace points
 		{"nbatches", 3},
 		{"dfbasis", "basis"},
-		{"c_os", 1.3}
+		{"c_os", 1.3},
+		{"eris", "core"},
+		{"intermeds", "core"}
 	}},
 	{"adc", {
 		{"print", 0},

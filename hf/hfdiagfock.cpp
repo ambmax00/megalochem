@@ -130,6 +130,8 @@ void hfmod::diag_fock() {
 		
 		*c_bm = std::move(*L);
 		
+		c_bm->filter();
+		
 		LOG.os<1>("Done with localization.\n");
 		
 	};
@@ -212,7 +214,7 @@ void hfmod::compute_virtual_density() {
 		mat_d p = mat_d::create_template(*m_p_bb_A).name("pv_bb_"+x);
 		pv_bb = p.get_smatrix();
 		
-		std::cout << "HERE: " << x << std::endl;
+		//std::cout << "HERE: " << x << std::endl;
 		
 		if (x == "A") {
 			lobound = m_mol->nocc_alpha();
@@ -223,17 +225,17 @@ void hfmod::compute_virtual_density() {
 			upbound = lobound + m_mol->nvir_beta() - 1;
 		}
 		
-		auto emat = dbcsr::matrix_to_eigen(*c_bm);
-		std::cout << emat << std::endl;
+		//auto emat = dbcsr::matrix_to_eigen(*c_bm);
+		//std::cout << emat << std::endl;
 		
-		std::cout << "BOUNDS" << lobound << " " << upbound << std::endl;
+		//std::cout << "BOUNDS" << lobound << " " << upbound << std::endl;
 		dbcsr::multiply('N','T',*c_bm,*c_bm,*pv_bb).first_k(lobound).last_k(upbound).perform();
 		//std::cout << "OUT" << std::endl;
 		
 		if (LOG.global_plev() >= 2) 
 			dbcsr::print(*pv_bb);
 		
-		std::cout << "DONE." << std::endl;
+		//std::cout << "DONE." << std::endl;
 		
 	};
 	

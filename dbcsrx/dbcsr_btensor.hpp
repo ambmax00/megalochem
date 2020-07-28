@@ -633,7 +633,7 @@ public:
 				blksizes[i].end(),0);
 			int nbatch = m_nbatches_dim[i];
 			nele_per_batch[i] = (double) nele / (double) nbatch;
-			std::cout << "NELE: " << nele_per_batch[i] << std::endl;
+			//std::cout << "NELE: " << nele_per_batch[i] << std::endl;
 		}	
 		
 		if (N == 3) {
@@ -647,6 +647,8 @@ public:
 			const size_t bsize2 = (dims.size() > 2) ? m_nbatches_dim[dim2] : 1;
 			
 			const size_t batchsize = bsize0 * bsize1 * bsize2;
+			
+			//std::cout << "BATCHSIZE: " << batchsize << std::endl;
 			
 			rview.nbatches = batchsize;
 			
@@ -690,17 +692,19 @@ public:
 					#pragma omp critical 
 					{
 						nblksprocbatch[batch_idx][m_mpirank]++;
-						nblksprocbatch[batch_idx][m_mpirank]++;
+						nzeprocbatch[batch_idx][m_mpirank]++;
 					}
+					
+					//std::cout << "BATCHIDX: " << batch_idx << std::endl;
 									
 					superidx[i] = batch_idx * nblks
 					 + i0 * blksize2 * blksize1
 					 + i1 * blksize2
 					 + i2;
 					 
-					 std::cout << "INTEGER: " << superidx[i] << " "
-						<< " BATCHES " << b0 << " " << b1 << " " << b2
-						<< " IDX " << i0 << " " << i1 << " " << i2 << std::endl;
+					 //std::cout << "INTEGER: " << superidx[i] << " "
+					//	<< " BATCHES " << b0 << " " << b1 << " " << b2
+					//	<< " IDX " << i0 << " " << i1 << " " << i2 << std::endl;
 					 
 			}
 				 
@@ -715,6 +719,13 @@ public:
 				MPI_Allgather(&nze,1,MPI_INT,nzeprocbatch[i].data(),1,MPI_INT,m_comm);
 				MPI_Allgather(&nblk,1,MPI_INT,nblksprocbatch[i].data(),1,MPI_INT,m_comm);
 				
+			}
+			
+			if (LOG.global_plev() >= 10 && m_mpirank == 0) {
+				std::cout << "BATCHSIZES:" << std::endl;
+				for (int i = 0; i != nblksprocbatch.size(); ++i) {
+					std::cout << "BATCH " << i << " " << nblksprocbatch[i][0] << std::endl;
+				}
 			}
 				 
 		}
@@ -789,6 +800,7 @@ public:
 			case direct : decompress_direct(idx);
 			break;
 			case core : decompress_core(idx);
+			break;
 		}
 		
 	}

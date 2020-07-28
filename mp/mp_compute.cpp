@@ -139,12 +139,12 @@ void mpmod::compute_batch() {
 	
 	if (intermed_method == "core") {
 		intermed_type = dbcsr::core;
-	} else if (eri_method == "disk") {
+	} else if (intermed_method == "disk") {
 		intermed_type = dbcsr::disk;
 	} 
 	
 	dbcsr::sbtensor<3,double> B_xbb_batch = 
-		std::make_shared<dbcsr::btensor<3,double>>(B_xbb,nbatches,eri_type,50);
+		std::make_shared<dbcsr::btensor<3,double>>(B_xbb,nbatches,eri_type,1);
 	
 	auto gen_func = aofac->get_generator(s_scr);
 	B_xbb_batch->set_generator(gen_func);
@@ -283,7 +283,7 @@ void mpmod::compute_batch() {
 		tensor3_d::create_template(*B_xbb).name("B_XBB_1_02").map1({1}).map2({0,2}));
 	
 	dbcsr::sbtensor<3,double> B_xBB_batch = 
-		std::make_shared<dbcsr::btensor<3,double>>(B_xBB_0_12_wr,nbatches,intermed_type,50);
+		std::make_shared<dbcsr::btensor<3,double>>(B_xBB_0_12_wr,nbatches,intermed_type,1);
 	
 	double mp2_energy = 0.0;
 	
@@ -343,6 +343,10 @@ void mpmod::compute_batch() {
 		LOG.os<>("Cholesky decomposition rank: ", rank, '\n');
 	
 		auto L_bu = chol.L(b, u);
+		
+		L_bu->filter();
+		
+		LOG.os<>("Occupancy of L: ", L_bu->occupation()*100, "%\n");
 		
 		arrvec<int,2> bu = {b,u};
 		arrvec<int,3> xub = {x,u,b};
@@ -472,6 +476,8 @@ void mpmod::compute_batch() {
 		
 		B_xbb_batch->decompress_finalize();
 		B_xBB_batch->compress_finalize();
+		
+		LOG.os<>("Occupation of B_xBB: ", B_xBB_batch->occupation()*100, "%\n"); 
 		
 		LOG.os<>("Finished batching.\n");
 		
