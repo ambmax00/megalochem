@@ -9,32 +9,42 @@ EXACT_J::EXACT_J(dbcsr::world& w, desc::options& iopt) : J(w,iopt) {}
 EXACT_K::EXACT_K(dbcsr::world& w, desc::options& iopt) : K(w,iopt) {}
 
 void EXACT_J::init_tensors() {
-	
-	dbcsr::pgrid<3> grid3(m_world.comm());
+
 	auto b = m_p_A->row_blk_sizes();
 	vec<int> d = {1};
 	
 	arrvec<int,3> bbd = {b,b,d};
+	int nbf = std::accumulate(b.begin(),b.end(),0);
+	std::array<int,3> tsizes = {nbf,nbf,1};
 	
-	m_J_bbd = dbcsr::make_stensor<3>(dbcsr::tensor3_d::create().ngrid(grid3).name("J dummy")
-		.map1({0,1}).map2({2}).blk_sizes(bbd));
+	m_spgrid_bbd = dbcsr::create_pgrid<3>(m_world.comm()).tensor_dims(tsizes).get();
 	
-	m_ptot_bbd = dbcsr::make_stensor<3>(dbcsr::tensor3_d::create_template(*m_J_bbd).name("ptot dummy"));
+	m_J_bbd = dbcsr::tensor_create<3>().name("J_bbd").pgrid(m_spgrid_bbd)
+		.map1({0,1}).map2({2}).blk_sizes(bbd).get();
+	
+	m_ptot_bbd = dbcsr::tensor_create_template<3>(m_J_bbd).name("p dummy").get();
+	
+	m_eri_batched = m_reg.get_btensor<4,double>("i_bbbb_batched");
 	
 }
 
 void EXACT_K::init_tensors() {
 	
-	dbcsr::pgrid<3> grid3(m_world.comm());
 	auto b = m_p_A->row_blk_sizes();
 	vec<int> d = {1};
 	
 	arrvec<int,3> bbd = {b,b,d};
+	int nbf = std::accumulate(b.begin(),b.end(),0);
+	std::array<int,3> tsizes = {nbf,nbf,1};
 	
-	m_K_bbd = dbcsr::make_stensor<3>(dbcsr::tensor3_d::create().ngrid(grid3).name("K dummy")
-		.map1({0,1}).map2({2}).blk_sizes(bbd));
+	m_spgrid_bbd = dbcsr::create_pgrid<3>(m_world.comm()).tensor_dims(tsizes).get();
 	
-	m_p_bbd = dbcsr::make_stensor<3>(dbcsr::tensor3_d::create_template(*m_K_bbd).name("p dummy"));
+	m_K_bbd = dbcsr::tensor_create<3>().name("K dummy").pgrid(m_spgrid_bbd)
+		.map1({0,1}).map2({2}).blk_sizes(bbd).get();
+	
+	m_p_bbd = dbcsr::tensor_create_template<3>(m_K_bbd).name("p dummy").get();
+	
+	m_eri_batched = m_reg.get_btensor<4,double>("i_bbbb_batched");
 	
 }	
 
@@ -60,10 +70,29 @@ void EXACT_J::compute_J() {
 		dbcsr::print(*m_ptot_bbd);
 	}
 	
-	// grab integrals
-	auto eris = m_reg.get_tensor<4,double>(m_mol->name() + "_i_bbbb_(01|23)");
+	m_J_bbd->batched_contract_init();
+	m_eri_batched->decompress_init({0,1});
 	
-	dbcsr::contract(*m_ptot_bbd, *eris, *m_J_bbd).print(false).perform("LS_, MNLS -> MN_");
+	for (int imu = 0; imu != m_eri_batched->nbatches_dim(0); ++imu) {
+		for (int inu = 0; inu != m_eri_batched->nbatches_dim(1); ++inu) {
+			
+			m_eri_batched->decompress({imu,inu});
+			
+			auto eri_01_23 = m_eri_batched->get_stensor();
+			
+			vec<vec<int>> mn_bounds = {
+				m_eri_batched->bounds(0)[imu],
+				m_eri_batched->bounds(1)[inu]
+			};
+			
+			dbcsr::contract(*m_ptot_bbd, *eri_01_23, *m_J_bbd)
+				.bounds3(mn_bounds).beta(1.0).perform("LS_, MNLS -> MN_");
+				
+		}
+	}
+			
+	m_eri_batched->decompress_finalize();
+	m_J_bbd->batched_contract_finalize();
 	
 	if (LOG.global_plev() >= 3) {
 		dbcsr::print(*m_J_bbd);
@@ -82,16 +111,37 @@ void EXACT_J::compute_J() {
 
 void EXACT_K::compute_K() {
 	
-	auto eris = m_reg.get_tensor<4,double>(m_mol->name() + "_i_bbbb_(01|23)");
-	
 	auto compute_K_single = [&](dbcsr::smat_d& p, dbcsr::smat_d& k, std::string x) {
 		
 		dbcsr::copy_matrix_to_3Dtensor_new<double>(*p,*m_p_bbd,true);
 		
 		LOG.os<1>("Computing exchange term (", x, ") ... \n");
+		
+		m_K_bbd->batched_contract_init();
+		m_eri_batched->decompress_init({0,2});
+	
+		for (int imu = 0; imu != m_eri_batched->nbatches_dim(0); ++imu) {
+			for (int inu = 0; inu != m_eri_batched->nbatches_dim(2); ++inu) {
 			
-		dbcsr::contract(*m_p_bbd, *eris, *m_K_bbd).alpha(-1.0).perform("LS_, MLSN -> MN_");
-
+				m_eri_batched->decompress({imu,inu});
+				
+				auto eri_02_13 = m_eri_batched->get_stensor();
+				
+				vec<vec<int>> mn_bounds = {
+					m_eri_batched->bounds(0)[imu],
+					m_eri_batched->bounds(2)[inu]
+				};
+				
+				dbcsr::contract(*m_p_bbd, *eri_02_13, *m_K_bbd)
+					.alpha(-1.0).beta(1.0)
+					.bounds3(mn_bounds).perform("LS_, MLNS -> MN_");
+					
+			}
+		}
+			
+		m_eri_batched->decompress_finalize();
+		m_K_bbd->batched_contract_finalize();
+	
 		dbcsr::copy_3Dtensor_to_matrix_new(*m_K_bbd,*k);
 		
 		//dbcsr::print(*m_K_bbd);
@@ -105,8 +155,12 @@ void EXACT_K::compute_K() {
 		
 	};
 	
+	m_eri_batched->reorder(vec<int>{0,2},vec<int>{1,3});
+	
 	compute_K_single(m_p_A, m_K_A, "A");
 	if (m_K_B) compute_K_single(m_p_B, m_K_B, "B");
+	
+	m_eri_batched->reorder(vec<int>{0,1},vec<int>{2,3});
 	
 }
 	

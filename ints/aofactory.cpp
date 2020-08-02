@@ -2,7 +2,6 @@
 #include <stdexcept>
 #include "ints/aofactory.h"
 #include "ints/integrals.h"
-#include "ints/registry.h"
 #include "ints/screening.h"
 #include "utils/pool.h"
 #include <libint2.hpp>
@@ -15,9 +14,9 @@ namespace ints {
 class aofactory::impl {
 protected:
 
-	desc::smolecule m_mol;
 	dbcsr::world m_world;
 	
+	desc::smolecule m_mol;
 	const desc::cluster_basis m_cbas;
 	std::optional<const desc::cluster_basis> m_xbas;
 	
@@ -30,23 +29,19 @@ protected:
 	std::string m_intname = "";
 
 public:
-
-	registry m_reg;
 	
 	impl(desc::smolecule mol, dbcsr::world w) :
-		m_mol(mol), 
 		m_world(w),
+		m_mol(mol),
 		m_cbas(m_mol->c_basis()),
 		m_xbas((m_mol->c_dfbasis()) ? 
-			std::make_optional<const desc::cluster_basis>(*m_mol->c_dfbasis()) :
+			std::make_optional<desc::cluster_basis>(*m_mol->c_dfbasis()) :
 			std::nullopt)
 		{ init(); }
 	
 	void init() {
 		libint2::initialize();
 	}
-	
-	desc::smolecule mol() { return m_mol; }
 	
 	void set_operator(std::string op) {
 		
@@ -125,17 +120,15 @@ public:
 	}
 	
 	template <int N, typename T = double>
-	dbcsr::stensor<N,T> setup_tensor(vec<int> map1, vec<int> map2) {
+	dbcsr::stensor<N,T> setup_tensor(dbcsr::shared_pgrid<N> spgrid, vec<int> map1, vec<int> map2) {
 		
-		dbcsr::pgrid<N> grid(m_world.comm()); 
 		arrvec<int,N> blksizes; 
 		for (int i = 0; i != N; ++i) { 
 			blksizes[i] = m_basvec[i]->cluster_sizes(); 
 		} 
 			
-		dbcsr::stensor<N,T> t_out = dbcsr::make_stensor<N,T>(
-			typename dbcsr::tensor<N,T>::create().name(m_intname) 
-			.ngrid(grid).map1(map1).map2(map2).blk_sizes(blksizes));
+		auto t_out = dbcsr::tensor_create<N,T>().name(m_intname)
+			.pgrid(spgrid).map1(map1).map2(map2).blk_sizes(blksizes).get();
 			
 		return t_out;
 		
@@ -227,86 +220,27 @@ public:
 		
 	}
 		
-	dbcsr::stensor<2,double> compute_2(vec<int>& map1, vec<int>& map2) { 
-		dbcsr::pgrid<2> grid(m_world.comm()); 
+	dbcsr::stensor<2,double> compute_2(dbcsr::shared_pgrid<2> spgrid, vec<int>& map1, vec<int>& map2) { 
+		
 		arrvec<int,2> blksizes;
 		for (int i = 0; i != 2; ++i) { 
 			blksizes[i] = m_basvec[i]->cluster_sizes(); 
 		} 
-		dbcsr::tensor<2> t_ints = dbcsr::tensor<2>::create().name(m_intname) 
-			.ngrid(grid).map1(map1).map2(map2).blk_sizes(blksizes); 
+		
+		auto t_ints = dbcsr::tensor_create<2>()
+			.name(m_intname) 
+			.pgrid(spgrid)
+			.map1(map1).map2(map2)
+			.blk_sizes(blksizes)
+			.get(); 
 			
-		t_ints.reserve_all();
+		t_ints->reserve_all();
 			
-		calc_ints(t_ints, m_eng_pool, m_basvec); 
-		return t_ints.get_stensor();
+		calc_ints(*t_ints, m_eng_pool, m_basvec); 
+		return t_ints;
 	}
 	
-	dbcsr::stensor<3,double> compute_3_full(vec<int>& map1, vec<int>& map2, screener* scr) { 
-		dbcsr::pgrid<3> grid(m_world.comm()); 
-		arrvec<int,3> blksizes; 
-		for (int i = 0; i != 3; ++i) { 
-			blksizes[i] = m_basvec[i]->cluster_sizes(); 
-		} 
-		
-		dbcsr::tensor<3> t_ints = dbcsr::tensor<3>::create().name(m_intname) 
-			.ngrid(grid).map1(map1).map2(map2).blk_sizes(blksizes); 
-	
-		if (scr) {
-			
-			size_t x_nblks = blksizes[0].size();
-			size_t b_nblks = blksizes[1].size();
-			
-			size_t ntot = x_nblks*b_nblks*b_nblks;
-			
-			arrvec<int,3> res;
-			res[0].reserve(ntot);
-			res[1].reserve(ntot);
-			res[2].reserve(ntot);
-			
-			size_t totblk = 0;
-			
-			auto blk_idx_loc = t_ints.blks_local();
-			
-			int blk_mu, blk_nu, blk_x;
-			
-			for (int i = 0; i != blk_idx_loc[1].size(); ++i) {
-				blk_mu = blk_idx_loc[1][i];
-				for (int j = 0; j != blk_idx_loc[2].size(); ++j) {
-					blk_nu = blk_idx_loc[2][j];
-					for (int x = 0; x != blk_idx_loc[0].size(); ++x) {
-						blk_x = blk_idx_loc[0][x];
-						
-						if (scr->skip_block(blk_x,blk_mu,blk_nu)) {
-							++totblk;
-							continue;
-						}
-						
-						res[0].push_back(blk_x);
-						res[1].push_back(blk_mu);
-						res[2].push_back(blk_nu);
-						
-					}
-				}
-			}
-			
-			std::cout << "SCREENED: " << totblk << std::endl;
-			
-			t_ints.reserve(res);
-			
-		} else {
-		
-			t_ints.reserve_all();
-			
-		}	
-		
-		calc_ints(t_ints, m_eng_pool, m_basvec, scr); 
-		auto out = t_ints.get_stensor();
-		
-		return out;
-	}
-	
-	void compute_3_partial(dbcsr::stensor<3>& t_in, vec<vec<int>>& blkbounds,
+	void compute_3_partial(dbcsr::shared_tensor<3>& t_in, vec<vec<int>>& blkbounds,
 		screener* scr) {
 			
 		auto blksizes = t_in->blk_sizes(); 
@@ -368,7 +302,74 @@ public:
 		
 	}
 	
-	void compute_3_partial_sym(dbcsr::stensor<3>& t_in, vec<vec<int>>& blkbounds,
+	void compute_4_partial(dbcsr::shared_tensor<4>& t_in, vec<vec<int>>& blkbounds,
+		screener* scr) {
+			
+		auto blksizes = t_in->blk_sizes(); 
+			
+		size_t totblk = 0;
+		
+		auto blk_idx_loc = t_in->blks_local();
+		
+		auto idx_speed = t_in->idx_speed();
+		
+		const int dim0 = idx_speed[3];
+		const int dim1 = idx_speed[2];
+		const int dim2 = idx_speed[1];
+		const int dim3 = idx_speed[0];
+		
+		const size_t nblk0 = blkbounds[0][1] - blkbounds[0][0] + 1;
+		const size_t nblk1 = blkbounds[1][1] - blkbounds[1][0] + 1;
+		const size_t nblk2 = blkbounds[2][1] - blkbounds[2][0] + 1;
+		const size_t nblk3 = blkbounds[3][1] - blkbounds[3][0] + 1;
+		
+		const size_t maxblks = nblk0 * nblk1 * nblk2 * nblk3;
+		
+		int iblk[4];
+		
+		arrvec<int,4> res;
+		
+		for (auto& r : res) r.reserve(maxblks);
+
+		for (int i0 = 0; i0 != blk_idx_loc[dim0].size(); ++i0) {
+			
+			iblk[dim0] = blk_idx_loc[dim0][i0];
+			if (iblk[dim0] < blkbounds[dim0][0] || iblk[dim0] > blkbounds[dim0][1]) continue;
+			 
+			for (int i1 = 0; i1 != blk_idx_loc[dim1].size(); ++i1) {
+				
+				iblk[dim1] = blk_idx_loc[dim1][i1];
+				if (iblk[dim1] < blkbounds[dim1][0] || iblk[dim1] > blkbounds[dim1][1]) continue;
+				
+				for (int i2 = 0; i2 != blk_idx_loc[dim2].size(); ++i2) {
+					iblk[dim2] = blk_idx_loc[dim2][i2];
+					
+					if (iblk[dim2] < blkbounds[dim2][0] || iblk[dim2] > blkbounds[dim2][1]) continue;
+					
+					for (int i3 = 0; i3 != blk_idx_loc[dim3].size(); ++i3) {
+						iblk[dim3] = blk_idx_loc[dim3][i3];
+						
+						if (iblk[dim3] < blkbounds[dim3][0] || iblk[dim3] > blkbounds[dim3][1]) continue;
+					
+						res[0].push_back(iblk[0]);
+						res[1].push_back(iblk[1]);
+						res[2].push_back(iblk[2]);
+						res[3].push_back(iblk[3]);
+						
+					}
+					
+				}
+			}
+			
+		}
+		
+		t_in->reserve(res);
+		
+		calc_ints(*t_in, m_eng_pool, m_basvec); 
+		
+	}
+	
+	void compute_3_partial_sym(dbcsr::shared_tensor<3>& t_in, vec<vec<int>>& blkbounds,
 		screener* scr) {
 			
 		auto blksizes = t_in->blk_sizes(); 
@@ -425,28 +426,7 @@ public:
 		
 	}
 	
-	dbcsr::stensor<4,double> compute_4(vec<int>& map1, vec<int>& map2) {
-		
-		dbcsr::pgrid<4> grid(m_world.comm()); 
-		arrvec<int,4> blksizes; 
-		for (int i = 0; i != 4; ++i) { 
-			blksizes[i] = m_basvec[i]->cluster_sizes(); 
-		} 
-		
-		dbcsr::tensor<4> t_ints = dbcsr::tensor<4>::create().name(m_intname) 
-			.ngrid(grid).map1(map1).map2(map2).blk_sizes(blksizes); 
-			
-		t_ints.reserve_all();
-			
-		calc_ints(t_ints, m_eng_pool, m_basvec); 
-		auto out = t_ints.get_stensor();
-		
-		//dbcsr::print(*out);
-		
-		return out;
-	}
-	
-	std::function<void(dbcsr::stensor<3>&,vec<vec<int>>&)>
+	std::function<void(dbcsr::shared_tensor<3>&,vec<vec<int>>&)>
 	get_generator(shared_screener s_scr) {
 		
 		using namespace std::placeholders;
@@ -457,16 +437,18 @@ public:
 		
 	}
 	
+	desc::smolecule mol() { return m_mol; }
+	
 };
 
-aofactory::aofactory(desc::smolecule mol, dbcsr::world& w) : m_mol(mol), pimpl(new impl(mol, w))  {}
+aofactory::aofactory(desc::smolecule mol, dbcsr::world& w) : 
+	pimpl(new impl(mol, w))  {}
+	
 aofactory::~aofactory() { delete pimpl; };
-
-desc::smolecule aofactory::mol() { return pimpl->mol(); }
 
 dbcsr::smatrix<double> aofactory::ao_overlap() {
 	
-	std::string intname = m_mol->name() + "_s_bb";
+	std::string intname = "s_bb";
 	
 	pimpl->set_name("s_bb");
 	pimpl->set_braket("bb");
@@ -477,7 +459,7 @@ dbcsr::smatrix<double> aofactory::ao_overlap() {
 	
 dbcsr::smatrix<double> aofactory::ao_kinetic() {
 	
-	std::string intname = m_mol->name() + "_k_bb";
+	std::string intname = "k_bb";
 	
 	pimpl->set_name("t_bb");
 	pimpl->set_braket("bb");
@@ -488,7 +470,7 @@ dbcsr::smatrix<double> aofactory::ao_kinetic() {
 
 dbcsr::smatrix<double> aofactory::ao_nuclear() {
 	
-	std::string intname = m_mol->name() + "_v_bb";
+	std::string intname = "v_bb";
 	
 	pimpl->set_name("v_bb");
 	pimpl->set_braket("bb");
@@ -506,48 +488,6 @@ dbcsr::smatrix<double> aofactory::ao_3coverlap(std::string metric) {
 	return pimpl->compute();
 }
 
-/*
-dbcsr::smatrix<double> ao_3coverlap_inv() {
-	
-	std::string name = m_mol->name() + "_s_xx_inv";
-	
-	auto s_xx = this->ao_3coverlap();
-	math::hermitian_eigen_solver solver(s_xx, 'V');
-	solver.compute();
-	
-	out = solver.inverse();
-	out.set_name(name);
-	
-	return out;
-	
-}
-
-dbcsr::smatrix<double> ao_3coverlap_invsqrt() {
-	
-	std::string name = m_mol->name() + "_s_xx_invsqrt";
-	
-	auto s_xx = this->ao_3coverlap();
-	math::hermitian_eigen_solver solver(s_xx, 'V');
-	solver.compute();
-	
-	out = solver.inverse_sqrt();
-	out.set_name(name);
-	
-	return out;
-	
-}
-*/
-dbcsr::stensor<3,double> aofactory::ao_3c2e(vec<int> map1, vec<int> map2, std::string metric, screener* scr) {
-	
-	auto name = m_mol->name() + "_i_xbb_" + pimpl->m_reg.map_to_string(map1,map2);
-	
-	pimpl->set_name(name);
-	pimpl->set_braket("xbb");
-	pimpl->set_operator(metric);
-	pimpl->setup_calc();
-	return pimpl->compute_3_full(map1,map2,scr);
-}
-
 void aofactory::ao_3c2e_setup(std::string metric) {
 	
 	pimpl->set_braket("xbb");
@@ -556,14 +496,34 @@ void aofactory::ao_3c2e_setup(std::string metric) {
 	
 }
 
-dbcsr::stensor<3,double> aofactory::ao_3c2e_setup_tensor(vec<int> map1, vec<int> map2) {
-	auto name = m_mol->name() + "_i_xbb_" + pimpl->m_reg.map_to_string(map1,map2);
-	pimpl->set_name(name);
-	return pimpl->setup_tensor<3>(map1,map2);
+void aofactory::ao_eri_setup(std::string metric) {
+	
+	pimpl->set_braket("bbbb");
+	pimpl->set_operator(metric);
+	pimpl->setup_calc();
 	
 }
 
-void aofactory::ao_3c2e_fill(dbcsr::stensor<3,double>& t_in, vec<vec<int>>& blkbounds, shared_screener scr, bool sym) {
+dbcsr::shared_tensor<3,double> aofactory::ao_3c2e_setup_tensor(dbcsr::shared_pgrid<3> spgrid, 
+	vec<int> map1, vec<int> map2) {
+	
+	std::string name = "i_xbb";
+	pimpl->set_name(name);
+	return pimpl->setup_tensor<3>(spgrid,map1,map2);
+	
+}
+
+dbcsr::shared_tensor<4,double> aofactory::ao_eri_setup_tensor(dbcsr::shared_pgrid<4> spgrid, 
+	vec<int> map1, vec<int> map2) {
+	
+	std::string name = "i_bbbb";
+	pimpl->set_name(name);
+	return pimpl->setup_tensor<4>(spgrid,map1,map2);
+	
+}
+
+void aofactory::ao_3c2e_fill(dbcsr::shared_tensor<3,double>& t_in, 
+	vec<vec<int>>& blkbounds, shared_screener scr, bool sym) {
 	
 	if (!sym) {
 		pimpl->compute_3_partial(t_in,blkbounds,scr.get());
@@ -572,22 +532,11 @@ void aofactory::ao_3c2e_fill(dbcsr::stensor<3,double>& t_in, vec<vec<int>>& blkb
 	}
 }
 
-void aofactory::ao_3c2e_fill(dbcsr::stensor<3,double>& t_in) {
+void aofactory::ao_eri_fill(dbcsr::shared_tensor<4,double>& t_in, 
+	vec<vec<int>>& blkbounds, shared_screener scr, bool sym) {
 	
-	pimpl->compute_3_simple(t_in);
+	pimpl->compute_4_partial(t_in,blkbounds,scr.get());
 	
-}
-	
-
-dbcsr::stensor<4,double> aofactory::ao_eri(vec<int> map1, vec<int> map2) {
-	
-	auto name = m_mol->name() + "_i_bbbb_" + pimpl->m_reg.map_to_string(map1,map2);
-	
-	pimpl->set_name(name);
-	pimpl->set_braket("bbbb");
-	pimpl->set_operator("coulomb");
-	pimpl->setup_calc();
-	return pimpl->compute_4(map1,map2);
 }
 
 dbcsr::smatrix<double> aofactory::ao_schwarz(std::string metric) {
@@ -612,6 +561,8 @@ std::function<void(dbcsr::stensor<3>&,vec<vec<int>>&)>
 		return pimpl->get_generator(s_scr);
 		
 }
+
+desc::smolecule aofactory::mol() { return pimpl->mol(); }
 
 
 } // end namespace ints

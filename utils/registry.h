@@ -1,18 +1,17 @@
-#ifndef INTS_REGISTRY_H
-#define INTS_REGISTRY_H
+#ifndef UTILS_REGISTRY_H
+#define UTILS_REGISTRY_H
 
 #include <any>
 #include <map>
 #include <dbcsr_tensor_ops.hpp>
 #include <dbcsr_btensor.hpp>
-#include "ints/screening.h"
 
-namespace ints {
+namespace util {
 	
 class registry {
 private:
 
-	inline static std::map<std::string,std::any> m_map;
+	std::map<std::string,std::any> m_map;
 	
 	template <typename item>
 	item get_item(std::string intname) {
@@ -29,21 +28,7 @@ private:
 public:
 
 	registry() {}
-	
-	~registry() {}
-	
-	std::string map_to_string(vec<int>& map1, vec<int>& map2) {
-		std::string out = "(";
 		
-		for (auto m : map1) { out += std::to_string(m); }
-		out += "|";
-		for (auto m : map2) { out += std::to_string(m); }
-		out += ")";
-		
-		return out;
-		
-	}
-	
 	template <typename T>
 	void insert_matrix(std::string name, dbcsr::smatrix<T>& m) {
 		std::any in = std::any(m);
@@ -62,11 +47,6 @@ public:
 		m_map[name] = in;
 	}; 
 	
-	void insert_screener(std::string name, shared_screener scr) {
-		std::any in = std::any(scr);
-		m_map[name] = in;
-	}; 
-	
 	template <typename T>
 	dbcsr::smatrix<T> get_matrix(std::string intname) {
 		return get_item<dbcsr::smatrix<T>>(intname);
@@ -80,10 +60,6 @@ public:
 	template <int N, typename T>
 	dbcsr::sbtensor<N,T> get_btensor(std::string intname) {
 		return get_item<dbcsr::sbtensor<N,T>>(intname);
-	}
-	
-	shared_screener get_screener(std::string name) {
-		return get_item<shared_screener>(name);
 	}
 	
 	void clear() {
@@ -111,6 +87,8 @@ public:
 		}
 			
 	}
+	
+	~registry() {}
 		
 		
 };

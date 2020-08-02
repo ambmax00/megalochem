@@ -2,7 +2,7 @@
 #define FOCK_JK_BUILDER_H
 
 #include "ints/aofactory.h"
-#include "ints/registry.h"
+#include "utils/registry.h"
 #include "desc/molecule.h"
 #include "desc/options.h"
 #include "utils/mpi_time.h"
@@ -18,7 +18,7 @@ protected:
 	desc::options m_opt;
 	dbcsr::world m_world;
 	
-	ints::registry m_reg;
+	util::registry m_reg;
 	
 	util::mpi_log LOG;
 	util::mpi_time TIME;
@@ -48,8 +48,11 @@ public:
 		m_SAD_iter = SAD; 
 		m_SAD_rank = rank;
 	}
+	void set_reg(util::registry& reg) {
+		m_reg = reg;
+	}
 	
-	~JK_common() {}
+	virtual ~JK_common() {}
 	
 	void print_info() { TIME.print_info(); }
 	
@@ -64,7 +67,7 @@ protected:
 public:
 	
 	J(dbcsr::world& w, desc::options& opt) : JK_common(w,opt) {}
-	~J() {}
+	virtual ~J() {}
 	virtual void compute_J() = 0;
 	virtual void init_tensors() = 0;
 	
@@ -83,7 +86,7 @@ protected:
 public:
 	
 	K(dbcsr::world& w, desc::options& opt) : JK_common(w,opt) {}
-	~K() {}
+	virtual ~K() {}
 	virtual void compute_K() = 0;
 	virtual void init_tensors() = 0;
 	
@@ -98,8 +101,11 @@ public:
 class EXACT_J : public J {
 private:
 
-	dbcsr::stensor3_d m_J_bbd;
-	dbcsr::stensor3_d m_ptot_bbd;
+	dbcsr::sbtensor<4,double> m_eri_batched;
+	dbcsr::shared_tensor<3,double> m_J_bbd;
+	dbcsr::shared_tensor<3,double> m_ptot_bbd;
+	
+	dbcsr::shared_pgrid<3> m_spgrid_bbd;
 
 public:
 	
@@ -112,8 +118,11 @@ public:
 class EXACT_K : public K {
 private:
 
-	dbcsr::stensor3_d m_K_bbd;
-	dbcsr::stensor3_d m_p_bbd;
+	dbcsr::sbtensor<4,double> m_eri_batched;
+	dbcsr::shared_tensor<3,double> m_K_bbd;
+	dbcsr::shared_tensor<3,double> m_p_bbd;
+	
+	dbcsr::shared_pgrid<3> m_spgrid_bbd;
 	
 public:
 
@@ -127,19 +136,23 @@ class BATCHED_DF_J : public J {
 private:
 
 	dbcsr::sbtensor<3,double> m_eri_batched;
-	ints::shared_screener m_scr = nullptr;
 	
-	dbcsr::stensor3_d m_J_bbd;
-	dbcsr::stensor3_d m_ptot_bbd;
-	dbcsr::stensor2_d m_gp_xd;
-	dbcsr::stensor2_d m_gq_xd;
-	dbcsr::stensor2_d m_inv;
+	dbcsr::shared_tensor<3,double> m_J_bbd;
+	dbcsr::shared_tensor<3,double> m_ptot_bbd;
+	dbcsr::shared_tensor<2,double> m_gp_xd;
+	dbcsr::shared_tensor<2,double> m_gq_xd;
+	dbcsr::shared_tensor<2,double> m_inv;
+	
+	dbcsr::shared_pgrid<3> m_spgrid_bbd;
+	dbcsr::shared_pgrid<2> m_spgrid_xd;
 
 public:
 
 	BATCHED_DF_J(dbcsr::world& w, desc::options& opt);
 	void compute_J() override;
 	void init_tensors() override;
+	
+	~BATCHED_DF_J() {}
 	
 };
 
@@ -149,21 +162,24 @@ private:
 	
 	dbcsr::sbtensor<3,double> m_eri_batched;
 	
-	dbcsr::stensor3_d m_HT1_xmb_02_1;
-	dbcsr::stensor3_d m_HT1_xmb_0_12;
-	dbcsr::stensor3_d m_HT2_xmb_0_12;
-	dbcsr::stensor3_d m_HT2_xmb_01_2;
+	dbcsr::shared_tensor<3,double> m_HT1_xmb_02_1;
+	dbcsr::shared_tensor<3,double> m_HT1_xmb_0_12;
+	dbcsr::shared_tensor<3,double> m_HT2_xmb_0_12;
+	dbcsr::shared_tensor<3,double> m_HT2_xmb_01_2;
 	
-	dbcsr::stensor2_d m_c_bm;
-	dbcsr::stensor2_d m_K_01;
-	dbcsr::stensor2_d m_invsqrt;
-
+	dbcsr::shared_tensor<2,double> m_c_bm;
+	dbcsr::shared_tensor<2,double> m_K_01;
+	dbcsr::shared_tensor<2,double> m_invsqrt;
+	
+	dbcsr::shared_pgrid<2> m_spgrid2;
 	
 public:
 
 	BATCHED_DFMO_K(dbcsr::world& w, desc::options& opt);
 	void compute_K() override;
 	void init_tensors() override;
+	
+	~BATCHED_DFMO_K() {}
 	
 };
 
@@ -173,18 +189,22 @@ private:
 	dbcsr::sbtensor<3,double> m_eri_batched;
 	dbcsr::sbtensor<3,double> m_c_xbb_batched;
 		
-	dbcsr::stensor<3,double> m_c_xbb_1_02;
-	dbcsr::stensor<3,double> m_cbar_xbb_01_2;
-	dbcsr::stensor<3,double> m_cbar_xbb_02_1;
+	dbcsr::shared_tensor<3,double> m_c_xbb_1_02;
+	dbcsr::shared_tensor<3,double> m_cbar_xbb_01_2;
+	dbcsr::shared_tensor<3,double> m_cbar_xbb_02_1;
 	
-	dbcsr::stensor2_d m_K_01;
-	dbcsr::stensor2_d m_p_bb;
+	dbcsr::shared_tensor<2,double> m_K_01;
+	dbcsr::shared_tensor<2,double> m_p_bb;
+	
+	dbcsr::shared_pgrid<2> m_spgrid2;
 	
 public:
 
 	BATCHED_DFAO_K(dbcsr::world& w, desc::options& opt);
 	void compute_K() override;
 	void init_tensors() override;
+	
+	~BATCHED_DFAO_K() {}
 	
 };
 /*

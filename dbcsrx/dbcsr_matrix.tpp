@@ -40,7 +40,7 @@ public:
 			c_dbcsr_distribution_release(&m_dist_ptr);
     }
     
-    ~dist() {}
+    ~dist() { release(); }
     
     template <typename T, typename>
 	friend class matrix;
@@ -64,8 +64,11 @@ public:
     
     matrix(const matrix& m) = delete;
     
-    matrix(matrix&& m) : m_matrix_ptr(m.m_matrix_ptr), m_world(m.m_world)
+    matrix(matrix&& m)
 	{
+		this->release();
+		this->m_matrix_ptr = m.m_matrix_ptr;
+		this->m_world = m.m_world;
 		m.m_matrix_ptr = nullptr;
 	}
 
@@ -73,8 +76,9 @@ public:
 		
 		if (&m == this) return *this;
 		
-		m_matrix_ptr = m.m_matrix_ptr;
-		m_world = m.m_world;
+		this->release();
+		this->m_matrix_ptr = m.m_matrix_ptr;
+		this->m_world = m.m_world;
 		
 		m.m_matrix_ptr = nullptr;
 		return *this;
@@ -435,7 +439,9 @@ public:
         m_matrix_ptr = nullptr;
     }
     
-    ~matrix() { release(); }
+    ~matrix() { 
+		if (m_matrix_ptr) std::cout << "Releasing: " << this->name() << std::endl;
+		release(); }
     
     world get_world() const {
 		return m_world;
@@ -572,12 +578,15 @@ public:
 	}
 	
 	smatrix<T> get_smatrix() {
-		matrix<T>* m = new matrix<T>(nullptr,m_world);
+	
+		smatrix<T> out = std::make_shared<matrix<T>>();
 		
-		m->m_matrix_ptr = m_matrix_ptr;
+		out->m_world = m_world;
+		out->m_matrix_ptr = m_matrix_ptr;
+		
 		m_matrix_ptr = nullptr;
 		
-		return smatrix<T>(m);
+		return out;
 		
 	}
     

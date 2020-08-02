@@ -8,7 +8,7 @@
 namespace dbcsr {
 
 template <int N, typename>
-class pgrid {
+class pgrid : std::enable_shared_from_this<pgrid<N>> {
 protected:
 
 	void* m_pgrid_ptr;
@@ -18,39 +18,12 @@ protected:
 	template <int M, typename>
 	friend class dist_t;
 	
-public:
+	template <int M>
+	friend class create_pgrid_base;
 	
-    #:set list = [ &
-        ['comm', 'MPI_Comm', 'required', 'val'],&
-        ['map1', 'vec<int>', 'optional', 'val'],&
-        ['map2', 'vec<int>', 'optional', 'val'],&
-        ['tensor_dims', 'arr<int,N>', 'optional', 'val'],&
-        ['nsplit', 'int', 'optional', 'val'],&
-        ['dimsplit', 'int', 'optional', 'val']]
-	${make_struct(structname='create',friend='pgrid',params=list)}$
+public:
 
 	pgrid() {}
-	
-	pgrid(MPI_Comm comm) : pgrid(create().comm(comm)) {}	
-	
-	pgrid(const create& p) : m_dims(N), m_comm(*p.c_comm) {
-		
-		MPI_Fint fmpi = MPI_Comm_c2f(m_comm);
-		
-		if (p.c_map1 && p.c_map2) {
-			c_dbcsr_t_pgrid_create_expert(&fmpi, m_dims.data(), N, &m_pgrid_ptr, 
-                (p.c_map1) ? p.c_map1->data() : nullptr, 
-                (p.c_map1) ? p.c_map1->size() : 0,
-                (p.c_map2) ? p.c_map2->data() : nullptr,
-                (p.c_map2) ? p.c_map2->size() : 0,
-                (p.c_tensor_dims) ? p.c_tensor_dims->data() : nullptr,
-                (p.c_nsplit) ? &*p.c_nsplit : nullptr, 
-                (p.c_dimsplit) ? &*p.c_dimsplit : nullptr);
-		} else {
-			c_dbcsr_t_pgrid_create(&fmpi, m_dims.data(), N, &m_pgrid_ptr, 
-                (p.c_tensor_dims) ? p.c_tensor_dims->data() : nullptr);
-		}
-	}
 	
 	pgrid(pgrid<N>& rhs) = delete;
 	
@@ -64,6 +37,8 @@ public:
 	
 	void destroy(bool keep_comm = false) {
 		
+		std::cout << "Destroying pgrid of dims " << N << std::endl;
+		
 		if (m_pgrid_ptr != nullptr)
 			c_dbcsr_t_pgrid_destroy(&m_pgrid_ptr, &keep_comm);
 			
@@ -76,10 +51,75 @@ public:
 	}
 	
 	~pgrid() {
-		destroy(true);
+		destroy(false);
 	}
+	
+	std::shared_ptr<pgrid<N>> get_ptr() {
+		return this->shared_from_this();
+	}
+	
+	template <int M>
+	friend class create_pgrid_base;
 
 };
+
+template <int N>
+using shared_pgrid = std::shared_ptr<pgrid<N>>;
+
+template <int N>
+class create_pgrid_base {
+	
+	#:set list = [ &
+        ['map1', 'vec<int>', 'optional', 'val'],&
+        ['map2', 'vec<int>', 'optional', 'val'],&
+        ['tensor_dims', 'arr<int,N>', 'optional', 'val'],&
+        ['nsplit', 'int', 'optional', 'val'],&
+        ['dimsplit', 'int', 'optional', 'val']]
+	${make_param(structname='create_pgrid_base',params=list)}$
+
+private:
+
+	MPI_Comm c_comm;
+	
+public:
+
+	create_pgrid_base(MPI_Comm comm) : c_comm(comm) {}	
+	
+	shared_pgrid<N> get() {
+		
+		shared_pgrid<N> spgrid_out = std::make_shared<pgrid<N>>();
+		spgrid_out->m_comm = c_comm;
+		spgrid_out->m_dims.resize(N);
+		
+		std::cout << "COMM: " << spgrid_out->m_comm << std::endl;
+		
+		MPI_Fint fmpi = MPI_Comm_c2f(c_comm);
+		
+		if (c_map1 && c_map2) {
+			c_dbcsr_t_pgrid_create_expert(&fmpi, spgrid_out->m_dims.data(), 
+				N, &spgrid_out->m_pgrid_ptr, 
+                (c_map1) ? c_map1->data() : nullptr, 
+                (c_map1) ? c_map1->size() : 0,
+                (c_map2) ? c_map2->data() : nullptr,
+                (c_map2) ? c_map2->size() : 0,
+                (c_tensor_dims) ? c_tensor_dims->data() : nullptr,
+                (c_nsplit) ? &*c_nsplit : nullptr, 
+                (c_dimsplit) ? &*c_dimsplit : nullptr);
+		} else {
+			c_dbcsr_t_pgrid_create(&fmpi, spgrid_out->m_dims.data(), N, 
+				&spgrid_out->m_pgrid_ptr, 
+                (c_tensor_dims) ? c_tensor_dims->data() : nullptr);
+		}
+		
+		return spgrid_out;
+	}
+	
+};
+
+template <int N>
+inline create_pgrid_base<N> create_pgrid(MPI_Comm comm) { 
+	return create_pgrid_base<N>(comm);
+}
 
 template <int N, typename>
 class dist_t {
@@ -93,24 +133,27 @@ private:
 	template <int M, typename T, typename>
 	friend class tensor;
 	
+	template <int M, typename T>
+	friend class tensor_create_base;
+	
+	template <int M, typename T>
+	friend class tensor_create_template_base;
+	
 public:
-
-    #:set list = [ &
-        ['ngrid', 'pgrid<N>', 'required', 'ref'],&
-        ['nd_dists', 'arrvec<int,N>', 'required', 'val']]
-    ${make_struct(structname='create',friend='dist_t',params=list)}$
 	
 	dist_t() : m_dist_ptr(nullptr) {}
 
 #:for idim in range(2,MAXDIM+1)
     template<int M = N, typename std::enable_if<M == ${idim}$,int>::type = 0>
-	dist_t(create& p) :
+	dist_t(shared_pgrid<N> spgrid, arrvec<int,N> nd_dists) :
 		m_dist_ptr(nullptr),
-		m_nd_dists(std::move(*p.c_nd_dists)),
-        m_comm(p.c_ngrid->m_comm)
+		m_nd_dists(nd_dists),
+        m_comm(spgrid->m_comm)
 	{
 		
-		c_dbcsr_t_distribution_new(&m_dist_ptr, p.c_ngrid->m_pgrid_ptr,
+		std::cout << "COMM: " << m_comm << std::endl;
+		
+		c_dbcsr_t_distribution_new(&m_dist_ptr, spgrid->m_pgrid_ptr,
                 ${datasize('m_nd_dists',0,idim)}$
                 #:if idim != MAXDIM
                 ,
@@ -147,7 +190,7 @@ public:
 };
 
 template <int N, typename T = double, typename>
-class tensor {
+class tensor : std::enable_shared_from_this<tensor<N,T>> {
 protected:
 
 	void* m_tensor_ptr;
@@ -166,6 +209,12 @@ public:
     
     template <int M, typename D>
 	friend class copy_base;
+	
+	template <int M, typename D>
+	friend class tensor_create_base;
+	
+	template <int M, typename D>
+	friend class tensor_create_template_base;
 	
 	template <typename D>
 	friend void copy_tensor_to_matrix(tensor<2,D>& t_in, matrix<D>& m_out, std::optional<bool> summation);
@@ -312,91 +361,11 @@ public:
 // ======= end map info =========
     
 	tensor() : m_tensor_ptr(nullptr) {}
-	
-    #:set list = [ &
-        ['name', 'std::string', 'required', 'val'],&
-        ['ndist','dist_t<N>','optional','ref'],&
-        ['ngrid', 'pgrid<N>', 'optional', 'ref'],&
-        ['map1', 'vec<int>', 'required', 'val'],&
-        ['map2', 'vec<int>', 'required', 'val'],&
-        ['blk_sizes', 'arrvec<int,N>', 'required', 'val']]
-    ${make_struct(structname='create',friend='tensor',params=list)}$
-    
-#:for idim in range(2,MAXDIM+1)
-    template<int M = N, typename D = T, typename std::enable_if<M == ${idim}$,int>::type = 0>
-	tensor(create& p) : m_tensor_ptr(nullptr) {
-		
-		void* dist_ptr;
-		dist_t<N>* distn = nullptr;
-		
-		if (p.c_ndist) {
-			
-			dist_ptr = p.c_ndist->m_dist_ptr;
-            m_comm = p.c_ndist->m_comm;
-			
-		} else {
-			
-			arrvec<int,N> distvecs;
-			
-			for (int i = 0; i != N; ++i) {
-				distvecs[i] = default_dist(p.c_blk_sizes->at(i).size(),
-				p.c_ngrid->dims()[i], p.c_blk_sizes->at(i));
-			}
-			
-			distn = new dist_t<N>(typename dist_t<N>::create().ngrid(*p.c_ngrid).nd_dists(distvecs));
-			dist_ptr = distn->m_dist_ptr;
-            m_comm = distn->m_comm;
-		}
-
-		c_dbcsr_t_create_new(&m_tensor_ptr, p.c_name->c_str(), dist_ptr, 
-						p.c_map1->data(), p.c_map1->size(),
-						p.c_map2->data(), p.c_map2->size(), &m_data_type, 
-						${datasizeptr('p.c_blk_sizes', 0, idim)}$
-                        #:if idim != MAXDIM
-                        ,
-                        #:endif
-                        ${datasize0(MAXDIM-idim)}$);
-						
-		if (distn) delete distn;
-					
-	}
-#:endfor
-
-    #:set list = [ &
-        ['tensor_in', 'tensor', 'required', 'ref'],&
-        ['name', 'std::string', 'required', 'val'],&
-        ['ndist', 'dist_t<N>', 'optional', 'ref'],&
-        ['map1', 'vec<int>', 'optional', 'val'],&
-        ['map2', 'vec<int>', 'optional', 'val']]
-    struct create_template {
-        ${make_param(structname='create_template',params=list)}$
-        private:
-            
-        required<tensor,ref> c_template;
-        
-        public:
-        
-        create_template(tensor& temp) : c_template(temp) {}
-        friend class tensor;
-    };
-    
-	tensor(create_template& p) : m_tensor_ptr(nullptr) {
-        
-        m_comm = p.c_template->m_comm;
-		
-		c_dbcsr_t_create_template(p.c_template->m_tensor_ptr, &m_tensor_ptr, 
-            p.c_name->c_str(), (p.c_ndist) ? p.c_ndist->m_dist_ptr : nullptr,
-            (p.c_map1) ? p.c_map1->data() : nullptr,
-            (p.c_map1) ? p.c_map1->size() : 0,
-            (p.c_map2) ? p.c_map2->data() : nullptr,
-            (p.c_map2) ? p.c_map2->size() : 0,
-            &m_data_type);
-		
-	}    
 		
 	~tensor() {
 		
 		//if (m_tensor_ptr != nullptr) std::cout << "Destroying: " << this->name() << std::endl;
+		if (m_tensor_ptr) std::cout << "Releasing: " << this->name() << std::endl;
 		destroy();
 		
 	}
@@ -404,6 +373,7 @@ public:
 	void destroy() {
 		
 		if (m_tensor_ptr != nullptr) {
+			std::cout << "Destroying " << this->name() << std::endl;
 			c_dbcsr_t_destroy(&m_tensor_ptr);
 		}
 		
@@ -594,31 +564,133 @@ public:
 		return map2;
 	}
 	
-	stensor<N,T> get_stensor() {
-		
-		tensor<N,T>* t = new tensor<N,T>();
-		
-		t->m_tensor_ptr = m_tensor_ptr;
-		t->m_comm = m_comm;
-		
-		m_tensor_ptr = nullptr;
-		
-		return stensor<N,T>(t);
-		
-	} 
+	std::shared_ptr<tensor<N,T>> get_ptr() {
+		return this->shared_from_this();
+	}
     
 };
 
 template <int N, typename T = double>
-stensor<N,T> make_stensor(typename tensor<N,T>::create& p) {
-    tensor<N,T> t(p);
-    return t.get_stensor();
-}
+using shared_tensor = std::shared_ptr<tensor<N,T>>;
+
+template <int N, typename T>
+class tensor_create_base {
+
+    #:set list = [ &
+        ['name', 'std::string', 'required', 'val'],&
+        ['ndist','dist_t<N>','optional','ref'],&
+        ['pgrid', 'shared_pgrid<N>', 'optional', 'ref'],&
+        ['map1', 'vec<int>', 'required', 'val'],&
+        ['map2', 'vec<int>', 'required', 'val'],&
+        ['blk_sizes', 'arrvec<int,N>', 'required', 'val']]
+    ${make_param(structname='tensor_create_base',params=list)}$
+
+public:
+
+    tensor_create_base() = default;
+
+#:for idim in range(2,MAXDIM+1)
+    template<int M = N, typename D = T, typename std::enable_if<M == ${idim}$,int>::type = 0>
+    shared_tensor<M,D> get() {
+		
+		shared_tensor<M,D> stensor_out = std::make_shared<tensor<M,D>>();
+ 
+		void* dist_ptr;
+		dist_t<N>* distn = nullptr;
+		
+		if (c_ndist) {
+			
+			dist_ptr = c_ndist->m_dist_ptr;
+            stensor_out->m_comm = c_ndist->m_comm;
+			
+		} else {
+			
+			arrvec<int,N> distvecs;
+			
+			for (int i = 0; i != N; ++i) {
+				distvecs[i] = default_dist(c_blk_sizes->at(i).size(),
+				(*c_pgrid)->dims()[i], c_blk_sizes->at(i));
+			}
+			
+			distn = new dist_t<N>(*c_pgrid, distvecs);
+			dist_ptr = distn->m_dist_ptr;
+            stensor_out->m_comm = distn->m_comm;
+		}
+
+		c_dbcsr_t_create_new(&stensor_out->m_tensor_ptr, c_name->c_str(), dist_ptr, 
+						c_map1->data(), c_map1->size(),
+						c_map2->data(), c_map2->size(), &stensor_out->m_data_type, 
+						${datasizeptr('c_blk_sizes', 0, idim)}$
+                        #:if idim != MAXDIM
+                        ,
+                        #:endif
+                        ${datasize0(MAXDIM-idim)}$);
+		
+		std::cout << "COMM: " << stensor_out->m_comm << std::endl;
+				
+		if (distn) delete distn;
+		
+		return stensor_out;
+					
+	}
+#:endfor
+
+};
 
 template <int N, typename T = double>
-stensor<N,T> make_stensor(typename tensor<N,T>::create_template& p) {
-    tensor<N,T> t(p);
-    return t.get_stensor();
+inline tensor_create_base<N,T> tensor_create() {
+	return tensor_create_base<N,T>();
+}
+
+template <int N, typename T>
+class tensor_create_template_base {
+	
+	 #:set list = [ &
+        ['name', 'std::string', 'required', 'val'],&
+        ['ndist', 'dist_t<N>', 'optional', 'ref'],&
+        ['map1', 'vec<int>', 'optional', 'val'],&
+        ['map2', 'vec<int>', 'optional', 'val']]
+	
+	${make_param(structname='tensor_create_template_base',params=list)}$
+
+private:
+
+	shared_tensor<N,T> c_template;
+	
+public:
+    
+    tensor_create_template_base(shared_tensor<N,T> templt) :
+		c_template(templt) {}
+    
+    shared_tensor<N,T> get() {
+   
+		shared_tensor<N,T> stensor_out 
+			= std::make_shared<tensor<N,T>>();
+        
+        stensor_out->m_comm = c_template->m_comm;
+		
+		c_dbcsr_t_create_template(c_template->m_tensor_ptr, 
+			&stensor_out->m_tensor_ptr, 
+            c_name->c_str(), (c_ndist) ? c_ndist->m_dist_ptr : nullptr,
+            (c_map1) ? c_map1->data() : nullptr,
+            (c_map1) ? c_map1->size() : 0,
+            (c_map2) ? c_map2->data() : nullptr,
+            (c_map2) ? c_map2->size() : 0,
+            &stensor_out->m_data_type);
+            
+       std::cout << "COMM: " << stensor_out->m_comm << std::endl;
+            
+       return stensor_out;
+		
+	}
+	
+};    
+
+template <int N, typename T = double>
+inline tensor_create_template_base<N,T> 
+	tensor_create_template(shared_tensor<N,T> tensor_in) 
+{
+	return tensor_create_template_base<N,T>(tensor_in);
 }
 
 template <int N, typename T>
@@ -754,7 +826,7 @@ void print(tensor<N,T>& t_in) {
 typedef tensor<${idim}$,${type}$> tensor${idim}$_${suffix}$;
 typedef iterator_t<${idim}$,${type}$> iterator_t${idim}$_${suffix}$;
 typedef block<${idim}$,${type}$> block${idim}$_${suffix}$;
-typedef stensor<${idim}$,${type}$> stensor${idim}$_${suffix}$;
+typedef shared_tensor<${idim}$,${type}$> shared_tensor${idim}$_${suffix}$;
 #:endfor
 #:endfor
 

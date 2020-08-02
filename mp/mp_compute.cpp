@@ -13,14 +13,6 @@
 
 #include <libint2/basis.h>
 
-using mat_d = dbcsr::mat_d;
-using tensor2_d = dbcsr::tensor2_d;
-using tensor3_d = dbcsr::tensor3_d;
-
-using smat_d = dbcsr::smat_d;
-using stensor2_d = dbcsr::stensor2_d;
-using stensor3_d = dbcsr::stensor3_d;
-
 namespace mp {
 	
 mpmod::mpmod(desc::shf_wfn& wfn_in, desc::options& opt_in, dbcsr::world& w_in) :
@@ -39,6 +31,7 @@ mpmod::mpmod(desc::shf_wfn& wfn_in, desc::options& opt_in, dbcsr::world& w_in) :
 
 void mpmod::compute_batch() {
 	
+	/*
 	LOG.banner<>("Batched CD-LT-SOS-RI-MP2", 50, '*');
 	
 	auto& laptime = TIME.sub("Computing laplace points");
@@ -115,11 +108,10 @@ void mpmod::compute_batch() {
 	 = std::make_shared<ints::aofactory>(m_hfwfn->mol(), m_world);
 	
 	// screening
-	ints::screener* scr = new ints::schwarz_screener(aofac, "erfc_coulomb");
-	ints::shared_screener s_scr(scr);
+	ints::shared_screener s_scr(new ints::schwarz_screener(aofac, "erfc_coulomb"));
 	
 	scrtime.start();
-	scr->compute();
+	s_scr->compute();
 	scrtime.finish();
 	
 	aofac->ao_3c2e_setup("erfc_coulomb");
@@ -636,7 +628,7 @@ void mpmod::compute_batch() {
 	
 	TIME.finish();
 	
-	TIME.print_info();
+	TIME.print_info();*/
 	
 }
 

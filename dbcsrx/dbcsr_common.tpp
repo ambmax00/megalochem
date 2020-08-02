@@ -122,6 +122,15 @@ class copy_base;
 
 // other 
 
+template <int N>
+class create_pgrid_base;
+
+template <int N, typename T>
+class tensor_create_base;
+
+template <int N, typename T>
+class tensor_create_template_base;
+
 template <typename T>
 void copy_tensor_to_matrix(tensor<2,T>& t_in, matrix<T>& m_out, std::optional<bool> summation = std::nullopt);
 
@@ -294,6 +303,8 @@ public:
     std::array<int,2> coord() { return m_coord; }
     
 };
+
+
 
 /* ---------------------------------------------------------------------
 /					BLOCK: multi-dimensional array (wrapper) class

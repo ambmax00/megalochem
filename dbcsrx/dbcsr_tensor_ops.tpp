@@ -126,7 +126,9 @@ public:
             (c_retain_sparsity) ? &*c_retain_sparsity : nullptr,
             unit_nr, (c_log) ? &*c_log : nullptr);
             
-        delete [] f_b1, f_b2, f_b3;
+        if (f_b1) delete [] f_b1;
+        if (f_b2) delete [] f_b2;
+        if (f_b3) delete [] f_b3;
              
     }
     
@@ -594,22 +596,6 @@ void copy_matrix_to_3Dtensor_new(matrix<T>& m, tensor<3,T>& t, bool sym = false)
 		send_blk_offset[dest_p] += nze;
 		
 	}
-	
-	
-	/*for (int i = 0; i != mpisize; ++i) {
-		
-		if (i == mpirank) {
-			std::cout << "RANK " << i << std::endl;
-			for (auto m : send_blk_data) {
-				for (auto s : m) {
-					std::cout << s << " ";
-				} std::cout << std::endl;
-			}
-		}
-		
-		MPI_Barrier(comm);	
-		
-	}*/
 	
 	iter.stop();
 		

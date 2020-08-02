@@ -1,5 +1,4 @@
 #include "hf/hfmod.h"
-#include "ints/registry.h"
 #include "hf/hfdefaults.h"
 #include "math/solvers/hermitian_eigen_solver.h"
 #include "math/linalg/piv_cd.h"

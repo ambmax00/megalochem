@@ -107,12 +107,7 @@ hfmod::hfmod(desc::smolecule mol, desc::options opt, dbcsr::world& w)
 	
 }
 
-hfmod::~hfmod() {
-	
-	ints::registry reg;
-	reg.clear(m_mol->name());
-	
-}
+hfmod::~hfmod() {}
 
 void hfmod::compute_nucrep() {
 	
@@ -239,6 +234,7 @@ void hfmod::compute() {
 	compute_guess();
 	
 	compute_nucrep();
+	
 	
 	// Now enter loop
 	int iter = 0;

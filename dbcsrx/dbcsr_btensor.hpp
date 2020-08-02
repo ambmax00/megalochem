@@ -131,10 +131,8 @@ public:
 			throw std::runtime_error("Invalid mode for batchtensor.\n");
 		}
 		
-		m_stensor = dbcsr::make_stensor<N,T>(
-			typename dbcsr::tensor<N,T>::create_template(*stensor_in)
-			.name(stensor_in->name() + "_batched")
-		);
+		m_stensor = tensor_create_template<N,T>(stensor_in)
+			.name(stensor_in->name() + "_batched").get();
 		
 		MPI_Comm_rank(m_comm, &m_mpirank);
 		MPI_Comm_size(m_comm, &m_mpisize);
@@ -561,9 +559,8 @@ public:
 	
 	void reorder(vec<int> map1, vec<int> map2) {
 		
-		stensor<N,T> newtensor = make_stensor<N,T>(
-			typename tensor<N,T>::create_template(*m_stensor)
-			.name(m_stensor->name()).map1(map1).map2(map2));
+		stensor<N,T> newtensor = tensor_create_template<N,T>(m_stensor)
+			.name(m_stensor->name()).map1(map1).map2(map2).get();
 			
 		if (m_type == core) {
 			dbcsr::copy(*m_stensor, *newtensor).move_data(true).perform();
@@ -845,10 +842,9 @@ public:
 			read_tensor = m_stensor;
 		} else {
 			LOG.os<1>("Read and write mappings incompatible.\n");
-			read_tensor = make_stensor<N,T>(
-				typename tensor<N,T>::create_template(*m_stensor)
+			read_tensor = tensor_create_template<N,T>(m_stensor)
 				.name(m_stensor->name() + "_RD")
-				.map1(m_wrview.map1).map2(m_wrview.map2));
+				.map1(m_wrview.map1).map2(m_wrview.map2).get();
 		}
 			
 		vec<int> dims = (m_read_current_is_contiguous) ?

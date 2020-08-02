@@ -10,32 +10,38 @@ BATCHED_DF_J::BATCHED_DF_J(dbcsr::world& w, desc::options& iopt)
 
 void BATCHED_DF_J::init_tensors() {
 	
-	// initialize tensors
-	dbcsr::pgrid<2> grid2(m_world.comm());
-	dbcsr::pgrid<3> grid3(m_world.comm());
-	
 	auto b = m_mol->dims().b();
 	auto x = m_mol->dims().x();
 	vec<int> d = {1};
 	
+	int nbf = std::accumulate(b.begin(), b.end(), 0);
+	int xnbf = std::accumulate(x.begin(), x.end(), 0);
+	
 	arrvec<int,3> bbd = {b,b,d};
 	arrvec<int,2> xd = {x,d};
 	
-	m_gp_xd = dbcsr::make_stensor<2>(dbcsr::tensor2_d::create().ngrid(grid2).name("c_x")
-		.map1({0}).map2({1}).blk_sizes(xd));
+	std::array<int,2> tsizes2 = {xnbf,1};
+	std::array<int,3> tsizes3 = {nbf,nbf,1};
 	
-	m_gq_xd = dbcsr::make_stensor<2>(dbcsr::tensor2_d::create_template(*m_gp_xd).name("c2_x"));
+	m_spgrid_xd = dbcsr::create_pgrid<2>(m_world.comm())
+		.tensor_dims(tsizes2).get();
+		
+	m_spgrid_bbd = dbcsr::create_pgrid<3>(m_world.comm())
+		.tensor_dims(tsizes3).get();
 	
-	m_J_bbd = dbcsr::make_stensor<3>(dbcsr::tensor3_d::create().ngrid(grid3).name("J dummy")
-		.map1({0,1}).map2({2}).blk_sizes(bbd));
+	m_gp_xd = dbcsr::tensor_create<2>().name("gp_xd").pgrid(m_spgrid_xd)
+		.map1({0}).map2({1}).blk_sizes(xd).get();
+		
+	m_gq_xd = dbcsr::tensor_create_template<2>(m_gp_xd).name("gq_xd").get();
 	
-	m_ptot_bbd = dbcsr::make_stensor<3>(dbcsr::tensor3_d::create_template(*m_J_bbd).name("ptot dummy"));
+	m_J_bbd = dbcsr::tensor_create<3>().name("J_bbd").pgrid(m_spgrid_bbd)
+		.map1({0,1}).map2({2}).blk_sizes(bbd).get();
 	
-	m_inv = m_reg.get_tensor<2,double>(m_mol->name() + "_s_xx_inv_(0|1)");
+	m_ptot_bbd = dbcsr::tensor_create_template<3>(m_J_bbd).name("ptot_bbd").get();
 	
-	m_eri_batched = m_reg.get_btensor<3,double>(m_mol->name() + "_i_xbb_(0|12)_batched");
+	m_inv = m_reg.get_tensor<2,double>("s_xx_inv");
 	
-	m_scr = m_reg.get_screener(m_mol->name() + "_schwarz_screener");
+	m_eri_batched = m_reg.get_btensor<3,double>("i_xbb_batched");
 	
 }
 
@@ -56,6 +62,7 @@ void BATCHED_DF_J::compute_J() {
 		ptot.copy_in(*m_p_A);
 		ptot.scale(2.0);
 		dbcsr::copy_matrix_to_3Dtensor_new(ptot,*m_ptot_bbd,true);
+		dbcsr::print(ptot);
 		ptot.clear();
 	} else {
 		ptot.copy_in(*m_p_A);
@@ -64,7 +71,7 @@ void BATCHED_DF_J::compute_J() {
 		ptot.clear();
 	}
 	
-	//dbcsr::print(*m_ptot_bbd);
+	dbcsr::print(*m_ptot_bbd);
 	
 	m_gp_xd->batched_contract_init();
 	m_ptot_bbd->batched_contract_init();
@@ -110,6 +117,8 @@ void BATCHED_DF_J::compute_J() {
 	dbcsr::contract(*m_gp_xd, *m_inv, *m_gq_xd).perform("X_, XY -> Y_");
 	
 	//dbcsr::print(*m_gq_xd);
+	
+	//dbcsr::print(*m_inv);
 	
 	m_J_bbd->batched_contract_init();
 	m_gq_xd->batched_contract_init();
@@ -165,14 +174,14 @@ void BATCHED_DFMO_K::init_tensors() {
 	auto b = m_p_A->row_blk_sizes();
 	arrvec<int,2> bb = {b,b};
 	
-	dbcsr::pgrid<2> grid2(m_world.comm());
+	m_spgrid2 = dbcsr::create_pgrid<2>(m_world.comm()).get();
 	
-	m_K_01 = dbcsr::make_stensor<2>(dbcsr::tensor2_d::create().ngrid(grid2).name("K_01")
-		.map1({0}).map2({1}).blk_sizes(bb));
+	m_K_01 = dbcsr::tensor_create<2>().pgrid(m_spgrid2).name("K_01")
+		.map1({0}).map2({1}).blk_sizes(bb).get();
 		
-	m_invsqrt = m_reg.get_tensor<2,double>(m_mol->name() + "_s_xx_invsqrt_(0|1)");
+	m_invsqrt = m_reg.get_tensor<2,double>("s_xx_invsqrt");
 	
-	m_eri_batched = m_reg.get_btensor<3,double>(m_mol->name() + "_i_xbb_(0|12)_batched");
+	m_eri_batched = m_reg.get_btensor<3,double>("i_xbb_batched");
 		
 }
 
@@ -182,9 +191,6 @@ void BATCHED_DFMO_K::compute_K() {
 	
 	auto b = m_mol->dims().b();
 	auto X = m_mol->dims().x();
-	
-	dbcsr::pgrid<2> grid2(m_world.comm());
-	dbcsr::pgrid<3> grid3(m_world.comm());
 	
 	auto compute_K_single = 
 	[&] (dbcsr::smat_d& c_bm, dbcsr::smat_d& k_bb, std::string x) {
@@ -238,28 +244,36 @@ void BATCHED_DFMO_K::compute_K() {
 		arrvec<int,2> bm = {b,m};
 		arrvec<int,3> xmb = {X,m,b};
 		
-		m_c_bm = dbcsr::make_stensor<2>(
-			dbcsr::tensor2_d::create().ngrid(grid2)
+		int nocc = std::accumulate(m.begin(), m.end(), 0);
+		int nbf = std::accumulate(b.begin(), b.end(), 0);
+		int xnbf = std::accumulate(x.begin(), x.end(), 0);
+		
+		std::array<int,2> tsizes2 = {nbf,nocc};
+		std::array<int,3> tsizes3 = {xnbf,nocc,nbf};
+		
+		dbcsr::shared_pgrid<2> grid2 =
+			dbcsr::create_pgrid<2>(m_world.comm()).tensor_dims(tsizes2).get();
+			
+		dbcsr::shared_pgrid<3> grid3 =
+			dbcsr::create_pgrid<3>(m_world.comm()).tensor_dims(tsizes3).get();
+		
+		m_c_bm = dbcsr::tensor_create<2,double>().pgrid(grid2)
 			.name("c_bm_" + x + "_0_1").map1({0}).map2({1})
-			.blk_sizes(bm));
+			.blk_sizes(bm).get();
 			
 		dbcsr::copy_matrix_to_tensor(*c_bm, *m_c_bm);
 							
-		m_HT1_xmb_02_1 = dbcsr::make_stensor<3>(
-			dbcsr::tensor3_d::create().name("HT1_xmb_02_1_" + x)
-			.ngrid(grid3).map1({0,2}).map2({1}).blk_sizes(xmb));
+		m_HT1_xmb_02_1 = dbcsr::tensor_create<3,double>().name("HT1_xmb_02_1_" + x)
+			.pgrid(grid3).map1({0,2}).map2({1}).blk_sizes(xmb).get();
 			
-		m_HT1_xmb_0_12 = dbcsr::make_stensor<3>(
-			dbcsr::tensor3_d::create().name("HT1_xmb_0_12_" + x)
-			.ngrid(grid3).map1({0}).map2({1,2}).blk_sizes(xmb));
+		m_HT1_xmb_0_12 = dbcsr::tensor_create_template<3>(m_HT1_xmb_02_1)
+			.name("HT1_xmb_0_12_" + x).map1({0}).map2({1,2}).get();
 			
-		m_HT2_xmb_0_12 = dbcsr::make_stensor<3>(
-			dbcsr::tensor3_d::create().name("HT2_xmb_0_12_" + x)
-			.ngrid(grid3).map1({0}).map2({1,2}).blk_sizes(xmb));
+		m_HT2_xmb_0_12 = dbcsr::tensor_create_template<3>(m_HT1_xmb_02_1)
+			.name("HT2_xmb_0_12_" + x).map1({0}).map2({1,2}).get();
 			
-		m_HT2_xmb_01_2 = dbcsr::make_stensor<3>(
-			dbcsr::tensor3_d::create().name("HT2_xmb_01_2_" + x)
-			.ngrid(grid3).map1({0,1}).map2({2}).blk_sizes(xmb));
+		m_HT2_xmb_01_2 = dbcsr::tensor_create_template<3>(m_HT1_xmb_02_1)
+			.name("HT2_xmb_01_2_" + x).map1({0,1}).map2({2}).get();
 		
 		reo0.start();
 		m_eri_batched->reorder(vec<int>{0,2},vec<int>{1});
@@ -269,6 +283,7 @@ void BATCHED_DFMO_K::compute_K() {
 		auto full_mb = m_eri_batched->full_bounds(1);
 		auto full_nb = m_eri_batched->full_bounds(2);
 		auto batch_nb = m_eri_batched->bounds(2);
+		auto batch_xb = m_eri_batched->bounds(0);
 		
 		int64_t nze_HTI = 0;
 		
@@ -336,18 +351,38 @@ void BATCHED_DFMO_K::compute_K() {
 			dbcsr::copy(*m_HT2_xmb_0_12,*m_HT2_xmb_01_2).move_data(true).perform();
 			reo2.finish();
 			
-			vec<vec<int>> x_o_bounds = {
-				full_xb,
-				o_bounds[iocc]
-			};
+			auto HT2_xmb_01_2_copy = 
+				dbcsr::tensor_create_template<3,double>(m_HT2_xmb_01_2)
+				.name("HT2_xmb_01_2_copy").get();
+				
+			dbcsr:copy(*m_HT2_xmb_01_2, *HT2_xmb_01_2_copy).perform();
+			
+			//dbcsr::print(*m_HT2_xmb_01_2);
+			//dbcsr::print(*HT2_xmb_01_2_copy);
+			
+			LOG.os<1>("Computing K_mn = HT_xim * HT_xin\n");
+			
+			m_K_01->batched_contract_init();
+			
+			for (int ix = 0; ix != batch_xb.size(); ++ix) {
+			
+				vec<vec<int>> x_o_bounds = {
+					batch_xb[ix],
+					o_bounds[iocc]
+				};
 					
-			con3.start();
-			dbcsr::contract(*m_HT2_xmb_01_2,*m_HT2_xmb_01_2,*m_K_01)
-				.bounds1(x_o_bounds).beta(1.0)
-				.perform("XiM, XiN -> MN"); 
-			con3.finish();
+				con3.start();
+				dbcsr::contract(*m_HT2_xmb_01_2,*HT2_xmb_01_2_copy,*m_K_01)
+					.bounds1(x_o_bounds).beta(1.0)
+					.perform("XiM, XiN -> MN"); 
+				con3.finish();
+				
+			}
+			
+			m_K_01->batched_contract_finalize();
 			
 			m_HT2_xmb_01_2->clear();
+			HT2_xmb_01_2_copy->clear();
 							
 		} // end for I
 		
@@ -358,11 +393,20 @@ void BATCHED_DFMO_K::compute_K() {
 		m_eri_batched->reorder(vec<int>{0},vec<int>{1,2});
 		retints.finish();
 		
-		//m_K_01->batched_contract_finalize();
-		
+		//dbcsr::print(*m_K_01);
+				
 		dbcsr::copy_tensor_to_matrix(*m_K_01,*k_bb);
 		m_K_01->clear();
 		k_bb->scale(-1.0);
+		
+		m_HT1_xmb_02_1->destroy();
+		m_HT1_xmb_0_12->destroy();
+		m_HT2_xmb_01_2->destroy();
+		m_HT2_xmb_0_12->destroy();
+		m_c_bm->destroy();
+		
+		grid2->destroy();
+		grid3->destroy();
 		
 	}; // end lambda function
 	
@@ -384,21 +428,21 @@ BATCHED_DFAO_K::BATCHED_DFAO_K(dbcsr::world& w, desc::options& opt)
 
 void BATCHED_DFAO_K::init_tensors() {
 	
-	auto inv = m_reg.get_tensor<2,double>(m_mol->name() + "_s_xx_inv_(0|1)");
+	auto inv = m_reg.get_tensor<2,double>("s_xx_inv");
 	
-	m_eri_batched = m_reg.get_btensor<3,double>(m_mol->name() + "_i_xbb_(0|12)_batched");
+	m_eri_batched = m_reg.get_btensor<3,double>("i_xbb_batched");
 	
 	auto eri_0_12 = m_eri_batched->get_stensor();
 	
 	// ======== Compute inv_xx * i_xxb ==============
 	
-	dbcsr::stensor3_d c_xbb_0_12 = dbcsr::make_stensor<3>(
-		dbcsr::tensor3_d::create_template(*eri_0_12).name("c_xbb_0_12")
-		.map1({0}).map2({1,2}));
+	dbcsr::shared_tensor<3> c_xbb_0_12 = 
+		dbcsr::tensor_create_template<3>(eri_0_12)
+		.name("c_xbb_0_12").map1({0}).map2({1,2}).get();
 	
-	m_c_xbb_1_02 = dbcsr::make_stensor<3>(
-		dbcsr::tensor3_d::create_template(*eri_0_12).name("c_xbb_1_02")
-		.map1({1}).map2({0,2}));
+	m_c_xbb_1_02 = 
+		dbcsr::tensor_create_template<3>(eri_0_12)
+		.name("c_xbb_1_02").map1({1}).map2({0,2}).get();
 	
 	dbcsr::btype mytype = dbcsr::invalid;
 	
@@ -479,23 +523,21 @@ void BATCHED_DFAO_K::init_tensors() {
 	
 	arrvec<int,2> bb = {b,b};
 	
-	dbcsr::pgrid<2> grid2(m_world.comm());
-	dbcsr::pgrid<3> grid3(m_world.comm());
+	m_spgrid2 = dbcsr::create_pgrid<2>(m_world.comm()).get();
 	
-	m_cbar_xbb_01_2 = dbcsr::make_stensor<3>(
-			dbcsr::tensor3_d::create_template(*eri_0_12)
-			.name("Cbar_xbb_01_2").map1({0,1}).map2({2}));
-		
-	m_cbar_xbb_02_1 = dbcsr::make_stensor<3>(
-			dbcsr::tensor3_d::create_template(*eri_0_12)
-			.name("Cbar_xbb_02_1").map1({0,2}).map2({1}));
+	m_cbar_xbb_01_2 = 
+		dbcsr::tensor_create_template<3>(eri_0_12)
+		.name("Cbar_xbb_01_2").map1({0,1}).map2({2}).get();
 	
-	m_K_01 = dbcsr::make_stensor<2>(dbcsr::tensor2_d::create().ngrid(grid2).name("K_01")
-		.map1({0}).map2({1}).blk_sizes(bb));
+	m_cbar_xbb_02_1 = 
+		dbcsr::tensor_create_template<3>(eri_0_12)
+		.name("Cbar_xbb_02_1").map1({0,2}).map2({1}).get();
+	
+	m_K_01 = dbcsr::tensor_create<2,double>().pgrid(m_spgrid2).name("K_01")
+		.map1({0}).map2({1}).blk_sizes(bb).get();
 		
-	m_p_bb = dbcsr::make_stensor<2>(
-			dbcsr::tensor2_d::create_template(*m_K_01)
-			.name("p_bb_0_1").map1({0}).map2({1}));
+	m_p_bb = dbcsr::tensor_create_template<2,double>(m_K_01)
+			.name("p_bb_0_1").map1({0}).map2({1}).get();
 
 }
 

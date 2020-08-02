@@ -13,8 +13,6 @@
 
 #include "extern/scalapack.h"
 
-
-#include "ints/aofactory.h"
 #include "math/linalg/LLT.h"
 #include <filesystem>
 
@@ -131,6 +129,7 @@ int main(int argc, char** argv) {
 	
 	time.start();
 	
+	
 	{ // BEGIN MAIN CONTEXT
 	
 //#ifdef USE_SCALAPACK
@@ -150,94 +149,7 @@ int main(int argc, char** argv) {
 	
 	desc::shf_wfn myhfwfn = std::make_shared<desc::hf_wfn>();
 	hf::hfmod myhf(mol,hfopt,wrd);
-/*
-	ints::aofactory aofac(mol,wrd);
-	auto xx = aofac.ao_3coverlap();
-	
-	math::LLT chol(xx,0);
-	
-	chol.compute();
-	
-	auto x = mol->dims().x();
-	auto L = chol.L(x);
-	
-	dbcsr::print(*L);
-	
-	auto invsqrt = chol.L_inv(x);
-	
-	dbcsr::print(*invsqrt);
-	
-	dbcsr::mat_d unity = dbcsr::mat_d::create_template(*invsqrt).name("HEY").type(dbcsr_type_no_symmetry);
-	
-	dbcsr::multiply('N', 'N', *L,*invsqrt,unity).perform();
-	
-	dbcsr::print(unity);
-	
-	exit(0);
-*/
-/*
-	
-	ints::aofactory aofac(mol,wrd);
-	
-	//auto eri = aofac.ao_3c2e(vec<int>{0},vec<int>{1,2});
-	
-	//dbcsr::print(*eri);
-	
-	auto eri = aofac.ao_3c2e_setup(vec<int>{0},vec<int>{1,2});
-	
-	tensor::batchtensor dt(eri,212,999);
-	
-	dt.create_file();
-	
-	dt.setup_batch();
-	dt.set_batch_dim(vec<int>{0});
-	
-	int nbatch = dt.nbatches();
-	
-	for (int i = 0; i != nbatch; ++i) {
-		
-		vec<vec<int>> bounds(3);
-		
-		bounds[0] = dt.bounds_blk(i,0);
-		bounds[1] = dt.bounds_blk(i,1);
-		bounds[2] = dt.bounds_blk(i,2);
-		
-		LOG.os<>("BOUNDS0: ", bounds[0][0], " ", bounds[0][1], '\n');
-		LOG.os<>("BOUNDS1: ", bounds[1][0], " ", bounds[1][1], '\n');
-		LOG.os<>("BOUNDS2: ", bounds[2][0], " ", bounds[2][1], '\n');
-		
-		aofac.ao_3c2e_fill(eri,bounds,nullptr);
 
-		dt.write(i);
-	
-		dbcsr::print(*eri);
-	
-		eri->clear();
-		
-	}
-	
-	//dt.delete_file();
-	
-	dt.set_batch_dim(vec<int>{1,2});
-	
-	for (int i = 0; i != nbatch; ++i) {
-		
-		LOG.os<>("BATCH ", i, '\n');
-		
-		dt.read(i);
-		
-		dbcsr::print(*eri);
-		
-		eri->clear();
-		
-	}
-	
-	dt.delete_file();
-	
-	exit(0);
-	
-*/
-	
 	bool skip_hf = hfopt.get<bool>("skip", false);
 	bool do_hf = opt.get<bool>("do_hf", true);
 	
@@ -256,7 +168,7 @@ int main(int argc, char** argv) {
 	}
 	
 	MPI_Barrier(MPI_COMM_WORLD);
-	
+	/*
 	auto mpopt = opt.subtext("mp");
 	
 	bool do_mp = opt.get<bool>("do_mp");
@@ -266,18 +178,22 @@ int main(int argc, char** argv) {
 		mp::mpmod mymp(myhfwfn,mpopt,wrd);
 		mymp.compute_batch();
 		
-	}
+	}*/
 	
 //#ifdef USE_SCALAPACK
 	scalapack::global_grid.free();
-	c_blacs_exit(0);
+	//c_blacs_exit(0);
 //#endif
 
-    } // END MAIN CONTEXT
+   } // END MAIN CONTEX*/
+    
+    LOG.os<>("THE END\n");
     
     time.finish();
 	
 	time.print_info();
+	
+	dbcsr::print_statistics(true);
 
 	dbcsr::finalize();
 

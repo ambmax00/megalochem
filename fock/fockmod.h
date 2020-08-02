@@ -30,6 +30,12 @@ private:
 	
 	std::shared_ptr<J> m_J_builder;
 	std::shared_ptr<K> m_K_builder;
+	
+	dbcsr::shared_pgrid<2> spgrid2;
+	dbcsr::shared_pgrid<3> spgrid3_xbb;
+	dbcsr::shared_pgrid<4> spgrid4;
+	
+	util::registry m_reg;
 
 public:
 

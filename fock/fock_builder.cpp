@@ -1,5 +1,6 @@
 #include "fock/fockmod.h"
 #include "ints/screening.h"
+#include "utils/registry.h"
 #include "math/linalg/LLT.h"
 #include "math/solvers/hermitian_eigen_solver.h"
 #include "fock/fock_defaults.h"
@@ -35,7 +36,7 @@ void fockmod::init() {
 	std::string metric = m_opt.get<std::string>("df_metric", FOCK_METRIC);
 	std::string eris_mem = m_opt.get<std::string>("eris", FOCK_ERIS);
 	
-	bool compute_eris = false;
+	bool compute_eris_batched = false;
 	bool compute_3c2e_batched = false;
 	bool compute_s_xx = false;
 	bool compute_s_xx_inv = false;
@@ -47,7 +48,7 @@ void fockmod::init() {
 		J* builder = new EXACT_J(m_world, m_opt);
 		m_J_builder.reset(builder);
 		
-		compute_eris = true;
+		compute_eris_batched = true;
 		
 	} else if (j_method == "batchdf") {
 		
@@ -67,7 +68,7 @@ void fockmod::init() {
 		K* builder = new EXACT_K(m_world, m_opt);
 		m_K_builder.reset(builder);
 		
-		compute_eris = true;
+		compute_eris_batched = true;
 		
 	} else if (k_method == "batchdfao") {
 		
@@ -110,9 +111,28 @@ void fockmod::init() {
 	m_K_builder->set_coeff_beta(m_c_B);
 	m_K_builder->set_factory(aofac);
 	
-	// initialize integrals depending on method combination
+	// initialize pgrids
 	
-	ints::registry reg;
+	if (compute_s_xx) {
+		spgrid2 = dbcsr::create_pgrid<2>(m_world.comm()).get();
+	}
+	
+	if (compute_3c2e_batched) {
+		int nbf_b = m_mol->c_basis().nbf();
+		int nbf_x = m_mol->c_dfbasis()->nbf();
+		std::array<int,3> tsizes = {nbf_x, nbf_b, nbf_b};
+		
+		spgrid3_xbb = dbcsr::create_pgrid<3>(m_world.comm()).tensor_dims(tsizes).get();
+		
+	}
+	
+	if (compute_eris_batched) {
+		spgrid4 = dbcsr::create_pgrid<4>(m_world.comm()).get();
+	}
+	
+	// initialize integrals depending on method combination
+
+	dbcsr::smatrix<double> c_s_xx;
 	
 	if (compute_s_xx) {
 		
@@ -124,7 +144,7 @@ void fockmod::init() {
 		
 			auto out = aofac->ao_3coverlap("coulomb");
 			out->filter();
-			reg.insert_matrix<double>(m_mol->name() + "_s_xx", out);
+			c_s_xx = out;
 			
 		} else {
 			
@@ -144,9 +164,18 @@ void fockmod::init() {
 			dbcsr::multiply('N', 'N', temp, *other_metric, *coul_metric).perform();
 			
 			coul_metric->filter();
-			reg.insert_matrix<double>(m_mol->name() + "_s_xx", coul_metric);
+			c_s_xx = coul_metric;
 			
 		}
+		
+		auto x = m_mol->dims().x();
+		arrvec<int,2> xx = {x,x};
+		
+		auto s_xx_01 = dbcsr::tensor_create<2>().name("s_xx")
+			.pgrid(spgrid2).map1({0}).map2({1}).blk_sizes(xx).get();
+			
+		dbcsr::copy_matrix_to_tensor(*c_s_xx, *s_xx_01);
+		m_reg.insert_tensor<2,double>("s_xx", s_xx_01);		
 			
 		t_eri.finish();
 		
@@ -160,7 +189,7 @@ void fockmod::init() {
 		
 		t_inv.start();
 		
-		auto s_xx = reg.get_matrix<double>(m_mol->name() + "_s_xx");
+		auto s_xx = c_s_xx;
 		
 		math::LLT chol(s_xx, LOG.global_plev());
 		chol.compute();
@@ -168,7 +197,6 @@ void fockmod::init() {
 		auto x = m_mol->dims().x();
 		auto Linv = chol.L_inv(x);
 		
-		dbcsr::pgrid<2> grid2(m_world.comm());
 		arrvec<int,2> xx = {m_mol->dims().x(), m_mol->dims().x()};
 		
 		if (compute_s_xx_inv) {
@@ -178,22 +206,19 @@ void fockmod::init() {
 			dbcsr::mat_d s = dbcsr::mat_d::create_template(*Linv)
 				.name(m_mol->name() + "_s_xx_inv")
 				.type(dbcsr_type_symmetric);
-			auto s_xx_inv = s.get_smatrix();
+			auto c_s_xx_inv = s.get_smatrix();
 			
-			dbcsr::multiply('T', 'N', *Linv, *Linv, *s_xx_inv).perform();
+			dbcsr::multiply('T', 'N', *Linv, *Linv, *c_s_xx_inv).perform();
 			
-			std::string name = m_mol->name() + "_s_xx_inv_(0|1)";
-			
-			dbcsr::stensor2_d s_xx_inv_01 = dbcsr::make_stensor<2>(
-				dbcsr::tensor2_d::create().name(name).ngrid(grid2)
-				.map1({0}).map2({1}).blk_sizes(xx));
+			auto s_xx_inv = dbcsr::tensor_create<2>().name("s_xx_inv")
+				.pgrid(spgrid2).map1({0}).map2({1}).blk_sizes(xx).get();
 				
-			reg.insert_matrix<double>(s_xx_inv->name(),s_xx_inv);
-				
-			dbcsr::copy_matrix_to_tensor(*s_xx_inv, *s_xx_inv_01); 
+			dbcsr::copy_matrix_to_tensor(*c_s_xx_inv, *s_xx_inv);
 			
-			s_xx_inv_01->filter();
-			reg.insert_tensor<2,double>(name, s_xx_inv_01);
+			//dbcsr::print(*c_s_xx);
+			//dbcsr::print(*s_xx_inv);
+			
+			m_reg.insert_tensor<2,double>("s_xx_inv", s_xx_inv);
 			
 		}
 		
@@ -206,17 +231,14 @@ void fockmod::init() {
 			//dbcsr::print(*Linv);
 			
 			dbcsr::mat_d Linv_t = dbcsr::mat_d::transpose(*Linv);
+			auto c_s_xx_invsqrt = Linv_t.get_smatrix();
 			
-			dbcsr::stensor2_d s_xx_invsqrt_01 = dbcsr::make_stensor<2>(
-				dbcsr::tensor2_d::create().name(name).ngrid(grid2)
-				.map1({0}).map2({1}).blk_sizes(xx));
-			
-			dbcsr::copy_matrix_to_tensor(Linv_t, *s_xx_invsqrt_01);
-			Linv_t.clear();
-			
-			//dbcsr::print(*s_xx_invsqrt_01);
-			s_xx_invsqrt_01->filter();
-			reg.insert_tensor<2,double>(name, s_xx_invsqrt_01);
+			auto s_xx_invsqrt = dbcsr::tensor_create<2>().name("s_xx_invsqrt")
+				.pgrid(spgrid2).map1({0}).map2({1}).blk_sizes(xx).get();
+				
+			dbcsr::copy_matrix_to_tensor(*c_s_xx_invsqrt, *s_xx_invsqrt);
+				
+			m_reg.insert_tensor<2,double>("s_xx_invsqrt", s_xx_invsqrt);
 			
 		}
 		
@@ -224,10 +246,45 @@ void fockmod::init() {
 		
 	}
 	
-	if (compute_eris) {
+	if (compute_eris_batched) {
 		
-		auto eris = aofac->ao_eri(vec<int>{0,1},vec<int>{2,3});
-		reg.insert_tensor<4,double>(m_mol->name() + "_i_bbbb_(01|23)", eris);
+		auto& t_ints = TIME.sub("Computing eris");
+		
+		t_ints.start();
+		
+		aofac->ao_eri_setup("coulomb");
+		
+		auto eris = aofac->ao_eri_setup_tensor(spgrid4, vec<int>{0,1}, vec<int>{2,3});
+		
+		int nbatches = m_opt.get<int>("nbatches", 4);
+		
+		dbcsr::sbtensor<4,double> eri_batched =
+			std::make_shared<dbcsr::btensor<4,double>>(eris,nbatches,dbcsr::core,50);
+					
+		eri_batched->compress_init({0,1});
+		
+		vec<vec<int>> bounds(4);
+		
+		for (int imu = 0; imu != eri_batched->nbatches_dim(0); ++imu) {
+			for (int inu = 0; inu != eri_batched->nbatches_dim(1); ++inu) {
+				
+				bounds[0] = eri_batched->blk_bounds(0)[imu];
+				bounds[1] = eri_batched->blk_bounds(1)[inu];
+				bounds[2] = eri_batched->full_blk_bounds(2);
+				bounds[3] = eri_batched->full_blk_bounds(3);
+				
+				aofac->ao_eri_fill(eris, bounds, nullptr);
+				
+				eri_batched->compress({imu,inu},eris);
+				
+			}
+		}
+			
+		eri_batched->compress_finalize();
+		
+		t_ints.finish();
+		
+		m_reg.insert_btensor<4,double>("i_bbbb_batched", eri_batched);
 		
 	}
 	
@@ -240,12 +297,10 @@ void fockmod::init() {
 		
 		t_screen.start();
 		
-		ints::screener* scr = new ints::schwarz_screener(aofac,metric);
-		std::shared_ptr<ints::screener> scr_s(scr);
-		scr->compute();
-		
-		reg.insert_screener(m_mol->name() + "_schwarz_screener", scr_s);
-		
+		std::shared_ptr<ints::screener> scr_s(
+			new ints::schwarz_screener(aofac,metric));
+		scr_s->compute();
+				
 		t_screen.finish();
 		
 		auto& t_eri_batched = TIME.sub("3c2e integrals batched");
@@ -253,7 +308,7 @@ void fockmod::init() {
 		t_eri_batched.start();
 		
 		aofac->ao_3c2e_setup(metric);
-		auto eri = aofac->ao_3c2e_setup_tensor(vec<int>{0}, vec<int>{1,2});
+		auto eri = aofac->ao_3c2e_setup_tensor(spgrid3_xbb, vec<int>{0}, vec<int>{1,2});
 		auto genfunc = aofac->get_generator(scr_s);
 		
 		dbcsr::btype mytype = dbcsr::core;
@@ -284,6 +339,8 @@ void fockmod::init() {
 				
 				if (mytype != dbcsr::direct) aofac->ao_3c2e_fill(eri,bounds,scr_s);
 				
+				//dbcsr::print(*eri);
+				
 				eribatch->compress({inu}, eri);
 		}
 		
@@ -291,11 +348,14 @@ void fockmod::init() {
 		
 		t_eri_batched.finish();
 		
-		reg.insert_btensor<3,double>(m_mol->name() + "_i_xbb_(0|12)_batched", eribatch);
+		m_reg.insert_btensor<3,double>("i_xbb_batched", eribatch);
 		
 		LOG.os<1>("Occupation of 3c2e integrals: ", eribatch->occupation() * 100, "%\n");
 		
-	}	
+	}
+	
+	m_J_builder->set_reg(m_reg);
+	m_K_builder->set_reg(m_reg);
 	
 	m_J_builder->init();
 	m_K_builder->init();
