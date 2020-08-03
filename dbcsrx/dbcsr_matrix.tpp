@@ -48,7 +48,7 @@ public:
 };
 
 template <typename T = double, typename>
-class matrix {
+class matrix : std::enable_shared_from_this<matrix<T>> {
 private:
     
     void* m_matrix_ptr;
@@ -86,6 +86,18 @@ public:
 	}
 
     typedef T value_type;
+    
+    template <typename D>
+    friend class create_base;
+    
+    template <typename D>
+    friend class create_template_base;
+    
+    template <typename D>
+    friend class transpose_base;
+    
+    template <typename D>
+    friend class matrix_copy_base;
     
     template <typename D>
     friend class multiply_base;
@@ -589,8 +601,259 @@ public:
 		return out;
 		
 	}
+	
+	std::shared_ptr<matrix<T>> get_ptr() {
+		return this->shared_from_this();
+	}
     
 };  
+
+template <typename T>
+using shared_matrix = matrix<T>;
+
+template <typename T>
+class create_base {
+	
+#:set list = [ &
+        ['name', 'std::string', 'required', 'val'], &
+        ['set_world', 'world', 'optional', 'ref'],&
+        ['set_dist', 'dist', 'optional', 'ref'],&
+        ['type', 'char', 'required', 'val'],&
+        ['row_blk_sizes', 'vec<int>', 'required', 'ref'],&
+        ['col_blk_sizes', 'vec<int>', 'required', 'ref'],&
+        ['nze', 'int', 'optional', 'val'],&
+        ['reuse', 'bool', 'optional', 'val'],&
+        ['reuse_arrays', 'bool', 'optional', 'val'],&
+        ['mutable_work', 'bool', 'optional', 'val'],&
+        ['replication_type', 'char', 'optional', 'val']]
+    ${make_param(structname='create_base',params=list)}$
+    
+public:
+
+	create_base() = default;
+
+	shared_matrix<T> get() {
+		
+		shared_matrix<T> m_out = std::make_shared<matrix<T>>();
+		
+		m_out->m_matrix_ptr = nullptr;
+		m_out->m_world = (c_set_world) ? (*c_set_world) : c_set_dist->m_world;
+		
+        dist* dist_ptr = nullptr;
+        
+        if (!c_set_dist) {
+			
+            vec<int> rowdist, coldist; 
+            auto dims = c_set_world->dims();
+            
+            auto rdist = default_dist(c_row_blk_sizes->size(),
+                            dims[0], *c_row_blk_sizes);
+            auto cdist = default_dist(c_col_blk_sizes->size(),
+                            dims[1], *c_col_blk_sizes);
+                            
+            dist_ptr = new dist(dist::create().set_world(*c_set_world).row_dist(rdist).col_dist(cdist));
+        } else {
+            dist_ptr = &*c_set_dist;
+        }
+        
+        c_dbcsr_create_new(&m_out->m_matrix_ptr, c_name->c_str(), dist_ptr->m_dist_ptr, *c_type, 
+                               c_row_blk_sizes->data(), c_row_blk_sizes->size(), 
+                               c_col_blk_sizes->data(), c_col_blk_sizes->size(), 
+                               (c_nze) ? &*c_nze : nullptr, &m_out->m_data_type, 
+                               (c_reuse) ? &*c_reuse : nullptr,
+                               (c_reuse_arrays) ? &*c_reuse_arrays : nullptr, 
+                               (c_mutable_work) ? &*c_mutable_work : nullptr, 
+                               (c_replication_type) ? &*c_replication_type : nullptr);
+    
+        if (!c_set_dist) delete dist_ptr;
+        
+        return m_out;
+        
+    }
+    
+};
+
+template <typename T>
+inline create_base<T> create() {
+	return create_base<T>();
+}
+
+template <typename T>
+class create_template_base {
+
+#:set list = [ &
+	['name', 'std::string', 'required', 'val'], &
+	['set_dist', 'dist', 'optional', 'ref'],&
+	['type', 'const char', 'optional', 'val'],&
+	['row_blk_sizes', 'vec<int>', 'optional', 'ref'],&
+	['col_blk_sizes', 'vec<int>', 'optional', 'ref'],&
+	['nze', 'int', 'optional', 'val'],&
+	['reuse', 'const bool', 'optional', 'val'],&
+	['reuse_arrays', 'const bool', 'optional', 'val'],&
+	['mutable_work', 'const bool', 'optional', 'val'],&
+	['replication_type', 'const char', 'optional', 'val']]
+	
+	${make_param(structname='create_template_base',params=list)}$
+
+private:
+		
+	shared_matrix<T> c_template;
+	
+public:
+	
+	create_template_base(shared_matrix<T>& temp) : c_template(temp) {}
+
+	shared_matrix<T> get() {
+		
+		shared_matrix<T> m_out = std::make_shared<matrix<T>>();
+		
+		m_out->m_matrix_ptr = nullptr;
+		m_out->m_world = c_template->m_world;
+ 
+        c_dbcsr_create_template(&m_out->m_matrix_ptr, 
+			c_name->c_str(), c_template->m_matrix_ptr, 
+			(c_set_dist) ? c_set_dist->m_dist_ptr : nullptr, 
+			(c_type) ? &*c_type : nullptr, 
+			(c_row_blk_sizes) ? c_row_blk_sizes->data() : nullptr,
+			(c_row_blk_sizes) ? c_row_blk_sizes->size() : 0,
+			(c_col_blk_sizes) ? c_col_blk_sizes->data() : nullptr,
+			(c_col_blk_sizes) ? c_col_blk_sizes->size() : 0,
+			(c_nze) ? &*c_nze : nullptr, &m_out->m_data_type, 
+			(c_reuse_arrays) ? &*c_reuse_arrays : nullptr, 
+			(c_mutable_work) ? &*c_mutable_work : nullptr, 
+			(c_replication_type) ? &*c_replication_type : nullptr);
+                                   
+		return m_out;
+
+    }
+    
+};
+
+template <typename T>
+inline create_template_base<T> 
+	create_template(shared_matrix<T>& m_in) {
+		return create_template_base<T>(m_in);
+}
+
+template <typename T>
+class transpose_base {
+	
+#:set list = [ &
+    ['shallow_copy', 'bool', 'optional', 'val'],&
+    ['transpose_data', 'bool', 'optional', 'val'],& 
+    ['transpose_dist', 'bool', 'optional', 'val'],& 
+    ['use_dist', 'bool', 'optional', 'val']]
+    
+    ${make_param('transpose_base', list)}$
+
+private:
+	
+	shared_matrix<T> c_in;
+
+public:
+    
+	transpose_base(shared_matrix<T>& m_in) : c_in(m_in) {}
+    
+    shared_matrix<T> get() {
+		
+		shared_matrix<T> m_out = std::make_shared<matrix<T>>();
+    
+        m_out->m_world = c_in->m_world;
+        c_dbcsr_transposed(&m_out->m_matrix_ptr, c_in->m_matrix_ptr, 
+                            (c_shallow_copy) ? &*c_shallow_copy : nullptr,
+                            (c_transpose_data) ? &*c_transpose_data : nullptr, 
+                            (c_transpose_dist) ? &*c_transpose_dist : nullptr, 
+                            (c_use_dist) ? &*c_use_dist : nullptr);
+                            
+        return m_out;                            
+    
+    }
+    
+};
+
+template <typename T>
+inline transpose_base<T> transpose(shared_matrix<T>& m_in) {
+	return transpose_base<T>(m_in);
+}
+
+
+template <typename T>
+class matrix_copy_base {
+
+#:set list = [ &
+    ['name', 'std::string', 'optional', 'val'],&
+    ['keep_sparsity', 'bool', 'optional', 'val'],&
+    ['shallow_data', 'bool', 'optional', 'val'],&
+    ['keep_imaginary', 'bool', 'optional', 'val'],&
+    ['type', 'char', 'optional', 'val']]
+    
+    ${make_param('matrix_copy_base', list)}$
+
+private:
+    
+	shared_matrix<T> c_in;
+	
+public:
+	
+	matrix_copy_base(shared_matrix<T>& in) : c_in(in) {}
+	
+	shared_matrix<T> get() {
+		
+		shared_matrix<T> m_out = std::make_shared<matrix<T>>();
+		
+		m_out->m_matrix_ptr = nullptr;
+		m_out->m_world = c_in->m_world;
+		
+		c_dbcsr_copy(&m_out->m_matrix_ptr, c_in->m_matrix_ptr, 
+			(c_name) ? c_name->c_str() : nullptr, 
+			(c_keep_sparsity) ? &*c_keep_sparsity : nullptr, 
+			(c_shallow_data) ? &*c_shallow_data : nullptr, 
+			(c_keep_imaginary) ? &*c_keep_imaginary : nullptr, 
+			(c_type) ? &*c_type : nullptr);
+			
+		return m_out;
+		
+	}
+
+};
+
+template <typename T>
+inline matrix_copy_base<T> copy(shared_matrix<T>& m_in) {
+	return matrix_copy_base<T>(m_in);
+}
+
+template <typename T>
+class read_base {
+
+#:set list = [&
+    ['filepath', 'std::string', 'required', 'val'],&
+    ['distribution', 'dist', 'required', 'ref'],&
+    ['set_world', 'world', 'required', 'ref']]
+    ${make_param(structname='read_base',params=list)}$
+
+public:
+
+	read_base() = default;
+	
+	shared_matrix<T> get() {
+		
+		shared_matrix<T> m_out = std::make_shared<matrix<T>>();
+		
+		m_out->m_matrix_ptr = nullptr;
+		m_out->m_world = c_set_world;
+		
+        c_dbcsr_binary_read(c_filepath->c_str(), c_distribution->m_dist_ptr, 
+			c_set_world->comm(), &m_out->m_matrix_ptr);
+			
+		return m_out;
+    }
+    
+};
+
+template <typename T>
+inline read_base<T> read() {
+	return read_base<T>();
+}
 
 template <typename T>
 class iterator {

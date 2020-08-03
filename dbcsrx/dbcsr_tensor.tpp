@@ -208,7 +208,7 @@ public:
     friend class contract_base;
     
     template <int M, typename D>
-	friend class copy_base;
+	friend class tensor_copy_base;
 	
 	template <int M, typename D>
 	friend class tensor_create_base;

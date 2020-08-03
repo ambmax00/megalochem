@@ -19,14 +19,14 @@ D* unfold_bounds(vec<vec<D>>& v) {
 }
 
 template <int N, typename T>
-class copy_base {
+class tensor_copy_base {
 
     #:set list = [ &
         ['order','vec<int>','optional','val'],&
         ['sum','bool','optional','val'],&
         ['bounds','vec<vec<int>>', 'optional', 'ref'],&
         ['move_data','bool','optional','val']]
-    ${make_param('copy_base',list)}$
+    ${make_param('tensor_copy_base',list)}$
         
 private:
 
@@ -35,7 +35,7 @@ private:
     
 public:
 
-    copy_base(tensor<N,T>& t1, tensor<N,T>& t2) : c_t_in(t1), c_t_out(t2) {}
+    tensor_copy_base(tensor<N,T>& t1, tensor<N,T>& t2) : c_t_in(t1), c_t_out(t2) {}
     
     void perform() {
         
@@ -53,12 +53,13 @@ public:
 };
 
 template <int N, typename T>
-copy_base(tensor<N,T>& t1, tensor<N,T>& t2) -> copy_base<tensor<N,T>::dim, typename tensor<N,T>::value_type>;
+tensor_copy_base(tensor<N,T>& t1, tensor<N,T>& t2) 
+	-> tensor_copy_base<tensor<N,T>::dim, typename tensor<N,T>::value_type>;
 
 template <typename tensortype>
-inline copy_base<tensortype::dim, typename tensortype::value_type>
+inline tensor_copy_base<tensortype::dim, typename tensortype::value_type>
 copy(tensortype& t1, tensortype& t2) {
-	return copy_base(t1,t2);
+	return tensor_copy_base(t1,t2);
 }
 
 template <int N1, int N2, int N3, typename T>
