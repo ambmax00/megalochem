@@ -70,29 +70,30 @@ void EXACT_J::compute_J() {
 		dbcsr::print(*m_ptot_bbd);
 	}
 	
-	m_J_bbd->batched_contract_init();
-	m_eri_batched->decompress_init({0,1});
+	//m_J_bbd->batched_contract_init();
+	m_eri_batched->decompress_init({2,3});
 	
-	for (int imu = 0; imu != m_eri_batched->nbatches_dim(0); ++imu) {
-		for (int inu = 0; inu != m_eri_batched->nbatches_dim(1); ++inu) {
+	auto eri_01_23 = m_eri_batched->get_stensor();
+	//dbcsr::print(*eri_01_23);
+	
+	for (int imu = 0; imu != m_eri_batched->nbatches_dim(2); ++imu) {
+		for (int inu = 0; inu != m_eri_batched->nbatches_dim(3); ++inu) {
 			
 			m_eri_batched->decompress({imu,inu});
 			
-			auto eri_01_23 = m_eri_batched->get_stensor();
-			
-			vec<vec<int>> mn_bounds = {
-				m_eri_batched->bounds(0)[imu],
-				m_eri_batched->bounds(1)[inu]
+			vec<vec<int>> ls_bounds = {
+				m_eri_batched->bounds(2)[imu],
+				m_eri_batched->bounds(3)[inu]
 			};
 			
 			dbcsr::contract(*m_ptot_bbd, *eri_01_23, *m_J_bbd)
-				.bounds3(mn_bounds).beta(1.0).perform("LS_, MNLS -> MN_");
+				.bounds1(ls_bounds).beta(1.0).perform("LS_, MNLS -> MN_");
 				
 		}
 	}
 			
 	m_eri_batched->decompress_finalize();
-	m_J_bbd->batched_contract_finalize();
+	//m_J_bbd->batched_contract_finalize();
 	
 	if (LOG.global_plev() >= 3) {
 		dbcsr::print(*m_J_bbd);
@@ -117,30 +118,30 @@ void EXACT_K::compute_K() {
 		
 		LOG.os<1>("Computing exchange term (", x, ") ... \n");
 		
-		m_K_bbd->batched_contract_init();
-		m_eri_batched->decompress_init({0,2});
+		//m_K_bbd->batched_contract_init();
+		m_eri_batched->decompress_init({1,3});
 	
-		for (int imu = 0; imu != m_eri_batched->nbatches_dim(0); ++imu) {
-			for (int inu = 0; inu != m_eri_batched->nbatches_dim(2); ++inu) {
+		for (int imu = 0; imu != m_eri_batched->nbatches_dim(1); ++imu) {
+			for (int inu = 0; inu != m_eri_batched->nbatches_dim(3); ++inu) {
 			
 				m_eri_batched->decompress({imu,inu});
 				
 				auto eri_02_13 = m_eri_batched->get_stensor();
 				
-				vec<vec<int>> mn_bounds = {
-					m_eri_batched->bounds(0)[imu],
-					m_eri_batched->bounds(2)[inu]
+				vec<vec<int>> ls_bounds = {
+					m_eri_batched->bounds(1)[imu],
+					m_eri_batched->bounds(3)[inu]
 				};
 				
 				dbcsr::contract(*m_p_bbd, *eri_02_13, *m_K_bbd)
 					.alpha(-1.0).beta(1.0)
-					.bounds3(mn_bounds).perform("LS_, MLNS -> MN_");
+					.bounds1(ls_bounds).perform("LS_, MLNS -> MN_");
 					
 			}
 		}
 			
 		m_eri_batched->decompress_finalize();
-		m_K_bbd->batched_contract_finalize();
+		//m_K_bbd->batched_contract_finalize();
 	
 		dbcsr::copy_3Dtensor_to_matrix_new(*m_K_bbd,*k);
 		

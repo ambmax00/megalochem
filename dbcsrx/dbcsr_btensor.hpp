@@ -577,34 +577,41 @@ public:
 		rview.is_contiguous = false;
 		rview.dims = dims;
 		
-		// check order of indices
-		vec<int> order;
-		order.insert(order.end(),dims.begin(),dims.end());
+		auto w_dims = m_wrview.dims;
 		
-		for (int i = 0; i != N - dims.size(); ++i) {
-			auto iter = std::find(order.begin(),order.end(),i);
-			if (iter == order.end()) order.push_back(i);
-		}
+		// get idx speed for writing
+		auto map1 = m_wrview.map1;
+		auto map2 = m_wrview.map2;
+		
+		map2.insert(map2.end(),map1.begin(),map1.end());
+		
+		auto order = map2;
+		
+		std::reverse(order.begin(),order.end());
 		
 		// reorder indices
 		for (auto i : order) {
 			LOG.os<1>(i, " ");
 		} LOG.os<1>('\n');
 		
-		auto idxspeed = m_stensor->idx_speed();
-		
-		vec<int> order_rev(3);
-		
-		for (int i = 0; i != N; ++i) {
-			auto iter = std::find(order.begin(),order.end(),i);
-			order_rev[i] = iter - order.begin();
-		}
-		
-		// reorder reverse indices
-		for (auto i : order_rev) {
-			LOG.os<1>(i, " ");
-		} LOG.os<1>('\n');
-		
+		for (auto rd : rview.dims) {
+			for (auto wd : w_dims) {
+				
+				LOG.os<1>("rd/wd ", rd, " ", wd, '\n');
+				
+				auto w_iter = std::find(order.begin(), order.end(), wd);
+				int w_npos = order.end() - w_iter;
+				
+				auto r_iter = std::find(order.begin(), order.end(), rd);
+				int r_npos = order.end() - r_iter;
+				
+				LOG.os<1>("w/rpos ", w_npos, " ", r_npos, '\n');
+				
+				if (r_npos > w_npos) 
+					throw std::runtime_error("Reading dimension(s) are too slow. \n Use direct or core.\n");
+				
+			}
+		}	
 		
 		// compute super indices
 		
@@ -618,7 +625,6 @@ public:
 		vec<size_t> perm(wlocblkidx[0].size()), superidx(wlocblkidx[0].size());
 		
 		std::iota(perm.begin(),perm.end(),(size_t)0);
-		std::iota(superidx.begin(),superidx.end(),(size_t)0);
 		
 		// get nblk_per_batch for all dims
 		vec<double> nele_per_batch(N);
@@ -635,13 +641,13 @@ public:
 		
 		if (N == 3) {
 			
-			const size_t dim0 = order[0];
-			const size_t dim1 = order[1];
-			const size_t dim2 = order[2];
+			const size_t ix0 = order[0];
+			const size_t ix1 = order[1];
+			const size_t ix2 = order[2];
 			
-			const size_t bsize0 = (dims.size() > 0) ? m_nbatches_dim[dim0] : 1;
-			const size_t bsize1 = (dims.size() > 1) ? m_nbatches_dim[dim1] : 1;
-			const size_t bsize2 = (dims.size() > 2) ? m_nbatches_dim[dim2] : 1;
+			const size_t bsize0 = (dims.size() > 0) ? m_nbatches_dim[dims[0]] : 1;
+			const size_t bsize1 = (dims.size() > 1) ? m_nbatches_dim[dims[1]] : 1;
+			const size_t bsize2 = (dims.size() > 2) ? m_nbatches_dim[dims[2]] : 1;
 			
 			const size_t batchsize = bsize0 * bsize1 * bsize2;
 			
@@ -656,8 +662,8 @@ public:
 			size_t nblks = std::accumulate(full.begin(),full.end(),
 				1, std::multiplies<size_t>());
 				
-			const size_t blksize1 = full[idxspeed[1]];
-			const size_t blksize2 = full[idxspeed[0]];
+			const size_t blksize1 = full[ix1];
+			const size_t blksize2 = full[ix2];
 			
 			nblksprocbatch = vec<vec<int>>(batchsize,vec<int>(m_mpisize));
 			nzeprocbatch = vec<vec<int>>(batchsize,vec<int>(m_mpisize));
@@ -665,26 +671,24 @@ public:
 			#pragma omp parallel for
 			for (size_t i = 0; i != superidx.size(); ++i) {	
 									
-					const size_t i0 = wlocblkidx[idxspeed[2]][i];
-					const size_t i1 = wlocblkidx[idxspeed[1]][i];
-					const size_t i2 = wlocblkidx[idxspeed[0]][i];
+					const size_t i0 = wlocblkidx[ix0][i];
+					const size_t i1 = wlocblkidx[ix1][i];
+					const size_t i2 = wlocblkidx[ix2][i];
 					
+					// compute batch indices
 					const size_t b0 = std::floor(
-						(double)off[dim0][wlocblkidx[dim0][i]]
-						/ nele_per_batch[dim0]);
+						(double)off[dims[0]][wlocblkidx[dims[0]][i]]
+						/ nele_per_batch[dims[0]]);
 					const size_t b1 = (dims.size() > 1) ? 
 						std::floor(
-						(double)off[dim1][wlocblkidx[dim1][i]] 
-						/ nele_per_batch[dim1]) : 0;
+						(double)off[dims[1]][wlocblkidx[dims[1]][i]] 
+						/ nele_per_batch[dims[1]]) : 0;
 					const size_t b2 = (dims.size() > 2) ?
 						std::floor(
-						(double)off[dim2][wlocblkidx[dim2][i]] 
-						/ nele_per_batch[dim2]) : 0;
+						(double)off[dims[2]][wlocblkidx[dims[2]][i]] 
+						/ nele_per_batch[dims[2]]) : 0;
 						
 					const size_t batch_idx = b0 * bsize1 * bsize2 + b1 * bsize2 + b2;
-					int size = sizes[idxspeed[2]][i0] 
-						* sizes[idxspeed[1]][i1]
-						* sizes[idxspeed[0]][i2];
 					
 					#pragma omp critical 
 					{
@@ -699,7 +703,7 @@ public:
 					 + i1 * blksize2
 					 + i2;
 					 
-					 //std::cout << "INTEGER: " << superidx[i] << " "
+					// std::cout << "INTEGER: " << superidx[i] << " "
 					//	<< " BATCHES " << b0 << " " << b1 << " " << b2
 					//	<< " IDX " << i0 << " " << i1 << " " << i2 << std::endl;
 					 
@@ -1076,7 +1080,14 @@ public:
 			
 			LOG.os<1>("Done!!\n");
 			
-		} // end if*/
+			/*std::cout << "READTENSOR" << std::endl;
+			dbcsr::print(*read_tensor);
+			
+			for (int i = 0; i != 1000; ++i) {
+				std::cout << data[i] << " ";
+			} std::cout << std::endl;*/
+			
+		} // end if
 		
 		if (!is_compatible) {
 			LOG.os<1>("Reordering tensor\n");

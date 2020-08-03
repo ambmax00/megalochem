@@ -30,8 +30,7 @@ mpmod::mpmod(desc::shf_wfn& wfn_in, desc::options& opt_in, dbcsr::world& w_in) :
 }
 
 void mpmod::compute_batch() {
-	
-	/*
+
 	LOG.banner<>("Batched CD-LT-SOS-RI-MP2", 50, '*');
 	
 	auto& laptime = TIME.sub("Computing laplace points");
@@ -76,6 +75,9 @@ void mpmod::compute_batch() {
 	mol->dims().b();
 	auto x = mol->dims().x();
 	
+	int nbf = std::accumulate(b.begin(), b.end(), 0);
+	int dfnbf = std::accumulate(x.begin(), x.end(), 0);
+	
 	// options
 	int nlap = m_opt.get<int>("nlap",MP_NLAP);
 	double c_os = m_opt.get<double>("c_os",MP_C_OS);
@@ -101,6 +103,16 @@ void mpmod::compute_batch() {
 	auto lp_alpha = lp.alpha();
 	
 	//==================================================================
+	//                        PGRIDS
+	//==================================================================
+	
+	auto spgrid2 = dbcsr::create_pgrid<2>(m_world.comm()).get();
+	
+	std::array<int,3> xbb_sizes = {dfnbf, nbf, nbf};
+	
+	auto spgrid3_xbb = dbcsr::create_pgrid<3>(m_world.comm()).tensor_dims(xbb_sizes).get();
+	
+	//==================================================================
 	//                        INTEGRALS
 	//==================================================================
 	
@@ -116,7 +128,7 @@ void mpmod::compute_batch() {
 	
 	aofac->ao_3c2e_setup("erfc_coulomb");
 	
-	auto B_xbb = aofac->ao_3c2e_setup_tensor(vec<int>{1},vec<int>{0,2});
+	auto B_xbb = aofac->ao_3c2e_setup_tensor(spgrid3_xbb, vec<int>{1},vec<int>{0,2});
 	
 	dbcsr::btype eri_type = dbcsr::invalid;
 	dbcsr::btype intermed_type = dbcsr::invalid;
@@ -197,11 +209,11 @@ void mpmod::compute_batch() {
 	
 	LOG.os<>("Forming tilde inv ...\n");
 	
-	smat_d Ctilde_inv_xx = std::make_shared<mat_d>(
-		mat_d::create_template(*C_xx).name("Ctilde_inv_xx"));
+	dbcsr::smat_d Ctilde_inv_xx = std::make_shared<dbcsr::mat_d>(
+		dbcsr::mat_d::create_template(*C_xx).name("Ctilde_inv_xx"));
 		
-	smat_d temp = std::make_shared<mat_d>(
-		mat_d::create_template(*C_xx).name("temp")
+	dbcsr::smat_d temp = std::make_shared<dbcsr::mat_d>(
+		dbcsr::mat_d::create_template(*C_xx).name("temp")
 		.type(dbcsr_type_no_symmetry));
 		
 	C_xx->clear();
@@ -235,44 +247,40 @@ void mpmod::compute_batch() {
 	
 	// matrices and tensors
 	
-	smat_d c_occ_exp = std::make_shared<mat_d>(
-		mat_d::create_template(*c_occ).name("Scaled Occ Coeff"));
+	dbcsr::smat_d c_occ_exp = std::make_shared<dbcsr::mat_d>(
+		dbcsr::mat_d::create_template(*c_occ).name("Scaled Occ Coeff"));
 		
-	smat_d c_vir_exp = std::make_shared<mat_d>(
-		mat_d::create_template(*c_vir).name("Scaled Vir Coeff"));
+	dbcsr::smat_d c_vir_exp = std::make_shared<dbcsr::mat_d>(
+		dbcsr::mat_d::create_template(*c_vir).name("Scaled Vir Coeff"));
 		
-	smat_d pseudo_occ = std::make_shared<mat_d>(
-		mat_d::create_template(*p_occ).name("Pseudo Density (OCC)"));
+	dbcsr::smat_d pseudo_occ = std::make_shared<dbcsr::mat_d>(
+		dbcsr::mat_d::create_template(*p_occ).name("Pseudo Density (OCC)"));
 		
-	smat_d pseudo_vir = std::make_shared<mat_d>(
-		mat_d::create_template(*p_vir).name("Pseudo Density (VIR)"));
+	dbcsr::smat_d pseudo_vir = std::make_shared<dbcsr::mat_d>(
+		dbcsr::mat_d::create_template(*p_vir).name("Pseudo Density (VIR)"));
 		
-	smat_d Z_XX = std::make_shared<mat_d>(
-		mat_d::create_template(*Ctilde_xx).name("Z_xx").type(dbcsr_type_no_symmetry));
+	dbcsr::smat_d Z_XX = std::make_shared<dbcsr::mat_d>(
+		dbcsr::mat_d::create_template(*Ctilde_xx).name("Z_xx").type(dbcsr_type_no_symmetry));
 		
-	smat_d Ztilde_XX = std::make_shared<mat_d>(
-		mat_d::create_template(*Ctilde_xx).name("Ztilde_xx").type(dbcsr_type_no_symmetry));
+	dbcsr::smat_d Ztilde_XX = std::make_shared<dbcsr::mat_d>(
+		dbcsr::mat_d::create_template(*Ctilde_xx).name("Ztilde_xx").type(dbcsr_type_no_symmetry));
 	
 	arrvec<int,2> bb = {b,b};
 	arrvec<int,2> xx = {x,x};
 	
-	dbcsr::pgrid<2> grid2(m_world.comm());
+	auto pseudo_vir_0_1 = dbcsr::tensor_create<2,double>()
+		.pgrid(spgrid2).name("pseudo_vir_0_1")
+		.map1({0}).map2({1}).blk_sizes(bb).get();
 		
-	stensor2_d pseudo_vir_0_1 = dbcsr::make_stensor<2>(
-		tensor2_d::create().ngrid(grid2).name("pseudo_vir_0_1")
-		.map1({0}).map2({1}).blk_sizes(bb));
+	auto Z_XX_0_1 = dbcsr::tensor_create<2,double>()
+		.pgrid(spgrid2).name("Z_xx_0_1")
+		.map1({0}).map2({1}).blk_sizes(xx).get();
+				
+	auto B_xBB_0_12_wr = dbcsr::tensor_create_template<3,double>(B_xbb)
+		.name("B_XBB_0_12").map1({0}).map2({1,2}).get();
 		
-	stensor2_d Z_XX_0_1 = dbcsr::make_stensor<2>(
-		tensor2_d::create().ngrid(grid2).name("Z_xx_0_1")
-		.map1({0}).map2({1}).blk_sizes(xx));
-		
-	dbcsr::pgrid<3> grid3(m_world.comm());
-		
-	stensor3_d B_xBB_0_12_wr = dbcsr::make_stensor<3>(
-		tensor3_d::create_template(*B_xbb).name("B_XBB_0_12").map1({0}).map2({1,2}));
-		
-	stensor3_d B_xBB_1_02 = dbcsr::make_stensor<3>(
-		tensor3_d::create_template(*B_xbb).name("B_XBB_1_02").map1({1}).map2({0,2}));
+	auto B_xBB_1_02 = dbcsr::tensor_create_template<3,double>(B_xbb)
+		.name("B_XBB_1_02").map1({1}).map2({0,2}).get();
 	
 	dbcsr::sbtensor<3,double> B_xBB_batch = 
 		std::make_shared<dbcsr::btensor<3,double>>(B_xBB_0_12_wr,nbatches,intermed_type,1);
@@ -343,19 +351,31 @@ void mpmod::compute_batch() {
 		arrvec<int,2> bu = {b,u};
 		arrvec<int,3> xub = {x,u,b};
 		
-		stensor2_d L_bu_0_1 = dbcsr::make_stensor<2>(
-			tensor2_d::create().ngrid(grid2).name("L_bu_0_1")
-			.map1({0}).map2({1}).blk_sizes(bu));
+		std::array<int,2> bu_sizes = {nbf, rank};
+		
+		std::array<int,3> xub_sizes = {dfnbf, rank, nbf};
+		
+		auto spgrid2_bu = dbcsr::create_pgrid<2>(m_world.comm())
+			.tensor_dims(bu_sizes).get();
+			
+		auto spgrid3_xub = dbcsr::create_pgrid<3>(m_world.comm())
+			.tensor_dims(xub_sizes).get();
+		
+		auto L_bu_0_1 = dbcsr::tensor_create<2,double>()
+			.pgrid(spgrid2_bu).name("L_bu_0_1")
+			.map1({0}).map2({1}).blk_sizes(bu).get();
 	
-		stensor3_d B_xub_1_02 = dbcsr::make_stensor<3>(
-			tensor3_d::create().ngrid(grid3).name("B_Xub_1_02").map1({1}).map2({0,2})
-			.blk_sizes(xub));
+		auto B_xub_1_02 = dbcsr::tensor_create<3,double>()
+			.pgrid(spgrid3_xub).name("B_Xub_1_02").map1({1}).map2({0,2})
+			.blk_sizes(xub).get();
 		
-		stensor3_d B_xub_2_01 = dbcsr::make_stensor<3>(
-			tensor3_d::create_template(*B_xub_1_02).name("B_Xub_2_01").map1({2}).map2({0,1}));
+		auto B_xub_2_01 = 
+			dbcsr::tensor_create_template<3,double>(B_xub_1_02)
+			.name("B_Xub_2_01").map1({2}).map2({0,1}).get();
 		
-		stensor3_d B_xuB_2_01 = dbcsr::make_stensor<3>(
-			tensor3_d::create_template(*B_xub_1_02).name("B_XuB_2_01").map1({2}).map2({0,1}));
+		auto B_xuB_2_01 = 
+			dbcsr::tensor_create_template<3,double>(B_xub_1_02)
+			.name("B_XuB_2_01").map1({2}).map2({0,1}).get();
 		
 		//copy over
 		dbcsr::copy_matrix_to_tensor(*L_bu, *L_bu_0_1);
@@ -570,8 +590,8 @@ void mpmod::compute_batch() {
 		
 		int nblks = x.size();
 
-		smat_d Ztilde_XX_t = std::make_shared<mat_d>(
-			mat_d::transpose(*Ztilde_XX));
+		dbcsr::smat_d Ztilde_XX_t = std::make_shared<dbcsr::mat_d>(
+			dbcsr::mat_d::transpose(*Ztilde_XX));
 			
 		//dbcsr::print(*Ztilde_XX);
 		//dbcsr::print(*Ztilde_XX_t);
@@ -628,7 +648,7 @@ void mpmod::compute_batch() {
 	
 	TIME.finish();
 	
-	TIME.print_info();*/
+	TIME.print_info();
 	
 }
 

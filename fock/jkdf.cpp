@@ -62,7 +62,7 @@ void BATCHED_DF_J::compute_J() {
 		ptot.copy_in(*m_p_A);
 		ptot.scale(2.0);
 		dbcsr::copy_matrix_to_3Dtensor_new(ptot,*m_ptot_bbd,true);
-		dbcsr::print(ptot);
+		//dbcsr::print(ptot);
 		ptot.clear();
 	} else {
 		ptot.copy_in(*m_p_A);
@@ -70,8 +70,6 @@ void BATCHED_DF_J::compute_J() {
 		dbcsr::copy_matrix_to_3Dtensor_new<double>(ptot,*m_ptot_bbd,true);
 		ptot.clear();
 	}
-	
-	dbcsr::print(*m_ptot_bbd);
 	
 	m_gp_xd->batched_contract_init();
 	m_ptot_bbd->batched_contract_init();
@@ -454,7 +452,7 @@ void BATCHED_DFAO_K::init_tensors() {
 	int nbatches = m_opt.get<int>("nbatches", 4);
 	
 	m_c_xbb_batched = std::make_shared<dbcsr::btensor<3,double>>(
-		m_c_xbb_1_02, nbatches, mytype, 50);
+		m_c_xbb_1_02, nbatches, mytype, LOG.global_plev());
 	
 	auto& calc_c = TIME.sub("Computing (mu,nu|X)(X|Y)^-1");
 	auto& con = calc_c.sub("Contraction");
@@ -571,7 +569,7 @@ void BATCHED_DFAO_K::compute_K() {
 		
 		auto eri_01_2 = m_eri_batched->get_stensor();
 	
-		m_eri_batched->decompress_init({2});
+		m_eri_batched->decompress_init({0});
 		m_c_xbb_batched->decompress_init({2,0});
 		
 		m_K_01->batched_contract_init();
@@ -588,14 +586,14 @@ void BATCHED_DFAO_K::compute_K() {
 		
 		for (int inu = 0; inu != nu_b.size(); ++inu) {
 			
-			// fetch integrals
-			fetch.start();
-			m_eri_batched->decompress({inu});
-			fetch.finish();
-			
-			//dbcsr::print(*eri_01_2);
-			
 			for (int ix = 0; ix != x_b.size(); ++ix) {
+				
+				// fetch integrals
+				fetch.start();
+				m_eri_batched->decompress({ix});
+				fetch.finish();
+				
+				//dbcsr::print(*eri_01_2);
 				
 				std::cout << "BATCH (x/n): " << ix << " " << inu << std::endl;
 	
@@ -604,8 +602,8 @@ void BATCHED_DFAO_K::compute_K() {
 			
 				con_1_batch.start();
 				dbcsr::contract(*eri_01_2, *m_p_bb, *m_cbar_xbb_01_2)
-					.bounds1(n_bounds).bounds2(xm_bounds)
-					.perform("XML, LS -> XMS");
+					.bounds2(xm_bounds).bounds3(n_bounds)
+					.perform("XML, LN -> XMN");
 				con_1_batch.finish();
 			
 				nze_cbar += m_cbar_xbb_01_2->num_nze_total();

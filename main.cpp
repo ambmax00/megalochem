@@ -168,7 +168,7 @@ int main(int argc, char** argv) {
 	}
 	
 	MPI_Barrier(MPI_COMM_WORLD);
-	/*
+	
 	auto mpopt = opt.subtext("mp");
 	
 	bool do_mp = opt.get<bool>("do_mp");
@@ -178,7 +178,7 @@ int main(int argc, char** argv) {
 		mp::mpmod mymp(myhfwfn,mpopt,wrd);
 		mymp.compute_batch();
 		
-	}*/
+	}
 	
 //#ifdef USE_SCALAPACK
 	scalapack::global_grid.free();
@@ -195,7 +195,9 @@ int main(int argc, char** argv) {
 	
 	dbcsr::print_statistics(true);
 
-	dbcsr::finalize();
+	///dbcsr::finalize();
+
+	LOG.os<>("========== FINSISHED WITHOUT CRASHING ! =========\n");
 
 	MPI_Finalize();
 

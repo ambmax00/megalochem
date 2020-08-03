@@ -259,19 +259,19 @@ void fockmod::init() {
 		int nbatches = m_opt.get<int>("nbatches", 4);
 		
 		dbcsr::sbtensor<4,double> eri_batched =
-			std::make_shared<dbcsr::btensor<4,double>>(eris,nbatches,dbcsr::core,50);
+			std::make_shared<dbcsr::btensor<4,double>>(eris,nbatches,dbcsr::core,LOG.global_plev());
 					
-		eri_batched->compress_init({0,1});
+		eri_batched->compress_init({2,3});
 		
 		vec<vec<int>> bounds(4);
 		
-		for (int imu = 0; imu != eri_batched->nbatches_dim(0); ++imu) {
-			for (int inu = 0; inu != eri_batched->nbatches_dim(1); ++inu) {
+		for (int imu = 0; imu != eri_batched->nbatches_dim(2); ++imu) {
+			for (int inu = 0; inu != eri_batched->nbatches_dim(3); ++inu) {
 				
-				bounds[0] = eri_batched->blk_bounds(0)[imu];
-				bounds[1] = eri_batched->blk_bounds(1)[inu];
-				bounds[2] = eri_batched->full_blk_bounds(2);
-				bounds[3] = eri_batched->full_blk_bounds(3);
+				bounds[0] = eri_batched->full_blk_bounds(0);
+				bounds[1] = eri_batched->full_blk_bounds(1);
+				bounds[2] = eri_batched->blk_bounds(2)[imu];
+				bounds[3] = eri_batched->blk_bounds(3)[inu];
 				
 				aofac->ao_eri_fill(eris, bounds, nullptr);
 				
@@ -319,7 +319,7 @@ void fockmod::init() {
 		int nbatches = m_opt.get<int>("nbatches", 4);
 		
 		dbcsr::sbtensor<3,double> eribatch = 
-			std::make_shared<dbcsr::btensor<3,double>>(eri,nbatches,mytype,50);
+			std::make_shared<dbcsr::btensor<3,double>>(eri,nbatches,mytype,LOG.global_plev());
 		
 		eribatch->set_generator(genfunc);
 		

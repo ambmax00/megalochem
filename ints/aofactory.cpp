@@ -241,7 +241,9 @@ public:
 	}
 	
 	void compute_3_partial(dbcsr::shared_tensor<3>& t_in, vec<vec<int>>& blkbounds,
-		screener* scr) {
+		shared_screener s_scr) {
+			
+		auto scr = s_scr.get();
 			
 		auto blksizes = t_in->blk_sizes(); 
 			
@@ -303,8 +305,10 @@ public:
 	}
 	
 	void compute_4_partial(dbcsr::shared_tensor<4>& t_in, vec<vec<int>>& blkbounds,
-		screener* scr) {
-			
+		shared_screener s_scr) {
+		
+		auto scr = s_scr.get();
+		
 		auto blksizes = t_in->blk_sizes(); 
 			
 		size_t totblk = 0;
@@ -370,8 +374,10 @@ public:
 	}
 	
 	void compute_3_partial_sym(dbcsr::shared_tensor<3>& t_in, vec<vec<int>>& blkbounds,
-		screener* scr) {
+		shared_screener s_scr) {
 			
+		auto scr = s_scr.get();
+		
 		auto blksizes = t_in->blk_sizes(); 
 			
 		size_t totblk = 0;
@@ -431,7 +437,7 @@ public:
 		
 		using namespace std::placeholders;
 		
-		auto gen = std::bind(&aofactory::impl::compute_3_partial_sym, this, _1, _2, s_scr.get());
+		auto gen = std::bind(&aofactory::impl::compute_3_partial_sym, this, _1, _2, s_scr);
 			
 		return gen;
 		
@@ -526,16 +532,16 @@ void aofactory::ao_3c2e_fill(dbcsr::shared_tensor<3,double>& t_in,
 	vec<vec<int>>& blkbounds, shared_screener scr, bool sym) {
 	
 	if (!sym) {
-		pimpl->compute_3_partial(t_in,blkbounds,scr.get());
+		pimpl->compute_3_partial(t_in,blkbounds,scr);
 	} else {
-		pimpl->compute_3_partial_sym(t_in,blkbounds,scr.get());
+		pimpl->compute_3_partial_sym(t_in,blkbounds,scr);
 	}
 }
 
 void aofactory::ao_eri_fill(dbcsr::shared_tensor<4,double>& t_in, 
 	vec<vec<int>>& blkbounds, shared_screener scr, bool sym) {
 	
-	pimpl->compute_4_partial(t_in,blkbounds,scr.get());
+	pimpl->compute_4_partial(t_in,blkbounds,scr);
 	
 }
 
