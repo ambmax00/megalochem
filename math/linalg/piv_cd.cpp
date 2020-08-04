@@ -211,17 +211,17 @@ void pivinc_cd::compute() {
 		
 		// a) find maximum diagonal element
 		
-		double max_U_diag = 0.0;
-		int max_U_idx;
+		double max_U_diag = U.get('A', ' ', I, I);
+		int max_U_idx = I;
 		
 		for (int ix = I; ix != N; ++ix) {
 			double ele = U.get('A', ' ', ix, ix);
-			if (ele > max_U_diag) {
+			if (ele >= max_U_diag) {
 				max_U_diag = ele;
 				max_U_idx = ix;
 			}
 		}
-		
+
 		LOG.os<1>("---- MAX ", max_U_diag, " @ ", max_U_idx, '\n');
 		
 		// b) permute rows/cols
