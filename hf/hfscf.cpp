@@ -101,10 +101,6 @@ hfmod::hfmod(desc::smolecule mol, desc::options opt, dbcsr::world& w)
 		
 	}
 	
-	LOG.os<>("Options: \n");
-	LOG.os<>("print ", LOG.global_plev(), '\n');
-	LOG.os<>("m_guess ", m_guess, '\n');
-	
 }
 
 hfmod::~hfmod() {}

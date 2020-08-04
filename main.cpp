@@ -145,6 +145,10 @@ int main(int argc, char** argv) {
 	auto mol = std::make_shared<desc::molecule>(filereader.get_mol());
 	auto opt = filereader.get_opt();
 	
+	if (wrd.rank() == 0) {
+		opt.print();
+	}
+	
 	auto hfopt = opt.subtext("hf");
 	
 	desc::shf_wfn myhfwfn = std::make_shared<desc::hf_wfn>();

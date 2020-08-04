@@ -106,6 +106,40 @@ public:
 		
 	}
 	
+	void print() {
+		
+		using string = std::string;
+		
+		auto boolname = typeid(bool).name();
+		auto intname = typeid(int).name();
+		auto floatname = typeid(float).name();
+		auto doublename = typeid(double).name();
+		auto stringname = typeid(string).name();
+		
+		for (auto m : m_map) {
+			
+			std::cout << m.first << " : ";
+			
+			auto m_any = m.second;
+			auto anyname = m_any.type().name();
+			
+			#define ifclause(type) \
+			if (type##name == anyname) { \
+				std::cout << std::any_cast<type>(m_any); \
+			}
+			
+			ifclause(bool)
+			ifclause(int)
+			ifclause(double)
+			ifclause(float)
+			ifclause(string)
+			
+			std::cout << std::endl;
+			
+		}
+		
+	}		
+			
 };
 
 }
