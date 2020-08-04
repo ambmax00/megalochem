@@ -64,7 +64,7 @@ public:
     
     matrix(const matrix& m) = delete;
     
-    matrix(matrix&& m)
+    matrix(matrix&& m) : m_matrix_ptr(nullptr)
 	{
 		this->release();
 		this->m_matrix_ptr = m.m_matrix_ptr;

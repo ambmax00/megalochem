@@ -14,14 +14,14 @@ vvshell split_atomic(vshell& basis) {
 	
 	while (slist.size()) {
 		
-		auto fshell = slist.begin();
-		cluster.push_back(*fshell);
+		auto fshell = *(slist.begin());
+		cluster.push_back(fshell);
 		
 		slist.pop_front();
 		auto it = slist.begin();
 		
 		while (it != slist.end()) {
-			if (it->O == fshell->O) {
+			if (it->O == fshell.O) {
 				cluster.push_back(*it);
 				it = slist.erase(it);
 			} else {
@@ -46,14 +46,14 @@ vvshell split_shell(vshell& basis) {
 	
 	while (slist.size()) {
 		
-		auto fshell = slist.begin();
-		cluster.push_back(*fshell);
+		auto fshell = *(slist.begin());
+		cluster.push_back(fshell);
 		
 		slist.pop_front();
 		auto it = slist.begin();
 		
 		while (it != slist.end()) {
-			if (it->O == fshell->O && it->contr[0].l == fshell->contr[0].l) {
+			if (it->O == fshell.O && it->contr[0].l == fshell.contr[0].l) {
 				cluster.push_back(*it);
 				it = slist.erase(it);
 			} else {
@@ -78,8 +78,8 @@ vvshell split_multi_shell(vshell& basis, int nsplit, bool strict, bool sp) {
 	
 	while (slist.size()) {
 		
-		auto fshell = slist.begin();
-		cluster.push_back(*fshell);
+		auto fshell = *(slist.begin());
+		cluster.push_back(fshell);
 		
 		slist.pop_front();
 		auto it = slist.begin();
@@ -94,7 +94,7 @@ vvshell split_multi_shell(vshell& basis, int nsplit, bool strict, bool sp) {
 			if (strict) {
 				
 				int l1 = it->contr[0].l;
-				int l2 = fshell->contr[0].l;
+				int l2 = fshell.contr[0].l;
 				
 				//std::cout << "strict: " << l1 << " " << l2 << std::endl;
 				
@@ -109,7 +109,7 @@ vvshell split_multi_shell(vshell& basis, int nsplit, bool strict, bool sp) {
 			
 			//std::cout << ((dont_split) ? "TRUE" : "FALSE") << std::endl;
 			
-			if (it->O == fshell->O 
+			if (it->O == fshell.O 
 				&& (nbf_cluster + nbf_shell <= nsplit || nbf_cluster == 0)
 				&& (dont_split))
 			{
