@@ -451,9 +451,7 @@ public:
         m_matrix_ptr = nullptr;
     }
     
-    ~matrix() { 
-		if (m_matrix_ptr) std::cout << "Releasing: " << this->name() << std::endl;
-		release(); }
+    ~matrix() { release(); }
     
     world get_world() const {
 		return m_world;

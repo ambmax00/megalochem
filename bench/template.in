@@ -2,8 +2,7 @@
         "name": "test",
         "global":
         {
-                "batchsize": 10000,
-                "block_threshold": 1e-9,
+                "block_threshold": 1e-7,
                 "integral_precision": 1e-12
         },
         "molecule":
@@ -14,7 +13,7 @@
                 "unit": "angstrom",
                 "file": "xxx.xyz",
                 "mo_split": 10,
-                "ao_split_method": "shell",
+                "ao_split_method": "multi_shell",
                 "basis": "cc-pvdz"
         },
         "hf":
@@ -25,10 +24,11 @@
                 "diis_start": 0,
                 "build_J": "batchdf",
                 "build_K": "batchdfmo",
-                "direct": false,
                 "df_metric": "coulomb",
                 "print": 1,
                 "skip": false,
-                "dfbasis": "cc-pvdz-ri"
+                "dfbasis": "cc-pvdz-ri",
+		"nbatches": 5,
+		"occ_nbatches": 5
         }
 }

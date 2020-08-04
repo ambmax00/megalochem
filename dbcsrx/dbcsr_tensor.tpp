@@ -37,8 +37,6 @@ public:
 	
 	void destroy(bool keep_comm = false) {
 		
-		std::cout << "Destroying pgrid of dims " << N << std::endl;
-		
 		if (m_pgrid_ptr != nullptr)
 			c_dbcsr_t_pgrid_destroy(&m_pgrid_ptr, &keep_comm);
 			
@@ -90,8 +88,6 @@ public:
 		shared_pgrid<N> spgrid_out = std::make_shared<pgrid<N>>();
 		spgrid_out->m_comm = c_comm;
 		spgrid_out->m_dims.resize(N);
-		
-		std::cout << "COMM: " << spgrid_out->m_comm << std::endl;
 		
 		MPI_Fint fmpi = MPI_Comm_c2f(c_comm);
 		
@@ -150,8 +146,6 @@ public:
 		m_nd_dists(nd_dists),
         m_comm(spgrid->m_comm)
 	{
-		
-		std::cout << "COMM: " << m_comm << std::endl;
 		
 		c_dbcsr_t_distribution_new(&m_dist_ptr, spgrid->m_pgrid_ptr,
                 ${datasize('m_nd_dists',0,idim)}$
@@ -365,7 +359,6 @@ public:
 	~tensor() {
 		
 		//if (m_tensor_ptr != nullptr) std::cout << "Destroying: " << this->name() << std::endl;
-		if (m_tensor_ptr) std::cout << "Releasing: " << this->name() << std::endl;
 		destroy();
 		
 	}
@@ -373,7 +366,6 @@ public:
 	void destroy() {
 		
 		if (m_tensor_ptr != nullptr) {
-			std::cout << "Destroying " << this->name() << std::endl;
 			c_dbcsr_t_destroy(&m_tensor_ptr);
 		}
 		
@@ -626,8 +618,6 @@ public:
                         #:endif
                         ${datasize0(MAXDIM-idim)}$);
 		
-		std::cout << "COMM: " << stensor_out->m_comm << std::endl;
-				
 		if (distn) delete distn;
 		
 		return stensor_out;
@@ -677,8 +667,6 @@ public:
             (c_map2) ? c_map2->data() : nullptr,
             (c_map2) ? c_map2->size() : 0,
             &stensor_out->m_data_type);
-            
-       std::cout << "COMM: " << stensor_out->m_comm << std::endl;
             
        return stensor_out;
 		
