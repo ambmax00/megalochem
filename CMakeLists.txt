@@ -3,7 +3,7 @@ cmake_minimum_required(VERSION 3.13 FATAL_ERROR)
 project(chem)
 enable_language(Fortran CXX)
 
-set(CMAKE_BUILD_TYPE Debug)
+set(CMAKE_BUILD_TYPE Release)
 set (CMAKE_CXX_STANDARD 17)
 
 set(CMAKE_MODULE_PATH ${CMAKE_SOURCE_DIR}/cmake/modules)
@@ -15,7 +15,6 @@ find_package(Eigen3 REQUIRED NO_MODULE)
 include_directories(${dir})
 
 find_package(OpenMP REQUIRED)
-find_package(Boost REQUIRED)
 find_package(MPI REQUIRED)
 find_package(DBCSR 2.0.0 CONFIG REQUIRED)
 find_package(PkgConfig)
@@ -25,8 +24,11 @@ find_package(SCALAPACK REQUIRED)
 
 get_target_property(DBCSR_INCLUDE_DIRS DBCSR::dbcsr INTERFACE_INCLUDE_DIRECTORIES)
 include_directories(
-	${DBCSR_INCLUDE_DIRS} ${MPI_CXX_HEADER_DIR} ${Boost_INCLUDE_DIRS}
-	${LIBINT2_INCLUDE_DIRS} ${CMAKE_CURRENT_BINARY_DIR} ${CMAKE_CURRENT_SOURCE_DIR}
+	${DBCSR_INCLUDE_DIRS} 
+	${MPI_CXX_HEADER_DIR} 
+	${LIBINT2_INCLUDE_DIRS} 
+	${CMAKE_CURRENT_BINARY_DIR} 
+	${CMAKE_CURRENT_SOURCE_DIR}
 )
 
 add_subdirectory(dbcsrx)

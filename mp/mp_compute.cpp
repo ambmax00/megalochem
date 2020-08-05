@@ -91,12 +91,16 @@ void mpmod::compute_batch() {
 	double elumo = eps_v->front();
 	double emax = eps_v->back();
 	
-	LOG.os<>("eps_min/eps_homo/eps_lumo/eps_max ", emin, " ", ehomo, " ", elumo, " ", emax, '\n');
+	double ymin = 2*(elumo - ehomo);
+	double ymax = 2*(emax - emin);
 	
-	math::laplace lp(nlap, emin, ehomo, elumo, emax);
+	LOG.os<>("eps_min/eps_homo/eps_lumo/eps_max ", emin, " ", ehomo, " ", elumo, " ", emax, '\n');
+	LOG.os<>("ymin/ymax ", ymin, " ", ymax, '\n');
+	
+	math::laplace lp(m_world.comm(), LOG.global_plev());
 	
 	laptime.start();
-	lp.compute();
+	lp.compute(nlap, ymin, ymax);
 	laptime.finish();
 	
 	auto lp_omega = lp.omega();

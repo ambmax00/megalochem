@@ -3,76 +3,118 @@
 
 #include <vector>
 #include <limits>
-#include <Eigen/Core>
 #include "utils/mpi_log.h"
-#include <boost/multiprecision/float128.hpp> 
-
-namespace boost{ 
-namespace multiprecision{
-
-class float128_backend;
-
-typedef number<float128_backend, et_off> float128;
-
-}}
-
-using namespace boost::multiprecision;
-
-typedef Eigen::Matrix<float128,Eigen::Dynamic,Eigen::Dynamic> MatrixX128;
-typedef Eigen::Matrix<float128,Eigen::Dynamic, 1> VectorX128;
+#include "math/laplace/laplace_minimax_c.h"
+#include <optional>
 
 namespace math {
 	
 class laplace {
 	
 private:
-
+	
+	MPI_Comm m_comm;
 	util::mpi_log LOG;
+	
+	int m_nlap;
+	double m_err;
+	std::vector<double> m_omega;
+	std::vector<double> m_alpha;
+	
+/*	mxiter               (optional) maximum number of iterations. Used for each
+                           of the iterative prodecures (Remez + Newton(-Maehly))
 
-	int m_k;
-	double m_emin, m_ehomo, m_elumo, m_emax, m_R;
-	double m_limit;
-	VectorX128 m_omega, m_alpha, m_xi;
+   stepmx               (optional) maximum step length used for each of the 
+                           Newton type procedures
+
+   tolrng               (optional) tolerance threshold for the Newton-Maehly
+                           procedure that determines the extremum points
+
+   tolpar               (optional) tolerance threshold for the Newton procedure
+                           that computes the Laplace parameters at each extremum
+                           point
+
+   tolerr               (optional) tolerance threshold for the maximum quadrature
+                           error obtained by the minimax algorithm
+
+   delta                (optional) shift parameter for initializating the next
+                           extremum point to be determined by Newton-Maehly
+
+   afact                (optional) factor for the line search algorithm used
+                           in combination with the Newton algorithm to determine
+                           the Laplace parameters
+
+   do_rmsd              (optional) compute an RMS error after the optimization
+                           of the Laplace parameters
+*/	
 	
-	std::vector<double> m_omega_db;
-	std::vector<double> m_alpha_db;
+#define set_var(type, name) \
+	std::optional<type> m_##name = std::nullopt; \
+	laplace& set_##name(type name) { \
+		m_##name = name; \
+		return *this; \
+	} 
 	
-	void minmax_read();
-	void minmax_root();
-	void minmax_newton();
-	void minmax_paraopt();
-	
-	void NewtonKahan(int i, int method);
-	MatrixX128 Jacobi();
-	
-	float128 Eta(float128 x);
-	float128 dEta(float128 x);
-	float128 ddEta(float128 x);
-	float128 deltak();
-	
+	set_var(int, mxiter)
+	set_var(double,stepmx)
+	set_var(double,tolrng)
+	set_var(double,tolpar)
+	set_var(double,tolerr)
+	set_var(double,delta)
+	set_var(double,afact)
+	set_var(bool,do_rmsd)
 
 public:
 
-	laplace(int t_k, double t_emin, double t_ehomo, 
-		double t_elumo, double t_emax) :  
-		m_k(t_k), m_emin(t_emin), m_ehomo(t_ehomo),
-		m_elumo(t_elumo), m_emax(t_emax),
-		m_omega(t_k), m_alpha(t_k), m_xi(2*t_k + 1),
-		m_omega_db(t_k), m_alpha_db(t_k),
-		LOG(MPI_COMM_WORLD, 1), m_limit(std::numeric_limits<double>::epsilon()) {};
+	laplace(MPI_Comm comm, int print) :  
+		m_comm(comm), LOG(comm, print), m_nlap(0), m_err(0.0) {}
+		
+	void compute(int nlap, double ymin, double ymax) {
 	
-	std::vector<double> omega() {
-		return m_omega_db;
+		int rank = -1;
+		
+		MPI_Comm_rank(m_comm, &rank);
+		
+		m_omega.clear();
+		m_alpha.clear();
+		
+		m_omega.resize(nlap);
+		m_alpha.resize(nlap);
+		
+		if (rank == 0) {
+		
+			int nprint = LOG.global_plev();
+			
+			c_laplace_minimax(&m_err, m_alpha.data(), m_omega.data(), 
+				&nlap, ymin, ymax, 
+				(m_mxiter) ? &*m_mxiter : nullptr , 
+				&nprint, 
+				(m_stepmx) ? &*m_stepmx : nullptr, 
+				(m_tolrng) ? &*m_tolrng : nullptr, 
+				(m_tolpar) ? &*m_tolpar : nullptr, 
+				(m_tolerr) ? &*m_tolerr : nullptr, 
+				(m_delta) ? &*m_delta : nullptr,
+				(m_afact) ? &*m_afact : nullptr,
+				(m_do_rmsd) ? &*m_do_rmsd : nullptr,
+				nullptr, nullptr);
+				
+		}
+		
+		MPI_Bcast(m_omega.data(), nlap, MPI_DOUBLE, 0, m_comm);
+		MPI_Bcast(m_alpha.data(), nlap, MPI_DOUBLE, 0, m_comm);
+			
+	}
+			
+	
+	std::vector<double> omega() const {
+		return m_omega;
 	}
 	
-	std::vector<double> alpha() {
-		return m_alpha_db;
+	std::vector<double> alpha() const {
+		return m_alpha;
 	}
 	
 	~laplace() {}
-	
-	void compute();
-	
 	
 };
 		
