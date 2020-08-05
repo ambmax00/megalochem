@@ -54,7 +54,7 @@ public:
 		} else if (op == "nuclear") {
 			m_Op = libint2::Operator::nuclear;
 		} else if (op == "erfc_coulomb") {
-			std::cout << "ERROR" << std::endl;
+			//std::cout << "ERROR" << std::endl;
 			m_Op = libint2::Operator::erfc_coulomb;
 		}
 		

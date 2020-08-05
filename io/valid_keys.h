@@ -62,7 +62,8 @@ static const json valid_keys =
 		{"dfbasis", "basis"},
 		{"c_os", 1.3},
 		{"eris", "core"},
-		{"intermeds", "core"}
+		{"intermeds", "core"},
+		{"cholprec", 1e-12}
 	}},
 	{"adc", {
 		{"print", 0},

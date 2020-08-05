@@ -189,7 +189,7 @@ void pivinc_cd::compute() {
 	LOG.os<>("-- Problem size: ", N, '\n');
 	LOG.os<1>("-- Maximum diagonal element of input matrix: ", max_U_diag_global, '\n');
 	
-	double thresh = 1e-12; /*N * std::numeric_limits<double>::epsilon() * max_U_diag_global;*/
+	double thresh = m_thresh; /*N * std::numeric_limits<double>::epsilon() * max_U_diag_global;*/
 	
 	LOG.os<>("-- Threshold: ", thresh, '\n');
 	

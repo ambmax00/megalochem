@@ -84,6 +84,7 @@ void mpmod::compute_batch() {
 	int nbatches = m_opt.get<int>("nbatches", MP_NBATCHES);
 	std::string eri_method = m_opt.get<std::string>("eris", MP_ERIS);
 	std::string intermed_method = m_opt.get<std::string>("intermeds", MP_INTERMEDS);
+	double cholprec = m_opt.get<double>("cholprec", MP_CHOLPREC);
 	
 	// laplace
 	double emin = eps_o->front();
@@ -336,7 +337,7 @@ void mpmod::compute_batch() {
 		
 		//=============== CHOLESKY DECOMPOSITION =======================
 		pcholtime.start();
-		math::pivinc_cd chol(pseudo_occ, 0);
+		math::pivinc_cd chol(pseudo_occ, cholprec, 0);
 		
 		chol.compute();
 		

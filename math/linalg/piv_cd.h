@@ -19,6 +19,7 @@ private:
 	util::mpi_log LOG;
 	
 	int m_rank = -1;
+	double m_thresh;
 	
 	std::optional<std::string> m_reorder_method = std::nullopt;
 	std::optional<bool> m_reduce = std::nullopt;
@@ -38,8 +39,8 @@ public:
 	}
 		
 
-	pivinc_cd(dbcsr::smat_d mat_in, int print) : 
-		m_mat_in(mat_in), LOG(m_mat_in->get_world().comm(), print) {}
+	pivinc_cd(dbcsr::smat_d mat_in, double thresh, int print) : 
+		m_mat_in(mat_in), m_thresh(thresh), LOG(m_mat_in->get_world().comm(), print) {}
 	~pivinc_cd() {}
 	
 	void compute();

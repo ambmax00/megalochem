@@ -103,7 +103,7 @@ void hfmod::diag_fock() {
 		
 		LOG.os<1>("Localizing occupied ", x, " MO orbitals.\n");
 		
-		math::pivinc_cd pcd(p_bb, LOG.global_plev());
+		math::pivinc_cd pcd(p_bb, 1e-12, LOG.global_plev());
 		
 		pcd.compute();
 		

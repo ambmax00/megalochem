@@ -398,7 +398,7 @@ void hfmod::compute_guess() {
 			
 			LOG.os<>("Forming cholesky orbitals from SAD guess.");
 			
-			math::pivinc_cd cd(m_p_bb_A, LOG.global_plev());
+			math::pivinc_cd cd(m_p_bb_A, 1e-12, LOG.global_plev());
 			
 			cd.compute();
 			

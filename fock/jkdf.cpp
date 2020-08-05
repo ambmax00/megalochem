@@ -595,7 +595,7 @@ void BATCHED_DFAO_K::compute_K() {
 				
 				//dbcsr::print(*eri_01_2);
 				
-				std::cout << "BATCH (x/n): " << ix << " " << inu << std::endl;
+				//std::cout << "BATCH (x/n): " << ix << " " << inu << std::endl;
 	
 				vec<vec<int>> xm_bounds = { x_b[ix], mu_full_b };
 				vec<vec<int>> n_bounds = { nu_b[inu] };
