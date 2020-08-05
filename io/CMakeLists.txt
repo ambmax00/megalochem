@@ -7,8 +7,13 @@ set (SOURCES
 
 add_library(chem_io ${SOURCES})
 
+target_include_directories(chem_io
+	PUBLIC
+	${LIBINT2_INCLUDE_DIRS}
+)
+
 target_link_libraries(chem_io 
-	Libint2::int2
+	Libint2::cxx
 	chem_desc
 	chem_dbcsrx
 	Eigen3::Eigen
