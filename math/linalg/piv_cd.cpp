@@ -3,6 +3,7 @@
  #include <limits>
  #include <numeric>
  #include <algorithm>
+#include <dbcsr_matrix_ops.hpp>
  
 #include "extern/scalapack.h"
 
@@ -15,16 +16,16 @@ void pivinc_cd::reorder_and_reduce(scalapack::distmat<double>& L) {
 	int N = L.nrowstot();
 	int nb = L.rowblk_size();
 	
-	std::vector<int> new_col_perms(N);
+	std::vector<int> new_col_perms(m_rank);
 	std::iota(new_col_perms.begin(),new_col_perms.end(),0);
 	
-	if (m_reorder_method) {
+	if (false) {//if (m_reorder_method) {
 		
 		LOG.os<>("-- Reordering cholesky orbitals according to method \"", *m_reorder_method, "\"\n");
 		
 		if (m_reorder_method == "value" || m_reorder_method == "v") {
 			
-			double reorder_thresh = 1e-12;
+			double reorder_thresh = m_thresh;
 			
 			// reorder it according to matrix values
 			std::vector<double> lmo_pos(m_rank,0);
@@ -60,7 +61,7 @@ void pivinc_cd::reorder_and_reduce(scalapack::distmat<double>& L) {
 				} LOG.os<2>('\n');
 			}		
 			
-			std::stable_sort(new_col_perms.begin(), new_col_perms.begin() + m_rank, 
+			std::stable_sort(new_col_perms.begin(), new_col_perms.end(), 
 				[&lmo_pos](int i1, int i2) { return lmo_pos[i1] < lmo_pos[i2]; });
 			
 			if (LOG.global_plev() >= 2) {
@@ -76,7 +77,7 @@ void pivinc_cd::reorder_and_reduce(scalapack::distmat<double>& L) {
 	}
 	
 	if (m_reduce && *m_reduce) {
-		m_L = std::make_shared<scalapack::distmat<double>>(N,m_rank,nb,nb,0,0);
+		m_L = std::make_shared<scalapack::distmat<double>>(N,N,nb,nb,0,0);
 	} else {
 		m_L = std::make_shared<scalapack::distmat<double>>(N,N,nb,nb,0,0);
 	}
@@ -127,7 +128,17 @@ void pivinc_cd::compute() {
 		
 	scalapack::distmat<double> U = dbcsr::matrix_to_scalapack(*m_mat_in, 
 		m_mat_in->name() + "_scalapack", nb, nb, ori_coord[0], ori_coord[1]);
-	
+
+	auto w = m_mat_in->get_world();
+	auto rblk = m_mat_in->row_blk_sizes();
+	auto cblk = m_mat_in->col_blk_sizes();
+
+	dbcsr::mat_d U_back = dbcsr::scalapack_to_matrix(U, "name", w, rblk, cblk, "symmetric");
+
+	U_back.add(1.0, -1.0, *m_mat_in);
+
+	LOG.os<>("U NORM: ", U_back.norm(1));	
+
 	scalapack::distmat<double> Ucopy(N,N,nb,nb,0,0);
 	
 	c_pdgeadd('N', N, N, 1.0, U.data(), 0, 0, U.desc().data(), 
@@ -362,15 +373,16 @@ void pivinc_cd::compute() {
 	//c_pdlapiv('B', 'R', 'R', N, N, Uc.data(), 0, 0, Uc.desc().data(), Prow.data(), 0, 0, Prow.desc().data(), iwork);
 	
 	//c_pdgeadd('N', N, N, 1.0, Ucopy.data(), 0, 0, Ucopy.desc().data(), -1.0, Uc.data(), 0, 0, Uc.desc().data());
+
+	reorder_and_reduce(L);
 	
-	c_pdgemm('N', 'T', N, N, N, 1.0, L.data(), 0, 0, L.desc().data(), 
-		L.data(), 0, 0, L.desc().data(), -1.0, Ucopy.data(), 0, 0, Ucopy.desc().data());
+	c_pdgemm('N', 'T', N, N, N, 1.0, m_L->data(), 0, 0, m_L->desc().data(), 
+		m_L->data(), 0, 0, m_L->desc().data(), -1.0, Ucopy.data(), 0, 0, Ucopy.desc().data());
 	
-	double err = c_pdlange('N', N, N, Ucopy.data(), 0, 0, Ucopy.desc().data(), nullptr);
+	double err = c_pdlange('F', N, N, Ucopy.data(), 0, 0, Ucopy.desc().data(), nullptr);
 	
 	LOG.os<>("-- CD error: ", err, '\n');
 	
-	reorder_and_reduce(L);
 	
 	LOG.os<>("Finished decomposition.\n");
 	
@@ -386,6 +398,12 @@ dbcsr::smat_d pivinc_cd::L(std::vector<int> rowblksizes, std::vector<int> colblk
 		w, rowblksizes, colblksizes);
 		
 	m_L->release();
+
+	dbcsr::mat_d cmat = dbcsr::mat_d::copy(*m_mat_in).name("COPY");
+
+	dbcsr::multiply('N', 'T', out, out, cmat).beta(-1.0).perform();
+
+	LOG.os<>("NORM: ", cmat.norm(1), '\n');
 	
 	return out.get_smatrix();
 	

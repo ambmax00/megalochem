@@ -264,7 +264,7 @@ public:
     void complete_redistribute(matrix<T>& in, std::optional<bool> keep_sparsity = std::nullopt, 
                                 std::optional<bool> summation = std::nullopt) {
     
-        c_dbcsr_complete_redistribute(in.m_matrix_ptr, &m_matrix_ptr, 
+        c_dbcsr_complete_redistribute(in.m_matrix_ptr, m_matrix_ptr, 
             (keep_sparsity) ? &*keep_sparsity : nullptr, 
             (summation) ? &*summation : nullptr);
             
@@ -385,7 +385,7 @@ public:
 		
 		for (int j = 0; j != ncolblk; ++j) {
 			for (int i = 0; i <= j; ++i) {
-				if (this->m_world.rank()) {
+				if (this->proc(i,j) == this->m_world.rank()) {
 					resrows.push_back(i);
 					rescols.push_back(j);
 				}

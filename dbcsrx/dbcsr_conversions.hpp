@@ -150,10 +150,10 @@ scalapack::distmat<T> matrix_to_scalapack(matrix<T>& mat_in, std::string nameint
 
 	if (mat_in.has_symmetry()) {
 		matrix<T> mat_in_nosym = mat_in.desymmetrize();
-		mat_out.redistribute(mat_in_nosym, false);
+		mat_out.complete_redistribute(mat_in_nosym, false);
 		//mat_in_nosym.release();
 	} else {
-		mat_out.redistribute(mat_in,false);
+		mat_out.complete_redistribute(mat_in,false);
 	}
 	
 	//dbcsr::print(mat_out);
@@ -223,11 +223,7 @@ matrix<T> scalapack_to_matrix(scalapack::distmat<T>& sca_mat_in, std::string nam
 		.set_dist(cycdist).row_blk_sizes(rowcycsizes).col_blk_sizes(colcycsizes)
 		.type(dbcsr_type_no_symmetry);
 	
-	if (sym) {
-		mat_cyclic.reserve_sym();
-	} else {
-		mat_cyclic.reserve_all();
-	}
+	mat_cyclic.reserve_all();
 
 #pragma omp parallel
 {
@@ -274,9 +270,19 @@ matrix<T> scalapack_to_matrix(scalapack::distmat<T>& sca_mat_in, std::string nam
 	// make new matrix
 	matrix<T> mat_out = typename matrix<T>::create().name(nameint).set_world(world_in)
 		.row_blk_sizes(rowblksizes).col_blk_sizes(colblksizes)
-		.type(dbcsr_type_no_symmetry);
+		.type(symtype);
+
+	bool keep_sp = false;
+
+	if (sym) {
+		mat_out.reserve_sym();
+		keep_sp = true;
+	}
 		
-	mat_out.redistribute(mat_cyclic);
+	mat_out.complete_redistribute(mat_cyclic,keep_sp);
+
+	if (sym) mat_out.filter();
+
 	mat_cyclic.release();
 	cycdist.release();
 	

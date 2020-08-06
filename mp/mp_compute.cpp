@@ -327,17 +327,22 @@ void mpmod::compute_batch() {
 		c_occ_exp->scale(exp_occ, "right");
 		c_vir_exp->scale(exp_vir, "right");
 				
-		c_occ_exp->filter();
-		c_vir_exp->filter();
+		//c_occ_exp->filter();
+		//c_vir_exp->filter();
 		
-		dbcsr::multiply('N', 'T', *c_occ_exp, *c_occ_exp, *pseudo_occ).alpha(pow(omega,0.25)).perform();
-		dbcsr::multiply('N', 'T', *c_vir_exp, *c_vir_exp, *pseudo_vir).alpha(pow(omega,0.25)).perform();
+		double prec = 1-16;
+
+		dbcsr::multiply('N', 'T', *c_occ_exp, *c_occ_exp, *pseudo_occ)
+			.alpha(pow(omega,0.25)).filter_eps(prec).perform();
+		dbcsr::multiply('N', 'T', *c_vir_exp, *c_vir_exp, *pseudo_vir)
+			.alpha(pow(omega,0.25)).filter_eps(prec).perform();
 		
 		pseudotime.finish();
 		
 		//=============== CHOLESKY DECOMPOSITION =======================
 		pcholtime.start();
-		math::pivinc_cd chol(pseudo_occ, cholprec, 0);
+		math::pivinc_cd chol(pseudo_occ, cholprec, LOG.global_plev());
+		chol.reorder("value");
 		
 		chol.compute();
 		
@@ -347,9 +352,14 @@ void mpmod::compute_batch() {
 		
 		LOG.os<>("Cholesky decomposition rank: ", rank, '\n');
 	
-		auto L_bu = chol.L(b, u);
+		auto L_bu = chol.L(b, b);
 		
 		L_bu->filter();
+
+		pseudo_occ->filter();
+		pseudo_vir->filter();
+
+		exit(0);
 		
 		LOG.os<>("Occupancy of L: ", L_bu->occupation()*100, "%\n");
 		
