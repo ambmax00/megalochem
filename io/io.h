@@ -35,10 +35,10 @@ void read_binary_mat(const char* filename, Matrix& matrix){
     in.close();
 }
 
-void write_matrix(dbcsr::smatrix<double>& m_in, std::string filename);
+void write_matrix(dbcsr::shared_matrix<double>& m_in, std::string filename);
 
-dbcsr::smatrix<double> read_matrix(std::string filename, std::string matname, 
-	dbcsr::world wrld, vec<int> rowblksizes, vec<int> colblksizes, char type);
+dbcsr::shared_matrix<double> read_matrix(std::string filename, std::string matname, 
+	dbcsr::world wrld, vec<int> rowblksizes, vec<int> colblksizes, dbcsr::type mytype);
 
 void write_vector(svector<double>& v_in, std::string filename, MPI_Comm comm);
 

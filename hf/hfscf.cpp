@@ -49,35 +49,47 @@ hfmod::hfmod(desc::smolecule mol, desc::options opt, dbcsr::world& w)
 	
 	// alpha
 	
-	mat_d core_bb = mat_d::create().set_world(m_world).name("core_bb")
-		.row_blk_sizes(b).col_blk_sizes(b).type(dbcsr_type_symmetric);
-	mat_d p_bb_A = mat_d::create_template(core_bb).name("p_bb_A");
-	mat_d f_bb_A = mat_d::create_template(core_bb).name("f_bb_A");
-	mat_d c_bm_A = mat_d::create().set_world(m_world).name("c_bm_A")
-		.row_blk_sizes(b).col_blk_sizes(mA).type(dbcsr_type_no_symmetry);
+	m_core_bb = dbcsr::create<double>()
+		.set_world(m_world)
+		.name("core_bb")
+		.row_blk_sizes(b)
+		.col_blk_sizes(b)
+		.matrix_type(dbcsr::type::symmetric).get();
 		
-	m_core_bb = core_bb.get_smatrix();
-	m_p_bb_A = p_bb_A.get_smatrix();
-	m_f_bb_A = f_bb_A.get_smatrix();
-	m_c_bm_A = c_bm_A.get_smatrix();
+	m_p_bb_A = dbcsr::create_template<double>(m_core_bb)
+		.name("p_bb_A").get();
+		
+	m_f_bb_A = dbcsr::create_template<double>(m_core_bb)
+		.name("f_bb_A").get();	
+	
+	m_c_bm_A = dbcsr::create<double>()
+		.set_world(m_world)
+		.name("c_bm_A")
+		.row_blk_sizes(b)
+		.col_blk_sizes(mA)
+		.matrix_type(dbcsr::type::no_symmetry)
+		.get();
 		
 	if (!m_restricted) {
 		
-		mat_d p_bb_B = mat_d::create_template(*m_core_bb).name("p_bb_B");
-		mat_d f_bb_B = mat_d::create_template(*m_core_bb).name("f_bb_B");
+		m_p_bb_B = dbcsr::create_template<double>(m_core_bb)
+			.name("p_bb_B").get();
 		
-		m_p_bb_B = p_bb_B.get_smatrix();
-		m_f_bb_B = f_bb_B.get_smatrix();
+		m_f_bb_B = dbcsr::create_template<double>(m_core_bb)
+			.name("f_bb_B").get();
 		
 	}
 	
 	if (!m_nobetaorb) {
-	
-		mat_d c_bm_B = mat_d::create().set_world(m_world).name("c_bm_B")
-			.row_blk_sizes(b).col_blk_sizes(mB).type(dbcsr_type_no_symmetry);
 		
-		m_c_bm_B = c_bm_B.get_smatrix();
-		 
+		m_c_bm_B = dbcsr::create<double>()
+			.set_world(m_world)
+			.name("c_bm_B")
+			.row_blk_sizes(b)
+			.col_blk_sizes(mB)
+			.matrix_type(dbcsr::type::no_symmetry)
+			.get();
+
 	}
 		
 	m_eps_A = std::make_shared<std::vector<double>>(std::vector<double>(0));
@@ -198,21 +210,31 @@ void hfmod::compute_scf_energy() {
 	
 }
 
-smat_d hfmod::compute_errmat(smat_d& F_x, smat_d& P_x, smat_d& S, std::string x) {
+dbcsr::shared_matrix<double> hfmod::compute_errmat(
+	dbcsr::shared_matrix<double>& F_x, 
+	dbcsr::shared_matrix<double>& P_x, 
+	dbcsr::shared_matrix<double>& S, std::string x) {
 	
-	mat_d e_1 = mat_d::create_template(*F_x).name("e_1_"+x).type(dbcsr_type_no_symmetry);
-	mat_d e_2 = mat_d::create_template(*F_x).name("e_2_"+x).type(dbcsr_type_no_symmetry);
+	auto e_1 = dbcsr::create_template(F_x)
+		.name("e_1_"+x)
+		.matrix_type(dbcsr::type::no_symmetry)
+		.get();
+		
+	auto e_2 = dbcsr::create_template(F_x)
+		.name("e_2_"+x)
+		.matrix_type(dbcsr::type::no_symmetry)
+		.get();
 	
 	//DO E = FPS - SPF
 	
-	dbcsr::multiply('N','N',*F_x,*P_x,e_1).perform();
-	dbcsr::multiply('N','N',e_1,*S,e_1).perform();
-	dbcsr::multiply('N','N',*S,*P_x,e_2).alpha(-1.0).perform();
-	dbcsr::multiply('N','N',e_2,*F_x,e_1).beta(1.0).perform();
+	dbcsr::multiply('N','N',*F_x,*P_x,*e_1).perform();
+	dbcsr::multiply('N','N',*e_1,*S,*e_1).perform();
+	dbcsr::multiply('N','N',*S,*P_x,*e_2).alpha(-1.0).perform();
+	dbcsr::multiply('N','N',*e_2,*F_x,*e_1).beta(1.0).perform();
 	
-	e_2.release();
+	e_2->release();
 	
-	return e_1.get_smatrix();
+	return e_1;
 	
 }
 
@@ -254,8 +276,8 @@ void hfmod::compute() {
 	math::diis_helper<2> diis_B(m_world.comm(),dstart, dmin, dmax, (LOG.global_plev() >= 2) ? true : false );
 	
 	// ERROR MATRICES
-	smat_d e_A;
-	smat_d e_B;
+	dbcsr::shared_matrix<double> e_A;
+	dbcsr::shared_matrix<double> e_B;
 	
 	size_t nbas = m_mol->c_basis().nbf();
 	
@@ -273,7 +295,7 @@ void hfmod::compute() {
 		
 	LOG.os<>("--------------------------------------------------------------------------------\n");
 	
-	auto RMS = [&](smat_d& m) {
+	auto RMS = [&](dbcsr::shared_matrix<double>& m) {
 		double prod = m->dot(*m);
 		return sqrt(prod/(nbas*nbas));
 	};

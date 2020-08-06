@@ -17,16 +17,16 @@ using MatrixX = Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic>;
 namespace dbcsr {
 
 template <typename T = double>
-MatrixX<T> matrix_to_eigen(dbcsr::matrix<T>& mat_in) {
-	int row = mat_in.nfullrows_total();
-	int col = mat_in.nfullcols_total();
+MatrixX<T> matrix_to_eigen(shared_matrix<T>& mat_in) {
+	int row = mat_in->nfullrows_total();
+	int col = mat_in->nfullcols_total();
 	
-	dbcsr::matrix<T>* mat_desym;
+	dbcsr::shared_matrix<T> mat_desym;
 	
-	if (mat_in.has_symmetry()) {
-		mat_desym = new dbcsr::matrix<T>(mat_in.desymmetrize());
+	if (mat_in->has_symmetry()) {
+		mat_desym = mat_in->desymmetrize();
 	} else {
-		mat_desym = &mat_in;
+		mat_desym = mat_in;
 	}
 	
 	mat_desym->replicate_all();
@@ -57,11 +57,10 @@ MatrixX<T> matrix_to_eigen(dbcsr::matrix<T>& mat_in) {
 	
 }
 
-	if (mat_in.has_symmetry()) {
+	if (mat_in->has_symmetry()) {
 		mat_desym->release();
-		delete mat_desym;
 	} else {
-		mat_in.distribute();
+		mat_in->distribute();
 	}
 	
 	return eigenmat;
@@ -69,40 +68,40 @@ MatrixX<T> matrix_to_eigen(dbcsr::matrix<T>& mat_in) {
 }
 
 template <typename T = double>
-matrix<T> eigen_to_matrix(MatrixX<T>& mat, world& w, std::string name, vec<int>& row_blk_sizes, 
-	vec<int>& col_blk_sizes, char type) {
+shared_matrix<T> eigen_to_matrix(MatrixX<T>& mat, world& w, std::string name, vec<int>& row_blk_sizes, 
+	vec<int>& col_blk_sizes, type mtype) {
 	
-	matrix<T> out = typename matrix<T>::create().name(name).set_world(w).row_blk_sizes(row_blk_sizes)
-		.col_blk_sizes(col_blk_sizes).type(type);
+	auto out = create<T>().name(name).set_world(w).row_blk_sizes(row_blk_sizes)
+		.col_blk_sizes(col_blk_sizes).matrix_type(mtype).get();
 	
-	if (out.has_symmetry()) {
+	if (out->has_symmetry()) {
 		//reserve upper diagonal blocks
 		int nrows, ncols;
-		nrows = out.nblkrows_total();
-		ncols = out.nblkcols_total();
+		nrows = out->nblkrows_total();
+		ncols = out->nblkcols_total();
 		vec<int> resrows, rescols;
 	
 		for (int i = 0; i != nrows; ++i) {
 			for (int j = 0; j != ncols; ++j) {
-				if (out.proc(i,j) == w.rank() && i <= j) {
+				if (out->proc(i,j) == w.rank() && i <= j) {
 					resrows.push_back(i);
 					rescols.push_back(j);
 				}
 			}
 		}
 	
-		out.reserve_blocks(resrows,rescols);
+		out->reserve_blocks(resrows,rescols);
 		
 	} else {
 		
-		out.reserve_all();
+		out->reserve_all();
 		
 	}
 	
 #pragma omp parallel 
 {
 	
-	iterator<T> iter(out);
+	iterator<T> iter(*out);
 	
 	iter.start();
 	
@@ -118,7 +117,7 @@ matrix<T> eigen_to_matrix(MatrixX<T>& mat, world& w, std::string name, vec<int>&
 	}
 	
 	iter.stop();
-	out.finalize();
+	out->finalize();
 	
 }
 
@@ -129,12 +128,13 @@ matrix<T> eigen_to_matrix(MatrixX<T>& mat, world& w, std::string name, vec<int>&
 //#ifdef USE_SCALAPACK
 
 template <typename T = double>
-scalapack::distmat<T> matrix_to_scalapack(matrix<T>& mat_in, std::string nameint, int nsplitrow, int nsplitcol, int ori_row, int ori_col) {
+scalapack::distmat<T> matrix_to_scalapack(shared_matrix<T> mat_in, std::string nameint, 
+	int nsplitrow, int nsplitcol, int ori_row, int ori_col) {
 	
-	world mworld = mat_in.get_world();	
+	world mworld = mat_in->get_world();	
 	
-	int nrows = mat_in.nfullrows_total();
-	int ncols = mat_in.nfullcols_total();	
+	int nrows = mat_in->nfullrows_total();
+	int ncols = mat_in->nfullcols_total();	
 
 	// make distvecs
 	vec<int> rowsizes = split_range(nrows, nsplitrow);
@@ -145,15 +145,15 @@ scalapack::distmat<T> matrix_to_scalapack(matrix<T>& mat_in, std::string nameint
 	
 	dist scaldist = dist::create().set_world(mworld).row_dist(rowdist).col_dist(coldist);
 	
-	matrix<T> mat_out = typename matrix<T>::create().name(mat_in.name() + " redist.").set_dist(scaldist)
-		.row_blk_sizes(rowsizes).col_blk_sizes(colsizes).type(dbcsr_type_no_symmetry);
+	shared_matrix<T> mat_out = create<T>().name(mat_in->name() + " redist.").set_dist(scaldist)
+		.row_blk_sizes(rowsizes).col_blk_sizes(colsizes).matrix_type(type::no_symmetry).get();
 
-	if (mat_in.has_symmetry()) {
-		matrix<T> mat_in_nosym = mat_in.desymmetrize();
-		mat_out.complete_redistribute(mat_in_nosym, false);
+	if (mat_in->has_symmetry()) {
+		auto mat_in_nosym = mat_in->desymmetrize();
+		mat_out->complete_redistribute(*mat_in_nosym, false);
 		//mat_in_nosym.release();
 	} else {
-		mat_out.complete_redistribute(mat_in,false);
+		mat_out->complete_redistribute(*mat_in,false);
 	}
 	
 	//dbcsr::print(mat_out);
@@ -163,7 +163,7 @@ scalapack::distmat<T> matrix_to_scalapack(matrix<T>& mat_in, std::string nameint
 
 #pragma omp parallel
 {
-	dbcsr::iterator iter(mat_out);
+	dbcsr::iterator iter(*mat_out);
 	iter.start();
 	
 	while (iter.blocks_left()) {
@@ -184,9 +184,9 @@ scalapack::distmat<T> matrix_to_scalapack(matrix<T>& mat_in, std::string nameint
 	}
 	
 	iter.stop();
-	mat_out.finalize();
+	mat_out->finalize();
 }	
-	mat_out.release();
+	mat_out->release();
 	scaldist.release();
 	
 	//scamat.print();
@@ -196,7 +196,7 @@ scalapack::distmat<T> matrix_to_scalapack(matrix<T>& mat_in, std::string nameint
 }
 
 template <typename T = double>
-matrix<T> scalapack_to_matrix(scalapack::distmat<T>& sca_mat_in, std::string nameint, 
+shared_matrix<T> scalapack_to_matrix(scalapack::distmat<T>& sca_mat_in, std::string nameint, 
 								world& world_in, vec<int>& rowblksizes, vec<int>& colblksizes, 
 								std::string type = "") 
 {
@@ -217,17 +217,18 @@ matrix<T> scalapack_to_matrix(scalapack::distmat<T>& sca_mat_in, std::string nam
 	
 	dist cycdist = dist::create().set_world(world_in).row_dist(rowdist).col_dist(coldist);
 	
-	char symtype = (sym) ? dbcsr_type_symmetric : dbcsr_type_no_symmetry;
+	auto mat_cyclic = create<T>()
+		.name(nameint + "cyclic")
+		.set_dist(cycdist)
+		.row_blk_sizes(rowcycsizes)
+		.col_blk_sizes(colcycsizes)
+		.matrix_type(type::no_symmetry).get();
 	
-	matrix<T> mat_cyclic = typename matrix<T>::create().name(nameint + "cyclic")
-		.set_dist(cycdist).row_blk_sizes(rowcycsizes).col_blk_sizes(colcycsizes)
-		.type(dbcsr_type_no_symmetry);
-	
-	mat_cyclic.reserve_all();
+	mat_cyclic->reserve_all();
 
 #pragma omp parallel
 {
-	dbcsr::iterator iter(mat_cyclic);
+	dbcsr::iterator iter(*mat_cyclic);
 	iter.start();
 	
 	while (iter.blocks_left()) {
@@ -264,32 +265,35 @@ matrix<T> scalapack_to_matrix(scalapack::distmat<T>& sca_mat_in, std::string nam
 	}
 	
 	iter.stop();
-	mat_cyclic.finalize();
+	mat_cyclic->finalize();
 }	
 	
 	// make new matrix
-	matrix<T> mat_out = typename matrix<T>::create().name(nameint).set_world(world_in)
-		.row_blk_sizes(rowblksizes).col_blk_sizes(colblksizes)
-		.type(symtype);
+	shared_matrix<T> mat_out = create<T>()
+		.name(nameint).set_world(world_in)
+		.row_blk_sizes(rowblksizes)
+		.col_blk_sizes(colblksizes)
+		.matrix_type((sym) ? type::symmetric : type::no_symmetry).get();
 
 	bool keep_sp = false;
 
 	if (sym) {
-		mat_out.reserve_sym();
+		mat_out->reserve_sym();
 		keep_sp = true;
 	}
 		
-	mat_out.complete_redistribute(mat_cyclic,keep_sp);
+	mat_out->complete_redistribute(*mat_cyclic,keep_sp);
 
-	if (sym) mat_out.filter();
+	if (sym) mat_out->filter(1e-16);
 
-	mat_cyclic.release();
+	mat_cyclic->release();
 	cycdist.release();
 	
 	return mat_out;
 	
 }
 
+/*
 //#endif // USE_SCALAPACK
 
 template <typename T = double>
@@ -306,9 +310,9 @@ MatrixX<T> tensor_to_eigen(dbcsr::tensor<2,T>& array, int l = 0) {
 	
 	MatrixX<T> m_out(tsize[0],tsize[1]);
 	
-	/* we loop over each process, from which we broadcast
-	 * each local block to all the other processes 
-	 */ 
+	// * we loop over each process, from which we broadcast
+	// * each local block to all the other processes 
+	
 	 
 	iterator_t<2,T> iter(array);
 	iter.start();
@@ -399,6 +403,7 @@ dbcsr::tensor<2,T> eigen_to_tensor(MatrixX<T>& M, std::string name,
 	return out;
 
 }
+*/
 
 template <typename T>
 void copy_tensor_to_matrix(tensor<2,T>& t_in, matrix<T>& m_out, std::optional<bool> summation) {
@@ -429,7 +434,7 @@ MatrixX<double> block_norms(matrix<T>& m_in) {
 
 	dbcsr::iterator iter(m_in);
 	
-	char mtype = m_in.matrix_type();
+	type mtype = m_in.matrix_type();
 
 //#pragma omp parallel
 //{
@@ -444,7 +449,7 @@ MatrixX<double> block_norms(matrix<T>& m_in) {
 		int jblk = iter.col();
 		
 		eigen_out(iblk,jblk) = iter.norm();
-		if (mtype == dbcsr_type_symmetric) eigen_out(jblk,iblk) = eigen_out(iblk,jblk);
+		if (mtype == type::symmetric) eigen_out(jblk,iblk) = eigen_out(iblk,jblk);
 	}
 	
 	iter.stop();

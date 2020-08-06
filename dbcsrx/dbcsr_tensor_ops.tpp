@@ -121,7 +121,7 @@ public:
             c_map2->data(), c_map2->size(), 
             f_b1, f_b2, f_b3,
             nullptr, nullptr, nullptr, nullptr, 
-            (c_filter) ? &*c_filter : &global::filter_eps,
+            (c_filter) ? &*c_filter : nullptr,
             (c_flop) ? &*c_flop : nullptr,
             (c_move) ? &*c_move : nullptr,
             (c_retain_sparsity) ? &*c_retain_sparsity : nullptr,
@@ -490,7 +490,7 @@ void copy_matrix_to_3Dtensor_new(matrix<T>& m, tensor<3,T>& t, bool sym = false)
 	matrix<T>* m_ptr;
 	
 	if (sym) { 
-		m_ptr = new matrix<T>(m.desymmetrize());
+		m_ptr = new matrix<T>(std::move(*m.desymmetrize()));
 	} else {
 		m_ptr = &m;
 	}
@@ -979,7 +979,7 @@ void copy_3Dtensor_to_matrix_new(tensor<3,T>& t, matrix<T>& m) {
 	
 	vec<int> rowres, colres;
 	
-	bool sym = (m.matrix_type() == dbcsr_type_symmetric) ? true : false;
+	bool sym = (m.matrix_type() == dbcsr::type::symmetric) ? true : false;
 	
 	if (sym) {
 		

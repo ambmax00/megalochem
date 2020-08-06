@@ -19,25 +19,25 @@ void hfmod::diag_fock() {
 		
 		LOG.os<2>("Orthogonalizing Fock Matrix: ", x, '\n');
 		
-		mat_d FX = mat_d::create_template(*f_bb).name("FX").type(dbcsr_type_no_symmetry);
-		mat_d XFX = mat_d::create_template(*f_bb).name("XFX");
+		auto FX = dbcsr::create_template(f_bb)
+			.name("FX").matrix_type(dbcsr::type::no_symmetry).get();
+		auto XFX = dbcsr::create_template(f_bb)
+			.name("XFX").get();
 		
-		dbcsr::multiply('N','N',*f_bb,*m_x_bb,FX).perform();
+		dbcsr::multiply('N','N',*f_bb,*m_x_bb,*FX).perform();
 		
 		//dbcsr::print(*f_bb);
 		
 		//dbcsr::print(FX);
 		
-		dbcsr::multiply('T','N',*m_x_bb,FX,XFX).perform(); 
+		dbcsr::multiply('T','N',*m_x_bb,*FX,*XFX).perform(); 
 		
-		FX.release();
+		FX->release();
 		
 		if (LOG.global_plev() >= 2) 
-			dbcsr::print(XFX);
+			dbcsr::print(*XFX);
 		
-		auto XFXs = XFX.get_smatrix();
-		
-		math::hermitian_eigen_solver solver(XFXs, 'V', (LOG.global_plev() >= 2) ? true : false);
+		math::hermitian_eigen_solver solver(XFX, 'V', (LOG.global_plev() >= 2) ? true : false);
 		
 		vec<int> m = (x == "A") ? m_mol->dims().ma() : m_mol->dims().mb();
 		
@@ -61,24 +61,23 @@ void hfmod::diag_fock() {
 			dbcsr::print(*c_bm_x);
 		}
 		
-		dbcsr::mat_d new_c_bm = dbcsr::mat_d::create_template(*c_bm_x).name(c_bm_x->name());
-		*c_bm = std::move(new_c_bm); 
+		auto new_c_bm = dbcsr::create_template<double>(c_bm_x)
+			.name(c_bm_x->name()).get();
+		*c_bm = std::move(*new_c_bm); 
 	
 		//Transform back
 		dbcsr::multiply('N','N',*m_x_bb,*c_bm_x,*c_bm).perform();
-		//dbcsr::einsum<2,2,2>({"IJ, Ji -> Ii", *m_x_bb, c_bm_x, c_bm, .unit_nr = u, .log = log});
 		
 		if (LOG.global_plev() >= 2) 
 			dbcsr::print(*c_bm);
-			
-		c_bm->filter();
 		
-		XFXs->release();
+		XFX->release();
 		c_bm_x->release();
 			
 	};
 	
-	auto form_density = [&] (smat_d& p_bb, smat_d& c_bm, std::string x) {
+	auto form_density = [&] (dbcsr::shared_matrix<double>& p_bb, 
+		dbcsr::shared_matrix<double>& c_bm, std::string x) {
 		
 		int limit = 0;
 		
@@ -90,20 +89,19 @@ void hfmod::diag_fock() {
 		
 		if (LOG.global_plev() >= 2) 
 			dbcsr::print(*p_bb);
-			
-		p_bb->filter();
-		
+					
 		//dbcsr::print(*p_bb);
 		
 		LOG.os<1>("Occupancy of ", p_bb->name(), " : ", p_bb->occupation()*100, "%\n"); 
 		
 	};
 	
-	auto localize = [&] (smat_d& p_bb, smat_d& c_bm, std::string x) {
+	auto localize = [&] (dbcsr::shared_matrix<double>& p_bb, 
+		dbcsr::shared_matrix<double>& c_bm, std::string x) {
 		
 		LOG.os<1>("Localizing occupied ", x, " MO orbitals.\n");
 		
-		math::pivinc_cd pcd(p_bb, 1e-12, LOG.global_plev());
+		math::pivinc_cd pcd(p_bb, LOG.global_plev());
 		
 		pcd.compute();
 		
@@ -129,9 +127,7 @@ void hfmod::diag_fock() {
 		}
 		
 		*c_bm = std::move(*L);
-		
-		c_bm->filter();
-		
+				
 		LOG.os<1>("Done with localization.\n");
 		
 	};
@@ -180,8 +176,9 @@ void hfmod::diag_fock() {
 	if (!m_restricted && !m_nobetaorb) {
 		form_density(m_p_bb_B, m_c_bm_B, "B");
 	} else if (!m_restricted && m_nobetaorb) {
-		mat_d p_bb_B = mat_d::create_template(*m_p_bb_A).name("p_bb_B");
-		m_p_bb_B = p_bb_B.get_smatrix();
+		dbcsr::shared_matrix<double> p_bb_B = 
+			dbcsr::create_template<double>(m_p_bb_A)
+			.name("p_bb_B").get();
 		m_p_bb_B->set(0.0);
 		
 		if (LOG.global_plev() >= 2) 
@@ -203,16 +200,23 @@ void hfmod::diag_fock() {
 		
 	}
 	
+	m_c_bm_A->filter(dbcsr::global::filter_eps);
+	m_p_bb_A->filter(dbcsr::global::filter_eps);
+	
+	if (m_c_bm_B) m_c_bm_B->filter(dbcsr::global::filter_eps);
+	if (m_p_bb_B) m_p_bb_B->filter(dbcsr::global::filter_eps);
+	
 }
 
 void hfmod::compute_virtual_density() {
 	
-	auto form_density = [&] (smat_d& pv_bb, smat_d& c_bm, std::string x) {
+	auto form_density = [&] (dbcsr::shared_matrix<double>& pv_bb, 
+		dbcsr::shared_matrix<double>& c_bm, std::string x) {
 		
 		int lobound, upbound;
 		
-		mat_d p = mat_d::create_template(*m_p_bb_A).name("pv_bb_"+x);
-		pv_bb = p.get_smatrix();
+		pv_bb = dbcsr::create_template<double>(m_p_bb_A)
+			.name("pv_bb_"+x).get();
 		
 		//std::cout << "HERE: " << x << std::endl;
 		
@@ -234,6 +238,8 @@ void hfmod::compute_virtual_density() {
 		
 		if (LOG.global_plev() >= 2) 
 			dbcsr::print(*pv_bb);
+			
+		pv_bb->filter(dbcsr::global::filter_eps);
 		
 		//std::cout << "DONE." << std::endl;
 		
@@ -243,8 +249,8 @@ void hfmod::compute_virtual_density() {
 		form_density(m_pv_bb_A, m_c_bm_A, "A");
 	} else {
 		
-		mat_d p = mat_d::create_template(*m_p_bb_A).name("pv_bb_A");
-		m_pv_bb_A = p.get_smatrix();
+		m_pv_bb_A = dbcsr::create_template<double>(m_p_bb_A)
+			.name("pv_bb_A").get();
 		m_pv_bb_A->reserve_all();
 		m_pv_bb_A->set(0.0);
 		//m_pv_bb_A->filter();
@@ -253,8 +259,10 @@ void hfmod::compute_virtual_density() {
 	if (!m_restricted && m_mol->nele_beta() != 0) {
 		form_density(m_pv_bb_B, m_c_bm_B, "B");
 	} else {
-		mat_d p = mat_d::create_template(*m_p_bb_A).name("pv_bb_B");
-		m_pv_bb_B = p.get_smatrix();
+		
+		m_pv_bb_B = dbcsr::create_template<double>(m_p_bb_A)
+			.name("pv_bb_B").get();
+		
 		m_pv_bb_B->reserve_all();
 		m_pv_bb_B->set(0.0);
 		//m_pv_bb_B->filter();

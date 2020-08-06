@@ -10,13 +10,13 @@ namespace math {
 class orthogonalizer {
 private:
 
-	dbcsr::smatrix<double> m_mat_in;
-	dbcsr::smatrix<double> m_mat_out;
+	dbcsr::shared_matrix<double> m_mat_in;
+	dbcsr::shared_matrix<double> m_mat_out;
 	bool m_print;
 
 public:
 
-	orthogonalizer(dbcsr::smatrix<double>& m, bool print = false) : m_mat_in(m), m_print(print) {};
+	orthogonalizer(dbcsr::shared_matrix<double>& m, bool print = false) : m_mat_in(m), m_print(print) {};
 	
 	void compute();
 

@@ -10,7 +10,7 @@ namespace math {
 class LLT {
 private:
 
-	dbcsr::smat_d m_mat_in;
+	dbcsr::shared_matrix<double> m_mat_in;
 	std::shared_ptr<
 	 scalapack::distmat<double>> m_L;
 	std::shared_ptr<
@@ -22,17 +22,17 @@ private:
 	 
 public:
 
-	LLT(dbcsr::smat_d& mat, int print) : 
+	LLT(dbcsr::shared_matrix<double>& mat, int print) : 
 		m_mat_in(mat), LOG(m_mat_in->get_world().comm(),print) {}
 	~LLT() {}
 	
 	void compute();
 	
-	dbcsr::smat_d L(vec<int> b);
+	dbcsr::shared_matrix<double> L(vec<int> b);
 	
-	dbcsr::smat_d L_inv(vec<int> b);
+	dbcsr::shared_matrix<double> L_inv(vec<int> b);
 	
-	dbcsr::smat_d inverse(vec<int> b);
+	dbcsr::shared_matrix<double> inverse(vec<int> b);
 	
 };
 

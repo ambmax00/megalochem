@@ -23,10 +23,10 @@ protected:
 	util::mpi_log LOG;
 	util::mpi_time TIME;
 	
-	dbcsr::smat_d m_p_A;
-	dbcsr::smat_d m_p_B;
-	dbcsr::smat_d m_c_A;
-	dbcsr::smat_d m_c_B;
+	dbcsr::shared_matrix<double> m_p_A;
+	dbcsr::shared_matrix<double> m_p_B;
+	dbcsr::shared_matrix<double> m_c_A;
+	dbcsr::shared_matrix<double> m_c_B;
 	
 	bool m_SAD_iter;
 	int m_SAD_rank;
@@ -36,10 +36,10 @@ protected:
 public:
 	
 	JK_common(dbcsr::world& w, desc::options opt);
-	void set_density_alpha(dbcsr::smat_d& ipA) { m_p_A = ipA; }
-	void set_density_beta(dbcsr::smat_d& ipB) { m_p_B = ipB; }
-	void set_coeff_alpha(dbcsr::smat_d& icA) { m_c_A = icA; }
-	void set_coeff_beta(dbcsr::smat_d& icB) { m_c_B = icB; }
+	void set_density_alpha(dbcsr::shared_matrix<double>& ipA) { m_p_A = ipA; }
+	void set_density_beta(dbcsr::shared_matrix<double>& ipB) { m_p_B = ipB; }
+	void set_coeff_alpha(dbcsr::shared_matrix<double>& icA) { m_c_A = icA; }
+	void set_coeff_beta(dbcsr::shared_matrix<double>& icB) { m_c_B = icB; }
 	void set_factory(std::shared_ptr<ints::aofactory>& ifac) { 
 		m_factory = ifac; 
 		m_mol = m_factory->mol();
@@ -61,7 +61,7 @@ public:
 class J : public JK_common {
 protected: 
 
-	dbcsr::smat_d m_J;
+	dbcsr::shared_matrix<double> m_J;
 	std::shared_ptr<J> m_builder;
 	
 public:
@@ -73,15 +73,15 @@ public:
 	
 	void init();
 	
-	dbcsr::smat_d get_J() { return m_J; }	
+	dbcsr::shared_matrix<double> get_J() { return m_J; }	
 		
 };
 
 class K : public JK_common {
 protected:
 
-	dbcsr::smat_d m_K_A;
-	dbcsr::smat_d m_K_B;
+	dbcsr::shared_matrix<double> m_K_A;
+	dbcsr::shared_matrix<double> m_K_B;
 	
 public:
 	
@@ -92,8 +92,8 @@ public:
 	
 	void init();
 	
-	dbcsr::smat_d get_K_A() { return m_K_A; }
-	dbcsr::smat_d get_K_B() { return m_K_B; }
+	dbcsr::shared_matrix<double> get_K_A() { return m_K_A; }
+	dbcsr::shared_matrix<double> get_K_B() { return m_K_B; }
 	
 };
 

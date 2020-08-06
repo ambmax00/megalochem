@@ -7,12 +7,24 @@
 namespace dbcsr {
 
 class dist {
-private:
+protected:
 
     void* m_dist_ptr;
     world m_world;
     
 public:
+
+	template <typename D>
+    friend class create_base;
+    
+    template <typename D>
+    friend class create_template_base;
+    
+    template <typename D>
+    friend class transpose_base;
+    
+    template <typename D>
+    friend class matrix_copy_base;
 
 	dist() {}
 	
@@ -49,7 +61,7 @@ public:
 
 template <typename T = double, typename>
 class matrix : std::enable_shared_from_this<matrix<T>> {
-private:
+protected:
     
     void* m_matrix_ptr;
     world m_world;
@@ -107,93 +119,6 @@ public:
 
 	template <typename D>
 	friend void copy_matrix_to_tensor(matrix<D>& m_in, tensor<2,D>& t_out, std::optional<bool> summation);
-    
-    #:set list = [ &
-        ['name', 'std::string', 'required', 'val'], &
-        ['set_world', 'world', 'optional', 'ref'],&
-        ['set_dist', 'dist', 'optional', 'ref'],&
-        ['type', 'char', 'required', 'val'],&
-        ['row_blk_sizes', 'vec<int>', 'required', 'ref'],&
-        ['col_blk_sizes', 'vec<int>', 'required', 'ref'],&
-        ['nze', 'int', 'optional', 'val'],&
-        ['reuse', 'bool', 'optional', 'val'],&
-        ['reuse_arrays', 'bool', 'optional', 'val'],&
-        ['mutable_work', 'bool', 'optional', 'val'],&
-        ['replication_type', 'char', 'optional', 'val']]
-    ${make_struct(structname='create',friend='matrix',params=list)}$
-    
-    matrix(create& p) 
-		: m_matrix_ptr(nullptr),
-		  m_world((p.c_set_world) ? *p.c_set_world : p.c_set_dist->m_world) {
-        
-        dist* dist_ptr = nullptr;
-        
-        if (!p.c_set_dist) {
-			
-            vec<int> rowdist, coldist; 
-            auto dims = p.c_set_world->dims();
-            
-            auto rdist = default_dist(p.c_row_blk_sizes->size(),
-                            dims[0], *p.c_row_blk_sizes);
-            auto cdist = default_dist(p.c_col_blk_sizes->size(),
-                            dims[1], *p.c_col_blk_sizes);
-                            
-            dist_ptr = new dist(dist::create().set_world(*p.c_set_world).row_dist(rdist).col_dist(cdist));
-        } else {
-            dist_ptr = &*p.c_set_dist;
-        }
-        
-        c_dbcsr_create_new(&m_matrix_ptr, p.c_name->c_str(), dist_ptr->m_dist_ptr, *p.c_type, 
-                               p.c_row_blk_sizes->data(), p.c_row_blk_sizes->size(), 
-                               p.c_col_blk_sizes->data(), p.c_col_blk_sizes->size(), 
-                               (p.c_nze) ? &*p.c_nze : nullptr, &m_data_type, 
-                               (p.c_reuse) ? &*p.c_reuse : nullptr,
-                               (p.c_reuse_arrays) ? &*p.c_reuse_arrays : nullptr, 
-                               (p.c_mutable_work) ? &*p.c_mutable_work : nullptr, 
-                               (p.c_replication_type) ? &*p.c_replication_type : nullptr);
-    
-        if (!p.c_set_dist) delete dist_ptr;
-        
-    }
-    
-    #:set list = [ &
-        ['name', 'std::string', 'required', 'val'], &
-        ['set_dist', 'dist', 'optional', 'ref'],&
-        ['type', 'const char', 'optional', 'val'],&
-        ['row_blk_sizes', 'vec<int>', 'optional', 'ref'],&
-        ['col_blk_sizes', 'vec<int>', 'optional', 'ref'],&
-        ['nze', 'int', 'optional', 'val'],&
-        ['reuse', 'const bool', 'optional', 'val'],&
-        ['reuse_arrays', 'const bool', 'optional', 'val'],&
-        ['mutable_work', 'const bool', 'optional', 'val'],&
-        ['replication_type', 'const char', 'optional', 'val']]
-    struct create_template {
-        ${make_param(structname='create_template',params=list)}$
-        private:
-            
-        required<matrix,ref> c_template;
-        
-        public:
-        
-        create_template(matrix& temp) : c_template(temp) {}
-        friend class matrix;
-    };
-    
-    matrix(create_template& p) : m_matrix_ptr(nullptr), m_world(p.c_template->get_world()) {
- 
-        c_dbcsr_create_template(&m_matrix_ptr, p.c_name->c_str(), p.c_template->m_matrix_ptr, 
-                                   (p.c_set_dist) ? p.c_set_dist->m_dist_ptr : nullptr, 
-                                   (p.c_type) ? &*p.c_type : nullptr, 
-                                   (p.c_row_blk_sizes) ? p.c_row_blk_sizes->data() : nullptr,
-                                   (p.c_row_blk_sizes) ? p.c_row_blk_sizes->size() : 0,
-                                   (p.c_col_blk_sizes) ? p.c_col_blk_sizes->data() : nullptr,
-                                   (p.c_col_blk_sizes) ? p.c_col_blk_sizes->size() : 0,
-                                   (p.c_nze) ? &*p.c_nze : nullptr, &m_data_type, 
-                                   (p.c_reuse_arrays) ? &*p.c_reuse_arrays : nullptr, 
-                                   (p.c_mutable_work) ? &*p.c_mutable_work : nullptr, 
-                                   (p.c_replication_type) ? &*p.c_replication_type : nullptr);
-                                   
-    }
     
     void set(const T alpha) {
         c_dbcsr_set(m_matrix_ptr, alpha);
@@ -270,73 +195,23 @@ public:
             
     }
     
-    void filter(std::optional<double> eps = std::nullopt, 
-				std::optional<int> method = std::nullopt, 
+    void filter(double eps, 
+				std::optional<filter> method = std::nullopt, 
                 std::optional<bool> use_absolute = std::nullopt, 
                 std::optional<bool> filter_diag = std::nullopt) {
-        c_dbcsr_filter(m_matrix_ptr, (eps) ? &*eps : &global::filter_eps, (method) ? &*method : nullptr, 
-                        (use_absolute) ? &*use_absolute : &global::filter_use_absolute, 
+					
+		int method_int = (method) ? static_cast<int>(*method) : 0;
+					
+        c_dbcsr_filter(m_matrix_ptr, &eps, (method) ? &method_int : nullptr, 
+                        (use_absolute) ? &*use_absolute : nullptr, 
                         (filter_diag) ? &*filter_diag : nullptr);
     }
 
-    matrix<T> get_block_diag(matrix<T>& in) { 
-        void* diag;
-        c_dbcsr_get_block_diag(in.m_matrix_ptr, &diag);
-        return matrix<T>(diag, in.m_world);
-    }
-   
-#:set list = [ &
-    ['shallow_copy', 'bool', 'optional', 'val'],&
-    ['transpose_data', 'bool', 'optional', 'val'],& 
-    ['transpose_dist', 'bool', 'optional', 'val'],& 
-    ['use_dist', 'bool', 'optional', 'val']]
-    struct transpose {
-        ${make_param('transpose', list)}$
-        private:
-			matrix& c_in;
-        public:
-            transpose(matrix& m_in) : c_in(m_in) {}
-            friend class matrix;
-    };
-    
-    matrix(const transpose& p) {
-        
-        m_world = p.c_in.m_world;
-        c_dbcsr_transposed(&m_matrix_ptr, p.c_in.m_matrix_ptr, 
-                            (p.c_shallow_copy) ? &*p.c_shallow_copy : nullptr,
-                            (p.c_transpose_data) ? &*p.c_transpose_data : nullptr, 
-                            (p.c_transpose_dist) ? &*p.c_transpose_dist : nullptr, 
-                            (p.c_use_dist) ? &*p.c_use_dist : nullptr);
-                            
-    }
-
-#:set list = [ &
-    ['name', 'std::string', 'optional', 'val'],&
-    ['keep_sparsity', 'bool', 'optional', 'val'],&
-    ['shallow_data', 'bool', 'optional', 'val'],&
-    ['keep_imaginary', 'bool', 'optional', 'val'],&
-    ['type', 'char', 'optional', 'val']]
-    
-    template <typename D>
-    struct copy {
-        ${make_param('copy', list)}$
-        private:
-            matrix<D>& c_in;
-        public:
-            copy(matrix<D>& in) : c_in(in) {}
-            friend class matrix;
-    };
-    
-    template <typename D>
-    matrix(const copy<D>& p) : m_matrix_ptr(nullptr) {
-        
-        m_world = p.c_in.m_world;
-        c_dbcsr_copy(&m_matrix_ptr, p.c_in.m_matrix_ptr, (p.c_name) ? p.c_name->c_str() : nullptr, 
-                      (p.c_keep_sparsity) ? &*p.c_keep_sparsity : nullptr, 
-                      (p.c_shallow_data) ? &*p.c_shallow_data : nullptr, 
-                      (p.c_keep_imaginary) ? &*p.c_keep_imaginary : nullptr, 
-                      (p.c_type) ? &*p.c_type : nullptr);
-                      
+    std::shared_ptr<matrix<T>> get_block_diag(matrix<T>& in) { 
+		auto out = std::make_shared<matrix<T>>();
+        c_dbcsr_get_block_diag(in.m_matrix_ptr, &out->m_matrix_ptr);
+        out->m_world = in.m_world;
+        return out;
     }
     
     void copy_in(const matrix& in, std::optional<bool> keep_sp = std::nullopt,
@@ -352,10 +227,11 @@ public:
                       (type) ? &*type : nullptr);
     }
     
-    matrix<T> desymmetrize() {
-		matrix<T> mat_out(nullptr, m_world);
-        c_dbcsr_desymmetrize(m_matrix_ptr, &mat_out.m_matrix_ptr);
-        return mat_out;
+    std::shared_ptr<matrix<T>> desymmetrize() {
+		auto out = std::make_shared<matrix<T>>();
+        c_dbcsr_desymmetrize(m_matrix_ptr, &out->m_matrix_ptr);
+        out->m_world = this->m_world;
+        return out;
     }
     
     void clear() {
@@ -509,10 +385,10 @@ public:
         return out;
     }
     
-    char matrix_type() const {
+    type matrix_type() const {
         char out;
         c_dbcsr_get_info(m_matrix_ptr, ${repeat('nullptr',20)}$, &out, nullptr, nullptr);
-        return out;
+        return static_cast<type>(out);
     }
     
     int proc(const int row, const int col) const {
@@ -560,44 +436,21 @@ public:
         c_dbcsr_binary_write(m_matrix_ptr, file_path.c_str());
     }
     
-#:set list = [&
-    ['filepath', 'std::string', 'required', 'val'],&
-    ['distribution', 'dist', 'required', 'ref'],&
-    ['set_world', 'world', 'required', 'ref']]
-    ${make_struct(structname='read',friend='matrix',params=list)}$
-    
-    matrix(read& p) {
-        m_world = *p.c_set_world;
-        c_dbcsr_binary_read(p.c_filepath->c_str(), p.c_distribution->m_dist_ptr, 
-        p.c_set_world->comm(), &m_matrix_ptr);
-    }
-    
     double norm(const int method) const {
 		double out;
 		c_dbcsr_norm_scalar(m_matrix_ptr, method, &out);
 		return out;
 	}
 	
-	void apply(int func, std::optional<double> a0 = std::nullopt, 
+	void apply(func my_func, std::optional<double> a0 = std::nullopt, 
 		std::optional<double> a1 = std::nullopt,
 		std::optional<double> a2 = std::nullopt) 
 	{
+	
+		int f = static_cast<int>(my_func);
 			
-		c_dbcsr_function_of_elements(m_matrix_ptr, func,
+		c_dbcsr_function_of_elements(m_matrix_ptr, f,
 			(a0) ? &*a0 : nullptr, (a1) ? &*a1 : nullptr, (a2) ? &*a2 : nullptr);		
-	}
-	
-	smatrix<T> get_smatrix() {
-	
-		smatrix<T> out = std::make_shared<matrix<T>>();
-		
-		out->m_world = m_world;
-		out->m_matrix_ptr = m_matrix_ptr;
-		
-		m_matrix_ptr = nullptr;
-		
-		return out;
-		
 	}
 	
 	std::shared_ptr<matrix<T>> get_ptr() {
@@ -607,7 +460,7 @@ public:
 };  
 
 template <typename T>
-using shared_matrix = matrix<T>;
+using shared_matrix = std::shared_ptr<matrix<T>>;
 
 template <typename T>
 class create_base {
@@ -616,14 +469,14 @@ class create_base {
         ['name', 'std::string', 'required', 'val'], &
         ['set_world', 'world', 'optional', 'ref'],&
         ['set_dist', 'dist', 'optional', 'ref'],&
-        ['type', 'char', 'required', 'val'],&
+        ['matrix_type', 'type', 'required', 'val'],&
         ['row_blk_sizes', 'vec<int>', 'required', 'ref'],&
         ['col_blk_sizes', 'vec<int>', 'required', 'ref'],&
         ['nze', 'int', 'optional', 'val'],&
         ['reuse', 'bool', 'optional', 'val'],&
         ['reuse_arrays', 'bool', 'optional', 'val'],&
         ['mutable_work', 'bool', 'optional', 'val'],&
-        ['replication_type', 'char', 'optional', 'val']]
+        ['replication_type', 'repl', 'optional', 'val']]
     ${make_param(structname='create_base',params=list)}$
     
 public:
@@ -654,14 +507,17 @@ public:
             dist_ptr = &*c_set_dist;
         }
         
-        c_dbcsr_create_new(&m_out->m_matrix_ptr, c_name->c_str(), dist_ptr->m_dist_ptr, *c_type, 
+        char mat_type = static_cast<char>(*c_matrix_type);
+        char repl_type = (c_replication_type) ? static_cast<char>(*c_replication_type) : '0';
+        
+        c_dbcsr_create_new(&m_out->m_matrix_ptr, c_name->c_str(), dist_ptr->m_dist_ptr, mat_type, 
                                c_row_blk_sizes->data(), c_row_blk_sizes->size(), 
                                c_col_blk_sizes->data(), c_col_blk_sizes->size(), 
                                (c_nze) ? &*c_nze : nullptr, &m_out->m_data_type, 
                                (c_reuse) ? &*c_reuse : nullptr,
                                (c_reuse_arrays) ? &*c_reuse_arrays : nullptr, 
                                (c_mutable_work) ? &*c_mutable_work : nullptr, 
-                               (c_replication_type) ? &*c_replication_type : nullptr);
+                               (c_replication_type) ? &repl_type : nullptr);
     
         if (!c_set_dist) delete dist_ptr;
         
@@ -682,14 +538,14 @@ class create_template_base {
 #:set list = [ &
 	['name', 'std::string', 'required', 'val'], &
 	['set_dist', 'dist', 'optional', 'ref'],&
-	['type', 'const char', 'optional', 'val'],&
+	['matrix_type', 'type', 'optional', 'val'],&
 	['row_blk_sizes', 'vec<int>', 'optional', 'ref'],&
 	['col_blk_sizes', 'vec<int>', 'optional', 'ref'],&
 	['nze', 'int', 'optional', 'val'],&
 	['reuse', 'const bool', 'optional', 'val'],&
 	['reuse_arrays', 'const bool', 'optional', 'val'],&
 	['mutable_work', 'const bool', 'optional', 'val'],&
-	['replication_type', 'const char', 'optional', 'val']]
+	['replication_type', 'repl', 'optional', 'val']]
 	
 	${make_param(structname='create_template_base',params=list)}$
 
@@ -707,11 +563,14 @@ public:
 		
 		m_out->m_matrix_ptr = nullptr;
 		m_out->m_world = c_template->m_world;
+		
+		char mat_type = (c_matrix_type) ? static_cast<char>(*c_matrix_type) : '0';
+		char repl_type = (c_replication_type) ? static_cast<char>(*c_replication_type) : '0';
  
         c_dbcsr_create_template(&m_out->m_matrix_ptr, 
 			c_name->c_str(), c_template->m_matrix_ptr, 
 			(c_set_dist) ? c_set_dist->m_dist_ptr : nullptr, 
-			(c_type) ? &*c_type : nullptr, 
+			(c_matrix_type) ? &mat_type : nullptr, 
 			(c_row_blk_sizes) ? c_row_blk_sizes->data() : nullptr,
 			(c_row_blk_sizes) ? c_row_blk_sizes->size() : 0,
 			(c_col_blk_sizes) ? c_col_blk_sizes->data() : nullptr,
@@ -719,7 +578,7 @@ public:
 			(c_nze) ? &*c_nze : nullptr, &m_out->m_data_type, 
 			(c_reuse_arrays) ? &*c_reuse_arrays : nullptr, 
 			(c_mutable_work) ? &*c_mutable_work : nullptr, 
-			(c_replication_type) ? &*c_replication_type : nullptr);
+			(c_replication_type) ? &repl_type : nullptr);
                                    
 		return m_out;
 
@@ -783,7 +642,7 @@ class matrix_copy_base {
     ['keep_sparsity', 'bool', 'optional', 'val'],&
     ['shallow_data', 'bool', 'optional', 'val'],&
     ['keep_imaginary', 'bool', 'optional', 'val'],&
-    ['type', 'char', 'optional', 'val']]
+    ['matrix_type', 'type', 'optional', 'val']]
     
     ${make_param('matrix_copy_base', list)}$
 
@@ -802,12 +661,14 @@ public:
 		m_out->m_matrix_ptr = nullptr;
 		m_out->m_world = c_in->m_world;
 		
+		char mat_type = (c_matrix_type) ? static_cast<char>(*c_matrix_type) : '0';
+		
 		c_dbcsr_copy(&m_out->m_matrix_ptr, c_in->m_matrix_ptr, 
 			(c_name) ? c_name->c_str() : nullptr, 
 			(c_keep_sparsity) ? &*c_keep_sparsity : nullptr, 
 			(c_shallow_data) ? &*c_shallow_data : nullptr, 
 			(c_keep_imaginary) ? &*c_keep_imaginary : nullptr, 
-			(c_type) ? &*c_type : nullptr);
+			(c_matrix_type) ? &mat_type : nullptr);
 			
 		return m_out;
 		

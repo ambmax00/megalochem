@@ -43,7 +43,7 @@ private:
 	// other
 	int m_SAD_rank;
 	
-	smat_d m_s_bb, //overlap
+	dbcsr::shared_matrix<double> m_s_bb, //overlap
 		  m_v_bb, // nuclear reulsion
 		  m_t_bb, // kinetic
 		  m_core_bb, // core hamiltonian
@@ -53,7 +53,7 @@ private:
 		  m_pv_bb_A,
 		  m_c_bm_A; // alpha/beta coefficient matrix	  
 				  
-	smat_d m_f_bb_B, m_p_bb_B, m_pv_bb_B, m_c_bm_B;
+	dbcsr::shared_matrix<double> m_f_bb_B, m_p_bb_B, m_pv_bb_B, m_c_bm_B;
 	
 	svector<double> m_eps_A, m_eps_B;
 	
@@ -61,7 +61,8 @@ private:
 	void one_electron();
 	
 	void compute_guess();
-	smat_d compute_errmat(smat_d& F, smat_d& P, smat_d& S, std::string x);
+	dbcsr::shared_matrix<double> compute_errmat(dbcsr::shared_matrix<double>& F, 
+		dbcsr::shared_matrix<double>& P, dbcsr::shared_matrix<double>& S, std::string x);
 	void diag_fock();
 	
 	void compute_scf_energy();
@@ -104,7 +105,9 @@ public:
 		out->m_pv_bb_B = m_pv_bb_B;
 		
 		// separate occupied and virtual coefficient matrix
-		auto separate = [&](smat_d& in, smat_d& out_o, smat_d& out_v, std::string x) {
+		auto separate = [&](dbcsr::shared_matrix<double>& in, 
+			dbcsr::shared_matrix<double>& out_o, 
+			dbcsr::shared_matrix<double>& out_v, std::string x) {
 				
 				vec<int> o, v, b;
 				int noblks, nvblks;
@@ -125,7 +128,7 @@ public:
 				b = m_mol->dims().b();
 				int nbas = m_mol->c_basis().nbf();
 				
-				auto eigen_cbm = dbcsr::matrix_to_eigen(*in);
+				auto eigen_cbm = dbcsr::matrix_to_eigen(in);
 				
 				Eigen::MatrixXd eigen_cbo = eigen_cbm.block(0,0,nbas,nocc);
 				Eigen::MatrixXd eigen_cbv = eigen_cbm.block(0,nocc,nbas,nvir);
@@ -134,9 +137,9 @@ public:
 				//std::cout << eigen_cbv << std::endl;
 				
 				if (nocc != 0)
-					out_o = (dbcsr::eigen_to_matrix(eigen_cbo, m_world, "c_bo_"+x, b, o, dbcsr_type_no_symmetry)).get_smatrix();
+					out_o = dbcsr::eigen_to_matrix(eigen_cbo, m_world, "c_bo_"+x, b, o, dbcsr::type::no_symmetry);
 				if (nvir != 0) 
-					out_v = (dbcsr::eigen_to_matrix(eigen_cbv, m_world, "c_bv_"+x, b, v, dbcsr_type_no_symmetry)).get_smatrix();
+					out_v = dbcsr::eigen_to_matrix(eigen_cbv, m_world, "c_bv_"+x, b, v, dbcsr::type::no_symmetry);
 				
 		};
 		

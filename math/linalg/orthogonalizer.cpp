@@ -22,17 +22,17 @@ void orthogonalizer::compute() {
 	
 	std::for_each(eigvals.begin(),eigvals.end(),[](double& d) { d = (d < threshold) ? 0 : 1/sqrt(d); });
 	
-	dbcsr::mat_d eigvec_copy = dbcsr::mat_d::copy<double>(*eigvecs);
+	auto eigvec_copy = dbcsr::copy<double>(eigvecs).get();
 	
-	eigvec_copy.scale(eigvals, "right");
+	eigvec_copy->scale(eigvals, "right");
 	
-	dbcsr::mat_d out = dbcsr::mat_d::create_template(*m_mat_in).name(m_mat_in->name() + " orthogonalized")
-		.type(dbcsr_type_symmetric);
+	m_mat_out = dbcsr::create_template(m_mat_in)
+		.name(m_mat_in->name() + " orthogonalized")
+		.matrix_type(dbcsr::type::symmetric)
+		.get();
 		
-	dbcsr::multiply('N', 'T', eigvec_copy, *eigvecs, out).perform(); 
-		
-	m_mat_out = out.get_smatrix();
-	
+	dbcsr::multiply('N', 'T', *eigvec_copy, *eigvecs, *m_mat_out).perform(); 
+			
 }
 	
 }

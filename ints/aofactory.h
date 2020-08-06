@@ -37,14 +37,14 @@ public:
 	aofactory(desc::smolecule mol, dbcsr::world& w);
 	~aofactory();
 		
-	dbcsr::smatrix<double> ao_overlap();
-	dbcsr::smatrix<double> ao_kinetic();
-	dbcsr::smatrix<double> ao_nuclear();
+	dbcsr::shared_matrix<double> ao_overlap();
+	dbcsr::shared_matrix<double> ao_kinetic();
+	dbcsr::shared_matrix<double> ao_nuclear();
 	
-	dbcsr::smatrix<double> ao_3coverlap(std::string metric);
+	dbcsr::shared_matrix<double> ao_3coverlap(std::string metric);
 	
-	dbcsr::smatrix<double> ao_schwarz(std::string metric);
-	dbcsr::smatrix<double> ao_3cschwarz(std::string metric);
+	dbcsr::shared_matrix<double> ao_schwarz(std::string metric);
+	dbcsr::shared_matrix<double> ao_3cschwarz(std::string metric);
 	
 	void ao_3c2e_setup(std::string metric);
 	

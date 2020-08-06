@@ -7,7 +7,7 @@ bool fexists(const std::string& filename) {
 		return (bool)ifile;
 }
 
-void write_matrix(dbcsr::smatrix<double>& m_in, std::string filename) {
+void write_matrix(dbcsr::shared_matrix<double>& m_in, std::string filename) {
 		
 		std::ofstream file;
 				
@@ -15,14 +15,14 @@ void write_matrix(dbcsr::smatrix<double>& m_in, std::string filename) {
 		
 		if (fexists(file_name) && m_in->get_world().rank() == 0) std::remove(file_name.c_str());
 		
-		auto eigen_mat = dbcsr::matrix_to_eigen(*m_in);
+		auto eigen_mat = dbcsr::matrix_to_eigen(m_in);
 		
 		if (m_in->get_world().rank() == 0) write_binary_mat(file_name.c_str(), eigen_mat);
 		
 }
 
-dbcsr::smatrix<double> read_matrix(std::string filename, std::string matname, 
-	dbcsr::world wrld, vec<int> rowblksizes, vec<int> colblksizes, char type) {
+dbcsr::shared_matrix<double> read_matrix(std::string filename, std::string matname, 
+	dbcsr::world wrld, vec<int> rowblksizes, vec<int> colblksizes, dbcsr::type mytype) {
 	
 	std::ifstream file;
 	
@@ -38,7 +38,7 @@ dbcsr::smatrix<double> read_matrix(std::string filename, std::string matname,
 	//std::cout << eigen_mat << std::endl;
 	
 	//dbcsr::pgrid<2> grid2(comm);
-	return (dbcsr::eigen_to_matrix(eigen_mat, wrld, matname, rowblksizes, colblksizes, type)).get_smatrix();
+	return dbcsr::eigen_to_matrix(eigen_mat, wrld, matname, rowblksizes, colblksizes, mytype);
 	
 }
 

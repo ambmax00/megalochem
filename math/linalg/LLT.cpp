@@ -29,7 +29,7 @@ void LLT::compute() {
 	MPI_Bcast(&ori_coord[0],2,MPI_INT,ori_proc,m_mat_in->get_world().comm());
 		
 	m_L = std::make_shared<scalapack::distmat<double>>(
-		dbcsr::matrix_to_scalapack(*m_mat_in, m_mat_in->name() + "_scalapack", 
+		dbcsr::matrix_to_scalapack(m_mat_in, m_mat_in->name() + "_scalapack", 
 		nb, nb, ori_coord[0], ori_coord[1])
 	);
 		
@@ -46,15 +46,13 @@ void LLT::compute() {
 	
 }
 
-dbcsr::smat_d LLT::L(vec<int> blksizes) {
+dbcsr::shared_matrix<double> LLT::L(vec<int> blksizes) {
 	
 	auto w = m_mat_in->get_world();
-	dbcsr::smat_d out = std::make_shared<dbcsr::mat_d>(
+	auto out =
 		dbcsr::scalapack_to_matrix(*m_L, "Cholesky decomposition of "+m_mat_in->name(),
-			w,blksizes,blksizes,"lowtriang")
-	);
+			w,blksizes,blksizes,"lowtriang");
 	
-	out->filter();
 	return out;
 	
 }
@@ -89,33 +87,29 @@ void LLT::compute_L_inverse() {
 	
 }
 
-dbcsr::smat_d LLT::L_inv(vec<int> blksizes) {
+dbcsr::shared_matrix<double> LLT::L_inv(vec<int> blksizes) {
 	
 	compute_L_inverse();
 	
 	auto w = m_mat_in->get_world();
-	dbcsr::smat_d out = std::make_shared<dbcsr::mat_d>(
+	auto out =
 		dbcsr::scalapack_to_matrix(*m_L_inv, "Inverted cholesky decomposition of "+m_mat_in->name(),
-			w,blksizes,blksizes,"lowtriang")
-	);
+			w,blksizes,blksizes,"lowtriang");
 	
-	out->filter();
 	return out;
 	
 }
 
-dbcsr::smat_d LLT::inverse(vec<int> blksizes) {
+dbcsr::shared_matrix<double> LLT::inverse(vec<int> blksizes) {
 	
 	auto Linv = this->L_inv(blksizes);
-	dbcsr::mat_d out = dbcsr::mat_d::create_template(*Linv)
+	auto out = dbcsr::create_template(Linv)
 		.name("Cholesky inverse of " + m_mat_in->name())
-		.type(dbcsr_type_symmetric);
-		
-	auto sout = out.get_smatrix();
+		.matrix_type(dbcsr::type::symmetric).get();
 	
-	dbcsr::multiply('T', 'N', *Linv, *Linv, *sout).perform();
+	dbcsr::multiply('T', 'N', *Linv, *Linv, *out).perform();
 	
-	return sout;
+	return out;
 	
 }
 	

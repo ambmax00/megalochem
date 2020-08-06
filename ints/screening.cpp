@@ -27,8 +27,8 @@ void schwarz_screener::compute() {
 	//std::cout << m_blk_norms_mn << std::endl;
 	//std::cout << m_blk_norms_x << std::endl;
 	
-	m_z_mn = dbcsr::matrix_to_eigen(*z_mn_dist);
-	m_z_x = dbcsr::matrix_to_eigen(*z_x_dist);
+	m_z_mn = dbcsr::matrix_to_eigen(z_mn_dist);
+	m_z_x = dbcsr::matrix_to_eigen(z_x_dist);
 	
 	z_mn_dist->release();
 	z_x_dist->release();

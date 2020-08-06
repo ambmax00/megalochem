@@ -49,7 +49,7 @@ void hermitian_eigen_solver::compute() {
 	
 	MPI_Bcast(&ori_coord[0],2,MPI_INT,ori_proc,m_mat_in->get_world().comm());
 		
-	scalapack::distmat<double> sca_mat_in = dbcsr::matrix_to_scalapack(*m_mat_in, 
+	scalapack::distmat<double> sca_mat_in = dbcsr::matrix_to_scalapack(m_mat_in, 
 		m_mat_in->name() + "_scalapack", nb, nb, ori_coord[0], ori_coord[1]);
 	
 	std::optional<scalapack::distmat<double>> sca_eigvec_opt;
@@ -86,11 +86,9 @@ void hermitian_eigen_solver::compute() {
 			
 		//sca_eigvec_opt->print();
 		
-		matrix dbcsr_eigvec = dbcsr::scalapack_to_matrix(*sca_eigvec_opt, 
+		m_eigvec = dbcsr::scalapack_to_matrix(*sca_eigvec_opt, 
 			"eigenvectors", m_world, rowblksizes, colblksizes); 
-		
-		m_eigvec = dbcsr_eigvec.get_smatrix();
-		
+				
 		sca_eigvec_opt->release();
 		
 	}
@@ -160,7 +158,7 @@ void hermitian_eigen_solver::compute(int scalapack_blksize) {
 
 smatrix hermitian_eigen_solver::inverse() {
 	
-	matrix eigvec_copy = matrix::copy<double>(*m_eigvec);
+	auto eigvec_copy = dbcsr::copy<double>(m_eigvec).get();
 	
 	//dbcsr::print(eigvec_copy);
 	
@@ -168,23 +166,26 @@ smatrix hermitian_eigen_solver::inverse() {
 	
 	std::for_each(eigval_copy.begin(),eigval_copy.end(),[](double& d) { d = 1.0/d; });
 	
-	eigvec_copy.scale(eigval_copy, "right");
+	eigvec_copy->scale(eigval_copy, "right");
 	
 	//dbcsr::print(eigvec_copy);
 	
-	matrix inv = matrix::create_template(*m_mat_in).name(m_mat_in->name() + "^-1").type(dbcsr_type_symmetric);
+	auto inv = dbcsr::create_template<double>(m_mat_in)
+		.name(m_mat_in->name() + "^-1")
+		.matrix_type(dbcsr::type::symmetric)
+		.get();
 	
-	dbcsr::multiply('N', 'T', eigvec_copy, *m_eigvec, inv).perform(); 
+	dbcsr::multiply('N', 'T', *eigvec_copy, *m_eigvec, *inv).perform(); 
 	
 	//eigvec_copy.release();
 	
-	return inv.get_smatrix();
+	return inv;
 	
 }
 
 smatrix hermitian_eigen_solver::inverse_sqrt() {
 	
-	matrix eigvec_copy = matrix::copy<double>(*m_eigvec);
+	auto eigvec_copy = dbcsr::copy<double>(m_eigvec).get();
 	
 	//dbcsr::print(eigvec_copy);
 	
@@ -192,17 +193,20 @@ smatrix hermitian_eigen_solver::inverse_sqrt() {
 	
 	std::for_each(eigval_copy.begin(),eigval_copy.end(),[](double& d) { d = 1.0/sqrt(d); });
 	
-	eigvec_copy.scale(eigval_copy, "right");
+	eigvec_copy->scale(eigval_copy, "right");
 	
 	//dbcsr::print(eigvec_copy);
 	
-	matrix inv = matrix::create_template(*m_mat_in).name(m_mat_in->name() + "^-1").type(dbcsr_type_symmetric);
+	auto inv = dbcsr::create_template<double>(m_mat_in)
+		.name(m_mat_in->name() + "^-1/2")
+		.matrix_type(dbcsr::type::symmetric)
+		.get();
 	
-	dbcsr::multiply('N', 'T', eigvec_copy, *m_eigvec, inv).perform(); 
+	dbcsr::multiply('N', 'T', *eigvec_copy, *m_eigvec, *inv).perform(); 
 	
 	//eigvec_copy.release();
 	
-	return inv.get_smatrix();
+	return inv;
 	
 }
 	

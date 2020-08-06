@@ -8,7 +8,7 @@ namespace math {
 class inverse {
 private:
 
-	dbcsr::smat_d m_mat_in;
+	dbcsr::shared_matrix<double> m_mat_in;
 	
 	vec<double> est_eig() {
 		
@@ -54,10 +54,10 @@ private:
 	
 public:
 
-	inverse(dbcsr::smat_d& in) : m_mat_in(in) {}
+	inverse(dbcsr::shared_matrix<double>& in) : m_mat_in(in) {}
 
 	void compute() {
-		
+		/*
 		// estimate eigenvalues
 		auto est = this->est_eig();
 		

@@ -95,9 +95,7 @@ void calc_ints(dbcsr::mat_d& m_out, util::ShrPool<libint2::Engine>& engine,
 	}//end parallel omp	
 	
 	//std::cout << "Done." << std::endl;
-	
-	m_out.filter();
-	
+		
 	//dbcsr::print(t);
 		
 	//std::cout << "Done reading." << std::endl;
@@ -205,9 +203,7 @@ void calc_ints(dbcsr::tensor<2>& t_out, util::ShrPool<libint2::Engine>& engine,
 	}//end parallel omp	
 	
 	//std::cout << "Done." << std::endl;
-	
-	t_out.filter();
-	
+		
 	//dbcsr::print(t);
 		
 	//std::cout << "Done reading." << std::endl;
@@ -321,8 +317,6 @@ void calc_ints(dbcsr::tensor<3>& t_out, util::ShrPool<libint2::Engine>& engine,
 		
 	}//end parallel omp	
 	
-	t_out.filter();
-
 }
 
 void calc_ints(dbcsr::tensor<4>& t_out, util::ShrPool<libint2::Engine>& engine,
@@ -457,8 +451,6 @@ void calc_ints(dbcsr::tensor<4>& t_out, util::ShrPool<libint2::Engine>& engine,
 		
 	}//end parallel omp	
 	
-	t_out.filter();
-
 }
 
 void calc_ints_schwarz_mn(dbcsr::mat_d& m_out, util::ShrPool<libint2::Engine>& engine,
@@ -556,9 +548,7 @@ void calc_ints_schwarz_mn(dbcsr::mat_d& m_out, util::ShrPool<libint2::Engine>& e
 	}//end parallel omp	
 	
 	//std::cout << "Done." << std::endl;
-	
-	m_out.filter();
-	
+		
 	//dbcsr::print(t);
 		
 	//std::cout << "Done reading." << std::endl;
@@ -629,9 +619,7 @@ void calc_ints_schwarz_x(dbcsr::mat_d& m_out, util::ShrPool<libint2::Engine>& en
 	}//end parallel omp	
 	
 	//std::cout << "Done." << std::endl;
-	
-	m_out.filter();
-	
+		
 	//dbcsr::print(t);
 		
 	//std::cout << "Done reading." << std::endl;

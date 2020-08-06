@@ -85,6 +85,53 @@ struct dbcsr_type {
 };
 
 // ---------------------------------------------------------------------
+//                                enums
+// ---------------------------------------------------------------------
+
+enum class filter {
+	frobenius = 1
+};
+
+enum class norm {	
+	frobenius = 1,
+	maxabsnorm = 2,
+	gershgorin = 3,
+	column = 4
+};
+
+enum class func {
+	inverse = 0,			
+	tanh = 1,				
+	dtanh = 2,				
+	ddtanh = 3,				
+	artanh = 4, 				
+	inverse_special = 5,	
+	spread_from_zero = 6,	
+	sin = 7,				
+	dsin = 8,				
+	ddsin = 9,				
+	asin = 10,				
+	cos = 11,				
+	truncate = 12
+};
+
+enum class type {
+	invalid = '0',			
+	no_symmetry = 'N',		
+	symmetric = 'S',			
+	antisymmetric = 'A',		
+	hermitian = 'H',			
+	antihermitian = 'K'
+};
+
+enum class repl {
+	none = 'N',
+	row = 'R',
+	col = 'C',
+	full = 'A'
+};
+
+// ---------------------------------------------------------------------
 //                     forward declarations (matrix) 
 // ---------------------------------------------------------------------
 

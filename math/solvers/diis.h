@@ -11,8 +11,7 @@
 
 namespace math {
 
-using mat_d = dbcsr::mat_d;
-using smat_d = dbcsr::smat_d;
+using smat_d = dbcsr::shared_matrix<double>;
 
 template <int N>
 class diis_helper {
@@ -69,10 +68,11 @@ public:
 			if (reduce) m_delta.erase(to_erase);
 			
 			// make a copy, put it into trialvecs
-			mat_d m_in = mat_d::create_template(*T).name("Trial Vec " + iter);
-			m_in.copy_in(*T);
+			auto m_in = dbcsr::create_template(T)
+				.name("Trial Vec " + iter).get();
+			m_in->copy_in(*T);
 			
-			m_trialvecs.push_back(m_in.get_smatrix());
+			m_trialvecs.push_back(m_in);
 			 
 			if (reduce) m_trialvecs.erase(m_trialvecs.begin() + max_pos); 
 			

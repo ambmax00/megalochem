@@ -136,21 +136,21 @@ public:
 
 		//m_s_bb = read_matrix(m_mol->name(), "s_bb", w, b, b, dbcsr_type_symmetric);
 		
-		m_f_bb_A = filio::read_matrix(filename("f_bb_A"), "f_bb_A", w, b, b, dbcsr_type_symmetric);
-		m_po_bb_A = filio::read_matrix(filename("po_bb_A"), "po_bb_A", w, b, b, dbcsr_type_symmetric);
-		m_pv_bb_A = filio::read_matrix(filename("pv_bb_A"), "pv_bb_A", w, b, b, dbcsr_type_symmetric);
-		m_c_bo_A = filio::read_matrix(filename("c_bo_A"), "c_bo_A", w, b, oA, dbcsr_type_no_symmetry);
-		m_c_bv_A = filio::read_matrix(filename("c_bv_A"), "c_bv_A", w, b, vA, dbcsr_type_no_symmetry);
+		m_f_bb_A = filio::read_matrix(filename("f_bb_A"), "f_bb_A", w, b, b, dbcsr::type::symmetric);
+		m_po_bb_A = filio::read_matrix(filename("po_bb_A"), "po_bb_A", w, b, b, dbcsr::type::symmetric);
+		m_pv_bb_A = filio::read_matrix(filename("pv_bb_A"), "pv_bb_A", w, b, b, dbcsr::type::symmetric);
+		m_c_bo_A = filio::read_matrix(filename("c_bo_A"), "c_bo_A", w, b, oA, dbcsr::type::no_symmetry);
+		m_c_bv_A = filio::read_matrix(filename("c_bv_A"), "c_bv_A", w, b, vA, dbcsr::type::no_symmetry);
 		
 		bool read_beta = (m_mol->nele_alpha() == m_mol->nele_beta()) ? false : true;
 		
 		if (read_beta) {
 				
-			m_f_bb_B = filio::read_matrix(filename("f_bb_B"), "f_bb_B", w, b, b, dbcsr_type_symmetric);
-			m_po_bb_B = filio::read_matrix(filename("po_bb_B"), "po_bb_B", w, b, b, dbcsr_type_symmetric);
-			m_pv_bb_B = filio::read_matrix(filename("pv_bb_B"), "pv_bb_B", w, b, b, dbcsr_type_symmetric);
-			m_c_bo_B = filio::read_matrix(filename("c_bo_B"), "c_bo_B", w, b, oB, dbcsr_type_no_symmetry);
-			m_c_bv_B = filio::read_matrix(filename("c_bv_B"), "c_bv_B", w, b, vB, dbcsr_type_no_symmetry);
+			m_f_bb_B = filio::read_matrix(filename("f_bb_B"), "f_bb_B", w, b, b, dbcsr::type::symmetric);
+			m_po_bb_B = filio::read_matrix(filename("po_bb_B"), "po_bb_B", w, b, b, dbcsr::type::symmetric);
+			m_pv_bb_B = filio::read_matrix(filename("pv_bb_B"), "pv_bb_B", w, b, b, dbcsr::type::symmetric);
+			m_c_bo_B = filio::read_matrix(filename("c_bo_B"), "c_bo_B", w, b, oB, dbcsr::type::no_symmetry);
+			m_c_bv_B = filio::read_matrix(filename("c_bv_B"), "c_bv_B", w, b, vB, dbcsr::type::no_symmetry);
 			
 		}
 		

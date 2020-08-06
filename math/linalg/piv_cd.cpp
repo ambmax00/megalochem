@@ -25,7 +25,7 @@ void pivinc_cd::reorder_and_reduce(scalapack::distmat<double>& L) {
 		
 		if (m_reorder_method == "value" || m_reorder_method == "v") {
 			
-			double reorder_thresh = m_thresh;
+			double reorder_thresh = 1e-12;
 			
 			// reorder it according to matrix values
 			std::vector<double> lmo_pos(m_rank,0);
@@ -126,18 +126,8 @@ void pivinc_cd::compute() {
 	
 	MPI_Bcast(&ori_coord[0],2,MPI_INT,ori_proc,comm);
 		
-	scalapack::distmat<double> U = dbcsr::matrix_to_scalapack(*m_mat_in, 
+	scalapack::distmat<double> U = dbcsr::matrix_to_scalapack(m_mat_in, 
 		m_mat_in->name() + "_scalapack", nb, nb, ori_coord[0], ori_coord[1]);
-
-	auto w = m_mat_in->get_world();
-	auto rblk = m_mat_in->row_blk_sizes();
-	auto cblk = m_mat_in->col_blk_sizes();
-
-	dbcsr::mat_d U_back = dbcsr::scalapack_to_matrix(U, "name", w, rblk, cblk, "symmetric");
-
-	U_back.add(1.0, -1.0, *m_mat_in);
-
-	LOG.os<>("U NORM: ", U_back.norm(1));	
 
 	scalapack::distmat<double> Ucopy(N,N,nb,nb,0,0);
 	
@@ -200,6 +190,7 @@ void pivinc_cd::compute() {
 	LOG.os<>("-- Problem size: ", N, '\n');
 	LOG.os<1>("-- Maximum diagonal element of input matrix: ", max_U_diag_global, '\n');
 	
+	m_thresh = N * std::numeric_limits<double>::epsilon() * max_U_diag_global;
 	double thresh = m_thresh; /*N * std::numeric_limits<double>::epsilon() * max_U_diag_global;*/
 	
 	LOG.os<>("-- Threshold: ", thresh, '\n');
@@ -394,18 +385,12 @@ dbcsr::smat_d pivinc_cd::L(std::vector<int> rowblksizes, std::vector<int> colblk
 	
 	auto w = m_mat_in->get_world();
 	
-	dbcsr::mat_d out = dbcsr::scalapack_to_matrix(*m_L, "Inc. Chol. Decom. of " + m_mat_in->name(), 
+	auto out = dbcsr::scalapack_to_matrix(*m_L, "Inc. Chol. Decom. of " + m_mat_in->name(), 
 		w, rowblksizes, colblksizes);
 		
 	m_L->release();
-
-	dbcsr::mat_d cmat = dbcsr::mat_d::copy(*m_mat_in).name("COPY");
-
-	dbcsr::multiply('N', 'T', out, out, cmat).beta(-1.0).perform();
-
-	LOG.os<>("NORM: ", cmat.norm(1), '\n');
 	
-	return out.get_smatrix();
+	return out;
 	
 }
 	

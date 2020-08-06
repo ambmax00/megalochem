@@ -13,7 +13,7 @@ namespace math {
 class pivinc_cd {
 private:
 
-	dbcsr::smat_d m_mat_in;
+	dbcsr::shared_matrix<double> m_mat_in;
 	std::shared_ptr<scalapack::distmat<double>> m_L;
 	
 	util::mpi_log LOG;
@@ -39,8 +39,8 @@ public:
 	}
 		
 
-	pivinc_cd(dbcsr::smat_d mat_in, double thresh, int print) : 
-		m_mat_in(mat_in), m_thresh(thresh), LOG(m_mat_in->get_world().comm(), print) {}
+	pivinc_cd(dbcsr::shared_matrix<double> mat_in, int print) : 
+		m_mat_in(mat_in), LOG(m_mat_in->get_world().comm(), print) {}
 	~pivinc_cd() {}
 	
 	void compute();

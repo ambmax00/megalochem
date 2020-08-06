@@ -13,8 +13,8 @@ using matrix = dbcsr::mat_d;
 class hermitian_eigen_solver {
 private:
 
-	smatrix m_mat_in;
-	smatrix m_eigvec;
+	dbcsr::shared_matrix<double> m_mat_in;
+	dbcsr::shared_matrix<double> m_eigvec;
 	std::vector<double> m_eigval;
 	dbcsr::world m_world;
 	util::mpi_log LOG;
@@ -38,7 +38,8 @@ public:
 		return *this;
 	}
 
-	hermitian_eigen_solver(smatrix& mat_in, char jobz, bool print = false) :
+	hermitian_eigen_solver(dbcsr::shared_matrix<double>& mat_in, 
+		char jobz, bool print = false) :
 		m_mat_in(mat_in), m_world(mat_in->get_world()),
 		LOG(m_world.comm(), (print) ? 0 : -1),
 		m_jobz(jobz) {}
@@ -49,13 +50,13 @@ public:
 		return m_eigval;
 	}
 	
-	smatrix eigvecs() {
+	dbcsr::shared_matrix<double> eigvecs() {
 		return m_eigvec;
 	}
 	
-	smatrix inverse();
+	dbcsr::shared_matrix<double> inverse();
 	
-	smatrix inverse_sqrt();
+	dbcsr::shared_matrix<double> inverse_sqrt();
 	
 };
 

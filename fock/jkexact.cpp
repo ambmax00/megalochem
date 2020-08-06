@@ -52,23 +52,26 @@ void EXACT_J::compute_J() {
 	
 	// copy P 
 	
-	dbcsr::mat_d ptot = dbcsr::mat_d::create_template(*m_p_A).name("ptot");
+	auto ptot = dbcsr::create_template<double>(m_p_A)
+		.name("ptot").get();
 	
 	if (m_p_A && !m_p_B) {
-		ptot.copy_in(*m_p_A);
-		ptot.scale(2.0);
-		dbcsr::copy_matrix_to_3Dtensor_new(ptot,*m_ptot_bbd,true);
-		ptot.clear();
+		ptot->copy_in(*m_p_A);
+		ptot->scale(2.0);
+		dbcsr::copy_matrix_to_3Dtensor_new(*ptot,*m_ptot_bbd,true);
+		ptot->clear();
 	} else {
-		ptot.copy_in(*m_p_A);
-		ptot.add(1.0, 1.0, *m_p_B);
-		dbcsr::copy_matrix_to_3Dtensor_new<double>(ptot,*m_ptot_bbd,true);
-		ptot.clear();
+		ptot->copy_in(*m_p_A);
+		ptot->add(1.0, 1.0, *m_p_B);
+		dbcsr::copy_matrix_to_3Dtensor_new<double>(*ptot,*m_ptot_bbd,true);
+		ptot->clear();
 	}
 	
 	if (LOG.global_plev() >= 3) {
 		dbcsr::print(*m_ptot_bbd);
 	}
+	
+	m_ptot_bbd->filter(dbcsr::global::filter_eps);
 	
 	//m_J_bbd->batched_contract_init();
 	m_eri_batched->decompress_init({2,3});

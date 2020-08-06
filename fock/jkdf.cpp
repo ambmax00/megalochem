@@ -56,20 +56,23 @@ void BATCHED_DF_J::compute_J() {
 	
 	// copy over density
 	
-	dbcsr::mat_d ptot = dbcsr::mat_d::create_template(*m_p_A).name("ptot");
+	auto ptot = dbcsr::create_template<double>(m_p_A)
+		.name("ptot").get();
 	
 	if (m_p_A && !m_p_B) {
-		ptot.copy_in(*m_p_A);
-		ptot.scale(2.0);
-		dbcsr::copy_matrix_to_3Dtensor_new(ptot,*m_ptot_bbd,true);
+		ptot->copy_in(*m_p_A);
+		ptot->scale(2.0);
+		dbcsr::copy_matrix_to_3Dtensor_new(*ptot,*m_ptot_bbd,true);
 		//dbcsr::print(ptot);
-		ptot.clear();
+		ptot->clear();
 	} else {
-		ptot.copy_in(*m_p_A);
-		ptot.add(1.0, 1.0, *m_p_B);
-		dbcsr::copy_matrix_to_3Dtensor_new<double>(ptot,*m_ptot_bbd,true);
-		ptot.clear();
+		ptot->copy_in(*m_p_A);
+		ptot->add(1.0, 1.0, *m_p_B);
+		dbcsr::copy_matrix_to_3Dtensor_new<double>(*ptot,*m_ptot_bbd,true);
+		ptot->clear();
 	}
+	
+	m_ptot_bbd->filter(dbcsr::global::filter_eps);
 	
 	m_gp_xd->batched_contract_init();
 	m_ptot_bbd->batched_contract_init();
@@ -328,6 +331,8 @@ void BATCHED_DFMO_K::compute_K() {
 			m_c_bm->batched_contract_finalize();
 			
 			m_eri_batched->decompress_finalize();
+			
+			m_HT1_xmb_02_1->filter(dbcsr::global::filter_eps);
 						
 			// end for M
 			reo1.start();
@@ -344,6 +349,8 @@ void BATCHED_DFMO_K::compute_K() {
 				.bounds2(nu_o_bounds).perform("XiN, XY -> YiN");
 			con2.finish();
 			m_HT1_xmb_0_12->clear();
+			
+			m_HT2_xmb_0_12->filter(dbcsr::global::filter_eps);
 			
 			reo2.start();
 			dbcsr::copy(*m_HT2_xmb_0_12,*m_HT2_xmb_01_2).move_data(true).perform();
@@ -495,6 +502,8 @@ void BATCHED_DFAO_K::init_tensors() {
 					.bounds2(b2).bounds3(b3)
 					.perform("XY, YMN -> XMN");
 				con.finish();
+				
+				c_xbb_0_12->filter(dbcsr::global::filter_eps);
 						
 				reo.start();
 				dbcsr::copy(*c_xbb_0_12, *m_c_xbb_1_02).move_data(true).perform();
@@ -607,6 +616,8 @@ void BATCHED_DFAO_K::compute_K() {
 				con_1_batch.finish();
 			
 				nze_cbar += m_cbar_xbb_01_2->num_nze_total();
+			
+				m_cbar_xbb_01_2->filter(dbcsr::global::filter_eps);
 			
 				vec<vec<int>> copy_bounds = {
 					x_b[ix],

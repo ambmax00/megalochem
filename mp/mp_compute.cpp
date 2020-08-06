@@ -4,7 +4,6 @@
 #include "math/solvers/hermitian_eigen_solver.h"
 #include "math/linalg/LLT.h"
 #include "math/linalg/piv_cd.h"
-#include "math/linalg/inverse.h"
 #include "ints/aofactory.h"
 #include "ints/screening.h"
 #include <dbcsr_matrix_ops.hpp>
@@ -174,8 +173,10 @@ void mpmod::compute_batch() {
 			mu_fullblk_bounds
 		};
 	
-		if (eri_type != dbcsr::direct) 
-				aofac->ao_3c2e_fill(B_xbb, blkbounds, s_scr);
+		if (eri_type != dbcsr::direct) {
+			aofac->ao_3c2e_fill(B_xbb, blkbounds, s_scr);
+			B_xbb->filter(dbcsr::global::filter_eps);
+		}
 				
 		B_xbb_batch->compress({ix}, B_xbb);
 		
@@ -214,12 +215,13 @@ void mpmod::compute_batch() {
 	
 	LOG.os<>("Forming tilde inv ...\n");
 	
-	dbcsr::smat_d Ctilde_inv_xx = std::make_shared<dbcsr::mat_d>(
-		dbcsr::mat_d::create_template(*C_xx).name("Ctilde_inv_xx"));
+	auto Ctilde_inv_xx = dbcsr::create_template(C_xx)
+		.name("Ctilde_inv_xx").get();
 		
-	dbcsr::smat_d temp = std::make_shared<dbcsr::mat_d>(
-		dbcsr::mat_d::create_template(*C_xx).name("temp")
-		.type(dbcsr_type_no_symmetry));
+	auto temp = dbcsr::create_template(C_xx)
+		.name("temp")
+		.matrix_type(dbcsr::type::no_symmetry)
+		.get();
 		
 	C_xx->clear();
 		
@@ -238,6 +240,8 @@ void mpmod::compute_batch() {
 	
 	Ctilde_inv_xx->release();
 	
+	Ctilde_xx->filter(dbcsr::global::filter_eps);
+	
 	invtime.finish();
 	
 	//==================================================================
@@ -252,23 +256,27 @@ void mpmod::compute_batch() {
 	
 	// matrices and tensors
 	
-	dbcsr::smat_d c_occ_exp = std::make_shared<dbcsr::mat_d>(
-		dbcsr::mat_d::create_template(*c_occ).name("Scaled Occ Coeff"));
+	auto c_occ_exp = dbcsr::create_template(c_occ)
+		.name("Scaled Occ Coeff").get();
 		
-	dbcsr::smat_d c_vir_exp = std::make_shared<dbcsr::mat_d>(
-		dbcsr::mat_d::create_template(*c_vir).name("Scaled Vir Coeff"));
+	auto c_vir_exp = dbcsr::create_template(c_vir)
+		.name("Scaled Vir Coeff").get();
 		
-	dbcsr::smat_d pseudo_occ = std::make_shared<dbcsr::mat_d>(
-		dbcsr::mat_d::create_template(*p_occ).name("Pseudo Density (OCC)"));
+	auto pseudo_occ = dbcsr::create_template(p_occ)
+		.name("Pseudo Density (OCC)").get();
 		
-	dbcsr::smat_d pseudo_vir = std::make_shared<dbcsr::mat_d>(
-		dbcsr::mat_d::create_template(*p_vir).name("Pseudo Density (VIR)"));
+	auto pseudo_vir = dbcsr::create_template(p_vir)
+		.name("Pseudo Density (VIR)").get();
 		
-	dbcsr::smat_d Z_XX = std::make_shared<dbcsr::mat_d>(
-		dbcsr::mat_d::create_template(*Ctilde_xx).name("Z_xx").type(dbcsr_type_no_symmetry));
+	auto Z_XX = dbcsr::create_template(Ctilde_xx)
+		.name("Z_xx")
+		.matrix_type(dbcsr::type::no_symmetry)
+		.get();
 		
-	dbcsr::smat_d Ztilde_XX = std::make_shared<dbcsr::mat_d>(
-		dbcsr::mat_d::create_template(*Ctilde_xx).name("Ztilde_xx").type(dbcsr_type_no_symmetry));
+	auto Ztilde_XX = dbcsr::create_template(Ctilde_xx)
+		.name("Ztilde_xx")
+		.matrix_type(dbcsr::type::no_symmetry)
+		.get();
 	
 	arrvec<int,2> bb = {b,b};
 	arrvec<int,2> xx = {x,x};
@@ -330,18 +338,16 @@ void mpmod::compute_batch() {
 		//c_occ_exp->filter();
 		//c_vir_exp->filter();
 		
-		double prec = 1-16;
-
 		dbcsr::multiply('N', 'T', *c_occ_exp, *c_occ_exp, *pseudo_occ)
-			.alpha(pow(omega,0.25)).filter_eps(prec).perform();
+			.alpha(pow(omega,0.25)).perform();
 		dbcsr::multiply('N', 'T', *c_vir_exp, *c_vir_exp, *pseudo_vir)
-			.alpha(pow(omega,0.25)).filter_eps(prec).perform();
+			.alpha(pow(omega,0.25)).perform();
 		
 		pseudotime.finish();
 		
 		//=============== CHOLESKY DECOMPOSITION =======================
 		pcholtime.start();
-		math::pivinc_cd chol(pseudo_occ, cholprec, LOG.global_plev());
+		math::pivinc_cd chol(pseudo_occ, LOG.global_plev());
 		chol.reorder("value");
 		
 		chol.compute();
@@ -352,14 +358,12 @@ void mpmod::compute_batch() {
 		
 		LOG.os<>("Cholesky decomposition rank: ", rank, '\n');
 	
-		auto L_bu = chol.L(b, b);
+		auto L_bu = chol.L(b, u);
 		
-		L_bu->filter();
+		L_bu->filter(dbcsr::global::filter_eps);
 
-		pseudo_occ->filter();
-		pseudo_vir->filter();
-
-		exit(0);
+		pseudo_occ->filter(dbcsr::global::filter_eps);
+		pseudo_vir->filter(dbcsr::global::filter_eps);
 		
 		LOG.os<>("Occupancy of L: ", L_bu->occupation()*100, "%\n");
 		
@@ -577,7 +581,9 @@ void mpmod::compute_batch() {
 		B_xbb_batch->reorder(vec<int>{1},vec<int>{0,2});
 		reo_ints2.finish();
 		
-		Z_XX_0_1->batched_contract_finalize();		
+		Z_XX_0_1->batched_contract_finalize();	
+		
+		Z_XX_0_1->filter(dbcsr::global::filter_eps);	
 		
 		LOG.os<1>("Finished batching.\n");
 
@@ -604,9 +610,10 @@ void mpmod::compute_batch() {
 		double sum = 0.0;
 		
 		int nblks = x.size();
+		
+		Ztilde_XX->filter(dbcsr::global::filter_eps);
 
-		dbcsr::smat_d Ztilde_XX_t = std::make_shared<dbcsr::mat_d>(
-			dbcsr::mat_d::transpose(*Ztilde_XX));
+		auto Ztilde_XX_t = dbcsr::transpose(Ztilde_XX).get();
 			
 		//dbcsr::print(*Ztilde_XX);
 		//dbcsr::print(*Ztilde_XX_t);

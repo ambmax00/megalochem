@@ -134,89 +134,86 @@ public:
 		
 	}
 	
-	dbcsr::smatrix<double> compute() {
+	dbcsr::shared_matrix<double> compute() {
 		
 		auto rowsizes = m_basvec[0]->cluster_sizes();
 		auto colsizes = m_basvec[1]->cluster_sizes();
 		
-		dbcsr::mat_d m_ints = dbcsr::mat_d::create()
+		auto m_ints = dbcsr::create<double>()
 			.name(m_intname)
 			.set_world(m_world)
 			.row_blk_sizes(rowsizes).col_blk_sizes(colsizes)
-			.type(dbcsr_type_symmetric);
+			.matrix_type(dbcsr::type::symmetric)
+			.get();
 			
 		// reserve symmtric blocks
-		int nblks = m_ints.nblkrows_total();
+		int nblks = m_ints->nblkrows_total();
 		
 		vec<int> resrows, rescols;
 		
 		for (int i = 0; i != nblks; ++i) {
 			for (int j = 0; j != nblks; ++j) {
-				if (m_ints.proc(i,j) == m_world.rank() && i <= j) {
+				if (m_ints->proc(i,j) == m_world.rank() && i <= j) {
 					resrows.push_back(i);
 					rescols.push_back(j);
 				}
 			}
 		}
 		
-		m_ints.reserve_blocks(resrows,rescols);
+		m_ints->reserve_blocks(resrows,rescols);
 
-		calc_ints(m_ints, m_eng_pool, m_basvec);
+		calc_ints(*m_ints, m_eng_pool, m_basvec);
 		
-		auto out = m_ints.get_smatrix();
-		
-		return out;
+		return m_ints;
 		
 	}
 	
-	dbcsr::smatrix<double> compute_screen(std::string method, std::string dim) {
+	dbcsr::shared_matrix<double> compute_screen(std::string method, std::string dim) {
 		
 		auto rowsizes = (dim == "bbbb") ? m_mol->dims().s() : m_mol->dims().xs();
 		auto colsizes = (dim == "bbbb") ? m_mol->dims().s() : vec<int>{1};
 		
-		char sym = (dim == "bbbb") ? dbcsr_type_symmetric : dbcsr_type_no_symmetry;
+		auto sym = (dim == "bbbb") ? dbcsr::type::symmetric : dbcsr::type::no_symmetry;
 		
-		dbcsr::mat_d m_ints = dbcsr::mat_d::create()
+		auto m_ints = dbcsr::create<double>()
 			.name(m_intname)
 			.set_world(m_world)
 			.row_blk_sizes(rowsizes).col_blk_sizes(colsizes)
-			.type(sym);
+			.matrix_type(sym).get();
 			
 		// reserve symmtric blocks
-		int nblks = m_ints.nblkrows_total();
+		int nblks = m_ints->nblkrows_total();
 		
-		if (sym == dbcsr_type_symmetric) {
+		if (sym == dbcsr::type::symmetric) {
 		
 			vec<int> resrows, rescols;
 			
 			for (int i = 0; i != nblks; ++i) {
 				for (int j = 0; j != nblks; ++j) {
-					if (m_ints.proc(i,j) == m_world.rank() && i <= j) {
+					if (m_ints->proc(i,j) == m_world.rank() && i <= j) {
 						resrows.push_back(i);
 						rescols.push_back(j);
 					}
 				}
 			}
 			
-			m_ints.reserve_blocks(resrows,rescols);
+			m_ints->reserve_blocks(resrows,rescols);
 			
 		} else {
 			
-			m_ints.reserve_all();
+			m_ints->reserve_all();
 			
 		}
 		
 		if (dim == "bbbb" && method == "schwarz") {
-			calc_ints_schwarz_mn(m_ints, m_eng_pool, m_basvec);
+			calc_ints_schwarz_mn(*m_ints, m_eng_pool, m_basvec);
 		} else if (dim == "xx" && method == "schwarz") {
-			calc_ints_schwarz_x(m_ints, m_eng_pool, m_basvec);
+			calc_ints_schwarz_x(*m_ints, m_eng_pool, m_basvec);
 		} else {
 			throw std::runtime_error("Unknown screening method.");
 		}
 		
-		auto out = m_ints.get_smatrix();
-	
-		return out;
+		return m_ints;
 		
 	}
 		
@@ -452,7 +449,7 @@ aofactory::aofactory(desc::smolecule mol, dbcsr::world& w) :
 	
 aofactory::~aofactory() { delete pimpl; };
 
-dbcsr::smatrix<double> aofactory::ao_overlap() {
+dbcsr::shared_matrix<double> aofactory::ao_overlap() {
 	
 	std::string intname = "s_bb";
 	
@@ -463,7 +460,7 @@ dbcsr::smatrix<double> aofactory::ao_overlap() {
 	return pimpl->compute();
 }
 	
-dbcsr::smatrix<double> aofactory::ao_kinetic() {
+dbcsr::shared_matrix<double> aofactory::ao_kinetic() {
 	
 	std::string intname = "k_bb";
 	
@@ -474,7 +471,7 @@ dbcsr::smatrix<double> aofactory::ao_kinetic() {
 	return pimpl->compute();
 }
 
-dbcsr::smatrix<double> aofactory::ao_nuclear() {
+dbcsr::shared_matrix<double> aofactory::ao_nuclear() {
 	
 	std::string intname = "v_bb";
 	
@@ -485,7 +482,7 @@ dbcsr::smatrix<double> aofactory::ao_nuclear() {
 	return pimpl->compute();
 }
 
-dbcsr::smatrix<double> aofactory::ao_3coverlap(std::string metric) {
+dbcsr::shared_matrix<double> aofactory::ao_3coverlap(std::string metric) {
 	
 	pimpl->set_name("s_xx_"+metric);
 	pimpl->set_braket("xx");
@@ -545,7 +542,7 @@ void aofactory::ao_eri_fill(dbcsr::shared_tensor<4,double>& t_in,
 	
 }
 
-dbcsr::smatrix<double> aofactory::ao_schwarz(std::string metric) {
+dbcsr::shared_matrix<double> aofactory::ao_schwarz(std::string metric) {
 	pimpl->set_name("Z_mn");
 	pimpl->set_braket("bbbb");
 	pimpl->set_operator(metric);
@@ -553,7 +550,7 @@ dbcsr::smatrix<double> aofactory::ao_schwarz(std::string metric) {
 	return pimpl->compute_screen("schwarz", "bbbb");
 }
 	
-dbcsr::smatrix<double> aofactory::ao_3cschwarz(std::string metric) {
+dbcsr::shared_matrix<double> aofactory::ao_3cschwarz(std::string metric) {
 	pimpl->set_name("Z_x");
 	pimpl->set_braket("xx");
 	pimpl->set_operator(metric);

@@ -244,13 +244,14 @@ void hfmod::compute_guess() {
 			
 			if (pB) {
 			
-				mat_d pscaled = mat_d::copy<double>(*pA).name(at_smol->name() + "_density");
-				pscaled.add(0.5, 0.5, *pB);
+				auto pscaled = dbcsr::copy<double>(pA)
+					.name(at_smol->name() + "_density").get();
+				pscaled->add(0.5, 0.5, *pB);
 				locdensitymap[Z] = dbcsr::matrix_to_eigen(pscaled);
 				
 			} else {
 				
-				locdensitymap[Z] = dbcsr::matrix_to_eigen(*pA);
+				locdensitymap[Z] = dbcsr::matrix_to_eigen(pA);
 				
 			}
 			
@@ -364,10 +365,7 @@ void hfmod::compute_guess() {
 		
 		
 		auto b = m_mol->dims().b();
-		mat_d ptot = dbcsr::eigen_to_matrix(ptot_eigen, m_world, "p_bb_A", b, b, dbcsr_type_symmetric);
-		
-		m_p_bb_A = ptot.get_smatrix();
-		m_p_bb_A->filter();
+		m_p_bb_A = dbcsr::eigen_to_matrix(ptot_eigen, m_world, "p_bb_A", b, b, dbcsr::type::symmetric);
 		
 		if (m_guess == "SADNO") {
 			
@@ -398,7 +396,7 @@ void hfmod::compute_guess() {
 			
 			LOG.os<>("Forming cholesky orbitals from SAD guess.");
 			
-			math::pivinc_cd cd(m_p_bb_A, 1e-12, LOG.global_plev());
+			math::pivinc_cd cd(m_p_bb_A, LOG.global_plev());
 			
 			cd.compute();
 			
@@ -410,7 +408,7 @@ void hfmod::compute_guess() {
 			m_c_bm_A = cd.L(b,m);
 			
 			m_c_bm_A->setname("c_bm_A");
-			m_c_bm_A->filter();
+			m_c_bm_A->filter(dbcsr::global::filter_eps);
 			
 			//dbcsr::print(*m_c_bm_A);
 			
@@ -419,6 +417,8 @@ void hfmod::compute_guess() {
 			//dbcsr::print(*m_p_bb_A);
 			
 		}
+		
+		m_p_bb_A->filter(dbcsr::global::filter_eps);
 			
 		if (!m_restricted) {
 			if (!m_nobetaorb) m_c_bm_B->copy_in(*m_c_bm_A);

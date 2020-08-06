@@ -17,14 +17,17 @@ fockmod::fockmod (dbcsr::world iworld, desc::smolecule imol, desc::options iopt)
 {
 	// set up tensors
 	auto b = m_mol->dims().b();
-	dbcsr::mat_d fA = dbcsr::matrix<>::create().set_world(m_world).name("f_bb_A")
-		.row_blk_sizes(b).col_blk_sizes(b).type(dbcsr_type_symmetric);
-	
-	m_f_bb_A = fA.get_smatrix();
-	
+	m_f_bb_A = dbcsr::create<double>()
+		.set_world(m_world)
+		.name("f_bb_A")
+		.row_blk_sizes(b)
+		.col_blk_sizes(b)
+		.matrix_type(dbcsr::type::symmetric)
+		.get();
+		
 	if (m_mol->nele_alpha() != m_mol->nele_beta() && m_mol->nele_beta() != 0) {
-		dbcsr::mat_d fB = dbcsr::matrix<>::create_template(*m_f_bb_A).name("f_bb_B");
-		m_f_bb_B = fB.get_smatrix();
+		m_f_bb_B = dbcsr::create_template<double>(m_f_bb_A)
+			.name("f_bb_B").get();
 	}
 	
 }
@@ -132,7 +135,7 @@ void fockmod::init() {
 	
 	// initialize integrals depending on method combination
 
-	dbcsr::smatrix<double> c_s_xx;
+	dbcsr::shared_matrix<double> c_s_xx;
 	
 	if (compute_s_xx) {
 		
@@ -143,7 +146,7 @@ void fockmod::init() {
 		if (metric == "coulomb") {
 		
 			auto out = aofac->ao_3coverlap("coulomb");
-			out->filter();
+			out->filter(dbcsr::global::filter_eps);
 			c_s_xx = out;
 			
 		} else {
@@ -157,13 +160,15 @@ void fockmod::init() {
 			
 			coul_metric->clear();
 			
-			dbcsr::mat_d temp = dbcsr::mat_d::create_template(*coul_metric)
-				.name("temp").type(dbcsr_type_no_symmetry);
+			dbcsr::shared_matrix<double> temp = 
+				dbcsr::create_template<double>(coul_metric)
+				.name("temp")
+				.matrix_type(dbcsr::type::no_symmetry).get();
 				
-			dbcsr::multiply('N', 'N', *other_metric, *coul_inv, temp).perform();
-			dbcsr::multiply('N', 'N', temp, *other_metric, *coul_metric).perform();
+			dbcsr::multiply('N', 'N', *other_metric, *coul_inv, *temp).perform();
+			dbcsr::multiply('N', 'N', *temp, *other_metric, *coul_metric).perform();
 			
-			coul_metric->filter();
+			//coul_metric->filter(dbcsr::global::filter_eps);
 			c_s_xx = coul_metric;
 			
 		}
@@ -203,10 +208,9 @@ void fockmod::init() {
 			
 			LOG.os<1>("Computing metric inverse...\n");
 			
-			dbcsr::mat_d s = dbcsr::mat_d::create_template(*Linv)
+			auto c_s_xx_inv = dbcsr::create_template<double>(Linv)
 				.name(m_mol->name() + "_s_xx_inv")
-				.type(dbcsr_type_symmetric);
-			auto c_s_xx_inv = s.get_smatrix();
+				.matrix_type(dbcsr::type::symmetric).get();
 			
 			dbcsr::multiply('T', 'N', *Linv, *Linv, *c_s_xx_inv).perform();
 			
@@ -214,6 +218,8 @@ void fockmod::init() {
 				.pgrid(spgrid2).map1({0}).map2({1}).blk_sizes(xx).get();
 				
 			dbcsr::copy_matrix_to_tensor(*c_s_xx_inv, *s_xx_inv);
+			
+			s_xx_inv->filter(dbcsr::global::filter_eps);
 			
 			//dbcsr::print(*c_s_xx);
 			//dbcsr::print(*s_xx_inv);
@@ -230,13 +236,14 @@ void fockmod::init() {
 			
 			//dbcsr::print(*Linv);
 			
-			dbcsr::mat_d Linv_t = dbcsr::mat_d::transpose(*Linv);
-			auto c_s_xx_invsqrt = Linv_t.get_smatrix();
+			dbcsr::shared_matrix<double> c_s_xx_invsqrt = dbcsr::transpose(Linv).get();
 			
 			auto s_xx_invsqrt = dbcsr::tensor_create<2>().name("s_xx_invsqrt")
 				.pgrid(spgrid2).map1({0}).map2({1}).blk_sizes(xx).get();
 				
 			dbcsr::copy_matrix_to_tensor(*c_s_xx_invsqrt, *s_xx_invsqrt);
+			
+			s_xx_invsqrt->filter(dbcsr::global::filter_eps);
 				
 			m_reg.insert_tensor<2,double>("s_xx_invsqrt", s_xx_invsqrt);
 			
@@ -274,6 +281,8 @@ void fockmod::init() {
 				bounds[3] = eri_batched->blk_bounds(3)[inu];
 				
 				aofac->ao_eri_fill(eris, bounds, nullptr);
+				
+				eris->filter(dbcsr::global::filter_eps);
 				
 				eri_batched->compress({imu,inu},eris);
 				
@@ -340,6 +349,7 @@ void fockmod::init() {
 				if (mytype != dbcsr::direct) aofac->ao_3c2e_fill(eri,bounds,scr_s);
 				
 				//dbcsr::print(*eri);
+				eri->filter(dbcsr::global::filter_eps);
 				
 				eribatch->compress({inu}, eri);
 		}

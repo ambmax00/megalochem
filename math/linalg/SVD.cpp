@@ -31,7 +31,7 @@ void SVD::compute() {
 	MPI_Bcast(&ori_coord[0],2,MPI_INT,ori_proc,wrd.comm());
 		
 	auto sca_mat_in = std::make_shared<scalapack::distmat<double>>(
-		dbcsr::matrix_to_scalapack(*m_mat_in, m_mat_in->name() + "_scalapack", 
+		dbcsr::matrix_to_scalapack(m_mat_in, m_mat_in->name() + "_scalapack", 
 		nb, nb, ori_coord[0], ori_coord[1])
 	);
 	

@@ -508,12 +508,15 @@ public:
 		return c_dbcsr_t_get_nze_total(m_tensor_ptr);
 	}
 	
-	void filter(std::optional<T> ieps = std::nullopt, 
-        std::optional<int> method = std::nullopt, 
+	void filter(T eps, 
+        std::optional<filter> method = std::nullopt, 
         std::optional<bool> use_absolute = std::nullopt) {
         
-		c_dbcsr_t_filter(m_tensor_ptr, (ieps) ? *ieps : global::filter_eps,
-            (method) ? &*method : nullptr, (use_absolute) ? &*use_absolute : &global::filter_use_absolute);
+        int fmethod = (method) ? static_cast<int>(*method) : 0;
+        
+		c_dbcsr_t_filter(m_tensor_ptr, eps,
+            (method) ? &fmethod : nullptr, 
+            (use_absolute) ? &*use_absolute : nullptr);
 		
 	}
 	

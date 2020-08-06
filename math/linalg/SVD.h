@@ -10,7 +10,7 @@ namespace math {
 class SVD {
 private:
 
-	dbcsr::smat_d m_mat_in;
+	dbcsr::shared_matrix<double> m_mat_in;
 	char m_jobu, m_jobvt;
 	
 	std::shared_ptr<scalapack::distmat<double>> m_U;
@@ -21,7 +21,7 @@ private:
 	 
 public:
 
-	SVD(dbcsr::smat_d& mat, char jobu, char jobvt, int print) : 
+	SVD(dbcsr::shared_matrix<double>& mat, char jobu, char jobvt, int print) : 
 		m_mat_in(mat), LOG(m_mat_in->get_world().comm(),print),
 		m_jobu(jobu), m_jobvt(jobvt) {}
 	~SVD() {}
