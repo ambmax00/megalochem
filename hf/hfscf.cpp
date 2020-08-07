@@ -185,6 +185,12 @@ void hfmod::one_electron() {
 		dbcsr::print(*m_x_bb);
 		LOG.os<>('\n');
 	}
+
+	m_s_bb->filter(dbcsr::global::filter_eps);
+	m_t_bb->filter(dbcsr::global::filter_eps);
+	m_v_bb->filter(dbcsr::global::filter_eps);
+	m_x_bb->filter(dbcsr::global::filter_eps);
+	m_core_bb->filter(dbcsr::global::filter_eps);
 	
 	LOG.os<>("Done with 1 electron integrals.\n");
 	

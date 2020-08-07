@@ -510,6 +510,7 @@ void mpmod::compute_batch() {
 				sectran.start();
 				dbcsr::contract(*pseudo_vir_0_1, *B_xub_2_01, *B_xuB_2_01)
 					.bounds2(nu_bounds).bounds3(x_u_bounds)
+					.filter(dbcsr::global::filter_eps)
 					.perform("Nn, Xin -> XiN");
 				sectran.finish();
 			
@@ -620,6 +621,7 @@ void mpmod::compute_batch() {
 				formZ.start();
 				dbcsr::contract(*B_xBB_0_12, *B_xbb_0_12, *Z_XX_0_1)
 					.beta(1.0).bounds1(mn_bounds)
+					.filter(dbcsr::global::filter_eps)
 					.perform("Mmn, Nmn -> MN");
 				formZ.finish();
 				
@@ -639,8 +641,6 @@ void mpmod::compute_batch() {
 		
 		Z_XX_0_1->batched_contract_finalize();	
 		
-		Z_XX_0_1->filter(dbcsr::global::filter_eps);	
-		
 		LOG.os<1>("Finished batching.\n");
 
 		formZtilde.start();
@@ -651,7 +651,8 @@ void mpmod::compute_batch() {
 		
 		// multiply
 		LOG.os<1>("Ztilde = Z * Jinv\n");
-		dbcsr::multiply('N', 'N', *Z_XX, *Ctilde_xx, *Ztilde_XX).perform();
+		dbcsr::multiply('N', 'N', *Z_XX, *Ctilde_xx, *Ztilde_XX)
+			.filter_eps(dbcsr::global::filter_eps).perform();
 		
 		formZtilde.finish();
 		
@@ -667,8 +668,6 @@ void mpmod::compute_batch() {
 		
 		int nblks = x.size();
 		
-		Ztilde_XX->filter(dbcsr::global::filter_eps);
-
 		auto Ztilde_XX_t = dbcsr::transpose(Ztilde_XX).get();
 			
 		//dbcsr::print(*Ztilde_XX);

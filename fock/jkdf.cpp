@@ -100,6 +100,7 @@ void BATCHED_DF_J::compute_J() {
 		
 		dbcsr::contract(*eri_0_12, *m_ptot_bbd, *m_gp_xd)
 			.bounds1(bounds1).beta(1.0)
+			.filter(dbcsr::global::filter_eps)
 			.perform("XMN, MN_ -> X_");
 					
 		con1.finish();
@@ -115,7 +116,8 @@ void BATCHED_DF_J::compute_J() {
 	
 	LOG.os<1>("X_, XY -> Y_\n");
 	
-	dbcsr::contract(*m_gp_xd, *m_inv, *m_gq_xd).perform("X_, XY -> Y_");
+	dbcsr::contract(*m_gp_xd, *m_inv, *m_gq_xd)
+		.filter(dbcsr::global::filter_eps).perform("X_, XY -> Y_");
 	
 	//dbcsr::print(*m_gq_xd);
 	
@@ -140,6 +142,7 @@ void BATCHED_DF_J::compute_J() {
 	
 		dbcsr::contract(*m_gq_xd, *eri_0_12, *m_J_bbd)
 			.bounds3(bounds3).beta(1.0)
+			.filter(dbcsr::global::filter_eps / nu_b.size())
 			.perform("X_, XMN -> MN_");
 					
 		con2.finish();
@@ -500,13 +503,14 @@ void BATCHED_DFAO_K::init_tensors() {
 				con.start();
 				dbcsr::contract(*inv, *eri_0_12, *c_xbb_0_12)
 					.bounds2(b2).bounds3(b3)
+					.filter(dbcsr::global::filter_eps)
 					.perform("XY, YMN -> XMN");
 				con.finish();
 				
-				c_xbb_0_12->filter(dbcsr::global::filter_eps);
-						
 				reo.start();
-				dbcsr::copy(*c_xbb_0_12, *m_c_xbb_1_02).move_data(true).perform();
+				dbcsr::copy(*c_xbb_0_12, *m_c_xbb_1_02)
+					.move_data(true)
+					.perform();
 				reo.finish();
 				
 				//dbcsr::print(*m_c_xbb_1_02);
@@ -612,12 +616,13 @@ void BATCHED_DFAO_K::compute_K() {
 				con_1_batch.start();
 				dbcsr::contract(*eri_01_2, *m_p_bb, *m_cbar_xbb_01_2)
 					.bounds2(xm_bounds).bounds3(n_bounds)
+					.filter(dbcsr::global::filter_eps)
 					.perform("XML, LN -> XMN");
 				con_1_batch.finish();
 			
 				nze_cbar += m_cbar_xbb_01_2->num_nze_total();
 			
-				m_cbar_xbb_01_2->filter(dbcsr::global::filter_eps);
+				//m_cbar_xbb_01_2->filter(dbcsr::global::filter_eps);
 			
 				vec<vec<int>> copy_bounds = {
 					x_b[ix],
@@ -647,6 +652,7 @@ void BATCHED_DFAO_K::compute_K() {
 				con_2_batch.start();
 				dbcsr::contract(*m_cbar_xbb_02_1, *c_xbb_1_02, *m_K_01)
 					.bounds1(xs_bounds).beta(1.0)
+					.filter(dbcsr::global::filter_eps / nu_b.size())
 					.perform("XMS, XNS -> MN");
 				con_2_batch.finish();
 								
