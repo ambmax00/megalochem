@@ -83,8 +83,8 @@ void mpmod::compute_batch() {
 	int nbatches = m_opt.get<int>("nbatches", MP_NBATCHES);
 	std::string eri_method = m_opt.get<std::string>("eris", MP_ERIS);
 	std::string intermed_method = m_opt.get<std::string>("intermeds", MP_INTERMEDS);
-	double cholprec = m_opt.get<double>("cholprec", MP_CHOLPREC);
-	
+	bool force_sparsity = m_opt.get<bool>("force_sparsity", MP_FORCE_SPARSITY);
+		
 	// laplace
 	double emin = eps_o->front();
 	double ehomo = eps_o->back();
@@ -159,28 +159,76 @@ void mpmod::compute_batch() {
 	
 	calcints.start();
 	
-	B_xbb_batch->compress_init({0});
+	B_xbb_batch->compress_init({0,2});
 	
 	auto x_blk_bounds = B_xbb_batch->blk_bounds(0);
-	auto nu_fullblk_bounds = B_xbb_batch->full_blk_bounds(1);
-	auto mu_fullblk_bounds = B_xbb_batch->full_blk_bounds(2);
+	auto mu_fullblk_bounds = B_xbb_batch->full_blk_bounds(1);
+	auto nu_blk_bounds = B_xbb_batch->blk_bounds(2);
 	
-	for (int ix = 0; ix != x_blk_bounds.size(); ++ix) {
+	int nxbatches = x_blk_bounds.size();
+	int nnbatches = nu_blk_bounds.size();
+	
+	vec<arrvec<int,3>> eri_blk_idx(nxbatches * nnbatches);
+	
+	int ibatch = 0;
+	
+	for (int ix = 0; ix != nxbatches; ++ix) {
+		for (int inu = 0; inu != nnbatches; ++inu) {
+			
+			int nxblkmax = x_blk_bounds[ix][1] - x_blk_bounds[ix][0] + 1;
+			int nnblkmax = nu_blk_bounds[inu][1] - nu_blk_bounds[inu][0] + 1;
+			
+			int max = nxblkmax * nnblkmax;
+			
+			if (force_sparsity) {
+				for (auto& a : eri_blk_idx[ibatch]) a.reserve(max);
+			}
+			
+			vec<vec<int>> blkbounds = {
+				x_blk_bounds[ix],
+				mu_fullblk_bounds,
+				nu_blk_bounds[inu]
+			};
 		
-		vec<vec<int>> blkbounds = {
-			x_blk_bounds[ix],
-			nu_fullblk_bounds,
-			mu_fullblk_bounds
-		};
-	
-		if (eri_type != dbcsr::direct) {
-			aofac->ao_3c2e_fill(B_xbb, blkbounds, s_scr);
-			B_xbb->filter(dbcsr::global::filter_eps);
-		}
+			if (eri_type != dbcsr::direct) {
+				aofac->ao_3c2e_fill(B_xbb, blkbounds, s_scr);
+				B_xbb->filter(dbcsr::global::filter_eps);
+			}
+			
+			if (force_sparsity) {
+			
+				dbcsr::iterator_t<3> iter(*B_xbb);
+				iter.start();
 				
-		B_xbb_batch->compress({ix}, B_xbb);
+				while (iter.blocks_left()) {
+					iter.next_block();
+					auto& idx = iter.idx();
+					
+					eri_blk_idx[ibatch][0].push_back(idx[0]);
+					eri_blk_idx[ibatch][1].push_back(idx[1]);
+					eri_blk_idx[ibatch][2].push_back(idx[2]);
+				}
+				
+				iter.stop();
+				for (auto& a : eri_blk_idx[ibatch]) a.shrink_to_fit();
+			
+			}
+			
+			B_xbb_batch->compress({ix,inu}, B_xbb);
+			
+			++ibatch;
 		
+		}
 	}
+	
+	/*for (auto v : eri_blk_idx) {
+		std::cout << "BATCH" << std::endl;
+		for (auto a : v) {
+			for (auto i : a) {
+				std::cout << i << " ";
+			} std::cout << std::endl;
+		}
+	}*/
 	
 	auto eri = B_xbb_batch->get_stensor();
 	
@@ -407,6 +455,8 @@ void mpmod::compute_batch() {
 		
 		LOG.os<1>("Starting batching over auxiliary functions.\n");
 		
+		ibatch = 0;
+		
 		// LOOP OVER BATCHES OF AUXILIARY FUNCTIONS 
 		for (int ix = 0; ix != B_xbb_batch->nbatches_dim(0); ++ix) {
 			
@@ -480,10 +530,14 @@ void mpmod::compute_batch() {
 					B_xBB_batch->bounds(0)[ix],
 					B_xBB_batch->bounds(2)[inu]
 				};
+				
+				if (force_sparsity) B_xBB_1_02->reserve(eri_blk_idx[ibatch]);
 									
 				fintran.start();
 				dbcsr::contract(*L_bu_0_1, *B_xub_1_02, *B_xBB_1_02)
-					.bounds3(x_nu_bounds).perform("Mi, XiN -> XMN");
+					.bounds3(x_nu_bounds)
+					.retain_sparsity(force_sparsity)
+					.perform("Mi, XiN -> XMN");
 				fintran.finish();
 		
 				// reorder
@@ -500,6 +554,8 @@ void mpmod::compute_batch() {
 				writetime.start();
 				B_xBB_batch->compress({ix,inu},B_xBB_0_12_wr);
 				writetime.finish();
+				
+				++ibatch;
 				
 			}
 			

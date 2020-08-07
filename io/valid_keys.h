@@ -63,7 +63,7 @@ static const json valid_keys =
 		{"c_os", 1.3},
 		{"eris", "core"},
 		{"intermeds", "core"},
-		{"cholprec", 1e-12}
+		{"force_sparsity", false}
 	}},
 	{"adc", {
 		{"print", 0},

@@ -15,6 +15,8 @@ inline const double MP_CHOLPREC = 1e-12;
 inline const std::string MP_ERIS = "core";
 inline const std::string MP_INTERMEDS = "core";
 
+inline const bool MP_FORCE_SPARSITY = false;
+
 }
 
 #endif

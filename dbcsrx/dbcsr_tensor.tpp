@@ -722,6 +722,13 @@ public:
 		
 	}
 	
+	void next_block() {
+		
+		c_dbcsr_t_iterator_next_block(m_iter_ptr, m_idx.data(), &m_blk_n, nullptr,
+			nullptr, nullptr);
+		
+	}
+	
 	bool blocks_left() {	
 		return c_dbcsr_t_iterator_blocks_left(m_iter_ptr);	
 	}
