@@ -4,7 +4,7 @@
 #include "ints/gentran.h"
 
 namespace adc {
-	
+/*
 void adcmod::mo_load() {
 	
 	LOG.os<>("Constructing MO integrals...\n");
@@ -64,7 +64,7 @@ void adcmod::mo_load() {
 	
 	LOG.os<>("Finished computing MO quantities.\n\n");
 		
-}
+}*/
 		
 adcmod::adcmod(desc::shf_wfn hfref, desc::options& opt, MPI_Comm comm) :
 	m_hfwfn(hfref), 
@@ -82,21 +82,14 @@ adcmod::adcmod(desc::shf_wfn hfref, desc::options& opt, MPI_Comm comm) :
 	TIME(comm, "ADC Module", LOG.global_plev())
 {
 	
-	LOG.banner("ADC MODULE",50,'*');	
-	
-	m_dims.o = m_hfwfn->mol()->dims().oa();
-	m_dims.v = m_hfwfn->mol()->dims().va();
-	m_dims.b = m_hfwfn->mol()->dims().b();
-	m_dims.x = m_hfwfn->mol()->dims().x();
-	
-	if (!m_use_ao) {
-		mo_load();
-	} else {
-		//ao_load();
-	}
+	LOG.banner("ADC MODULE",50,'*');
 	
 	LOG.os<>("--- Ready for launching computation. --- \n\n");
 	
 }
+
+void adcmod::init() {
+	
+	// setup pgrids (?)
 
 } // end namespace

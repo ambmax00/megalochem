@@ -1,9 +1,9 @@
 set(SOURCES
 	adcmod.h
-	adc_diag.cpp
+	#adc_diag.cpp
 	adc_compute.cpp
 	adc_init.cpp
-	adc_amplitudes.cpp
+	#adc_amplitudes.cpp
 )
 
 add_library(chem_adc ${SOURCES})
@@ -13,5 +13,6 @@ target_link_libraries(
 	PRIVATE
 	chem_ints
 	chem_desc
+	chem_dbcsrx
 	chem_math_laplace
 )

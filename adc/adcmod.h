@@ -3,28 +3,15 @@
 
 #include "desc/options.h"
 #include "desc/wfn.h"
-#include "tensor/dbcsr.hpp"
 #include "utils/mpi_time.h"
 #include "adc/adc_defaults.h"
+#include "utils/registry.h"
+#include <dbcsr_matrix.hpp>
+#include <dbcsr_tensor.hpp>
 
 #include <mpi.h>
 
 namespace adc {
-
-struct dims {
-	
-	vec<int> b, o, v, x;
-	
-};
-	
-struct moctx {
-	
-	svector<double> eps_o, eps_v;
-	dbcsr::stensor<3> b_xoo, b_xov, b_xvv;
-	dbcsr::stensor<4> t_ovov;
-	dbcsr::stensor<2> d_ov; // matrix diagonal
-	
-};
 	
 class adcmod {
 private:
@@ -35,10 +22,6 @@ private:
 	
 	util::mpi_time TIME;
 	util::mpi_log LOG;
-	
-	// have two structs: mo_ctx, ao_ctx
-	dims m_dims;
-	moctx m_mo;
 	
 	int m_order;
 	bool m_use_ao;
@@ -51,21 +34,25 @@ private:
 	double m_c_os;
 	double m_c_osc;
 	
-	void mo_load();
+	util::registry m_reg;
 	
-	void mo_compute_diag_0();
-	void mo_compute_diag_1();
-	void mo_compute_diag();
+	void init();
 	
-	void mo_amplitudes();
+	//void mo_load();
 	
-	void antisym(dbcsr::tensor<4>& t, vec<int>& o, vec<int>& v);
+	//void mo_compute_diag_0();
+	//void mo_compute_diag_1();
+	//void mo_compute_diag();
 	
-	void scale(dbcsr::tensor<4>& t, vec<double>& eo, vec<double>& ev);
+	//void mo_amplitudes();
+	
+	//void antisym(dbcsr::tensor<4>& t, vec<int>& o, vec<int>& v);
+	
+	//void scale(dbcsr::tensor<4>& t, vec<double>& eo, vec<double>& ev);
 	
 public:	
 
-	adcmod(desc::shf_wfn hfref, desc::options& opt, MPI_Comm comm);
+	adcmod(desc::shf_wfn hfref, desc::options& opt, dbcsr::world& w);
 	~adcmod() {}
 	
 	void compute();

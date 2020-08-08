@@ -11,7 +11,24 @@
 namespace adc {
 
 void adcmod::compute() {
-
+	
+		// BEFORE: init tensors base (ints, metrics, etc..., put into m_reg)
+		
+		// AFTER: init tensors (2) (mo-ints, diags, amplitudes ...) 
+				
+		// setup sigma constructor
+		
+		// SECOND: Generate guesses
+		
+		// THIRD: Launch ADC(1)
+		
+		// IF ADC(2) REQUESTED, LAUNCH ADC(2) AFTERWARDS
+		
+		
+		
+		
+		
+		/*
 		LOG.os<>("--- Starting Computation ---\n\n");
 		
 		dbcsr::pgrid<2> grid2(m_comm);
@@ -46,6 +63,7 @@ void adcmod::compute() {
 			
 		// generate the guesses
 		
+		/*
 		vec<int> map1 = {0};
 		vec<int> map2 = {1};
 		arrvec<int,2> blksizes = {m_dims.o, m_dims.v};
@@ -106,7 +124,7 @@ void adcmod::compute() {
 			LOG.os<>("Running SOS-RI-ADC(2)...\n\n");
 			//dav.compute(rvs, m_nroots, omega);
 			
-		}
+		}*/
 		
 }
 

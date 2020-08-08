@@ -184,6 +184,15 @@ int main(int argc, char** argv) {
 		
 	}
 	
+	auto adcopt = opt.subtext("adc");
+	bool do_adc = opt.get<bool>("do_adc");
+	
+	if (do_adc) {
+		
+		adc::adcmod myadc(myhfwfn,adcopt,wrd);
+		
+	}
+	
 //#ifdef USE_SCALAPACK
 	scalapack::global_grid.free();
 	//c_blacs_exit(0);

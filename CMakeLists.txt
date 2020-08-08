@@ -39,8 +39,7 @@ add_subdirectory(ints)
 add_subdirectory(fock)
 add_subdirectory(hf)
 add_subdirectory(mp)
-#add_subdirectory(adc)
-#add_subdirectory(mp2)
+add_subdirectory(adc)
 
 add_executable(
 	chem 
@@ -60,5 +59,5 @@ target_link_libraries(
 	chem_ints
 	chem_math_linalg
 	#	chem_math_solvers
-	#chem_adc
+	chem_adc
 )
