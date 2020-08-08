@@ -324,6 +324,7 @@ void BATCHED_DFMO_K::compute_K() {
 				con1.start();
 				dbcsr::contract(*eri_xbb_02_1,*m_c_bm,*m_HT1_xmb_02_1)
 					.bounds2(xn_bounds).bounds3(o_tbounds).beta(1.0)
+					.filter(dbcsr::global::filter_eps / batch_nb.size())
 					.perform("XMN, Mi -> XiN");
 				con1.finish();
 			
@@ -335,8 +336,6 @@ void BATCHED_DFMO_K::compute_K() {
 			
 			m_eri_batched->decompress_finalize();
 			
-			m_HT1_xmb_02_1->filter(dbcsr::global::filter_eps);
-						
 			// end for M
 			reo1.start();
 			dbcsr::copy(*m_HT1_xmb_02_1,*m_HT1_xmb_0_12).move_data(true).perform();
@@ -349,11 +348,11 @@ void BATCHED_DFMO_K::compute_K() {
 			
 			con2.start();
 			dbcsr::contract(*m_HT1_xmb_0_12,*m_invsqrt,*m_HT2_xmb_0_12)
-				.bounds2(nu_o_bounds).perform("XiN, XY -> YiN");
+				.bounds2(nu_o_bounds)
+				.filter(dbcsr::global::filter_eps)
+				.perform("XiN, XY -> YiN");
 			con2.finish();
 			m_HT1_xmb_0_12->clear();
-			
-			m_HT2_xmb_0_12->filter(dbcsr::global::filter_eps);
 			
 			reo2.start();
 			dbcsr::copy(*m_HT2_xmb_0_12,*m_HT2_xmb_01_2).move_data(true).perform();
@@ -382,6 +381,7 @@ void BATCHED_DFMO_K::compute_K() {
 				con3.start();
 				dbcsr::contract(*m_HT2_xmb_01_2,*HT2_xmb_01_2_copy,*m_K_01)
 					.bounds1(x_o_bounds).beta(1.0)
+					.filter(dbcsr::global::filter_eps/batch_xb.size())
 					.perform("XiM, XiN -> MN"); 
 				con3.finish();
 				
