@@ -572,50 +572,61 @@ void mpmod::compute_batch() {
 		LOG.os<>("Setting up decompression.\n");
 		
 		viewtime.start();
-		B_xbb_batch->decompress_init({1,2});
-		B_xBB_batch->decompress_init({1,2});
+		B_xbb_batch->decompress_init({2});
+		B_xBB_batch->decompress_init({0,2});
 		viewtime.finish();
 		
-		auto mu_bbounds = B_xbb_batch->bounds(1);
+		auto x_bbounds = B_xbb_batch->bounds(0);
 		auto nu_bbounds = B_xbb_batch->bounds(2);
+		auto mu_bounds = B_xbb_batch->full_bounds(1);
 		
 		LOG.os<>("Computing Z_XY.\n");
 		
-		Z_XX_0_1->batched_contract_init();
+		//Z_XX_0_1->batched_contract_init();
 		
-		for (int imu = 0; imu != mu_bbounds.size(); ++imu) {
-			for (int inu = 0; inu != nu_bbounds.size(); ++inu) {
+		for (int inu = 0; inu != nu_bbounds.size(); ++inu) {
+			
+			LOG.os<>("-- Fetching integral batch (n)", inu, "\n");
 				
-				LOG.os<>("-- Batch: ", imu, " ", inu, '\n');
+			fetchints2.start();
+			B_xbb_batch->decompress({2});
+			fetchints2.finish();
+			
+			B_xbb_batch->decompress({inu});
+			
+			auto B_xbb_0_12 = B_xbb_batch->get_stensor();
+			
+			for (int ix = 0; ix != x_bbounds.size(); ++ix) {
 				
-				LOG.os<>("-- Fetching integrals...\n");
+				LOG.os<>("---- Batch: ", inu, " ", ix, '\n');
 				
-				fetchints2.start();
-				B_xbb_batch->decompress({imu,inu});
-				fetchints2.finish();
-				
-				auto B_xbb_0_12 = B_xbb_batch->get_stensor();
-				
-				LOG.os<>("-- Fetching intermediate...\n");
+				LOG.os<>("---- Fetching intermediate batch (x/n)",
+					ix, " ", inu, "\n");
 				
 				readtime.start();
-				B_xBB_batch->decompress({imu,inu});
+				B_xBB_batch->decompress({ix,inu});
 				readtime.finish();
 				
 				auto B_xBB_0_12 = B_xBB_batch->get_stensor();
 				
 				vec<vec<int>> mn_bounds = {
-					mu_bbounds[imu],
+					mu_bounds,
 					nu_bbounds[inu]
 				};
 				
+				vec<vec<int>> x_bounds = {
+					x_bbounds[ix]
+				};
+				
 				// form Z
-				LOG.os<>("-- Forming Z.\n");
+				LOG.os<>("---- Forming Z.\n");
 				
 				formZ.start();
 				dbcsr::contract(*B_xBB_0_12, *B_xbb_0_12, *Z_XX_0_1)
-					.beta(1.0).bounds1(mn_bounds)
-					.filter(dbcsr::global::filter_eps)
+					.beta(1.0)
+					.bounds1(mn_bounds)
+					.bounds3(x_bounds)
+					.filter(dbcsr::global::filter_eps/x_bbounds.size())
 					.perform("Mmn, Nmn -> MN");
 				formZ.finish();
 				
@@ -633,7 +644,7 @@ void mpmod::compute_batch() {
 		B_xbb_batch->reorder(vec<int>{1},vec<int>{0,2});
 		reo_ints2.finish();
 		
-		Z_XX_0_1->batched_contract_finalize();	
+		//Z_XX_0_1->batched_contract_finalize();	
 		
 		LOG.os<1>("Finished batching.\n");
 
