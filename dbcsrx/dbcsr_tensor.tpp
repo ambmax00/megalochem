@@ -489,6 +489,7 @@ public:
                                ${repeat('nullptr',4*MAXDIM)}$,
                                nullptr, &cstring, nullptr);
 		std::string out(cstring);
+		c_free_string(&cstring);
         return out;
 	}
 	

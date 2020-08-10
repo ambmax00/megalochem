@@ -378,6 +378,8 @@ void pivinc_cd::compute() {
 	LOG.os<>("Finished decomposition.\n");
 	
 	delete [] iwork;
+	delete [] ipiv_r;
+	delete [] ipiv_c;
 		
 }
 	

@@ -33,6 +33,9 @@ public:
 	virtual double val_x(int i) { return 0; }
 	virtual double val_bb(int i, int j) { return 0; }
 	
+	virtual double blknorm_x(int i) { return 0; }
+	virtual double blknorm_bb(int i, int j) { return 0; }
+	
 	~screener() {}
 	
 };
@@ -59,6 +62,9 @@ public:
 	
 	double val_x(int i) override { return m_z_x(i,0); }
 	double val_bb(int i, int j) override  { return m_z_mn(i,j); }
+	
+	double blknorm_x(int i) override { return m_blk_norms_x(i,0); }
+	double blknorm_bb(int i, int j) override  { return m_blk_norms_mn(i,j); }
 	
 	~schwarz_screener() {}
 	

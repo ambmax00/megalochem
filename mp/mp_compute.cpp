@@ -167,23 +167,10 @@ void mpmod::compute_batch() {
 	
 	int nxbatches = x_blk_bounds.size();
 	int nnbatches = nu_blk_bounds.size();
-	
-	vec<arrvec<int,3>> eri_blk_idx(nxbatches * nnbatches);
-	
-	int ibatch = 0;
-	
+		
 	for (int ix = 0; ix != nxbatches; ++ix) {
 		for (int inu = 0; inu != nnbatches; ++inu) {
-			
-			int nxblkmax = x_blk_bounds[ix][1] - x_blk_bounds[ix][0] + 1;
-			int nnblkmax = nu_blk_bounds[inu][1] - nu_blk_bounds[inu][0] + 1;
-			
-			int max = nxblkmax * nnblkmax;
-			
-			if (force_sparsity) {
-				for (auto& a : eri_blk_idx[ibatch]) a.reserve(max);
-			}
-			
+		
 			vec<vec<int>> blkbounds = {
 				x_blk_bounds[ix],
 				mu_fullblk_bounds,
@@ -195,30 +182,10 @@ void mpmod::compute_batch() {
 				B_xbb->filter(dbcsr::global::filter_eps);
 			}
 			
-			if (force_sparsity) {
-			
-				dbcsr::iterator_t<3> iter(*B_xbb);
-				iter.start();
-				
-				while (iter.blocks_left()) {
-					iter.next_block();
-					auto& idx = iter.idx();
-					
-					eri_blk_idx[ibatch][0].push_back(idx[0]);
-					eri_blk_idx[ibatch][1].push_back(idx[1]);
-					eri_blk_idx[ibatch][2].push_back(idx[2]);
-				}
-				
-				iter.stop();
-				for (auto& a : eri_blk_idx[ibatch]) a.shrink_to_fit();
-			
-			}
-			
 			B_xbb_batch->compress({ix,inu}, B_xbb);
-			
-			++ibatch;
 		
 		}
+		
 	}
 	
 	/*for (auto v : eri_blk_idx) {
@@ -454,9 +421,7 @@ void mpmod::compute_batch() {
 		B_xBB_batch->compress_init({0,2});
 		
 		LOG.os<1>("Starting batching over auxiliary functions.\n");
-		
-		ibatch = 0;
-		
+				
 		// LOOP OVER BATCHES OF AUXILIARY FUNCTIONS 
 		for (int ix = 0; ix != B_xbb_batch->nbatches_dim(0); ++ix) {
 			
@@ -532,8 +497,39 @@ void mpmod::compute_batch() {
 					B_xBB_batch->bounds(2)[inu]
 				};
 				
-				if (force_sparsity) B_xBB_1_02->reserve(eri_blk_idx[ibatch]);
-									
+				if (force_sparsity) {
+					
+					arrvec<int,3> res;
+					
+					auto nblksloc = B_xBB_1_02->nblks_local();
+					int nblksloctot = nblksloc[0] * nblksloc[1] * nblksloc[2];
+					
+					LOG.os<1>("LOCBLK: ", nblksloctot, '\n');
+					
+					for (auto& r : res) r.reserve(nblksloctot);
+					
+					// get relevant blocks using Z_mn matrix
+					auto B_xBB_blkidx = B_xBB_1_02->blks_local();
+					
+					for (auto imu : B_xBB_blkidx[1]) {
+						for (auto inu : B_xBB_blkidx[2]) {
+							
+							if (s_scr->blknorm_bb(imu,inu) < 
+								dbcsr::global::filter_eps)
+								continue; 
+							
+							for (auto ix : B_xBB_blkidx[0]) {
+								res[0].push_back(ix);
+								res[1].push_back(imu);
+								res[2].push_back(inu);
+							}
+						}
+					}
+					
+					B_xBB_1_02->reserve(res);
+					
+				}
+												
 				fintran.start();
 				dbcsr::contract(*L_bu_0_1, *B_xub_1_02, *B_xBB_1_02)
 					.bounds3(x_nu_bounds)
@@ -555,9 +551,7 @@ void mpmod::compute_batch() {
 				writetime.start();
 				B_xBB_batch->compress({ix,inu},B_xBB_0_12_wr);
 				writetime.finish();
-				
-				++ibatch;
-				
+								
 			}
 			
 		}

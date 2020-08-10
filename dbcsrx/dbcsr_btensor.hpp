@@ -551,6 +551,12 @@ public:
 		
 	}
 	
+	void clear() {
+		
+		if (m_type != core) m_stensor->clear();
+		
+	}
+	
 	void compress_finalize() {
 		
 		LOG.os<1>("Finalizing compression...\n");
