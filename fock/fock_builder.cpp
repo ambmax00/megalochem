@@ -82,13 +82,22 @@ void fockmod::init() {
 		compute_s_xx_inv = true;
 		compute_3c2e_batched = true;
 		
-	}  else if (k_method == "batchdfmo") {
+	} else if (k_method == "batchdfmo") {
 		
 		K* builder = new BATCHED_DFMO_K(m_world,m_opt);
 		m_K_builder.reset(builder);
 		
 		compute_s_xx = true;
 		compute_s_xx_invsqrt = true;
+		compute_3c2e_batched = true;
+		
+	} else if (k_method == "batchpari") {
+		
+		K* builder = new BATCHED_PARI_K(m_world,m_opt);
+		m_K_builder.reset(builder);
+		
+		compute_s_xx = true;
+		compute_s_xx_inv = true;
 		compute_3c2e_batched = true;
 		
 	}
@@ -173,15 +182,17 @@ void fockmod::init() {
 			
 		}
 		
-		auto x = m_mol->dims().x();
-		arrvec<int,2> xx = {x,x};
+		//auto x = m_mol->dims().x();
+		//arrvec<int,2> xx = {x,x};
 		
-		auto s_xx_01 = dbcsr::tensor_create<2>().name("s_xx")
-			.pgrid(spgrid2).map1({0}).map2({1}).blk_sizes(xx).get();
+		//auto s_xx_01 = dbcsr::tensor_create<2>().name("s_xx")
+			//.pgrid(spgrid2).map1({0}).map2({1}).blk_sizes(xx).get();
 			
-		dbcsr::copy_matrix_to_tensor(*c_s_xx, *s_xx_01);
-		m_reg.insert_tensor<2,double>("s_xx", s_xx_01);		
-			
+		//dbcsr::copy_matrix_to_tensor(*c_s_xx, *s_xx_01);
+		//m_reg.insert_tensor<2,double>("s_xx", s_xx_01);		
+		
+		m_reg.insert_matrix<double>("s_xx", c_s_xx);
+		
 		t_eri.finish();
 		
 	}

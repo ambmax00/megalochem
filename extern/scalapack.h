@@ -55,7 +55,7 @@ extern "C" {
 	
 	void pdgesvd_(char* jobu, char* jobvt, int* m, int* n, double* a, int* ia, int* ja,
 		int* desca, double* s, double* u, int* iu, int* ju, int* descu, double* vt,
-		int* ivt, int* jvt, int* descvt, double* work, int* lwork, double* rwork, int* info);
+		int* ivt, int* jvt, int* descvt, double* work, int* lwork, int* info);
 		
 	void Cigebs2d(int ConTxt, char *scope, char *top, int m, int n, int *A, int lda);
 	void Cigebr2d(int ConTxt, char *scope, char *top, int m, int n, int *A,
@@ -236,7 +236,7 @@ inline void c_pdtrmm(char side, char uplo, char transa, char diag, int m, int n,
 
 inline void c_pdgesvd(char jobu, char jobvt, int m, int n, double* a, int ia, int ja,
 		int* desca, double* s, double* u, int iu, int ju, int* descu, double* vt,
-		int ivt, int jvt, int* descvt, double* work, int lwork, double* rwork, int* info)
+		int ivt, int jvt, int* descvt, double* work, int lwork, int* info)
 {
 	int f_ia = ia + 1;
 	int f_ja = ja + 1;
@@ -244,9 +244,9 @@ inline void c_pdgesvd(char jobu, char jobvt, int m, int n, double* a, int ia, in
 	int f_ju = ju + 1;
 	int f_ivt = ivt + 1;
 	int f_jvt = jvt + 1;
-	
+		
 	pdgesvd_(&jobu, &jobvt, &m, &n, a, &f_ia, &f_ja, desca, s, u, &f_iu, &f_ju, descu, 
-		vt, &f_ivt, &f_jvt, descvt, work, &lwork, rwork, info);
+		vt, &f_ivt, &f_jvt, descvt, work, &lwork, info);
 }
 
 namespace scalapack {
@@ -330,6 +330,11 @@ public:
 		m_rsrc(irsrc), m_csrc(icsrc)
 	{
 		
+		if (global_grid.mypnum() == 0) {
+			std::cout << nrows << " " << ncols << " " << rowblksize
+				<< " " << colblksize << std::endl;
+			}
+		
 		m_nrowsloc = std::max(1,c_numroc(m_nrowstot, m_rowblk_size, global_grid.myprow(), 
 			irsrc, global_grid.nprow()));
 		m_ncolsloc = std::max(1,c_numroc(m_ncolstot, m_colblk_size, global_grid.mypcol(), 
@@ -347,12 +352,23 @@ public:
 		}
 		c_blacs_barrier(global_grid.ctx(),'A');
 		*/
-				
+		
+		std::cout << "ROWS/COLS: " << nrows << " " << ncols << std::endl;
+		for (int i = 0; i != global_grid.nprocs(); ++i) {
+			if (i == global_grid.mypnum()) {
+				std::cout << "SRC: " << irsrc << " " << icsrc << std::endl;
+				std::cout << "LOCAL: " << m_nrowsloc << " " 
+					<< m_ncolsloc << std::endl;
+			}
+		}
+		
 		int info = 0;
 		c_descinit(&m_desc[0],m_nrowstot,m_ncolstot,m_rowblk_size,
 					m_colblk_size,irsrc,icsrc,global_grid.ctx(),m_nrowsloc,&info);
 					
 		m_data = new T[m_nrowsloc*m_ncolsloc]();
+		
+		std::cout << "DESC:" << m_desc[2] << " " << m_desc[3] << std::endl;
 		
 	}
 	
@@ -443,6 +459,14 @@ public:
 	void print() {
 		
 		c_blacs_barrier(global_grid.ctx(),'A');
+		
+		if (global_grid.mypnum() == 0) 
+			std::cout << "MATRIX SIZE: " << m_nrowstot 
+				<< " " << m_ncolstot << std::endl;
+				
+		if (global_grid.mypnum() == 0) 
+			std::cout << "LOCAL MATRIX SIZE: " << m_nrowsloc 
+				<< " " << m_ncolsloc << std::endl;
 		
 		for (int pi = 0; pi != global_grid.nprow(); ++pi) {
 			for (int pj = 0; pj != global_grid.npcol(); ++pj) {

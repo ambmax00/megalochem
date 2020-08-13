@@ -1,7 +1,7 @@
 #include "adc/adcmod.h"
-#include "adc/adc_ri_u1.h"
-#include "tensor/dbcsr_conversions.h"
-#include "math/solvers/davidson.h"
+//#include "adc/adc_ri_u1.h"
+#include <dbcsr_conversions.hpp>
+//#include "math/solvers/davidson.h"
 
 #include <algorithm>
 
@@ -14,36 +14,24 @@ void adcmod::compute() {
 	
 		// BEFORE: init tensors base (ints, metrics, etc..., put into m_reg)
 		
-		// AFTER: init tensors (2) (mo-ints, diags, amplitudes ...) 
-				
-		// setup sigma constructor
+		init_ao_tensors();
 		
+		// AFTER: init tensors (2) (mo-ints, diags, amplitudes ...) 
+		
+		init_mo_tensors();
+				
 		// SECOND: Generate guesses
 		
-		// THIRD: Launch ADC(1)
+		compute_diag();
 		
-		// IF ADC(2) REQUESTED, LAUNCH ADC(2) AFTERWARDS
-		
-		
-		
-		
-		
-		/*
 		LOG.os<>("--- Starting Computation ---\n\n");
-		
-		dbcsr::pgrid<2> grid2(m_comm);
-		
+				
 		int nocc = m_hfwfn->mol()->nocc_alpha();
 		int nvir = m_hfwfn->mol()->nvir_alpha();
 		
-		//exit(0);
-		
-		LOG.os<>("Computing Diagonal for Davidson Conditioning...\n\n");
-		mo_compute_diag();
-		
-		LOG.os<>("Conputing guess vectors...\n\n");
+		LOG.os<>("Computing guess vectors...\n");
 		// now order it : there is probably a better way to do it
-		auto eigen_ia = dbcsr::tensor_to_eigen(*m_mo.d_ov);
+		auto eigen_ia = dbcsr::matrix_to_eigen(m_d_ov);
 		
 		std::vector<int> index(eigen_ia.size(), 0);
 		for (int i = 0; i!= index.size(); ++i) {
@@ -55,38 +43,32 @@ void adcmod::compute() {
 				return (eigen_ia.data()[a] < eigen_ia.data()[b]);
 		});
 		
-		for (auto i : index) {
-			std::cout << i << " ";
-		} std::cout << std::endl;
-		
-		std::vector<dbcsr::stensor<2>> dav_guess(m_nroots);
+		std::vector<dbcsr::shared_matrix<double>> dav_guess(m_nroots);
 			
 		// generate the guesses
 		
-		/*
-		vec<int> map1 = {0};
-		vec<int> map2 = {1};
-		arrvec<int,2> blksizes = {m_dims.o, m_dims.v};
+		auto o = m_hfwfn->mol()->dims().oa();
+		auto v = m_hfwfn->mol()->dims().va();
 		
 		for (int i = 0; i != m_nroots; ++i) {
 			
-			std::cout << "on guess: " << i << std::endl;
+			LOG.os<>("Guess ", i, '\n');
 			
 			Eigen::MatrixXd mat = Eigen::MatrixXd::Zero(nocc,nvir);
 			mat.data()[index[i]] = 1.0;
 			
 			std::string name = "guess_" + std::to_string(i);
-			std::cout << name << std::endl;
 			
-			auto ten = dbcsr::eigen_to_tensor(mat, name, grid2, map1, map2, blksizes);
-			auto sten = ten.get_stensor();
+			auto guessmat = dbcsr::eigen_to_matrix(mat, m_world, name,
+				o, v, dbcsr::type::no_symmetry);
 			
-			dav_guess[i] = sten;
+			dav_guess[i] = guessmat;
 			
-			dbcsr::print(*sten);
+			dbcsr::print(*guessmat);
 			
 		}
 		
+		/*
 		ri_adc1_u1 ri_adc1(m_mo.eps_o, m_mo.eps_v, m_mo.b_xoo, m_mo.b_xov, m_mo.b_xvv); 
 		
 		math::davidson<ri_adc1_u1> dav = math::davidson<ri_adc1_u1>::create()

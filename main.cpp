@@ -8,7 +8,7 @@
 #include "io/reader.h"
 #include "hf/hfmod.h"
 #include "mp/mpmod.h"
-//#include "adc/adcmod.h"
+#include "adc/adcmod.h"
 #include "utils/mpi_time.h"
 
 #include "extern/scalapack.h"
@@ -190,7 +190,7 @@ int main(int argc, char** argv) {
 	if (do_adc) {
 		
 		adc::adcmod myadc(myhfwfn,adcopt,wrd);
-		
+		myadc.compute();
 	}
 	
 //#ifdef USE_SCALAPACK
@@ -208,7 +208,7 @@ int main(int argc, char** argv) {
 	
 	dbcsr::print_statistics(true);
 
-	///dbcsr::finalize();
+	dbcsr::finalize();
 
 	LOG.os<>("========== FINSISHED WITHOUT CRASHING ! =========\n");
 

@@ -30,8 +30,8 @@ MatrixX<T> matrix_to_eigen(shared_matrix<T>& mat_in) {
 	}
 	
 	mat_desym->replicate_all();
-	
-	MatrixX<T> eigenmat(row,col);
+		
+	MatrixX<T> eigenmat = MatrixX<T>::Zero(row,col);
 
 #pragma omp parallel 
 {

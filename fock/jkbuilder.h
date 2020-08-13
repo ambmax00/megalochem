@@ -207,6 +207,23 @@ public:
 	~BATCHED_DFAO_K() {}
 	
 };
+
+class BATCHED_PARI_K : public K {
+private:
+
+	dbcsr::sbtensor<3,double> m_eri_batched;
+	dbcsr::sbtensor<3,double> m_c_xbb_batched;
+	
+public:
+
+	BATCHED_PARI_K(dbcsr::world& w, desc::options& opt);
+	void compute_K() override;
+	void init_tensors() override;
+	
+	~BATCHED_PARI_K() {}
+	
+};
+
 /*
 class CADF_K : public K {
 private:

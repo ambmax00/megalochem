@@ -570,6 +570,19 @@ public:
 		
 	}
 	
+	void reorder(shared_tensor<N,T> mytensor) {
+		
+		stensor<N,T> newtensor = tensor_create_template<N,T>(mytensor)
+			.name(m_stensor->name()).get();
+			
+		if (m_type == core) {
+			dbcsr::copy(*m_stensor, *newtensor).move_data(true).perform();
+		}
+		
+		m_stensor = newtensor;
+		
+	}
+	
 	view set_view(vec<int> dims) {
 		
 		view rview;

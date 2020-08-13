@@ -5,7 +5,7 @@ set(SOURCES
 	jkcommon.cpp
 	jkexact.cpp
 	jkdf.cpp
-	jkcadf.cpp
+	jkpari.cpp
 )
 
 add_library(chem_fock ${SOURCES})
