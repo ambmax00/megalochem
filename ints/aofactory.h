@@ -3,6 +3,7 @@
 
 #include <dbcsr_tensor.hpp>
 #include <dbcsr_conversions.hpp>
+#include "math/other/blockmap.h"
 #include "desc/molecule.h"
 #include <string>
 #include <limits>
@@ -61,6 +62,9 @@ public:
 		
 	void ao_eri_fill(dbcsr::shared_tensor<4,double>& t_in, vec<vec<int>>& blkbounds, 
 		std::shared_ptr<screener> scr, bool sym = false);
+		
+	void ao_3c2e_fill_blockmap(math::blockmap<3>& b_in, arrvec<int,3>& blks,
+		std::shared_ptr<screener> scr);
 		
 	std::function<void(dbcsr::shared_tensor<3,double>&,vec<vec<int>>&)>
 	get_generator(std::shared_ptr<screener> s_scr);

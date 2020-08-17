@@ -7,6 +7,7 @@
 #include "utils/params.hpp"
 #include "desc/basis.h"
 #include "ints/screening.h"
+#include "math/other/blockmap.h"
 #include <vector>
 #include <mpi.h>
 #include <libint2.hpp>
@@ -31,7 +32,9 @@ void calc_ints_schwarz_mn(dbcsr::mat_d& m_out, util::ShrPool<libint2::Engine>& e
 void calc_ints_schwarz_x(dbcsr::mat_d& m_out, util::ShrPool<libint2::Engine>& engine,
 	std::vector<const desc::cluster_basis*>& basvec);
 
-	
+void calc_ints(math::blockmap<3>& b_in, arrvec<int,3>& newblks, util::ShrPool<libint2::Engine>& engine,
+	std::vector<const desc::cluster_basis*>& basvec);
+
 }
 
 #endif

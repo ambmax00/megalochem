@@ -429,6 +429,31 @@ public:
 		
 	}
 	
+	void compute(math::blockmap<3>& b_in, arrvec<int,3> idx,
+		shared_screener scr) {
+	
+		arrvec<int,3> newblks;
+	
+		for (auto x : idx[0]) {
+			for (auto m : idx[1]) {
+				for (auto n : idx[2]) {
+					
+					if (scr->skip_block(x,m,n)) continue;
+					
+					newblks[0].push_back(x);
+					newblks[1].push_back(m);
+					newblks[2].push_back(n);
+			
+				}
+			}
+		}
+		
+		b_in.reserve(newblks);
+		
+		calc_ints(b_in, newblks, m_eng_pool, m_basvec);
+	
+	}
+	
 	std::function<void(dbcsr::shared_tensor<3>&,vec<vec<int>>&)>
 	get_generator(shared_screener s_scr) {
 		
@@ -535,6 +560,13 @@ void aofactory::ao_3c2e_fill(dbcsr::shared_tensor<3,double>& t_in,
 	}
 }
 
+void aofactory::ao_3c2e_fill_blockmap(math::blockmap<3>& b_in, arrvec<int,3>& blks,
+	shared_screener scr) {
+	
+	pimpl->compute(b_in, blks, scr);
+	
+}
+				
 void aofactory::ao_eri_fill(dbcsr::shared_tensor<4,double>& t_in, 
 	vec<vec<int>>& blkbounds, shared_screener scr, bool sym) {
 	
