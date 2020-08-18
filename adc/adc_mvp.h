@@ -1,22 +1,25 @@
 #ifndef ADC_MVP_H
 #define ADC_MVP_H
 
-#include <dbcsr_matrix.hpp>
+#include <dbcsr_matrix_ops.hpp>
+#include <dbcsr_tensor_ops.hpp>
 #include "utils/registry.h"
 #include "desc/options.h"
+#include "fock/jkbuilder.h"
+#include "adc/adc_defaults.h"
 
 namespace adc {
 	
 using smat = dbcsr::shared_matrix<double>;
 using stensor2 = dbcsr::shared_tensor<2,double>;
 using stensor3 = dbcsr::shared_tensor<3,double>;
-using sbtensor3 = dbcsr::sbtensor<3,double>
-	
+using sbtensor3 = dbcsr::sbtensor<3,double>;
+
 class MVP {
-private:
+protected:
 
 	dbcsr::world m_world;
-	
+	desc::smolecule m_mol;
 	desc::options m_opt;
 	
 	util::mpi_log LOG;
@@ -27,47 +30,55 @@ private:
 	svector<double> m_epsv;
 		
 	vec<int> m_o, m_v, m_b, m_x;
+	
+	smat compute_sigma_0(smat& u_ia);
+	
+	smat u_transform(smat& u_ao, char to, smat& c_bo, char tv, smat& c_bv);
 
 public:
 
-	MVP(dbcsr::world w, desc::options opt, util::registry reg,
+	MVP(dbcsr::world& w, desc::smolecule smol, 
+		desc::options opt, util::registry& reg,
 		svector<double> epso, svector<double> epsv) :
-		m_world(w), m_opt(opt), LOG(w.comm(), m_opt.get<int>("print")),
+		m_world(w), m_mol(smol), m_opt(opt), 
+		LOG(w.comm(), m_opt.get<int>("print", ADC_PRINT_LEVEL)),
+		TIME(w.comm(), "MVP"),
 		m_reg(reg), m_epso(epso), m_epsv(epsv) {}
 		
-	virtual smat compute(smat u_ia, double omega);
+	virtual smat compute(smat u_ia, double omega = 0.0) = 0;
 	
-	virtual void init();
+	virtual void init() = 0;
 	
-	virtual ~MVP();
+	virtual ~MVP() {}
 	
 };
 
-class MVP_ri_adc1 : MVP {
+class MVP_ao_ri_adc1 : public MVP {
 private:
-
-	dbcsr::shared_pgrid<2> m_spgrid2;
-	dbcsr::shared_pgrid<3> m_spgrid3;
 	
-	stensor m_d_xoo, m_d_xov, m_d_xvv;
+	std::shared_ptr<fock::J> m_jbuilder;
+	std::shared_ptr<fock::K> m_kbuilder;
 	
-	stensor2 m_c_xd;
-	stensor3 m_c_xov;
+	smat m_c_bo;
+	smat m_c_bv;
 
 public:
 
-	MVP_ri_adc1(dbcsr::world w, desc::options opt, util::registry reg,
+	MVP_ao_ri_adc1(dbcsr::world& w, desc::smolecule smol,
+		desc::options opt, util::registry& reg,
 		svector<double> epso, svector<double> epsv) :
-		MVP(w,opt,reg,epso,epsv) {}
+		MVP(w,smol,opt,reg,epso,epsv) {}
 		
 	void init() override;
 	
 	smat compute(smat u_ia, double omega) override;
 	
-	~MVP_ri_adc1() {}
+	~MVP_ao_ri_adc1() override {}
 	
 };
 	
 
 } // end namespace
+
+#endif
 

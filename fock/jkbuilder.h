@@ -31,8 +31,8 @@ protected:
 	bool m_SAD_iter;
 	int m_SAD_rank;
 	
-	std::shared_ptr<ints::aofactory> m_factory;
-	
+	bool m_sym = true;
+		
 public:
 	
 	JK_common(dbcsr::world& w, desc::options opt);
@@ -40,9 +40,9 @@ public:
 	void set_density_beta(dbcsr::shared_matrix<double>& ipB) { m_p_B = ipB; }
 	void set_coeff_alpha(dbcsr::shared_matrix<double>& icA) { m_c_A = icA; }
 	void set_coeff_beta(dbcsr::shared_matrix<double>& icB) { m_c_B = icB; }
-	void set_factory(std::shared_ptr<ints::aofactory>& ifac) { 
-		m_factory = ifac; 
-		m_mol = m_factory->mol();
+	void set_sym(bool sym) { m_sym = sym; }
+	void set_mol(desc::smolecule& smol) { 
+		m_mol = smol;
 	}
 	void set_SAD(bool SAD, int rank) { 
 		m_SAD_iter = SAD; 

@@ -5,6 +5,7 @@
 #include <map>
 #include <dbcsr_tensor_ops.hpp>
 #include <dbcsr_btensor.hpp>
+#include <stdexcept>
 
 namespace util {
 	
@@ -21,6 +22,8 @@ private:
 				throw std::runtime_error("Registry: Bad cast.");
 			}
 			out = std::any_cast<item>(m_map[intname]);
+		} else {
+			throw std::runtime_error("Could not find " + intname + " in registry!");
 		}
 		return out;
 	}

@@ -164,7 +164,8 @@ public:
         return out;
     }
     
-    void hadamard_product(const matrix& a, const matrix& b, std::optional<T> assume_value) {
+    void hadamard_product(const matrix& a, const matrix& b, 
+		std::optional<T> assume_value = std::nullopt) {
         c_dbcsr_hadamard_product(a.m_matrix_ptr, b.m_matrix_ptr, m_matrix_ptr, (assume_value) ? &*assume_value : nullptr); 
     }
     

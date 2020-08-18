@@ -13,28 +13,30 @@ JK_common::JK_common(dbcsr::world& w, desc::options opt) :
 void J::init() {
 	
 	// set up J
-	auto b = m_p_A->row_blk_sizes();
+	auto b = m_mol->dims().b();
 	
 	m_J = dbcsr::create<double>()
 		.name("J_bb")
 		.set_world(m_world)
 		.row_blk_sizes(b)
 		.col_blk_sizes(b)
-		.matrix_type(dbcsr::type::symmetric).get();
+		.matrix_type((m_sym) ? dbcsr::type::symmetric : dbcsr::type::no_symmetry)
+		.get();
 	
 }
 
 void K::init() {
 	
 	// set up K's
-	auto b = m_p_A->row_blk_sizes();
+	auto b = m_mol->dims().b();
 	
 	m_K_A = dbcsr::create<double>()
 		.name("K_bb_A")
 		.set_world(m_world)
 		.row_blk_sizes(b)
 		.col_blk_sizes(b)
-		.matrix_type(dbcsr::type::symmetric).get();
+		.matrix_type((m_sym) ? dbcsr::type::symmetric : dbcsr::type::no_symmetry)
+		.get();
 		
 	if (m_p_B) {
 		m_K_B = dbcsr::create<double>()
@@ -42,7 +44,8 @@ void K::init() {
 			.set_world(m_world)
 			.row_blk_sizes(b)
 			.col_blk_sizes(b)
-			.matrix_type(dbcsr::type::symmetric).get();
+			.matrix_type((m_sym) ? dbcsr::type::symmetric : dbcsr::type::no_symmetry)
+			.get();
 	}
 	
 }

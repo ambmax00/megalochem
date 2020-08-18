@@ -1,12 +1,8 @@
 #include "adc/adcmod.h"
-//#include "adc/adc_ri_u1.h"
+#include "adc/adc_mvp.h"
+#include "math/solvers/davidson.h"
+
 #include <dbcsr_conversions.hpp>
-//#include "math/solvers/davidson.h"
-
-#include <algorithm>
-
-#include <fstream>
-#include <sstream>
 
 namespace adc {
 
@@ -28,10 +24,14 @@ void adcmod::compute() {
 				
 		int nocc = m_hfwfn->mol()->nocc_alpha();
 		int nvir = m_hfwfn->mol()->nvir_alpha();
+		auto epso = m_hfwfn->eps_occ_A();
+		auto epsv = m_hfwfn->eps_vir_A();
 		
 		LOG.os<>("Computing guess vectors...\n");
 		// now order it : there is probably a better way to do it
 		auto eigen_ia = dbcsr::matrix_to_eigen(m_d_ov);
+		
+		std::cout << eigen_ia << std::endl;
 		
 		std::vector<int> index(eigen_ia.size(), 0);
 		for (int i = 0; i!= index.size(); ++i) {
@@ -67,6 +67,25 @@ void adcmod::compute() {
 			dbcsr::print(*guessmat);
 			
 		}
+		
+		MVP* mvfacptr = new MVP_ao_ri_adc1(m_world, m_hfwfn->mol(), 
+			m_opt, m_reg, epso, epsv);
+		std::shared_ptr<MVP> mvfac(mvfacptr);
+		
+		mvfac->init();
+		auto out = mvfac->compute(dav_guess[0], 0.0); 
+		
+		math::davidson<MVP> dav;
+		
+		dav.set_factory(mvfac);
+		dav.set_diag(m_d_ov);
+		dav.pseudo(false);
+		dav.conv(1e-6);
+		dav.maxiter(100);	
+		
+		int nroots = m_opt.get<int>("nroots", ADC_NROOTS);
+		
+		dav.compute(dav_guess, nroots);
 		
 		/*
 		ri_adc1_u1 ri_adc1(m_mo.eps_o, m_mo.eps_v, m_mo.b_xoo, m_mo.b_xov, m_mo.b_xvv); 

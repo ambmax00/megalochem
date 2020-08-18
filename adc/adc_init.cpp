@@ -393,6 +393,7 @@ void adcmod::init_mo_tensors() {
 	arrvec<int,2> bo = {b,o};
 	arrvec<int,2> bv = {b,v};
 	
+	/*
 	auto c_bo_01 = dbcsr::tensor_create<2,double>()
 		.pgrid(m_spgrid2_bo).name("c_bo").map1({0})
 		.map2({1}).blk_sizes(bo).get();
@@ -405,7 +406,13 @@ void adcmod::init_mo_tensors() {
 	dbcsr::copy_matrix_to_tensor(*c_bv, *c_bv_01);
 	
 	m_reg.insert_tensor<2,double>("c_bo",c_bo_01);
-	m_reg.insert_tensor<2,double>("c_bv",c_bv_01);
+	m_reg.insert_tensor<2,double>("c_bv",c_bv_01);*/
+	
+	dbcsr::print(*c_bo);
+	dbcsr::print(*c_bv);
+	
+	m_reg.insert_matrix<double>("c_bo", c_bo);
+	m_reg.insert_matrix<double>("c_bv", c_bv);
 	
 	/*
 	if (compute_moints) { 

@@ -115,13 +115,13 @@ void fockmod::init() {
 	m_J_builder->set_density_beta(m_p_B);
 	m_J_builder->set_coeff_alpha(m_c_A);
 	m_J_builder->set_coeff_beta(m_c_B);
-	m_J_builder->set_factory(aofac);
+	m_J_builder->set_mol(m_mol);
 	
 	m_K_builder->set_density_alpha(m_p_A);
 	m_K_builder->set_density_beta(m_p_B);
 	m_K_builder->set_coeff_alpha(m_c_A);
 	m_K_builder->set_coeff_beta(m_c_B);
-	m_K_builder->set_factory(aofac);
+	m_K_builder->set_mol(m_mol);
 	
 	// initialize pgrids
 	

@@ -62,13 +62,15 @@ void BATCHED_DF_J::compute_J() {
 	if (m_p_A && !m_p_B) {
 		ptot->copy_in(*m_p_A);
 		ptot->scale(2.0);
-		dbcsr::copy_matrix_to_3Dtensor_new(*ptot,*m_ptot_bbd,true);
+		bool sym = ptot->has_symmetry();
+		dbcsr::copy_matrix_to_3Dtensor_new(*ptot,*m_ptot_bbd,sym);
 		//dbcsr::print(ptot);
 		ptot->clear();
 	} else {
 		ptot->copy_in(*m_p_A);
 		ptot->add(1.0, 1.0, *m_p_B);
-		dbcsr::copy_matrix_to_3Dtensor_new<double>(*ptot,*m_ptot_bbd,true);
+		bool sym = ptot->has_symmetry();
+		dbcsr::copy_matrix_to_3Dtensor_new<double>(*ptot,*m_ptot_bbd,sym);
 		ptot->clear();
 	}
 	

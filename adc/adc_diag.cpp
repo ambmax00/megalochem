@@ -243,7 +243,7 @@ void adcmod::compute_diag() {
 	LOG.os<>("Computing zeroth order diagonal.\n");
 	
 	auto epso = m_hfwfn->eps_occ_A();
-	auto epsv = m_hfwfn->eps_occ_B();
+	auto epsv = m_hfwfn->eps_vir_A();
 	
 	auto o = m_hfwfn->mol()->dims().oa();
 	auto v = m_hfwfn->mol()->dims().va();
@@ -255,6 +255,8 @@ void adcmod::compute_diag() {
 		.col_blk_sizes(v)
 		.matrix_type(dbcsr::type::no_symmetry)
 		.get();
+		
+	m_d_ov->reserve_all();
 	
 	dbcsr::iterator<double> iter(*m_d_ov);
 	
@@ -280,6 +282,8 @@ void adcmod::compute_diag() {
 	}
 	
 	iter.stop();
+	
+	dbcsr::print(*m_d_ov);
 	
 	LOG.os<>("Done with diagonal.\n");
 	
