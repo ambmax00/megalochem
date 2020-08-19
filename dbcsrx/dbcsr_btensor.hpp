@@ -183,6 +183,8 @@ public:
 		
 	}
 	
+	btensor(const btensor& in) = default;
+	
 	void set_generator(generator_type& func) {
 		m_generator = func;
 	}
@@ -558,6 +560,11 @@ public:
 	}
 	
 	void reorder(vec<int> map1, vec<int> map2) {
+		
+		auto this_map1 = m_stensor->map1_2d();
+		auto this_map2 = m_stensor->map2_2d();
+		
+		if (map1 != this_map1 || map2 != this_map2) return;
 		
 		stensor<N,T> newtensor = tensor_create_template<N,T>(m_stensor)
 			.name(m_stensor->name()).map1(map1).map2(map2).get();

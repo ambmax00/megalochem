@@ -473,19 +473,17 @@ void BATCHED_PARI_K::init_tensors() {
 			inv_xx.clear();
 			
 			c_xbb_ab.print();
+			c_xbb_ab.filter(dbcsr::global::filter_eps);
 			
 			c_xbb.insert(c_xbb_ab);
-			c_xbb.filter(dbcsr::global::filter_eps);
+			
 				
 		}
 		
 		std::cout << "CXBB" << std::endl;
 		c_xbb.print();
 		
-	}
-	
-	exit(0);		
-	
+	}	
 	
 	
 	/*
