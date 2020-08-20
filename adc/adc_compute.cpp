@@ -87,6 +87,8 @@ void adcmod::compute() {
 		
 		dav.compute(dav_guess, nroots);
 		
+		std::cout << "OMEGA: " << dav.eigval() << std::endl;
+		
 		/*
 		ri_adc1_u1 ri_adc1(m_mo.eps_o, m_mo.eps_v, m_mo.b_xoo, m_mo.b_xov, m_mo.b_xvv); 
 		

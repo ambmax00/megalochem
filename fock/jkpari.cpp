@@ -14,50 +14,20 @@ BATCHED_PARI_K::BATCHED_PARI_K(dbcsr::world& w, desc::options& opt)
 
 void BATCHED_PARI_K::init_tensors() {
 	
-	// get s_xx
+	auto& time_setup = TIME.sub("Setting up preliminary data");
+	auto& time_form_cfit = TIME.sub("Forming cfit");
 	
-	// get mapping
+	time_setup.start();
 	
-	// construct aofactory, initialize
-	// compute schwarz screening
-	
-	// set up column world
-	
-	// set up blacs grid
-	
-	// loop over (batches) of atoms A
-	
-		// get mu,nu pairs
-	   // reserve c_xab_mu,nu
-	   // reserve temp blocks
-	
-		// loop over munu block pairs
-	
-		   // generate eris 
-		 
-		   // get mu,nu,x_ab indices
-		   // get entries from s_xx
-		   // do SVD
-		   
-		   // collect stacks
-		   
-		  // end loop
-		 // end loop
-		 
-		// process matrix stacks
-		// copy c_xab_mu,nu into c_xmn
-		
-	// end batch loop
-		 
 	// =================== get tensors/matrices ========================
-	auto s_xx = m_reg.get_matrix<double>("s_xx");
+	auto s_xx = m_reg.get_matrix<double>("s_xx_mat");
 	
 	dbcsr::print(*s_xx);
 	
 	auto s_xx_desym = s_xx->desymmetrize();
 	s_xx_desym->replicate_all();
 	
-	auto eri_batched = m_reg.get_btensor<3,double>("i_xbb_batched");
+	m_eri_batched = m_reg.get_btensor<3,double>("i_xbb_batched");
 	
 	std::shared_ptr<ints::aofactory> aofac =
 		std::make_shared<ints::aofactory>(m_mol, m_world);
@@ -73,6 +43,7 @@ void BATCHED_PARI_K::init_tensors() {
 	auto b = m_mol->dims().b();
 	auto x = m_mol->dims().x();
 	
+	arrvec<int,2> bb = {b,b};
 	arrvec<int,3> xbb = {x,b,b};
 	arrvec<int,2> xx = {x,x};
 	
@@ -126,10 +97,16 @@ void BATCHED_PARI_K::init_tensors() {
 	int nbf = m_mol->c_basis().nbf();
 	int dfnbf = m_mol->c_dfbasis()->nbf();
 	
-	std::array<int,3> xbbsizes = {dfnbf,nbf,nbf};
+	std::array<int,3> xbbsizes = {1,nbf,nbf};
+	
+	m_spgrid2 = dbcsr::create_pgrid<2>(m_world.comm()).get();
 	
 	auto spgrid3 = dbcsr::create_pgrid<3>(m_world.comm())
 		.tensor_dims(xbbsizes).map1({0}).map2({1,2}).get();
+	
+	auto spgrid2_self = dbcsr::create_pgrid<2>(MPI_COMM_SELF).get();
+	
+	auto spgrid3_self = dbcsr::create_pgrid<3>(MPI_COMM_SELF).get();
 		
 	auto dims = spgrid3->dims();
 	
@@ -139,13 +116,9 @@ void BATCHED_PARI_K::init_tensors() {
 	
 	LOG.os<>("Grid size: ", m_world.nprow(), " ", m_world.npcol(), '\n');
 		
-	vec<int> d0(x.size());
+	vec<int> d0(x.size(),0.0);
 	vec<int> d1(b.size());
 	vec<int> d2(b.size());
-	
-	for (int i = 0; i != d0.size(); ++i) {
-		d0[i] = blk_to_atom_x[i] % dims[0];
-	}
 	
 	for (int i = 0; i != d1.size(); ++i) {
 		d1[i] = blk_to_atom_b[i] % dims[1];
@@ -160,15 +133,40 @@ void BATCHED_PARI_K::init_tensors() {
 
 	// ===================== setup tensors =============================
 	
-	auto eri = eri_batched->get_stensor();
+	auto eri = m_eri_batched->get_stensor();
+		
+	auto c_xbb_centered = dbcsr::tensor_create<3,double>()
+		.name("c_xbb_centered")
+		.ndist(cdist)
+		.map1({0}).map2({1,2})
+		.blk_sizes(xbb)
+		.get();
+		
+	auto c_xbb_dist = dbcsr::tensor_create_template<3,double>(eri)
+		.name("fitting coefficients")
+		.map1({0,1}).map2({2})
+		.get();
+		
+	auto c_xbb_self = dbcsr::tensor_create<3,double>()
+		.name("c_xbb_self")
+		.pgrid(spgrid3_self)
+		.map1({0}).map2({1,2})
+		.blk_sizes(xbb)
+		.get();
+		
+	auto eri_self = 
+		dbcsr::tensor_create_template<3,double>(c_xbb_self)
+		.name("eri_self").get();
 	
-	dbcsr::print(*eri);
+	auto inv_self = dbcsr::tensor_create<2,double>()
+		.name("inv_self")
+		.pgrid(spgrid2_self)
+		.map1({0}).map2({1})
+		.blk_sizes(xx)
+		.get();
 	
-	auto c_xab_mn = dbcsr::tensor_create_template<3,double>(eri)
-		.name("c_xab_mn_batch").get();
-	
-	arrvec<int,3> blkidx = c_xab_mn->blks_local();
-	arrvec<int,3> blkoffsets = c_xab_mn->blk_offsets();
+	arrvec<int,3> blkidx = c_xbb_dist->blks_local();
+	arrvec<int,3> blkoffsets = c_xbb_dist->blk_offsets();
 	
 	auto& x_offsets = blkoffsets[0];
 	auto& b_offsets = blkoffsets[1];
@@ -183,20 +181,21 @@ void BATCHED_PARI_K::init_tensors() {
 		} std::cout << std::endl;
 	};
 	
-	print(loc_x_idx);
-	print(loc_m_idx);
-	print(loc_n_idx);	
+	//print(loc_x_idx);
+	//print(loc_m_idx);
+	//print(loc_n_idx);	
 	
 	// Divide up atom pairs over procs
 	
 	vec<std::pair<int,int>> atom_pairs;
-	int nproc = std::min(natoms*natoms,m_world.size());
 	
 	for (int i = 0; i != natoms; ++i) {
 		for (int j = 0; j != natoms; ++j) {
 			
-			int a = i + j * natoms;
-			if (a % nproc == m_world.rank()) {
+			int rproc = i % dims[1];
+			int cproc = j % dims[2];
+		
+			if (rproc == m_world.myprow() && cproc == m_world.mypcol()) {
 				
 				std::pair<int,int> ab = {i,j};
 				atom_pairs.push_back(ab);
@@ -206,45 +205,43 @@ void BATCHED_PARI_K::init_tensors() {
 		}
 	}
 	
+	time_setup.finish();
+	
+	time_form_cfit.start();
+	
 	// get number of batches
 	
-	int nbatches = 5;
+	int nbatches = 25;
 	int natom_pairs = atom_pairs.size();
 	
 	LOG(-1).os<>("NATOM PAIRS: ", natom_pairs, '\n');
-	
-	math::blockmap<3> i_xbb_ab(xbb);
-	math::blockmap<2> inv_xx(xx);
-	math::blockmap<3> c_xbb_ab(xbb);
-	math::blockmap<3> c_xbb(xbb);
-	
-	double npairs_per_batch_d = (double)natom_pairs / (double)nbatches;
-			
-	if (npairs_per_batch_d < 1.0) {
-		nbatches = natom_pairs;
-		std::cout << "Readjusting to " << natom_pairs << " batches." << std::endl;  
-	}
 	
 	int npairs_per_batch = std::ceil((double)natom_pairs / (double)nbatches);
 	
 	for (int ibatch = 0; ibatch != nbatches; ++ibatch) {
 		
-		std::cout << "PROCESSING BATCH NR: " << ibatch << " out of " << nbatches 
-			<< " on proc " << m_world.rank() << std::endl;
+#if 0	
+		for (int ip = 0; ip != m_world.size(); ++ip) {
+		
+		if (ip == m_world.rank()) {
+#endif
+	
+		//std::cout << "PROCESSING BATCH NR: " << ibatch << " out of " << nbatches 
+			//<< " on proc " << m_world.rank() << std::endl;
 		
 		int low = ibatch * npairs_per_batch;
 		int high = std::min(natom_pairs,(ibatch+1) * npairs_per_batch);
 		
-		std::cout << "LOW/HIGH: " << low << " " << high << std::endl;
+		//std::cout << "LOW/HIGH: " << low << " " << high << std::endl;
 				
-		for (int ipair = low; ipair != high; ++ipair) {
+		for (int ipair = low; ipair < high; ++ipair) {
 			
 			int iAtomA = atom_pairs[ipair].first;
 			int iAtomB = atom_pairs[ipair].second;
-			
+#if 0
 			std::cout << "Processing atoms " << iAtomA << " " << iAtomB 
 				<< " on proc " << m_world.rank() << std::endl;
-
+#endif			
 			// Get mu/nu indices centered on alpha/beta
 			
 			vec<int> ma_idx, nb_idx, xab_idx;
@@ -264,7 +261,21 @@ void BATCHED_PARI_K::init_tensors() {
 					blk_to_atom_x[i] == iAtomB) 
 					xab_idx.push_back(i);
 			}
+#if 0
+			std::cout << "INDICES: " << std::endl;
 			
+			for (auto m : ma_idx) {
+				std::cout << m << " ";
+			} std::cout << std::endl;
+			
+			for (auto n : nb_idx) {
+				std::cout << n << " ";
+			} std::cout << std::endl;
+			
+			for (auto ix : xab_idx) {
+				std::cout << ix << " ";
+			} std::cout << std::endl;
+#endif			
 			int mnblks = ma_idx.size();
 			int nnblks = nb_idx.size();		
 			int xblks = xab_idx.size();
@@ -273,18 +284,13 @@ void BATCHED_PARI_K::init_tensors() {
 			
 			arrvec<int,3> blks = {xab_idx, ma_idx, nb_idx};
 			
-			aofac->ao_3c2e_fill_blockmap(i_xbb_ab, blks, scr_s);	
+			aofac->ao_3c2e_fill(eri_self, blks, scr_s);	
 			
-			std::cout << "BEFORE FILTER" << std::endl;
-			i_xbb_ab.print();
+			eri_self->filter(dbcsr::global::filter_eps);
 			
-			i_xbb_ab.filter(dbcsr::global::filter_eps);
+			if (eri_self->num_blocks_total() == 0) continue;
 			
-			std::cout << "AFTER FILTER" << std::endl;
-			i_xbb_ab.print();
-			
-			if (i_xbb_ab.num_blocks() == 0) continue;
-			
+			dbcsr::print(*eri_self);			
 			// get matrix parts of s_xx
 				
 			// problem size
@@ -305,7 +311,13 @@ void BATCHED_PARI_K::init_tensors() {
 			
 			// get (alpha|beta) matrix 
 			Eigen::MatrixXd alphaBeta = Eigen::MatrixXd::Zero(m,m);
-			
+
+#if 0
+			auto met = dbcsr::tensor_create_template<2,double>(inv_self)
+				.name("metric").get();
+				
+			met->reserve_all();
+#endif		
 			// loop over xab blocks
 			for (auto ix : xab_idx) {
 				for (auto iy : xab_idx) {
@@ -318,11 +330,15 @@ void BATCHED_PARI_K::init_tensors() {
 			
 					if (found) {
 						
-						std::cout << "FOUND: " << ix << " " << iy << std::endl;
+						std::array<int,2> sizes = {xsize,ysize};
+						
+#if 0		
+						std::array<int,2> idx = {ix,iy};
+						met->put_block(idx, ptr, sizes);
+#endif
+						
 						Eigen::Map<Eigen::MatrixXd> blk(ptr,xsize,ysize);
-						
-						std::cout << blk << std::endl;
-						
+												
 						int xoff = xab_offs[xab_mapping[ix]];
 						int yoff = xab_offs[xab_mapping[iy]];
 						
@@ -332,17 +348,22 @@ void BATCHED_PARI_K::init_tensors() {
 					
 				}
 			}
-			
+
+#if 0	
 			std::cout << "Problem size: " << m << " x " << m << std::endl;
-			//std::cout << "MY ALPHABETA: " << std::endl;
-			//for (int i = 0; i != m*m; ++i) {
-			//	std::cout << alphaBeta.data()[i] << std::endl;
-			//}
-				
+			std::cout << "MY ALPHABETA: " << std::endl;
+			
+			std::cout << alphaBeta << std::endl;
+			
+			std::cout << "ALPHA TENSOR: " << std::endl;
+			dbcsr::print(*met);
+
+#endif
+
 			Eigen::MatrixXd U = Eigen::MatrixXd::Zero(m,m);
 			Eigen::MatrixXd Vt = Eigen::MatrixXd::Zero(m,m);
 			Eigen::VectorXd s = Eigen::VectorXd::Zero(m);
-			
+		
 			int info = 1;
 			double worksize = 0;
 			
@@ -368,14 +389,15 @@ void BATCHED_PARI_K::init_tensors() {
 			//for (int i = 0; i != m*m; ++i) {
 			//	std::cout << Inv.data()[i] << std::endl;
 			//}
-			
+
+#if 0		
 			Eigen::MatrixXd E = Eigen::MatrixXd::Identity(m,m);
 			
 			E -= Inv * alphaBeta_c;
 			std::cout << "ERROR1: " << E.norm() << std::endl;
 			
 			std::cout << Inv << std::endl;
-			
+#endif
 			U.resize(0,0);
 			Vt.resize(0,0);
 			s.resize(0);
@@ -392,452 +414,126 @@ void BATCHED_PARI_K::init_tensors() {
 				}
 			}
 			
-			inv_xx.reserve(res_x);
+			inv_self->reserve(res_x);
 			
-			for (auto ix : xab_idx) {
-				for (auto iy : xab_idx) {
+			dbcsr::iterator_t<2,double> iter_inv(*inv_self);
+			iter_inv.start();
+			
+			while (iter_inv.blocks_left()) {
+				iter_inv.next();
+				
+				int ix0 = iter_inv.idx()[0];
+				int ix1 = iter_inv.idx()[1];
+			
+				int xoff0 = xab_offs[xab_mapping[ix0]];
+				int xoff1 = xab_offs[xab_mapping[ix1]];
+			
+				int xsize0 = x[ix0];
+				int xsize1 = x[ix1];
 					
-					int xoff = xab_offs[xab_mapping[ix]];
-					int yoff = xab_offs[xab_mapping[iy]];
-					int xsize = x[ix];
-					int ysize = x[iy];
+				Eigen::MatrixXd blk = Inv.block(xoff0,xoff1,xsize0,xsize1);
+				
+				bool found = true;
+				double* blkptr = inv_self->get_block_p(iter_inv.idx(), found);
 					
-					Eigen::MatrixXd blk = Inv.block(xoff,yoff,xsize,ysize);
-					std::array<int,2> idx = {ix,iy};
-					double* data = inv_xx.get_block(idx);
-					
-					std::copy(blk.data(), blk.data() + xsize*ysize, data);
-					
-				}
+				std::copy(blk.data(), blk.data() + xsize0*xsize1, blkptr);
+				
 			}
+			
+			iter_inv.stop();
 							 
-			inv_xx.filter(dbcsr::global::filter_eps);
-			inv_xx.print();
+			inv_self->filter(dbcsr::global::filter_eps);
+			//dbcsr::print(*inv_self);
 						
-			// allocate cxbb
-			
-			arrvec<int,3> res_c;
-			
-			for (auto x : xab_idx) {
-				for (auto m : ma_idx) {
-					for (auto n : nb_idx) {
-						res_c[0].push_back(x);
-						res_c[1].push_back(m);
-						res_c[2].push_back(n);
-					}
-				}
-			}
-			
-			c_xbb_ab.reserve(res_c);
-			
-			// insert into stacks
-			
-			for (auto inv_pair = inv_xx.begin(); inv_pair != inv_xx.end(); ++inv_pair) {
+			dbcsr::contract(*inv_self, *eri_self, *c_xbb_self)
+				.alpha(1.0).beta(1.0)
+				.filter(dbcsr::global::filter_eps)
+				.perform("XY, YMN -> XMN");
+		
+#if 0		
+			dbcsr::contract(*met, *c_xbb_self, *eri_self)
+				.alpha(-1.0).beta(1.0)
+				.filter(dbcsr::global::filter_eps)
+				.perform("XY, YMN -> XMN");
 				
-				int ix0 = inv_pair->first[0];
-				int ix1 = inv_pair->first[1];
-				
-				double* inv_data = inv_xx.get_data(inv_pair->second);
-				
-				for (auto im : ma_idx) {
-					for (auto in : nb_idx) {
-						
-						std::array<int,3> idxc = {ix0,im,in};
-						std::array<int,3> idxi = {ix1,im,in};
-						
-						double* cxbb_data = c_xbb_ab.get_block(idxc);
-						double* ixbb_data = i_xbb_ab.get_block(idxi);
-						
-						if (cxbb_data && ixbb_data) {
-							
-							std::cout << "MULT: " << ix0 << "," << ix1 << " * " << 
-								ix1 << "," << im << "," << in << " = " << ix0 << 
-									"," << im << "," << in << std::endl;
-							
-							int m = x[ix0];
-							int n = b[im] * b[in];
-							int k = x[ix1];
-							
-							double alpha = 1.0;
-							double beta = 1.0;
-							
-							libxsmm_gemm(NULL, NULL, m, n, k, &alpha, inv_data, NULL, ixbb_data, 
-								NULL, &beta, cxbb_data, NULL);				
-							
-						} // endif
-					} // end for in 
-				} // end for im	
-			} // end for inv_pair
-			
-			i_xbb_ab.clear();
-			inv_xx.clear();
-			
-			c_xbb_ab.print();
-			c_xbb_ab.filter(dbcsr::global::filter_eps);
-			
-			c_xbb.insert(c_xbb_ab);
+			std::cout << "SUM" << std::endl;
+			dbcsr::print(*eri_self);
+#endif
+		
+			eri_self->clear();
+			inv_self->clear();
 			
 				
+		} // end loop over atom pairs
+		
+		//dbcsr::print(*c_xbb_self);
+		
+		arrvec<int,3> c_res;
+		
+		dbcsr::iterator_t<3> iter_c_self(*c_xbb_self);
+		iter_c_self.start();
+		
+		while (iter_c_self.blocks_left()) {
+			iter_c_self.next();
+			
+			auto& idx = iter_c_self.idx();
+			
+			c_res[0].push_back(idx[0]);
+			c_res[1].push_back(idx[1]);
+			c_res[2].push_back(idx[2]);
+			
 		}
 		
-		std::cout << "CXBB" << std::endl;
-		c_xbb.print();
+		iter_c_self.stop();
 		
-	}	
-	
-	
-	/*
-	// ================== START ATOM BATCH LOOP  =======================
-	
-	int split = 5;
-	int n_abatches = std::ceil( (double)natoms / (double)split);  
-	
-	for (int ia_batch = 0; ia_batch != n_abatches; ++ia_batch) {
-		
-		// get low and high
-		int a_low = ia_batch * split;
-		int a_high = (ia_batch != n_abatches - 1) ? (ia_batch + 1) * split : natoms;
-	
-		LOG.os<>("Processing batch of atoms ", a_low, " to ", a_high - 1, '\n');
-	
-		// =============== reserve c_xab ======================
-		arrvec<int,3> c_res; 
-		
-		for (auto m : loc_m_idx) {
-			int ia = blk_to_atom_b[m];
-			
-			if (ia < a_low || ia > a_high) continue;
-			
-			for (auto n : loc_n_idx) {
-				int ib = blk_to_atom_b[n];
+		//std::cout << "RESERVING" << std::endl;
+		c_xbb_centered->reserve(c_res);
 				
-				for (auto x : loc_x_idx) {
-					int iab = blk_to_atom_x[x];
+		for (size_t iblk = 0; iblk != c_res[0].size(); ++iblk) {
+			
+			std::array<int,3> idx = {c_res[0][iblk], 
+					c_res[1][iblk], c_res[2][iblk]};
+			
+			int ntot = x[idx[0]] * b[idx[1]] * b[idx[2]];
+			
+			bool found = true;
 					
-					if (iab == ia || iab == ib) {
-						
-						c_res[0].push_back(x);
-						c_res[1].push_back(m);
-						c_res[2].push_back(n);
-					}
-				}
-				
-				
-				
-			}
+			double* ptr_self = c_xbb_self->get_block_p(idx, found);
+			double* ptr_all = c_xbb_centered->get_block_p(idx, found);
+			
+			std::copy(ptr_self, ptr_self + ntot, ptr_all);
+			
 		}
 		
-		c_xab_mn->reserve(c_res);
+		dbcsr::print(*c_xbb_centered);
 		
-		dbcsr::print(*c_xab_mn);
-		
-		for (auto& a : c_res) {
-			a.clear();
-			a.shrink_to_fit();
-		}
-	
-	
-		// =============== START LOOP over atom pairs ==================
-		for (int ia = a_low; ia < a_high; ++ia) {
-			for (int ib = 0; ib < natoms ; ++ib) {
-				
-				 // get pointers
-	
-				MPI_Barrier(m_world.comm());
+		c_xbb_self->clear();
 
-				// Get mu/nu indices centered on alpha/beta
-			
-				vec<int> ma_idx, nb_idx, mnab_idx, xab_idx;
-			
-				for (auto m : loc_m_idx) {
-					if (blk_to_atom_b[m] == ia) ma_idx.push_back(m);
-				}
-				
-				for (auto n : loc_n_idx) {
-					if (blk_to_atom_b[n] == ib) nb_idx.push_back(n);
-				}
-				
-				int mnblks = ma_idx.size();
-				int nnblks = nb_idx.size();
-				
-				if (ma_idx.size() == 0 || nb_idx.size() == 0) continue;
-				
-				// get sizes 
-				
-				vec<int> ma_blksizes(mnblks), nb_blksizes(nnblks);
-				
-				for (int i = 0; i != mnblks; ++i) {
-					ma_blksizes[i] = b[ma_idx[i]];
-				}
-				
-				for (int i = 0; i != nnblks; ++i) {
-					nb_blksizes[i] = b[nb_idx[i]];
-				}
-				
-				// get x indices centered on alpha or beta
-				
-				for (int i = 0; i != x.size(); ++i) {
-					if (blk_to_atom_x[i] == ia || 
-						blk_to_atom_x[i] == ib) 
-						xab_idx.push_back(i);
-				}
-				
-				int xblks = xab_idx.size();
-				
-				COLLOG(-1).os<>("Hello from col process ", _grid.myprow(), " out of ",
-					_grid.nprow(), ", my global rank is ", m_world.rank(), '\n');
-					
-				COLLOG.os<>("Processing atoms ", ia, " ", ib, '\n');
-				
-				// get matrix parts of s_xx
-				
-				// problem size
-				int n = dfnbf;
-				int m = 0;
-				
-				vec<int> xab_sizes(xab_idx.size());
-				std::map<int,int> xab_mapping;
-				
-				for (int i = 0; i != xab_idx.size(); ++i) {
-					int ixab = xab_idx[i];
-					m += x[ixab];
-					xab_sizes[i] = x[ixab];
-					xab_mapping[ixab] = i;
-				}
-			
-				COLLOG.os<>("Problem size: ", n, " x ", m, '\n');
-			
-				Eigen::MatrixXd s_xx_01(n,m);
-				int ioff = 0;
-				
-				if (colworld.rank() == 0) {
-					std::cout << s_xx_eigen << std::endl;
-				}
-				
-				auto s_xx_01_mat = dbcsr::create<double>()
-					.set_world(colworld)
-					.name("column_s_xx")
-					.row_blk_sizes(xab_sizes)
-					.col_blk_sizes(xab_sizes)
-					.matrix_type(dbcsr::type::no_symmetry)
-					.get();
-					
-				s_xx_01_mat->reserve_all();
-				
-				dbcsr::iterator<double> it_sxx(*s_xx_01_mat);
-				it_sxx.start();
-				
-				while (it_sxx.blocks_left()) {
-					
-					it_sxx.next_block();
-					
-					int ix_glob = xab_idx[it_sxx.row()];
-					int ixab_glob = xab_idx[it_sxx.col()];
-					
-					int ix_off = blkoffsets[0][ix_glob];
-					int ixab_off = blkoffsets[0][ixab_glob];
-					
-					int ix_size = it_sxx.row_size();
-					int ixab_size = it_sxx.col_size();
-					
-					auto eigen_blk =  
-						s_xx_eigen.block(ix_off, ixab_off, ix_size, ixab_size);
-						
-					for (int i = 0; i != ix_size; ++i) {
-						for (int j = 0; j != ixab_size; ++j) {
-							it_sxx(i,j) = eigen_blk(i,j);
-						}
-					}
-					
-				}
-				
-				it_sxx.stop();
-				
-				//for (int ic = 0; ic != m_world.nprow(); ++ic) {
-				//	if (colworld.rank() == ic) {
-				//		std::cout << "S_XX ? " << s_xx_01 << std::endl;
-				//	}
-				//	MPI_Barrier(col_comm);
-				//}
-				
-				//Eigen::JacobiSVD<Eigen::MatrixXd> svd(s_xx_01, Eigen::ComputeThinU | Eigen::ComputeThinV);
-				//std::cout << "Its singular values are:" << std::endl << svd.singularValues() << std::endl;
-				//std::cout << "Its left singular vectors are the columns of the thin U matrix:" << std::endl << svd.matrixU() << std::endl;
-				//std::cout << "Its right singular vectors are the columns of the thin V matrix:" << std::endl << svd.matrixV() << std::endl;
-			
-				// do an SVD
-				
-			
-				/*
-				auto c = dbcsr::matrix_to_eigen(s_xx_01_mat);
-			
-				Eigen::MatrixXd diff = c - s_xx_01;
-				
-				MPI_Barrier(col_comm);
-				
-				for (int ic = 0; ic != m_world.nprow(); ++ic) {
-					if (colworld.rank() == ic) {
-						std::cout << "ZEROS ? " << diff << std::endl;
-					}
-					MPI_Barrier(col_comm);
-				}
-			
-				dbcsr::print(*s_xx_01_mat);
-			
-				MPI_Barrier(col_comm);
-			
-				math::SVD do_svd(s_xx_01_mat, 'V', 'V', 1);
-			
-				do_svd.compute();
-			
-				auto inv = do_svd.inverse();
-				
-				dbcsr::print(*inv);
-			
-				inv->replicate_all();
-			
-				// form mm stacks
-			
-				std::array<int,3> idx;
-				std::array<int,3> blksize;
-			
-				std::map<std::array<int,3>,double*> c_xmn_blocks;
-			
-				stack mm_stack;
-						
-				for (auto im : ma_idx) {
-					for (auto in : nb_idx) {
-					
-					for (auto ix : loc_x_idx) {
-						
-						std::cout << "FETCHING BLOCK NR: " << im << " "
-							<< in << " " << ix << std::endl;
-						
-						idx[0] = ix;
-						idx[1] = im;
-						idx[2] = in;
-						
-						blksize[0] = x[ix];
-						blksize[1] = b[im];
-						blksize[2] = b[in];
-						
-						bool found = false;
-						
-						double* ptr_xmn = eri_centered->get_block_p(idx, found);
-						if (!found) continue;
-							
-						for (auto ixab : xab_idx) {
-							
-							std::cout << "ixab glob: " << ixab << " ->  " 
-								<< "ixab loc: " << xab_mapping[ixab] << std::endl; 
-							
-							std::cout << "CONTRACTING WITH: " << ix << " " << ixab
-								<< std::endl;
-								
-							int blksizeab = x[ixab];
-							
-							double* ptr_xabx = inv->get_block_data(xab_mapping[ixab], ix, found);
-							if (!found) continue;
-							
-							std::array<int,3> mnk = {blksizeab, blksize[1] * blksize[2], blksize[0]};
-							
-							std::array<int,3> c_idx = {ixab,im,in};
-							
-							double* ptr_c;
-							
-							auto iter = c_xmn_blocks.find(c_idx);
-							if (iter == c_xmn_blocks.end()) {
-								ptr_c = new double[blksizeab*blksize[1]*blksize[2]]();
-								c_xmn_blocks[c_idx] = ptr_c;
-							} else {
-								ptr_c = iter->second;
-							}
-							
-							std::array<double*,3> ptrs = {ptr_xabx,ptr_xmn,ptr_c};
-							
-							mm_stack.insert(mnk, ptrs);
-															
-						} // end xab
-						
-					} // end x
-					
-				} //end nu
-				
-			} // end mu
-			
-			// ========= PROCESS STACKS ==============
-			
-			
-			
-			// === now gather blocks =====
-			
-			MPI_Barrier(col_comm);
-			
-			COLLOG.os<>("REDUCING\n");
-			for (auto& idxblk : c_xmn_blocks) {
-				
-				std::array<int,3> idx = idxblk.first;
-				double* send = idxblk.second;
-				
-				const int s0 = x[idx[0]];
-				const int s1 = b[idx[1]];
-				const int s2 = b[idx[2]];
-				
-				const int size = s0*s1*s2;
-				
-				COLLOG.os<>("BLOCK: ", idx[0], " ", idx[1], " ", idx[2], '\n');
-				
-				for (int i = 0; i != colworld.size(); ++i) {
-					if (i == colworld.rank()) {
-						std::cout << "PROC: " << i << std::endl;
-						for (int j = 0; j != size; ++j) {
-							std::cout << send[j] << " ";
-						} std::cout << std::endl;
-					}
-					std::cout << std::endl;
-					MPI_Barrier(col_comm);
-				}
-				
-				// to which proc does xab belong to? 
-				int dest = c_xab_mn->proc(idx);
-				
-				COLLOG(-1).os<>("Destination: ", dest, '\n');
-				
-				double* recv = nullptr;
-				if (dest == colworld.rank()) {
-					bool found = true;
-					recv = c_xab_mn->get_block_p(idx,found); 
-					if (!found) std::cout << "NOT THERE!!!" << std::endl;
-				}
-	
-				MPI_Reduce(send, recv, size, MPI_DOUBLE, MPI_SUM, dest, col_comm);
-				
-				COLLOG.os<>("After reduction: \n");
-				if (dest == colworld.rank()) {
-					std::cout << "PROC: " << dest << std::endl;
-					for (int j = 0; j != size; ++j) {
-						std::cout << recv[j] << " ";
-					} std::cout << std::endl;
-				}
-				
-				delete [] send;
-				
-			}
-	
-	
-		 } // end atom b loop
-		} // end atom a loop 
+#if 0
+		} // end if
 		
-	} // end atom a batch loop
+		MPI_Barrier(m_world.comm());
+		
+		} // end proc loop
+#endif
 	
-	dbcsr::print(*c_xab_mn);
+		dbcsr::copy(*c_xbb_centered, *c_xbb_dist).move_data(true).sum(true).perform();
+		
+	} // end loop over atom pair batches
+		
+	//dbcsr::print(*c_xbb_dist);
 	
-	LOG.os<>("DONE");
+	m_cfit_xbb = c_xbb_dist;
 	
-	MPI_Barrier(m_world.comm());
+	time_form_cfit.finish();
 	
-	exit(0);
-	*/
+	m_K_01 = dbcsr::tensor_create<2,double>().pgrid(m_spgrid2).name("K_01")
+		.map1({0}).map2({1}).blk_sizes(bb).get();
+		
+	m_p_bb = dbcsr::tensor_create_template<2,double>(m_K_01)
+			.name("p_bb_0_1").map1({0}).map2({1}).get();
+	
+	m_s_xx = m_reg.get_tensor<2,double>("s_xx");
 	
 }
 
@@ -845,6 +541,207 @@ void BATCHED_PARI_K::compute_K() {
 	
 	TIME.start();
 	
+	auto& time_reo_int1 = TIME.sub("Reordering integrals (1)");
+	auto& time_reo_int2 = TIME.sub("Reordering integrlas (2)");
+	auto& time_fetch_ints = TIME.sub("Fetching ints");
+	auto& time_reo_cbar = TIME.sub("Reordering c_bar");
+	auto& time_reo_ctil = TIME.sub("Reordering c_tilde");
+	auto& time_form_cbar = TIME.sub("Forming c_bar");
+	auto& time_form_ctil = TIME.sub("Forming c_til");
+	auto& time_copy_cfit = TIME.sub("Copying c_fit");
+	auto& time_form_K1 = TIME.sub("Forming K1");
+	auto& time_form_K2 = TIME.sub("Forming K2");
+	
+	time_reo_int1.start();
+	m_eri_batched->reorder(vec<int>{0,2},vec<int>{1});
+	time_reo_int1.finish();
+	
+	auto eri = m_eri_batched->get_stensor();
+	
+	// allocate tensors
+	
+	auto cfit_xbb_01_2 = m_cfit_xbb;
+	
+	auto cfit_xbb_0_12 = dbcsr::tensor_create_template(eri)
+		.name("cfit_xbb_0_12")
+		.map1({0}).map2({1,2})
+		.get();
+	
+	auto cbar_xbb_01_2 = dbcsr::tensor_create_template(eri)
+		.name("cbar_xbb_01_2")
+		.map1({0,1}).map2({2})
+		.get();
+		
+	auto cbar_xbb_02_1 = dbcsr::tensor_create_template(eri)
+		.name("cbar_xbb_02_1")
+		.map1({0,2}).map2({1})
+		.get();
+	
+	auto ctil_xbb_0_12 = dbcsr::tensor_create_template(eri)
+		.name("ctil_xbb_0_12")
+		.map1({0}).map2({1,2})
+		.get();
+		
+	auto ctil_xbb_02_1 = dbcsr::tensor_create_template(eri)
+		.name("ctil_xbb_02_1")
+		.map1({0,2}).map2({1})
+		.get();
+	
+	auto K1 = dbcsr::tensor_create_template(m_K_01)
+		.name("K1").get();
+		
+	auto K2 = dbcsr::tensor_create_template(m_K_01)
+		.name("K2").get();
+	
+	auto xbounds = m_eri_batched->bounds(0);
+	auto bbounds = m_eri_batched->bounds(1);
+	auto fullxbounds = m_eri_batched->full_bounds(0);
+	auto fullbbounds = m_eri_batched->full_bounds(1);
+	
+	int n_xbatches = m_eri_batched->nbatches_dim(0);
+	int n_bbatches = m_eri_batched->nbatches_dim(1);
+	
+	m_eri_batched->decompress_init({0,2});
+	
+	dbcsr::copy_matrix_to_tensor(*m_p_A, *m_p_bb);
+	
+	// Loop Q
+	for (int ix = 0; ix != n_xbatches; ++ix) {
+		// Loop sig
+		for (int isig = 0; isig != n_bbatches; ++isig) {
+			
+			LOG.os<1>("Loop PARI K, batch nr ", ix, " ", isig, '\n');
+			
+			vec<vec<int>> xm_bounds = {
+				xbounds[ix],
+				fullbbounds
+			};
+			
+			vec<vec<int>> s_bounds = {
+				bbounds[isig]
+			};
+			
+			LOG.os<1>("Forming cbar.\n");
+			
+			// form cbar
+			
+			time_form_cbar.start();
+			dbcsr::contract(*cfit_xbb_01_2, *m_p_bb, *cbar_xbb_01_2)
+				.bounds2(xm_bounds)
+				.bounds3(s_bounds)
+				.perform("Qml, ls -> Qms");
+			time_form_cbar.finish();	
+				
+			vec<vec<int>> rns_bounds = {
+				fullxbounds,
+				fullbbounds,
+				bbounds[isig]
+			};
+			 
+			LOG.os<1>("Copying...\n");
+			time_copy_cfit.start();
+			dbcsr::copy(*cfit_xbb_01_2,*cfit_xbb_0_12)
+				.bounds(rns_bounds)
+				.perform();
+			time_copy_cfit.finish();
+		
+			vec<vec<int>> ns_bounds = {
+				fullbbounds,
+				bbounds[isig]
+			};
+			
+			vec<vec<int>> x_bounds = {
+				xbounds[ix]
+			};
+			
+			LOG.os<1>("Forming ctil.\n");
+			time_form_ctil.start();
+			dbcsr::contract(*cfit_xbb_0_12, *m_s_xx, *ctil_xbb_0_12)
+				.bounds2(ns_bounds)
+				.bounds3(x_bounds)
+				.perform("Rns, RQ -> Qns");	
+			time_form_ctil.finish();
+			
+			cfit_xbb_0_12->clear();
+			
+			LOG.os<1>("Reordering ctil.\n");
+			time_reo_ctil.start();
+			dbcsr::copy(*ctil_xbb_0_12, *ctil_xbb_02_1).move_data(true).perform();
+			time_reo_ctil.finish();
+			
+			LOG.os<1>("Reordering cbar.\n");
+			time_reo_cbar.start();
+			dbcsr::copy(*cbar_xbb_01_2, *cbar_xbb_02_1).move_data(true).perform();
+			time_reo_cbar.finish();
+			
+			LOG.os<1>("Fetching integrals.\n");
+			time_fetch_ints.start();
+			m_eri_batched->decompress({ix,isig});
+			time_fetch_ints.finish();
+			auto eri_02_1 = m_eri_batched->get_stensor();
+			
+			vec<vec<int>> xs_bounds = {
+				xbounds[ix],
+				bbounds[isig]
+			};
+			
+			LOG.os<1>("Forming K (1).\n");
+			
+			time_form_K1.start();
+			dbcsr::contract(*cbar_xbb_02_1, *eri_02_1, *K1)
+				.bounds1(xs_bounds)
+				.beta(1.0)
+				.perform("Qms, Qns -> mn");
+			time_form_K1.finish();
+							
+			LOG.os<1>("Forming K (2).\n");
+			
+			time_form_K2.start();
+			dbcsr::contract(*ctil_xbb_02_1, *cbar_xbb_02_1, *K2)
+				.bounds1(xs_bounds)
+				.beta(1.0)
+				.perform("Qns, Qms -> mn");	
+			time_form_K2.finish();
+			
+			ctil_xbb_02_1->clear();
+			cbar_xbb_02_1->clear();
+		
+			LOG.os<1>("Done.\n");
+				
+		} // end loop sig
+	} // end loop x
+	
+	m_eri_batched->decompress_finalize();
+		
+	K2->scale(-0.5);	
+	
+	dbcsr::print(*K1);
+	dbcsr::print(*K2);
+		
+	dbcsr::copy(*K1, *m_K_01).move_data(true).sum(true).perform();
+	dbcsr::copy(*K2, *m_K_01).move_data(true).sum(true).perform();		
+			
+	dbcsr::print(*m_K_01);
+	
+	LOG.os<1>("Forming final K.\n");
+	
+	auto K_copy = dbcsr::tensor_create_template<2,double>(m_K_01)
+		.name("K copy").get();
+		
+	dbcsr::copy(*m_K_01, *K_copy).order({1,0}).perform();
+	dbcsr::copy(*K_copy, *m_K_01).move_data(true).sum(true).perform();
+		
+	dbcsr::copy_tensor_to_matrix(*m_K_01, *m_K_A);
+	
+	m_K_01->clear();
+	
+	m_K_A->scale(-1.0);
+	dbcsr::print(*m_K_A);
+	
+	time_reo_int2.start();
+	m_eri_batched->reorder(vec<int>{0}, vec<int>{1,2});
+	time_reo_int2.finish();	
+		
 	TIME.finish();
 			
 }

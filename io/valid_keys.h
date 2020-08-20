@@ -75,7 +75,8 @@ static const json valid_keys =
 		{"method", "ADC1"}, /* what method? 
 			(ri-adc1, ri-adc2, sos-ri-adc, ao-ri-adc1, ao-ri-adc2) */
 		{"diag_order", 0}, // at which order to compute the ADC diagonal
-		{"build_K", "df"}
+		{"build_K", "df"},
+		{"build_Z", "LLMPFULL"}
 	}}	
 };
 

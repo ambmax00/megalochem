@@ -29,7 +29,8 @@ void MVP_ao_ri_adc1::init() {
 		fock::K* kbuilder = new fock::BATCHED_DFAO_K(m_world,m_opt);
 		m_kbuilder.reset(kbuilder);
 	} else if (kmethod == "pari") {
-		// nothing yet
+		fock::K* kbuilder = new fock::BATCHED_PARI_K(m_world,m_opt);
+		m_kbuilder.reset(kbuilder);
 	}
 	
 	m_kbuilder->set_sym(false);

@@ -42,6 +42,7 @@ void fockmod::init() {
 	bool compute_eris_batched = false;
 	bool compute_3c2e_batched = false;
 	bool compute_s_xx = false;
+	bool s_xx_tensor = false;
 	bool compute_s_xx_inv = false;
 	bool compute_s_xx_invsqrt = false;
 	
@@ -99,6 +100,7 @@ void fockmod::init() {
 		compute_s_xx = true;
 		compute_s_xx_inv = true;
 		compute_3c2e_batched = true;
+		s_xx_tensor = true;
 		
 	}
 	
@@ -182,16 +184,20 @@ void fockmod::init() {
 			
 		}
 		
-		//auto x = m_mol->dims().x();
-		//arrvec<int,2> xx = {x,x};
-		
-		//auto s_xx_01 = dbcsr::tensor_create<2>().name("s_xx")
-			//.pgrid(spgrid2).map1({0}).map2({1}).blk_sizes(xx).get();
+		if (s_xx_tensor) {
 			
-		//dbcsr::copy_matrix_to_tensor(*c_s_xx, *s_xx_01);
-		//m_reg.insert_tensor<2,double>("s_xx", s_xx_01);		
+			auto x = m_mol->dims().x();
+			arrvec<int,2> xx = {x,x};
+			
+			auto s_xx_01 = dbcsr::tensor_create<2>().name("s_xx")
+				.pgrid(spgrid2).map1({0}).map2({1}).blk_sizes(xx).get();
+				
+			dbcsr::copy_matrix_to_tensor(*c_s_xx, *s_xx_01);
+			m_reg.insert_tensor<2,double>("s_xx", s_xx_01);		
+				
+		}	
 		
-		m_reg.insert_matrix<double>("s_xx", c_s_xx);
+		m_reg.insert_matrix<double>("s_xx_mat", c_s_xx);
 		
 		t_eri.finish();
 		

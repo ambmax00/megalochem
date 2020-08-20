@@ -26,14 +26,14 @@
 
 namespace filio {
 
-void validate(const json& j, const json& compare) {
+void validate(std::string section, const json& j, const json& compare) {
 	
 	for (auto it = j.begin(); it != j.end(); ++it) {
 		if (compare.find(it.key()) == compare.end()){
-			throw std::runtime_error("Invalid keyword: "+it.key());
+			throw std::runtime_error("Section " + section + ", invalid keyword: "+it.key());
 		}
 		if (it->is_structured() && !it->is_array() && it.key() != "gen_basis") {
-			validate(*it, compare[it.key()]);
+			validate(it.key(), *it, compare[it.key()]);
 		}
 	}
 }
@@ -273,7 +273,7 @@ reader::reader(MPI_Comm comm, std::string filename, int print) : m_comm(comm), L
 	
 	in >> data;
 	
-	validate(data, valid_keys);
+	validate("all", data, valid_keys);
 	
 	if (data.find("global") != data.end()) {
 		json& jglob = data["global"];

@@ -429,11 +429,13 @@ public:
 		
 	}
 	
-	void compute(math::blockmap<3>& b_in, arrvec<int,3> idx,
-		shared_screener scr) {
-	
+	void compute_3_partial(dbcsr::shared_tensor<3>& t_in, arrvec<int,3>& idx,
+		shared_screener s_scr) {
+			
+		auto scr = s_scr.get();
+		
 		arrvec<int,3> newblks;
-	
+		
 		for (auto x : idx[0]) {
 			for (auto m : idx[1]) {
 				for (auto n : idx[2]) {
@@ -448,10 +450,10 @@ public:
 			}
 		}
 		
-		b_in.reserve(newblks);
+		t_in->reserve(newblks);
 		
-		calc_ints(b_in, newblks, m_eng_pool, m_basvec);
-	
+		calc_ints(*t_in, m_eng_pool, m_basvec, scr); 
+		
 	}
 	
 	std::function<void(dbcsr::shared_tensor<3>&,vec<vec<int>>&)>
@@ -560,10 +562,10 @@ void aofactory::ao_3c2e_fill(dbcsr::shared_tensor<3,double>& t_in,
 	}
 }
 
-void aofactory::ao_3c2e_fill_blockmap(math::blockmap<3>& b_in, arrvec<int,3>& blks,
-	shared_screener scr) {
+void aofactory::ao_3c2e_fill(dbcsr::shared_tensor<3>& t_in, 
+	arrvec<int,3>& idx, shared_screener s_scr) {
 	
-	pimpl->compute(b_in, blks, scr);
+	pimpl->compute_3_partial(t_in, idx, s_scr);
 	
 }
 				
