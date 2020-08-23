@@ -5,10 +5,10 @@
 
 namespace fock {
 	
-JK_common::JK_common(dbcsr::world& w, desc::options opt) :
+JK_common::JK_common(dbcsr::world& w, desc::options opt, std::string name) :
 	m_world(w), m_opt(opt),
 	LOG(m_world.comm(),m_opt.get<int>("print", FOCK_PRINT_LEVEL)),
-	TIME(m_world.comm(), "JK Builder", LOG.global_plev()) {}
+	TIME(m_world.comm(), name, LOG.global_plev()) {}
 	
 void J::init() {
 	

@@ -1162,6 +1162,8 @@ public:
 		return (double)m_nzetot / (double) tot;
 		
 	}
+	
+	btype get_type() { return m_type; }
 
 	
 }; //end class btensor

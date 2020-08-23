@@ -210,7 +210,7 @@ int main(int argc, char** argv) {
 
 	dbcsr::finalize();
 
-	LOG.os<>("========== FINSISHED WITHOUT CRASHING ! =========\n");
+	LOG.os<>("========== FINISHED WITHOUT CRASHING ! =========\n");
 
 	MPI_Finalize();
 

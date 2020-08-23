@@ -45,6 +45,10 @@ void LLMP_FULL_Z::init_tensors() {
 	
 	m_z_xbb_batched = std::make_shared<dbcsr::btensor<3,double>>(
 		z_xbb, nbatches, intermedt, m_opt.get<int>("print", 0));
+	
+	m_force_sparsity = m_opt.get<bool>("force_sparsity", false);
+	
+	m_shell_idx = get_shellpairs(m_eri_batched);
 		
 }
 
@@ -138,6 +142,10 @@ void LLMP_FULL_Z::compute() {
 	m_eri_batched->decompress_init({0});
 	m_z_xbb_batched->compress_init({0,2});
 	
+	auto xbounds = m_eri_batched->bounds(0);
+	auto bbounds = m_eri_batched->bounds(1);
+	auto fullbbounds = m_eri_batched->full_bounds(1);
+	
 	LOG.os<>("Starting batching over auxiliary functions.\n");
 		
 	// ===== LOOP OVER BATCHES OF AUXILIARY FUNCTIONS ==================
@@ -156,8 +164,8 @@ void LLMP_FULL_Z::compute() {
 	    LOG.os<1>("-- First transform.\n");
 	    
 	    vec<vec<int>> x_nu_bounds = { 
-			m_eri_batched->bounds(0)[ix], 
-			m_eri_batched->full_bounds(2)
+			xbounds[ix], 
+			fullbbounds
 		};
 	    
 	    time_tran1.start();
@@ -186,7 +194,7 @@ void LLMP_FULL_Z::compute() {
 			
 			vec<vec<int>> nu_bounds = { m_z_xbb_batched->bounds(2)[inu] };
 			vec<vec<int>> x_u_bounds = { 
-				m_z_xbb_batched->bounds(0)[ix],
+				xbounds[ix],
 				vec<int>{0, notot - 1}
 			};
 			
@@ -211,13 +219,38 @@ void LLMP_FULL_Z::compute() {
 			LOG.os<1>("-- Final transform.\n");
 			
 			vec<vec<int>> x_nu_bounds = {
-				m_z_xbb_batched->bounds(0)[ix],
-				m_z_xbb_batched->bounds(2)[inu]
+				xbounds[ix],
+				bbounds[inu]
 			};
+			
+			if (m_force_sparsity) {
+				
+				arrvec<int,3> res;
+				
+				auto xblkbounds = m_eri_batched->blk_bounds(0)[ix];
+				auto bblkbounds = m_eri_batched->blk_bounds(1)[inu];
+				
+				for (int mublk = 0; mublk != b.size(); ++mublk) {
+					for (int nublk = bblkbounds[0]; nublk != bblkbounds[1]+1; ++nublk) {
+						
+						if (!m_shell_idx(mublk,nublk)) continue;
+						
+						for (int xblk = xblkbounds[0]; xblk != xblkbounds[1]+1; ++xblk) {
+							res[0].push_back(xblk);
+							res[1].push_back(mublk);
+							res[2].push_back(nublk);
+						}
+					}
+				}
+				
+				b2_xbb_1_02->reserve(res);
+				
+			}
 											
 			time_tran3.start();
 			dbcsr::contract(*m_locc_01, *b2_xob_1_02, *b2_xbb_1_02)
 				.bounds3(x_nu_bounds)
+				.retain_sparsity(m_force_sparsity)
 				.perform("Mi, XiN -> XMN");
 			time_tran3.finish();
 	

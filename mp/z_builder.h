@@ -4,6 +4,7 @@
 #include <dbcsr_matrix_ops.hpp>
 #include <dbcsr_tensor_ops.hpp>
 #include <dbcsr_btensor.hpp>
+#include <Eigen/Core>
 #include "utils/mpi_time.h"
 #include "utils/registry.h"
 #include "desc/options.h"
@@ -28,6 +29,8 @@ protected:
 	dbcsr::shared_matrix<double> m_pvir;
 	dbcsr::shared_matrix<double> m_locc;
 	dbcsr::shared_matrix<double> m_lvir;
+	
+	Eigen::MatrixXi get_shellpairs(dbcsr::sbtensor<3,double> eri_batched);
 
 public:
 
@@ -86,6 +89,10 @@ private:
 	dbcsr::shared_tensor<2,double> m_locc_01;
 	dbcsr::shared_tensor<2,double> m_pvir_01;
 	
+	Eigen::MatrixXi m_shell_idx;
+	
+	bool m_force_sparsity;
+	
 public:
 
 	LLMP_FULL_Z(dbcsr::world& w, desc::options& opt) :
@@ -106,6 +113,10 @@ private:
 	
 	dbcsr::shared_tensor<2,double> m_locc_01;
 	dbcsr::shared_tensor<2,double> m_pvir_01;
+	
+	Eigen::MatrixXi m_shell_idx;
+	
+	bool m_force_sparsity;
 	
 public:
 

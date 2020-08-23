@@ -158,7 +158,7 @@ public:
 		smat_d cboA, cboB, cbvA, cbvB;
 		separate(m_c_bm_A, cboA, cbvA, "A");
 		
-		dbcsr::print(*m_c_bm_A);
+		//dbcsr::print(*m_c_bm_A);
 		
 		if (m_c_bm_B) separate(m_c_bm_B, cboB, cbvB, "B");
 		

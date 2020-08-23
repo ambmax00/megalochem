@@ -6,7 +6,7 @@
 namespace fock {
 
 BATCHED_DF_J::BATCHED_DF_J(dbcsr::world& w, desc::options& iopt) 
-	: J(w,iopt) {} 
+	: J(w,iopt,"BATCHED_DF_J") {} 
 
 void BATCHED_DF_J::init_tensors() {
 	
@@ -173,7 +173,7 @@ void BATCHED_DF_J::compute_J() {
 }
 
 BATCHED_DFMO_K::BATCHED_DFMO_K(dbcsr::world& w, desc::options& opt) 
-	: K(w,opt) {}
+	: K(w,opt,"BATCHED_DFMO_K") {}
 
 void BATCHED_DFMO_K::init_tensors() {
 	
@@ -434,8 +434,7 @@ void BATCHED_DFMO_K::compute_K() {
 }
 
 BATCHED_DFAO_K::BATCHED_DFAO_K(dbcsr::world& w, desc::options& opt) 
-	: K(w,opt) {}
-
+	: K(w,opt,"BATCHED_DFAO_K") {}
 void BATCHED_DFAO_K::init_tensors() {
 	
 	auto inv = m_reg.get_tensor<2,double>("s_xx_inv");

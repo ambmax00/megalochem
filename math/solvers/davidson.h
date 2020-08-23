@@ -7,6 +7,7 @@
 #include <Eigen/Eigenvalues>
 #include <dbcsr_matrix_ops.hpp>
 #include <dbcsr_conversions.hpp>
+#include "utils/mpi_log.h"
 
 namespace math {
 
@@ -15,7 +16,8 @@ using smat = dbcsr::shared_matrix<double>;
 template <class MVFactory>
 class davidson {
 private:
-
+	
+	util::mpi_log LOG;
 	smat m_diag; // diagonal of matrix
 	std::shared_ptr<MVFactory> m_fac; // Matrix vector product engine
 
@@ -61,16 +63,21 @@ public:
 		return *this;
 	}
 	
-	davidson() : m_eigval(0.0),	m_converged(false) {}
+	davidson(MPI_Comm comm, int nprint) : 
+		LOG(comm, nprint),
+		m_eigval(0.0), 
+		m_converged(false) {}
 
 	void compute(std::vector<smat>& guess, int nroots, std::optional<double> omega = std::nullopt) {
+		
+		LOG.os<>("Launching davidson diagonalization.\n");
 		
 		if (!omega && m_pseudo) 
 			throw std::runtime_error("Davidson solver initialized as pseudo-eigenvalue problem, but no omega given.");
 		
 		m_vecs = guess;
 		
-		std::cout << "GUESS SIZE: " << m_vecs.size() << std::endl;
+		LOG.os<1>("GUESS SIZE: ", m_vecs.size(), '\n');
 		
 		m_nroots = nroots;
 		
@@ -84,7 +91,7 @@ public:
 		
 		for (int ITER = 0; ITER != m_maxiter; ++ITER) {
 			
-			std::cout << "DAVIDSON ITERATION: " << ITER << std::endl;
+			LOG.os<1>("DAVIDSON ITERATION: ", ITER, '\n');
 			
 			// current subspace size
 			m_subspace = m_vecs.size();
@@ -93,15 +100,16 @@ public:
 			// compute sigma vectors
 			std::cout << m_vecs.size() << std::endl;
 			
+			LOG.os<1>("Computing MV products.\n");
 			for (int i = prev_subspace; i != m_subspace; ++i) {
 				
-				std::cout << "GUESS VECTOR: " << i << std::endl;
+				//std::cout << "GUESS VECTOR: " << i << std::endl;
 				dbcsr::print(*m_vecs[i]);
 				
 				auto Av_i = (m_pseudo) ? m_fac->compute(m_vecs[i],*omega) : m_fac->compute(m_vecs[i]);
 				m_sigmas.push_back(Av_i);
 				
-				std::cout << "SIGMA VECTOR: " << i << std::endl;
+				//std::cout << "SIGMA VECTOR: " << i << std::endl;
 				dbcsr::print(*Av_i); 
 				
 			}
@@ -117,8 +125,8 @@ public:
 				}
 			}
 			
-			std::cout << "SUBSPACE MATRIX" << std::endl;
-			std::cout << Asub << std::endl;
+			LOG.os<1>("SUBSPACE MATRIX:\n");
+			LOG.os<1>(Asub, '\n');
 			
 			// diagonalize it
 			Eigen::SelfAdjointEigenSolver<Eigen::MatrixXd> es;
@@ -139,29 +147,27 @@ public:
 				
 			}
 			
-			std::cout << "EIGENVALUES: " << std::endl;
-			for (int i = 0; i != evals.size(); ++i) {
-				std::cout << evals[i] << " ";
-			} std::cout << std::endl;
+			if (LOG.global_plev() >= 1) {
+				LOG.os<1>("EIGENVALUES: \n");
+				for (int i = 0; i != evals.size(); ++i) {
+					LOG.os<1>(evals[i], " ");
+				} LOG.os<1>('\n');
+			}
 			
-			std::cout << "EIGENVECTORS: " << std::endl;
-			std::cout << evecs << std::endl;
+			LOG.os<1>("EIGENVECTORS: \n", evecs, '\n');
 			
 			// compute residual
 			// r_k = sum_i U_ik sigma_i - sum_i U_ik lambda_k b_i 
 			
-			std::cout << "SETUP" << std::endl;
+			LOG.os<1>("Computing residual.\n");
 			
 			// ======= r_k ========
 			
 			smat r_k = dbcsr::create_template<double>(m_vecs[0]).name("r_k").get();
 			smat temp = dbcsr::create_template<double>(m_vecs[0]).name("temp").get();
-			
-			std::cout << "LOOP" << std::endl;
-			
+						
 			for (int i = 0; i != m_subspace; ++i) {
 				
-				std::cout << "Copy" << std::endl;
 				temp->copy_in(*m_sigmas[i]);
 				
 				//dbcsr::copy(*m_sigmas[i], temp).perform();
@@ -186,17 +192,18 @@ public:
 			
 			temp->release();
 			
-			std::cout << "RESIDUAL" << std::endl;
-			dbcsr::print(*r_k);
+			if (LOG.global_plev() >= 2) {
+				dbcsr::print(*r_k);
+			}
 			
 			double rms = r_k->norm(dbcsr_norm_frobenius);
-			std::cout << "RMS: " << rms << std::endl;
+			LOG.os<>("RMS: ", rms, '\n');
 			
 			// Convergence criteria
 			// Normal davidson: RMS of residual is below certain threshold
 			// pseudo davidson: RMS of residual is higher than |omega - omega'| 
 			
-			if (m_pseudo) std::cout << "EVALS: " << *omega << " " << evals(m_nroots-1) << std::endl;
+			if (m_pseudo) LOG.os<>("EVALS: ", *omega, " ", evals(m_nroots-1), '\n');
 			
 			m_converged = (m_pseudo) ? (rms < fabs(*omega - evals(m_nroots - 1))) : (rms < conv);
 			
@@ -205,6 +212,8 @@ public:
 			// correction 
 			// Only Diagonal-Preconditioned-Residue for now (DPR)
 			// D_ia = (lamda_k - A_iaia)^-1
+			
+			LOG.os<1>("Computing preconditioner.\n");
 			
 			smat D = dbcsr::create_template(r_k).name("D").get();
 			
@@ -250,16 +259,16 @@ public:
 				
 			} //end while*/
 			
-			std::cout << "PRECONDITIONER" << std::endl;
-			
-			dbcsr::print(*D);
+			if (LOG.global_plev() >= 2) {			
+				dbcsr::print(*D);
+			}
 			
 			// form new vector
 			smat d_k = dbcsr::create_template(r_k).name("d_k").get();
 			
 			// d(k)_ia = D(k)_ia * q(k)_ia
 			
-			dbcsr::print(*r_k);
+			//dbcsr::print(*r_k);
 			
 			d_k->hadamard_product(*r_k, *D);
 			
@@ -280,11 +289,9 @@ public:
 			//dbcsr::copy(d_k, bnew).perform();
 			bnew->copy_in(*d_k);
 			
-			std::cout << "LOOP" << std::endl;
+			LOG.os<1>("Computing new guess vector.\n");
 			for (int i = 0; i != m_vecs.size(); ++i) {
-				
-				std::cout << "STEP " << i << std::endl;
-				
+								
 				//dbcsr::copy(*m_vecs[i], temp2).perform();
 				temp2->copy_in(*m_vecs[i]);
 				
@@ -312,11 +319,11 @@ public:
 			// normalize
 			double bnorm = sqrt(bnew->dot(*bnew));
 			
-			dbcsr::print(*bnew);
-			
 			bnew->scale(1.0/bnorm);
 			
-			dbcsr::print(*bnew);
+			if (LOG.global_plev() >= 2) {
+				dbcsr::print(*bnew);
+			}
 						
 			m_vecs.push_back(bnew);
 				
@@ -330,8 +337,8 @@ public:
 		
 		// Make sure that abs max element of eigenvectors is positive.
 		
-		std::cout << "EVECS" << std::endl;
-		std::cout << evecs << std::endl;
+		//std::cout << "EVECS" << std::endl;
+		//std::cout << evecs << std::endl;
 		
 		/*for (int i = 0; i != m_subspace; ++i) {
 				// get min and max coeff
@@ -343,9 +350,10 @@ public:
 				
 		}*/
 		
-		std::cout << "EVECS" << std::endl;
-		std::cout << evecs << std::endl;
+		//std::cout << "EVECS" << std::endl;
+		//std::cout << evecs << std::endl;
 		
+		LOG.os<1>("Forming Ritz vectors.\n");
 		// x_k = sum_i ^M U_ik * b_i
 		for (int k = 0; k != m_nroots; ++k) {
 			
@@ -355,26 +363,27 @@ public:
 			
 			for (int i = 0; i != m_vecs.size(); ++i) {
 				
-				dbcsr::print(*m_vecs[i]);
-				std::cout << evecs(i,k) << std::endl;
+				//dbcsr::print(*m_vecs[i]);
+				//std::cout << evecs(i,k) << std::endl;
 				
 				temp3->copy_in(*m_vecs[i]);
 				//dbcsr::copy<2>(*m_vecs[i], temp3).perform();
 				temp3->scale(evecs(i,k));
 				
-				dbcsr::print(*temp3);
+				//dbcsr::print(*temp3);
 				
 				x_k->add(1.0,1.0,*temp3);
 				//dbcsr::copy(temp3, x_k).sum(true).move_data(true).perform();
 				
 			}
 				
-			dbcsr::print(*x_k);
+			//dbcsr::print(*x_k);
 			m_ritzvecs.push_back(x_k);
 			
 		}
 		
-		std::cout << "FINISHED COMPUTATION" << std::endl;
+		//std::cout << "FINISHED COMPUTATION" << std::endl;
+		LOG.os<>("Finished computation.\n");
 		
 	}
 	

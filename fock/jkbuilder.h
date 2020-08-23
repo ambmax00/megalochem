@@ -35,7 +35,7 @@ protected:
 		
 public:
 	
-	JK_common(dbcsr::world& w, desc::options opt);
+	JK_common(dbcsr::world& w, desc::options opt, std::string name);
 	void set_density_alpha(dbcsr::shared_matrix<double>& ipA) { m_p_A = ipA; }
 	void set_density_beta(dbcsr::shared_matrix<double>& ipB) { m_p_B = ipB; }
 	void set_coeff_alpha(dbcsr::shared_matrix<double>& icA) { m_c_A = icA; }
@@ -66,7 +66,7 @@ protected:
 	
 public:
 	
-	J(dbcsr::world& w, desc::options& opt) : JK_common(w,opt) {}
+	J(dbcsr::world& w, desc::options& opt, std::string name) : JK_common(w,opt,name) {}
 	virtual ~J() {}
 	virtual void compute_J() = 0;
 	virtual void init_tensors() = 0;
@@ -85,7 +85,7 @@ protected:
 	
 public:
 	
-	K(dbcsr::world& w, desc::options& opt) : JK_common(w,opt) {}
+	K(dbcsr::world& w, desc::options& opt, std::string name) : JK_common(w,opt,name) {}
 	virtual ~K() {}
 	virtual void compute_K() = 0;
 	virtual void init_tensors() = 0;

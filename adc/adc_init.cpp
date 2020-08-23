@@ -408,11 +408,17 @@ void adcmod::init_mo_tensors() {
 	m_reg.insert_tensor<2,double>("c_bo",c_bo_01);
 	m_reg.insert_tensor<2,double>("c_bv",c_bv_01);*/
 	
-	dbcsr::print(*c_bo);
-	dbcsr::print(*c_bv);
+	//dbcsr::print(*c_bo);
+	//dbcsr::print(*c_bv);
 	
 	m_reg.insert_matrix<double>("c_bo", c_bo);
 	m_reg.insert_matrix<double>("c_bv", c_bv);
+	
+	auto cboe = dbcsr::matrix_to_eigen(c_bo);
+	auto cbve = dbcsr::matrix_to_eigen(c_bv);
+	
+	LOG.os<>("OCC:", '\n', cboe, '\n');
+	LOG.os<>("VIR:", '\n', cbve, '\n');
 	
 	/*
 	if (compute_moints) { 

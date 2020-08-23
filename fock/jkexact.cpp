@@ -5,8 +5,8 @@
 
 namespace fock {
 
-EXACT_J::EXACT_J(dbcsr::world& w, desc::options& iopt) : J(w,iopt) {} 
-EXACT_K::EXACT_K(dbcsr::world& w, desc::options& iopt) : K(w,iopt) {}
+EXACT_J::EXACT_J(dbcsr::world& w, desc::options& iopt) : J(w,iopt,"EXACT_J") {} 
+EXACT_K::EXACT_K(dbcsr::world& w, desc::options& iopt) : K(w,iopt,"EXACT_K") {}
 
 void EXACT_J::init_tensors() {
 

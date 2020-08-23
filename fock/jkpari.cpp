@@ -10,7 +10,7 @@
 namespace fock {
 
 BATCHED_PARI_K::BATCHED_PARI_K(dbcsr::world& w, desc::options& opt) 
-	: K(w,opt) {}
+	: K(w,opt,"PARI-K") {}
 
 void BATCHED_PARI_K::init_tensors() {
 	
@@ -22,7 +22,7 @@ void BATCHED_PARI_K::init_tensors() {
 	// =================== get tensors/matrices ========================
 	auto s_xx = m_reg.get_matrix<double>("s_xx_mat");
 	
-	dbcsr::print(*s_xx);
+	//dbcsr::print(*s_xx);
 	
 	auto s_xx_desym = s_xx->desymmetrize();
 	s_xx_desym->replicate_all();
@@ -290,7 +290,7 @@ void BATCHED_PARI_K::init_tensors() {
 			
 			if (eri_self->num_blocks_total() == 0) continue;
 			
-			dbcsr::print(*eri_self);			
+			//dbcsr::print(*eri_self);			
 			// get matrix parts of s_xx
 				
 			// problem size
@@ -505,7 +505,7 @@ void BATCHED_PARI_K::init_tensors() {
 			
 		}
 		
-		dbcsr::print(*c_xbb_centered);
+		//dbcsr::print(*c_xbb_centered);
 		
 		c_xbb_self->clear();
 
@@ -629,6 +629,7 @@ void BATCHED_PARI_K::compute_K() {
 			dbcsr::contract(*cfit_xbb_01_2, *m_p_bb, *cbar_xbb_01_2)
 				.bounds2(xm_bounds)
 				.bounds3(s_bounds)
+				.filter(dbcsr::global::filter_eps)
 				.perform("Qml, ls -> Qms");
 			time_form_cbar.finish();	
 				
@@ -659,6 +660,7 @@ void BATCHED_PARI_K::compute_K() {
 			dbcsr::contract(*cfit_xbb_0_12, *m_s_xx, *ctil_xbb_0_12)
 				.bounds2(ns_bounds)
 				.bounds3(x_bounds)
+				.filter(dbcsr::global::filter_eps)
 				.perform("Rns, RQ -> Qns");	
 			time_form_ctil.finish();
 			
@@ -690,6 +692,7 @@ void BATCHED_PARI_K::compute_K() {
 			time_form_K1.start();
 			dbcsr::contract(*cbar_xbb_02_1, *eri_02_1, *K1)
 				.bounds1(xs_bounds)
+				.filter(dbcsr::global::filter_eps/n_xbatches)
 				.beta(1.0)
 				.perform("Qms, Qns -> mn");
 			time_form_K1.finish();
@@ -699,6 +702,7 @@ void BATCHED_PARI_K::compute_K() {
 			time_form_K2.start();
 			dbcsr::contract(*ctil_xbb_02_1, *cbar_xbb_02_1, *K2)
 				.bounds1(xs_bounds)
+				.filter(dbcsr::global::filter_eps/n_xbatches)
 				.beta(1.0)
 				.perform("Qns, Qms -> mn");	
 			time_form_K2.finish();
@@ -715,13 +719,13 @@ void BATCHED_PARI_K::compute_K() {
 		
 	K2->scale(-0.5);	
 	
-	dbcsr::print(*K1);
-	dbcsr::print(*K2);
+	//dbcsr::print(*K1);
+	//dbcsr::print(*K2);
 		
 	dbcsr::copy(*K1, *m_K_01).move_data(true).sum(true).perform();
 	dbcsr::copy(*K2, *m_K_01).move_data(true).sum(true).perform();		
 			
-	dbcsr::print(*m_K_01);
+	//dbcsr::print(*m_K_01);
 	
 	LOG.os<1>("Forming final K.\n");
 	
@@ -736,7 +740,7 @@ void BATCHED_PARI_K::compute_K() {
 	m_K_01->clear();
 	
 	m_K_A->scale(-1.0);
-	dbcsr::print(*m_K_A);
+	//dbcsr::print(*m_K_A);
 	
 	time_reo_int2.start();
 	m_eri_batched->reorder(vec<int>{0}, vec<int>{1,2});

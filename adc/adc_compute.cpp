@@ -75,7 +75,7 @@ void adcmod::compute() {
 		mvfac->init();
 		auto out = mvfac->compute(dav_guess[0], 0.0); 
 		
-		math::davidson<MVP> dav;
+		math::davidson<MVP> dav(m_world.comm(), LOG.global_plev());
 		
 		dav.set_factory(mvfac);
 		dav.set_diag(m_d_ov);
@@ -87,47 +87,108 @@ void adcmod::compute() {
 		
 		dav.compute(dav_guess, nroots);
 		
-		std::cout << "OMEGA: " << dav.eigval() << std::endl;
+		LOG.os<>("Excitation energy of state nr. ", m_nroots, ": ", dav.eigval(), '\n');
 		
-		/*
-		ri_adc1_u1 ri_adc1(m_mo.eps_o, m_mo.eps_v, m_mo.b_xoo, m_mo.b_xov, m_mo.b_xvv); 
+		auto rvecs = dav.ritz_vectors();
+		auto vec_k = rvecs[m_nroots-1];
 		
-		math::davidson<ri_adc1_u1> dav = math::davidson<ri_adc1_u1>::create()
-			.factory(ri_adc1).diag(m_mo.d_ov);
+		auto vec_k_e = dbcsr::matrix_to_eigen(vec_k);
+		double thresh = 1e-6;
 		
-		LOG.os<>("Running ADC(1) davidson...\n\n");
-		dav.compute(dav_guess, m_nroots);
+		std::vector<int> occs, virs;
 		
-		auto rvs = dav.ritz_vectors();
+		LOG.os<>("State involves the orbital(s):\n");
+		for (int iocc = 0; iocc != vec_k_e.rows(); ++iocc) {
+			for (int ivir = 0; ivir != vec_k_e.cols(); ++ivir) {
+				if (fabs(vec_k_e(iocc,ivir)) >= thresh) {
+					LOG.os<>(iocc, " -> ", ivir, " : ", vec_k_e(iocc,ivir), '\n');
+					occs.push_back(iocc);
+					virs.push_back(ivir);
+				}
+			}
+		}
 		
-		auto rn = rvs[m_nroots - 1];
-		double omega = dav.eigval();
-
-		// compute ADC2
-		if (!m_use_sos) {
+		auto get_unique = [](std::vector<int>& vec) {
+			std::sort(vec.begin(), vec.end());
+			vec.erase(unique( vec.begin(), vec.end() ), vec.end());
+		};
+		
+		// which AOs are involved?
+		get_unique(occs);
+		get_unique(virs);
+		
+		auto c_bo = m_hfwfn->c_bo_A();
+		auto c_bv = m_hfwfn->c_bv_A();
+		
+		auto c_bo_e = dbcsr::matrix_to_eigen(c_bo);
+		auto c_bv_e = dbcsr::matrix_to_eigen(c_bv);
+		
+		// OCC
+		std::vector<int> aolist;
+		
+		auto get_aos = [&](std::vector<int>& list, std::vector<int> mlist,
+			Eigen::MatrixXd& c_bm) {
+		
+			for (auto im : mlist) {
+				std::cout << "CHECKING " << im << std::endl;
+				for (int ibas = 0; ibas != c_bm.rows(); ++ibas) {
+					if (fabs(c_bm(ibas,im)) >= thresh) {
+						list.push_back(ibas);
+						std::cout << ibas << " ";
+					}
+				}
+				std::cout << std::endl;
+			}
+		};
+		
+		std::cout << "DO OCCS" << std::endl;
+		get_aos(aolist, occs, c_bo_e);
+		std::cout << "DO VIRS" << std::endl;
+		get_aos(aolist, virs, c_bv_e);
+		
+		get_unique(aolist);
+		
+		LOG.os<>("AOs involved: \n");
+		for (auto l : aolist) {
+			LOG.os<>(l, " ");
+		} LOG.os<>('\n');
+		
+		auto get_shell_to_block = [&](std::vector<int>& list, std::vector<int>& offs) {
 			
-			ri_adc2_diis_u1 ri_adc2(m_mo.eps_o, m_mo.eps_v, m_mo.b_xoo, m_mo.b_xov, m_mo.b_xvv, m_mo.t_ovov);
+			vec<int> ao_to_block;
+			
+			for (auto l : list) {
+			
+				int a = -1;
+			
+				for (int ioff = 0; ioff != offs.size()-1; ++ioff) {
+					if (l >= offs[ioff] && l < offs[ioff+1]) {
+						a = ioff;
+						ao_to_block.push_back(ioff);
+						break;
+					}
+				}
+				
+				if (a == -1) ao_to_block.push_back(offs.size()-1);
+				
+			}
+			
+			return ao_to_block;
+			
+		};
 		
-			math::modified_davidson<ri_adc2_diis_u1> dav
-				= math::modified_davidson<ri_adc2_diis_u1>::create()
-				.factory(ri_adc2).diag(m_mo.d_ov);
-			
-			LOG.os<>("Running RI-ADC(2)...\n\n");
-			dav.compute(rvs, m_nroots, omega);
-			
-		} else {
-			
-			std::cout << "SOS" << std::endl;
-			lp_ri_adc2_diis_u1 ri_adc2(m_mo.eps_o, m_mo.eps_v, m_mo.b_xoo, m_mo.b_xov, m_mo.b_xvv);
+		auto boff = c_bo->row_blk_offsets();
 		
-			//math::modified_davidson<lp_ri_adc2_diis_u1> dav 
-			//	= math::modified_davidson<lp_ri_adc2_diis_u1>::create()
-			//	.factory(ri_adc2).diag(m_mo.d_ov);
-			
-			LOG.os<>("Running SOS-RI-ADC(2)...\n\n");
-			//dav.compute(rvs, m_nroots, omega);
-			
-		}*/
+		auto aoblk = get_shell_to_block(aolist, boff);
+		get_unique(aoblk);
+		
+		auto atoms = m_hfwfn->mol()->atoms();
+		auto blkatom = m_hfwfn->mol()->c_basis().block_to_atom(atoms);
+		
+		LOG.os<>("ATOM CENTRES:\n");
+		for (auto a : aoblk) {
+			LOG.os<>(blkatom[a], " ");
+		} LOG.os<>('\n');
 		
 }
 

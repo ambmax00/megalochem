@@ -4,7 +4,7 @@ namespace mp {
 
 void LLMP_MEM_Z::init_tensors() {
 	
-	LOG.os<>("Setting up tensors in LLMP_FULL.\n");
+	LOG.os<>("Setting up tensors in LLMP_MEM.\n");
 	
 	m_eri_batched = m_reg.get_btensor<3,double>("i_xbb_batched");
 	auto eri = m_eri_batched->get_stensor();
