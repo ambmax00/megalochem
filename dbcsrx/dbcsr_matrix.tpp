@@ -368,10 +368,11 @@ public:
 #:if i % 2 != 0
     #:set rowcol = 'cols'
 #:endif
-        std::vector<int> out(this->nblk${rowcol}$_${loctot}$(),0);
+		int size = this->nblk${rowcol}$_${loctot}$();
+        std::vector<int> out(size,0);
         //std::cout << out.size() << std::endl;
         
-        c_dbcsr_get_${var}$(m_matrix_ptr, out.data());
+        c_dbcsr_get_${var}$(m_matrix_ptr, out.data(), size);
                              
         return out;
         
