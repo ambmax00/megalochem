@@ -48,7 +48,7 @@ void LLMP_FULL_Z::init_tensors() {
 	
 	m_force_sparsity = m_opt.get<bool>("force_sparsity", false);
 	
-	m_shell_idx = get_shellpairs(m_eri_batched);
+	if (m_force_sparsity) m_shell_idx = get_shellpairs(m_eri_batched);
 		
 }
 
@@ -229,13 +229,17 @@ void LLMP_FULL_Z::compute() {
 				
 				auto xblkbounds = m_eri_batched->blk_bounds(0)[ix];
 				auto bblkbounds = m_eri_batched->blk_bounds(1)[inu];
-				
+
 				for (int mublk = 0; mublk != b.size(); ++mublk) {
 					for (int nublk = bblkbounds[0]; nublk != bblkbounds[1]+1; ++nublk) {
 						
 						if (!m_shell_idx(mublk,nublk)) continue;
 						
 						for (int xblk = xblkbounds[0]; xblk != xblkbounds[1]+1; ++xblk) {
+							
+							std::array<int,3> idx = {xblk,mublk,nublk};
+							if (m_world.rank() != b2_xbb_1_02->proc(idx)) continue;
+
 							res[0].push_back(xblk);
 							res[1].push_back(mublk);
 							res[2].push_back(nublk);
@@ -244,7 +248,7 @@ void LLMP_FULL_Z::compute() {
 				}
 				
 				b2_xbb_1_02->reserve(res);
-				
+
 			}
 											
 			time_tran3.start();

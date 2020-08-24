@@ -175,7 +175,7 @@ public:
     
         c_dbcsr_get_block_p(m_matrix_ptr, row, col, &data, &found, &size[0], &size[1]);
         
-        std::cout << "SIZES: " << size[0] << " " << size[1] << std::endl;
+        //std::cout << "SIZES: " << size[0] << " " << size[1] << std::endl;
         return block<2,T>(size, data);
     }
     

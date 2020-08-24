@@ -330,10 +330,10 @@ public:
 		m_rsrc(irsrc), m_csrc(icsrc)
 	{
 		
-		if (global_grid.mypnum() == 0) {
-			std::cout << nrows << " " << ncols << " " << rowblksize
-				<< " " << colblksize << std::endl;
-			}
+		//if (global_grid.mypnum() == 0) {
+		//	std::cout << nrows << " " << ncols << " " << rowblksize
+		//		<< " " << colblksize << std::endl;
+		//	}
 		
 		m_nrowsloc = std::max(1,c_numroc(m_nrowstot, m_rowblk_size, global_grid.myprow(), 
 			irsrc, global_grid.nprow()));
@@ -353,14 +353,14 @@ public:
 		c_blacs_barrier(global_grid.ctx(),'A');
 		*/
 		
-		std::cout << "ROWS/COLS: " << nrows << " " << ncols << std::endl;
-		for (int i = 0; i != global_grid.nprocs(); ++i) {
+		//std::cout << "ROWS/COLS: " << nrows << " " << ncols << std::endl;
+		/*for (int i = 0; i != global_grid.nprocs(); ++i) {
 			if (i == global_grid.mypnum()) {
 				std::cout << "SRC: " << irsrc << " " << icsrc << std::endl;
 				std::cout << "LOCAL: " << m_nrowsloc << " " 
 					<< m_ncolsloc << std::endl;
 			}
-		}
+		}*/
 		
 		int info = 0;
 		c_descinit(&m_desc[0],m_nrowstot,m_ncolstot,m_rowblk_size,
@@ -368,7 +368,7 @@ public:
 					
 		m_data = new T[m_nrowsloc*m_ncolsloc]();
 		
-		std::cout << "DESC:" << m_desc[2] << " " << m_desc[3] << std::endl;
+		//std::cout << "DESC:" << m_desc[2] << " " << m_desc[3] << std::endl;
 		
 	}
 	

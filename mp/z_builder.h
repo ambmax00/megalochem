@@ -3,6 +3,7 @@
 
 #include <dbcsr_matrix_ops.hpp>
 #include <dbcsr_tensor_ops.hpp>
+#include <dbcsr_conversions.hpp>
 #include <dbcsr_btensor.hpp>
 #include <Eigen/Core>
 #include "utils/mpi_time.h"

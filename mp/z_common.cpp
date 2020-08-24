@@ -53,8 +53,8 @@ Eigen::MatrixXi Z::get_shellpairs(dbcsr::sbtensor<3,double> eri_batched) {
 	MPI_Allreduce(idx_loc.data(), idx_tot.data(), nblkb*nblkb, MPI_INT,
 		MPI_LOR, eri->comm());
 	
-	std::cout << "IDXLOC" << std::endl;
-	std::cout << idx_loc << std::endl;
+	//std::cout << "IDXLOC" << std::endl;
+	//std::cout << idx_loc << std::endl;
 	
 	return idx_tot;
 	
