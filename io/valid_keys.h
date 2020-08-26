@@ -71,6 +71,8 @@ static const json valid_keys =
 		{"c_os", 1.3},
 		{"c_os_coupling", 1.15},
 		{"dfbasis", "basis"},
+		{"nbatches", 3},
+		{"nlap", 5},
 		{"nroots", 0},
 		{"method", "ADC1"}, /* what method? 
 			(ri-adc1, ri-adc2, sos-ri-adc, ao-ri-adc1, ao-ri-adc2) */

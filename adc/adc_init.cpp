@@ -250,11 +250,15 @@ void adcmod::init_ao_tensors() {
 				.name("s_xx_inv")
 				.matrix_type(dbcsr::type::symmetric).get();
 			
-			dbcsr::multiply('T', 'N', *Linv, *Linv, *c_s_xx_inv).perform();
+			dbcsr::multiply('T', 'N', *Linv, *Linv, *c_s_xx_inv)
+				.filter_eps(dbcsr::global::filter_eps)
+				.perform();
+				
+			m_reg.insert_matrix<double>("s_xx_inv_mat", c_s_xx_inv); 
 			
 			auto s_xx_inv = dbcsr::tensor_create<2>().name("s_xx_inv")
 				.pgrid(m_spgrid2).map1({0}).map2({1}).blk_sizes(xx).get();
-				
+			
 			dbcsr::copy_matrix_to_tensor(*c_s_xx_inv, *s_xx_inv);
 			
 			s_xx_inv->filter(dbcsr::global::filter_eps);
@@ -357,6 +361,12 @@ void adcmod::init_ao_tensors() {
 		LOG.os<1>("Occupation of 3c2e integrals: ", eribatch->occupation() * 100, "%\n");
 		
 	}
+	
+	auto po = m_hfwfn->po_bb_A();
+	auto pv = m_hfwfn->pv_bb_A();
+	
+	m_reg.insert_matrix<double>("po_bb", po);
+	m_reg.insert_matrix<double>("pv_bb", pv);
 	
 	LOG.os<>("Finished setting up AO integral tensors.\n");
 	

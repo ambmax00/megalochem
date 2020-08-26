@@ -230,37 +230,49 @@ public:
 	
 };
 
-/*
-class CADF_K : public K {
-private:
+inline std::shared_ptr<J> get_J(
+	std::string name, dbcsr::world& w, desc::options opt) {
 	
-	dbcsr::stensor2_d m_s_xx_inv;
-	dbcsr::smat_d m_s_xx;
+	std::shared_ptr<J> out;
+	J* ptr = nullptr;
 	
-	tensor::sbatchtensor<3,double> m_fit_batched;
-	tensor::sbatchtensor<3,double> m_eri_batched;
+	if (name == "exact") {
+		ptr = new EXACT_J(w,opt);
+	} else if (name == "batchdf") {
+		ptr = new BATCHED_DF_J(w,opt);
+	}
 	
-	std::shared_ptr<ints::screener> m_scr;
+	if (!ptr) {
+		throw std::runtime_error("INVALID J BUILDER SPECIFIED");
+	}
 	
-	arrvec<int,3> m_L3;
-	arrvec<int,3> m_LB;
-	
-	vec<int> m_blk_to_atom_x;
-	vec<int> m_blk_to_atom_b;
-	vec<vec<int>> m_atom_to_blk_x;
-	vec<vec<int>> m_atom_to_blk_b;
-	
-	void compute_fit();
-	void compute_L3();
-	void compute_LB();
-	
-public:
+	out.reset(ptr);
+	return out;
 
-	CADF_K(dbcsr::world& w, desc::options& opt);
-	void compute_K() override;
-	void init_tensors() override;
+}
 
-};*/
+inline std::shared_ptr<K> get_K(
+	std::string name, dbcsr::world& w, desc::options opt) {
+	
+	std::shared_ptr<K> out;
+	K* ptr = nullptr;
+	
+	if (name == "exact") {
+		ptr = new EXACT_K(w,opt);
+	} else if (name == "batchdfao") {
+		ptr = new BATCHED_DFAO_K(w,opt);
+	} else if (name == "batchdfmo") {
+		ptr = new BATCHED_DFMO_K(w,opt);
+	}
+	
+	if (!ptr) {
+		throw std::runtime_error("INVALID K BUILDER SPECIFIED");
+	}
+	
+	out.reset(ptr);
+	return out;
+
+}
 
 } // end namespace
 

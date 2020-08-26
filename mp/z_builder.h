@@ -132,6 +132,26 @@ public:
 	
 };
 
+inline std::shared_ptr<Z> get_Z(
+	std::string name, dbcsr::world& w, desc::options opt) {
+	
+	std::shared_ptr<Z> out;
+	Z* ptr = nullptr;
+	
+	if (name == "LLMPFULL") {
+		ptr = new LLMP_FULL_Z(w,opt);
+	} else if (name == "LLMPMEM") {
+		ptr = new LLMP_MEM_Z(w,opt);
+	}
+	
+	if (!ptr) {
+		throw std::runtime_error("INVALID Z BUILDER SPECIFIED");
+	}
+	
+	out.reset(ptr);
+	return out;
+
+}
 
 } // end namespace
 

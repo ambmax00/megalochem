@@ -76,6 +76,57 @@ public:
 	~MVP_ao_ri_adc1() override {}
 	
 };
+
+class MVP_ao_ri_adc2 : public MVP {
+private:
+
+	smat m_c_bo;
+	smat m_c_bv;
+	smat m_s_xx_inv;
+	
+	smat m_i_oo;
+	smat m_i_vv;
+	
+	dbcsr::sbtensor<3,double> m_eri_batched;
+	
+	std::vector<double> m_omega;
+	std::vector<double> m_alpha;
+	int m_nlap;
+	
+	std::vector<smat> m_pseudo_occs;
+	std::vector<smat> m_pseudo_virs;
+	
+	dbcsr::shared_pgrid<2> m_spgrid2;
+	
+	std::shared_ptr<fock::J> m_jbuilder;
+	std::shared_ptr<fock::K> m_kbuilder;
+	
+	double m_c_os;
+	double m_c_osc;
+	
+	void compute_intermeds();
+	std::pair<smat,smat> compute_jk(smat& u_ao);
+	smat compute_sigma_1(smat& jmat, smat& kmat);
+	smat compute_sigma_2a(smat& u_ia);
+	smat compute_sigma_2b(smat& u_ia);
+	smat compute_sigma_2c(smat& jmat, smat& kmat);
+	//void compute_sigma_2d();
+	//void compute_sigma_2e();
+	
+public:
+
+	MVP_ao_ri_adc2(dbcsr::world& w, desc::smolecule smol,
+		desc::options opt, util::registry& reg,
+		svector<double> epso, svector<double> epsv) :
+		MVP(w,smol,opt,reg,epso,epsv) {}
+		
+	void init() override;
+	
+	smat compute(smat u_ia, double omega) override;
+	
+	~MVP_ao_ri_adc2() override {}
+	
+};
 	
 
 } // end namespace

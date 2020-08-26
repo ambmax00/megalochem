@@ -68,7 +68,7 @@ void adcmod::compute() {
 			
 		}
 		
-		MVP* mvfacptr = new MVP_ao_ri_adc1(m_world, m_hfwfn->mol(), 
+		MVP* mvfacptr = new MVP_ao_ri_adc2(m_world, m_hfwfn->mol(), 
 			m_opt, m_reg, epso, epsv);
 		std::shared_ptr<MVP> mvfac(mvfacptr);
 		

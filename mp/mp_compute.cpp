@@ -365,6 +365,8 @@ void mpmod::compute_batch() {
 		zbuilder->compute();
 		auto Z_XX = zbuilder->zmat();
 		
+		dbcsr::print(*Z_XX);
+		
 		formZtilde.start();
 		
 		// multiply
