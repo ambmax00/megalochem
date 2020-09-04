@@ -20,6 +20,8 @@ static const std::string ADC_METRIC = "coulomb";
 static const std::string ADC_BUILD_Z = "LLMPFULL";
 static const std::string ADC_BUILD_J = "batchdf";
 static const std::string ADC_BUILD_K = "batchdfao";
+static const std::string ADC_INTERMEDS = "core";
+static const std::string ADC_DOUBLES = "full";
 	
 } // end namespace
 

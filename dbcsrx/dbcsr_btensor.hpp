@@ -564,7 +564,23 @@ public:
 		auto this_map1 = m_stensor->map1_2d();
 		auto this_map2 = m_stensor->map2_2d();
 		
-		if (map1 != this_map1 || map2 != this_map2) return;
+		std::cout << "MAP1 vs MAP1 new" << std::endl;
+		auto prt = [](vec<int> m) {
+			for (auto i : m) {
+				std::cout << i << " ";
+			} std::cout << std::endl;
+		};
+		
+		prt(this_map1);
+		prt(map1);
+		
+		std::cout << "MAP2 vs MAP2 new" << std::endl;
+		prt(this_map2);
+		prt(map2);
+		
+		if (map1 == this_map1 && map2 == this_map2) return;
+		
+		std::cout << "REO" << std::endl;
 		
 		stensor<N,T> newtensor = tensor_create_template<N,T>(m_stensor)
 			.name(m_stensor->name()).map1(map1).map2(map2).get();

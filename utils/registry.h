@@ -91,6 +91,10 @@ public:
 			
 	}
 	
+	void erase(std::string key) {
+		m_map.erase(key);
+	}
+	
 	~registry() {}
 		
 		

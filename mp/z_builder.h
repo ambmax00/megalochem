@@ -132,6 +132,33 @@ public:
 	
 };
 
+class LLMP_ASYM_Z : public Z {
+private:	
+	
+	dbcsr::sbtensor<3,double> m_eri_batched;
+	dbcsr::sbtensor<3,double> m_t_batched;
+	
+	dbcsr::shared_tensor<2,double> m_locc_01;
+	dbcsr::shared_tensor<2,double> m_pvir_01;
+	
+	Eigen::MatrixXi m_shell_idx;
+	
+	bool m_force_sparsity;
+	
+public:
+
+	LLMP_ASYM_Z(dbcsr::world& w, desc::options& opt) :
+		Z(w,opt,"LLMP_MEM") {}
+
+	void init_tensors() override;
+	void compute() override;
+	
+	~LLMP_ASYM_Z() override {}
+	
+	
+};
+
+
 inline std::shared_ptr<Z> get_Z(
 	std::string name, dbcsr::world& w, desc::options opt) {
 	

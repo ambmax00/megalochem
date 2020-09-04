@@ -6,6 +6,7 @@
 #include "utils/registry.h"
 #include "desc/options.h"
 #include "fock/jkbuilder.h"
+#include "mp/z_builder.h"
 #include "adc/adc_defaults.h"
 
 namespace adc {
@@ -80,8 +81,14 @@ public:
 class MVP_ao_ri_adc2 : public MVP {
 private:
 
+	int m_nbatches;
+	dbcsr::btype m_bmethod;
+
 	smat m_c_bo;
 	smat m_c_bv;
+	smat m_po_bb;
+	smat m_pv_bb;
+	smat m_s_bb;
 	smat m_s_xx_inv;
 	
 	smat m_i_oo;
@@ -89,17 +96,20 @@ private:
 	
 	dbcsr::sbtensor<3,double> m_eri_batched;
 	
-	std::vector<double> m_omega;
-	std::vector<double> m_alpha;
+	std::vector<double> m_weigths, m_weights_dd;
+	std::vector<double> m_xpoints, m_xpoints_dd;
 	int m_nlap;
 	
 	std::vector<smat> m_pseudo_occs;
 	std::vector<smat> m_pseudo_virs;
+	std::vector<smat> m_pseudo_occs_dd;
+	std::vector<smat> m_pseudo_virs_dd;
 	
 	dbcsr::shared_pgrid<2> m_spgrid2;
 	
 	std::shared_ptr<fock::J> m_jbuilder;
 	std::shared_ptr<fock::K> m_kbuilder;
+	std::shared_ptr<mp::Z> m_zbuilder;
 	
 	double m_c_os;
 	double m_c_osc;
@@ -110,8 +120,18 @@ private:
 	smat compute_sigma_2a(smat& u_ia);
 	smat compute_sigma_2b(smat& u_ia);
 	smat compute_sigma_2c(smat& jmat, smat& kmat);
-	//void compute_sigma_2d();
-	//void compute_sigma_2e();
+	smat compute_sigma_2d(smat& u_ia);
+	smat compute_sigma_2e(smat& u_ia, double omega);
+	
+	dbcsr::sbtensor<3,double> compute_J(smat& u_ia);
+	std::pair<smat,smat> compute_sigma_2e_ilap(dbcsr::sbtensor<3,double>& J_xbb_batched, 
+		smat& FA, smat& FB, smat& pseudo_o, smat& pseudo_v);
+	
+#if 1
+	std::vector<smat> m_FS;
+	stensor3 m_I;
+#endif
+	
 	
 public:
 
