@@ -12,7 +12,7 @@ static const int ADC_NBATCHES = 5;
 static const int ADC_NLAP = 5;
 
 static const double ADC_C_OS = 1.3;
-static const double ADC_C_OS_COUPLING = 1.15;
+static const double ADC_C_OS_COUPLING = 1.17;
 
 static const std::string ADC_METHOD = "ri_adc_1";
 static const std::string ADC_ERIS = "core";

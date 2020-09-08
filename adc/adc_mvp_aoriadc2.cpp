@@ -18,11 +18,11 @@ void MVP_ao_ri_adc2::compute_intermeds() {
 	 * 
 	 * I_ab :
 	 * K kernel with P = Pocc(t) and s_xx_inv = F(t)_XY
-	 * I_ab = antisym[ C_Bb sum_t C_Aa exp(t) * K_AB ]
+	 * I_ab = - antisym[ C_Bb sum_t C_Aa exp(t) * K_AB ]
 	 * 
 	 * I_ij
 	 * K kernel with P = Pvir(t) and s_xx_inv = F(t)_XY
-	 * I_ij = antisym[ C_Jj sum_t C_Ii exp(t) * K_IJ ]
+	 * I_ij = - antisym[ C_Jj sum_t C_Ii exp(t) * K_IJ ]
 	 * 
 	 */
 	 
@@ -223,6 +223,8 @@ void MVP_ao_ri_adc2::compute_intermeds() {
 			.perform();
 			
 		kbuilder_ilap.reset();
+		
+		f_xx_ilap->clear();
 			
 		//dbcsr::multiply('N', 'N', *i_ob, *m_c_bo, *i_oo_tmp)
 			//.perform();
@@ -256,8 +258,8 @@ void MVP_ao_ri_adc2::compute_intermeds() {
 	m_i_oo->add(1.0, 1.0, *i_oo_tr);
 	m_i_vv->add(1.0, 1.0, *i_vv_tr);
 	
-	m_i_oo->scale(0.5 * m_c_os);
-	m_i_vv->scale(0.5 * m_c_os);
+	m_i_oo->scale(-0.5 * m_c_os);
+	m_i_vv->scale(-0.5 * m_c_os);
 	
 	dbcsr::print(*m_i_oo);
 	dbcsr::print(*m_i_vv);
@@ -481,7 +483,7 @@ smat MVP_ao_ri_adc2::compute_sigma_2c(smat& jmat, smat& kmat) {
 	// I_ia = [2*(jb|ia) - (ja|ib)] u_jb
 	
 	// in AO:
-	/* sig_2c = -1/2 * c_os * sum_t c_mi * exp(eps_i t) 
+	/* sig_2c = +1/2 * c_os * sum_t c_mi * exp(eps_i t) 
 	 * 				c_na * exp(-eps_a t) * (mn|X') * (X'|X)^inv d_X(t)
 	 * d_X(t) = (nk|X) * I_n'k' * Po_nn'(t) * Pv_kk'(t)
 	 * I_mk = jmat + transpose(K)
@@ -564,12 +566,12 @@ smat MVP_ao_ri_adc2::compute_sigma_2c(smat& jmat, smat& kmat) {
 
 smat MVP_ao_ri_adc2::compute_sigma_2d(smat& u_ia) {
 	
-	/* sig_2a = +0.5 sum_jb [2 * (ia|bj) - (ja|ib)] * I_jb
+	/* sig_2d = - 0.5 sum_jb [2 * (ia|bj) - (ja|ib)] * I_jb
 	 * where I_ia = sum_jb t_iajb^SOS u_jb
 	 * 
 	 * in AO:
 	 * 
-	 * sig_2a = 2 * J(I_nr)_transpose - K(I_nr)_transpose 
+	 * sig_2a = + 2 * J(I_nr)_transpose - K(I_nr)_transpose 
 	 * I_nr = sum_t c_os Po(t) * J(u_pseudo_ao(t)) * Pv(t)
 	 */
 	 
@@ -642,7 +644,7 @@ smat MVP_ao_ri_adc2::compute_sigma_2d(smat& u_ia) {
 	auto sig_2d = u_transform(jmat_trans, 'T', m_c_bo, 'N', m_c_bv);
 	sig_2d->setname("sig_2d");
 	
-	sig_2d->scale(0.5);
+	sig_2d->scale(-0.5);
 	
 	return sig_2d;
 		
@@ -823,7 +825,11 @@ dbcsr::sbtensor<3,double> MVP_ao_ri_adc2::compute_J(smat& u_ao) {
 
 std::pair<smat,smat> MVP_ao_ri_adc2::compute_sigma_2e_ilap(
 	dbcsr::sbtensor<3,double>& J_xbb_batched, 
-	smat& FA, smat& FB, smat& pseudo_o, smat& pseudo_v) {
+	smat& FA, smat& FB, smat& pseudo_o, smat& pseudo_v 
+#if 1	
+	, double omega, int ilap
+#endif	
+	) {
 	
 	// two different ways: full or memory efficient
 	auto imethod = m_opt.get<std::string>("doubles", ADC_DOUBLES);
@@ -899,16 +905,17 @@ std::pair<smat,smat> MVP_ao_ri_adc2::compute_sigma_2e_ilap(
 					vec<vec<int>> kabounds = { fullbb, bbds[inu] };
 					
 					dbcsr::contract(*FA_01, *J_xbb_0_12, *I_xbb_0_12)
-						.bounds1(ybounds)
-						.bounds2(xbounds)
-						.bounds3(kabounds)
+						//.bounds1(ybounds)
+						//.bounds2(xbounds)
+						//.bounds3(kabounds)
 						.filter(dbcsr::global::filter_eps)
 						.beta(1.0)
-						.perform("XY, Yka -> Xka");
+						.perform("YX, Yka -> Xka");
 						
 				}
 				
 				J_xbb_batched->decompress_finalize();
+				
 				m_eri_batched->decompress_init({0,2});
 				
 				for (int iy = 0; iy != xbds.size(); ++iy) {
@@ -921,9 +928,9 @@ std::pair<smat,smat> MVP_ao_ri_adc2::compute_sigma_2e_ilap(
 					vec<vec<int>> kabounds = { fullbb, bbds[inu] };
 					
 					dbcsr::contract(*FB_01, *eri_0_12, *I_xbb_0_12)
-						.bounds1(ybounds)
-						.bounds2(xbounds)
-						.bounds3(kabounds)
+						//.bounds1(ybounds)
+						//.bounds2(xbounds)
+						//.bounds3(kabounds)
 						.filter(dbcsr::global::filter_eps)
 						.beta(1.0)
 						.perform("YX, Yka -> Xka");
@@ -943,6 +950,8 @@ std::pair<smat,smat> MVP_ao_ri_adc2::compute_sigma_2e_ilap(
 
 #if 1
 		auto Iout = I_xbb_batched->get_stensor();
+		double xpt = m_xpoints_dd[ilap];
+		Iout->scale(exp(xpt * omega));
 		dbcsr::copy(*Iout, *m_I).perform();
 		
 #endif
@@ -1001,14 +1010,10 @@ std::pair<smat,smat> MVP_ao_ri_adc2::compute_sigma_2e_ilap(
 				
 				// form cbar
 				dbcsr::contract(*eri_1_02, *po_01, *cbar_1_02)
-					.bounds2(xmbounds)
-					.bounds3(nbounds)
+					//.bounds2(xmbounds)
+					//.bounds3(nbounds)
 					.filter(dbcsr::global::filter_eps)
 					.perform("Xlm, lk -> Xkm");
-				
-				dbcsr::print(*eri_1_02);
-				dbcsr::print(*po_01);
-				dbcsr::print(*cbar_1_02);
 					
 				dbcsr::copy(*cbar_1_02, *cbar_01_2).move_data(true).perform();
 				
@@ -1019,7 +1024,7 @@ std::pair<smat,smat> MVP_ao_ri_adc2::compute_sigma_2e_ilap(
 				
 				// form sig_A
 				dbcsr::contract(*I_xbb_01_2, *cbar_01_2, *sigma_ilap_01)
-					.bounds1(xnubounds)
+					//.bounds1(xnubounds)
 					.filter(dbcsr::global::filter_eps)
 					.beta(1.0)
 					.perform("Xka, Xkm -> ma");
@@ -1053,8 +1058,8 @@ std::pair<smat,smat> MVP_ao_ri_adc2::compute_sigma_2e_ilap(
 				
 				// form cbar
 				dbcsr::contract(*eri_1_02, *pv_01, *cbar_1_02)
-					.bounds2(xmbounds)
-					.bounds3(nbounds)
+					//.bounds2(xmbounds)
+					//.bounds3(nbounds)
 					.filter(dbcsr::global::filter_eps)
 					.perform("Xda, dg -> Xga");
 					
@@ -1067,7 +1072,7 @@ std::pair<smat,smat> MVP_ao_ri_adc2::compute_sigma_2e_ilap(
 				
 				// form sig_A
 				dbcsr::contract(*I_xbb_02_1, *cbar_01_2, *sigma_ilap_01)
-					.bounds1(xnubounds)
+					//.bounds1(xnubounds)
 					.filter(dbcsr::global::filter_eps)
 					.beta(1.0)
 					.perform("Xmg, Xga -> ma");
@@ -1093,6 +1098,10 @@ std::pair<smat,smat> MVP_ao_ri_adc2::compute_sigma_2e_ilap(
 		
 	}
 	
+	//double xpt = m_xpoints_dd[ilap];
+	//sigma_ilap_A->scale(exp(omega * xpt));
+	//sigma_ilap_B->scale(exp(omega * xpt));
+	
 	std::pair<smat,smat> out = {sigma_ilap_A, sigma_ilap_B};
 	
 	return out;
@@ -1102,9 +1111,9 @@ std::pair<smat,smat> MVP_ao_ri_adc2::compute_sigma_2e_ilap(
 smat MVP_ao_ri_adc2::compute_sigma_2e(smat& u_ao, double omega) {
 	
 	/* IN AO:
-	 * sig_e2 = c_os_c ^2 [ sum_t
-	 * 	C_μi C_αa * exp(-ε_a t) * I_{Xκα}(t) * (X|μκ') Po(t)_κκ'
-	 * + C_μi C_αa * exp(ε_i t) * I_{Xμγ}(t) * (X|γ'α) Pv(t)_γγ']
+	 * sig_e2 = - c_os_c ^2 [ sum_t
+	 * 	exp(omega t) C_μi C_αa * exp(-ε_a t) * I_{Xκα}(t) * (X|μκ') Po(t)_κκ'
+	 * + exp(omega t) C_μi C_αa * exp(ε_i t) * I_{Xμγ}(t) * (X|γ'α) Pv(t)_γγ']
 	 * 
 	 * with
 	 * 
@@ -1203,8 +1212,8 @@ smat MVP_ao_ri_adc2::compute_sigma_2e(smat& u_ao, double omega) {
 		dbcsr::multiply('N', 'T', *c_bv_eps, *c_bv_eps, *pseudo_v)
 			.alpha(pow(wght,0.25)).perform();
 		
-		pseudo_o->scale(exp(-0.25 * omega * xpt));
-		pseudo_v->scale(exp(-0.25 * omega * xpt)); 
+		//pseudo_o->scale(exp(0.25 * omega * xpt));
+		//pseudo_v->scale(exp(0.25 * omega * xpt)); 
 		
 		math::pivinc_cd chol(pseudo_o, LOG.global_plev());
 		chol.compute();
@@ -1228,21 +1237,35 @@ smat MVP_ao_ri_adc2::compute_sigma_2e(smat& u_ao, double omega) {
 		m_zbuilder->set_occ_coeff(L_bu);
 		m_zbuilder->set_vir_density(pseudo_v);
 		
+		/*
+		dbcsr::multiply('N', 'T', *L_bu, *L_bu, *pseudo_o)
+			.beta(-1.0).perform();
+		
+		std::cout << "PO" << std::endl;
+		pseudo_o->filter(1e-12);
+		dbcsr::print(*pseudo_o);
+		*/
+		
 		LOG.os<1>("Forming ZA.\n");
 		m_zbuilder->compute();
 		
 		auto Z_xx = m_zbuilder->zmat();
-		auto F_xx_A = u_transform(Z_xx, 'T', m_s_xx_inv, 'T', m_s_xx_inv);
 		
-#if 1
-		static int il = 0;
-		auto Fcheck = m_FS[il++];
-		Fcheck->add(1.0, -1.0, *F_xx_A);
-		Fcheck->filter(1e-9);
-		std::cout << "FCHECK" << std::endl;
-#endif
-
-		dbcsr::print(*Fcheck);
+		auto temp = dbcsr::create_template(Z_xx)
+			.name("temp_xx")
+			.matrix_type(dbcsr::type::no_symmetry)
+			.get();
+			
+		dbcsr::multiply('N', 'N', *m_s_xx_inv, *Z_xx, *temp)
+			.filter_eps(dbcsr::global::filter_eps)
+			.perform();
+			
+		dbcsr::multiply('N', 'N', *temp, *m_s_xx_inv, *Z_xx)
+			.filter_eps(dbcsr::global::filter_eps)
+			.perform();
+			
+		auto F_xx_A = dbcsr::copy(Z_xx).get();
+		Z_xx->clear();
 		
 		F_xx_A->setname("F_xx_A");
 		
@@ -1264,7 +1287,11 @@ smat MVP_ao_ri_adc2::compute_sigma_2e(smat& u_ao, double omega) {
 		dbcsr::print(*F_xx_B);
 		
 		auto sig_pair = compute_sigma_2e_ilap(J_xbb_batched, F_xx_A, F_xx_B, 
-			pseudo_o, pseudo_v);
+			pseudo_o, pseudo_v
+#if 1
+		, omega, ilap
+#endif
+		);
 		auto sig_ilap_A = sig_pair.first;
 		auto sig_ilap_B = sig_pair.second;
 		
@@ -1275,13 +1302,13 @@ smat MVP_ao_ri_adc2::compute_sigma_2e(smat& u_ao, double omega) {
 		exp_vir = *m_epsv;
 		
 		std::for_each(exp_occ.begin(),exp_occ.end(),
-			[xpt,wght,omega](double& eps) {
-				eps = exp(0.25 * log(wght) + eps * xpt - 0.25 * omega);
+			[xpt,wght](double& eps) {
+				eps = exp(0.25 * log(wght) + eps * xpt);
 			});
 			
 		std::for_each(exp_vir.begin(),exp_vir.end(),
-			[xpt,wght,omega](double& eps) {
-				eps = exp(0.25 * log(wght) - eps * xpt - 0.25 * omega);
+			[xpt,wght](double& eps) {
+				eps = exp(0.25 * log(wght) - eps * xpt);
 			});
 			
 		c_bo_eps->scale(exp_occ, "right");
@@ -1294,7 +1321,12 @@ smat MVP_ao_ri_adc2::compute_sigma_2e(smat& u_ao, double omega) {
 		auto sig_ilap_B_ia = u_transform(sig_ilap_B, 'T', c_bo_eps, 'N', m_c_bv); 
 		
 		std::cout << "ILAP" << std::endl;
-		dbcsr::print(*sigma_2e_A);
+		dbcsr::print(*sig_ilap_A_ia);
+		
+		std::cout << "SCALE: " << omega << " " << xpt << " " << exp(omega * xpt) << std::endl;
+		
+		//sig_ilap_A_ia->scale(exp(-omega * xpt));
+		//sig_ilap_B_ia->scale(exp(-omega * xpt));
 		
 		sigma_2e_A->add(1.0, 1.0, *sig_ilap_A_ia);
 		sigma_2e_B->add(1.0, 1.0, *sig_ilap_B_ia);
@@ -1335,7 +1367,7 @@ smat MVP_ao_ri_adc2::compute_sigma_2e(smat& u_ao, double omega) {
 	
 	m_reg.erase("t_xbb_batched");
 	
-	sigma_2e_A->scale(pow(m_c_osc, 2));
+	sigma_2e_A->scale(-pow(m_c_osc, 2));
 	sigma_2e_B->scale(pow(m_c_osc, 2));
 
 #if 1
@@ -1385,8 +1417,10 @@ smat MVP_ao_ri_adc2::compute_sigma_2e(smat& u_ao, double omega) {
 	dbcsr::contract(*co, *I_HT, *ints_mo)
 		.perform("nj, Xin -> Xij");
 		
+	dbcsr::print(*ints_mo);
+		
 	dbcsr::contract(*I_mo, *ints_mo, *sig)
-		.perform("Xka, Xmk -> ma");
+		.perform("Xka, Xkm -> ma");
 	
 	sig->scale(m_c_osc);
 	dbcsr::print(*sig);
@@ -1396,7 +1430,10 @@ smat MVP_ao_ri_adc2::compute_sigma_2e(smat& u_ao, double omega) {
 	dbcsr::print(*sigma_2e_A);
 	dbcsr::print(*sigma_2e_B);
 	
-	exit(0);
+	sigma_2e_A->setname("sigma_2e");
+	sigma_2e_A->add(1.0, 1.0, *sigma_2e_B);
+	
+	return sigma_2e_A;
 	
 }
 	
@@ -1449,6 +1486,12 @@ smat MVP_ao_ri_adc2::compute(smat u_ia, double omega) {
 	
 	std::cout << "SIG_2D:" << std::endl;
 	dbcsr::print(*sig_2d);
+	
+	sig_0->add(1.0,1.0,*sig_2c);
+	sig_0->add(1.0,1.0,*sig_2d);
+	
+	sig_2d->release();
+	sig_2c->release();
 		
 	// compute new laplace points
 	math::laplace lp_dd(m_world.comm(), LOG.global_plev());
@@ -1465,8 +1508,12 @@ smat MVP_ao_ri_adc2::compute(smat u_ia, double omega) {
 	m_weights_dd = lp_dd.omega();
 	m_xpoints_dd = lp_dd.alpha();
 	
-	compute_sigma_2e(u_ao,omega);
+	auto sig_2e = compute_sigma_2e(u_ao,omega);
 	
+	sig_0->add(1.0,1.0,*sig_2e);
+	
+	dbcsr::print(*sig_0);
+		
 	return sig_0;
 	
 }

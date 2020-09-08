@@ -125,7 +125,11 @@ private:
 	
 	dbcsr::sbtensor<3,double> compute_J(smat& u_ia);
 	std::pair<smat,smat> compute_sigma_2e_ilap(dbcsr::sbtensor<3,double>& J_xbb_batched, 
-		smat& FA, smat& FB, smat& pseudo_o, smat& pseudo_v);
+		smat& FA, smat& FB, smat& pseudo_o, smat& pseudo_v
+#if 1
+	, double omega, int ilap
+#endif	
+	);
 	
 #if 1
 	std::vector<smat> m_FS;

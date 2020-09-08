@@ -73,7 +73,12 @@ void adcmod::compute() {
 		std::shared_ptr<MVP> mvfac(mvfacptr);
 		
 		mvfac->init();
-		auto out = mvfac->compute(dav_guess[0], 0.0); 
+		auto out = mvfac->compute(dav_guess[0], 0.3); 
+		
+		double t = out->dot(*dav_guess[0]);
+		std::cout << "DOT: " << t << std::endl;
+		
+		exit(0); 
 		
 		math::davidson<MVP> dav(m_world.comm(), LOG.global_plev());
 		
