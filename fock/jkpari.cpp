@@ -541,7 +541,6 @@ void BATCHED_PARI_K::compute_K() {
 	TIME.start();
 	
 	auto& time_reo_int1 = TIME.sub("Reordering integrals (1)");
-	auto& time_reo_int2 = TIME.sub("Reordering integrlas (2)");
 	auto& time_fetch_ints = TIME.sub("Fetching ints");
 	auto& time_reo_cbar = TIME.sub("Reordering c_bar");
 	auto& time_reo_ctil = TIME.sub("Reordering c_tilde");
@@ -741,9 +740,9 @@ void BATCHED_PARI_K::compute_K() {
 	m_K_A->scale(-1.0);
 	//dbcsr::print(*m_K_A);
 	
-	time_reo_int2.start();
-	m_eri_batched->reorder(vec<int>{0}, vec<int>{1,2});
-	time_reo_int2.finish();	
+	//time_reo_int2.start();
+	//m_eri_batched->reorder(vec<int>{0}, vec<int>{1,2});
+	//time_reo_int2.finish();	
 		
 	TIME.finish();
 			

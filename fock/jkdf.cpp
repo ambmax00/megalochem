@@ -51,6 +51,7 @@ void BATCHED_DF_J::compute_J() {
 	auto& con2 = TIME.sub("second contraction");
 	auto& fetch1 = TIME.sub("fetch ints (1)");
 	auto& fetch2 = TIME.sub("fetch ints (2)");
+	auto& reoint = TIME.sub("Reordering ints");
 	
 	TIME.start();
 	
@@ -75,6 +76,10 @@ void BATCHED_DF_J::compute_J() {
 	}
 	
 	m_ptot_bbd->filter(dbcsr::global::filter_eps);
+	
+	reoint.start();
+	m_eri_batched->reorder(vec<int>{0},vec<int>{1,2});
+	reoint.finish();
 	
 	m_gp_xd->batched_contract_init();
 	m_ptot_bbd->batched_contract_init();
@@ -203,7 +208,7 @@ void BATCHED_DFMO_K::compute_K() {
 		
 		auto& reo0 = TIME.sub("Reordering ints (1) " + x);
 		auto& fetch1 = TIME.sub("Fetch ints " + x);
-		auto& retints = TIME.sub("Reordering ints (2) " + x);
+		//auto& retints = TIME.sub("Reordering ints (2) " + x);
 		auto& con1 = TIME.sub("Contraction (1) " + x);
 		auto& con2 = TIME.sub("Contraction (2) " + x);
 		auto& con3 = TIME.sub("Contraction (3) " + x);
@@ -399,9 +404,9 @@ void BATCHED_DFMO_K::compute_K() {
 		double HTI_occupancy = (double)nze_HTI / (double)nze_HTI_tot;
 		LOG.os<1>("Occupancy of HTI: ", HTI_occupancy * 100, "%\n");
 		
-		retints.start();
-		m_eri_batched->reorder(vec<int>{0},vec<int>{1,2});
-		retints.finish();
+		//retints.start();
+		//m_eri_batched->reorder(vec<int>{0},vec<int>{1,2});
+		//retints.finish();
 		
 		//dbcsr::print(*m_K_01);
 				
@@ -578,7 +583,7 @@ void BATCHED_DFAO_K::compute_K() {
 		auto& con_2_batch = TIME.sub("Contraction (2)/batch " + x);
 		auto& fetch = TIME.sub("Fetching integrals/batch " + x);
 		auto& fetch2 = TIME.sub("Fetching fitting coeffs/batch " + x);
-		auto& retint = TIME.sub("Returning integrals/batch " + x);
+		//auto& retint = TIME.sub("Returning integrals/batch " + x);
 		
 		reo_int.start();
 		m_eri_batched->reorder(vec<int>{0,1}, vec<int>{2});
@@ -669,9 +674,9 @@ void BATCHED_DFAO_K::compute_K() {
 		double occ_cbar = (double) nze_cbar / (double) nze_cbar_tot;
 		LOG.os<1>("Occupancy of cbar: ", occ_cbar, "%\n");
 		
-		retint.start();
-		m_eri_batched->reorder(vec<int>{0},vec<int>{1,2});
-		retint.finish();
+		//retint.start();
+		//m_eri_batched->reorder(vec<int>{0},vec<int>{1,2});
+		//retint.finish();
 		
 		m_K_01->batched_contract_finalize();
 		

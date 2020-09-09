@@ -349,11 +349,11 @@ void LLMP_FULL_Z::compute() {
 	
 	m_z_xbb_batched->reset();
 	
-	LOG.os<>("Reordering ints 0|12 -> 1|02 \n");
+	//LOG.os<>("Reordering ints 0|12 -> 1|02 \n");
 	
-	time_reo_int2.start();
-	m_eri_batched->reorder(vec<int>{1},vec<int>{0,2});
-	time_reo_int2.finish();
+	//time_reo_int2.start();
+	//m_eri_batched->reorder(vec<int>{1},vec<int>{0,2});
+	//time_reo_int2.finish();
 	
 	m_zmat_01->batched_contract_finalize();	
 	
