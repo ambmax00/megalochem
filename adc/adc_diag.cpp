@@ -283,7 +283,7 @@ void adcmod::compute_diag() {
 	
 	iter.stop();
 	
-	dbcsr::print(*m_d_ov);
+	if (LOG.global_plev() >= 2) dbcsr::print(*m_d_ov);
 	
 	LOG.os<>("Done with diagonal.\n");
 	

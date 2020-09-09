@@ -160,7 +160,9 @@ void adcmod::init_ao_tensors() {
 		case method::ao_ri_adc_2:
 			compute_3c2e = true;
 			compute_metric_inv = true;
-/* ======>*/compute_metric_invsqrt = true;//<========= needs to be deleted later !!!!
+		#if 0
+			compute_metric_invsqrt = true;
+		#endif
 			compute_s_bb = true;
 			break;
 	}
@@ -235,32 +237,31 @@ void adcmod::init_ao_tensors() {
 		t_inv.start();
 		
 		auto s_xx = c_s_xx;
-		/*
+		
 		math::LLT chol(s_xx, LOG.global_plev());
 		chol.compute();
 		
 		auto x = m_hfwfn->mol()->dims().x();
-		auto Linv = chol.L_inv(x);*/
+		auto Linv = chol.L_inv(x);
 		
 		arrvec<int,2> xx = {dimx,dimx};
 		
-		math::hermitian_eigen_solver sol(s_xx, 'V', true);
-		sol.compute();
+		//math::hermitian_eigen_solver sol(s_xx, 'V', true);
+		//sol.compute();
 		
 		if (compute_metric_inv) {
 			
 			LOG.os<1>("Computing metric inverse...\n");
 			
-			/*
 			auto c_s_xx_inv = dbcsr::create_template<double>(Linv)
 				.name("s_xx_inv")
 				.matrix_type(dbcsr::type::symmetric).get();
 			
 			dbcsr::multiply('T', 'N', *Linv, *Linv, *c_s_xx_inv)
 				.filter_eps(dbcsr::global::filter_eps)
-				.perform();*/
+				.perform();
 				
-			auto c_s_xx_inv = sol.inverse();
+			//auto c_s_xx_inv = sol.inverse();
 			
 			m_reg.insert_matrix<double>("s_xx_inv_mat", c_s_xx_inv); 
 			
@@ -285,14 +286,14 @@ void adcmod::init_ao_tensors() {
 			std::string name = "s_xx_invsqrt_(0|1)";
 			
 			//dbcsr::print(*Linv);
-			auto M = dbcsr::matrix_to_eigen(s_xx);
-			Eigen::SelfAdjointEigenSolver<Eigen::MatrixXd> SAES(M);
+			//auto M = dbcsr::matrix_to_eigen(s_xx);
+			//Eigen::SelfAdjointEigenSolver<Eigen::MatrixXd> SAES(M);
 
-			Eigen::MatrixXd inv = SAES.operatorInverseSqrt();
+			//Eigen::MatrixXd inv = SAES.operatorInverseSqrt();
 			
-			//dbcsr::shared_matrix<double> c_s_xx_invsqrt = dbcsr::transpose(Linv).get();
-			auto c_s_xx_invsqrt = dbcsr::eigen_to_matrix(inv, 
-				m_world, "inv", dimx, dimx, dbcsr::type::symmetric); // sol.inverse_sqrt();
+			dbcsr::shared_matrix<double> c_s_xx_invsqrt = dbcsr::transpose(Linv).get();
+			//auto c_s_xx_invsqrt = dbcsr::eigen_to_matrix(inv, 
+			//	m_world, "inv", dimx, dimx, dbcsr::type::symmetric); // sol.inverse_sqrt();
 			
 			auto s_xx_invsqrt = dbcsr::tensor_create<2>().name("s_xx_invsqrt")
 				.pgrid(m_spgrid2).map1({0}).map2({1}).blk_sizes(xx).get();
@@ -445,11 +446,11 @@ void adcmod::init_mo_tensors() {
 	m_reg.insert_matrix<double>("c_bo", c_bo);
 	m_reg.insert_matrix<double>("c_bv", c_bv);
 	
-	auto cboe = dbcsr::matrix_to_eigen(c_bo);
-	auto cbve = dbcsr::matrix_to_eigen(c_bv);
+	//auto cboe = dbcsr::matrix_to_eigen(c_bo);
+	//auto cbve = dbcsr::matrix_to_eigen(c_bv);
 	
-	LOG.os<>("OCC:", '\n', cboe, '\n');
-	LOG.os<>("VIR:", '\n', cbve, '\n');
+	//LOG.os<>("OCC:", '\n', cboe, '\n');
+	//LOG.os<>("VIR:", '\n', cbve, '\n');
 	
 	/*
 	if (compute_moints) { 
