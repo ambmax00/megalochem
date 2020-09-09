@@ -7,7 +7,6 @@ set(SOURCES
 	adc_mvp_common.cpp
 	adc_mvp_aoriadc1.cpp
 	adc_mvp_aoriadc2.cpp
-	#adc_amplitudes.cpp
 )
 
 add_library(chem_adc ${SOURCES})
