@@ -2,7 +2,6 @@
 #include "ints/aofactory.h"
 #include "ints/screening.h"
 #include "math/linalg/SVD.h"
-#include "math/other/blockmap.h"
 #include "extern/lapack.h"
 #include <Eigen/Core>
 #include <Eigen/SVD>

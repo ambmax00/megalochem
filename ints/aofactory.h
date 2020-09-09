@@ -3,7 +3,6 @@
 
 #include <dbcsr_tensor.hpp>
 #include <dbcsr_conversions.hpp>
-#include "math/other/blockmap.h"
 #include "desc/molecule.h"
 #include <string>
 #include <limits>
