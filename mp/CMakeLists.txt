@@ -1,6 +1,10 @@
 set(SOURCES
 	mpmod.h
 	mp_compute.cpp
+	z_builder.h
+	z_common.cpp
+	z_full.cpp
+	z_mem.cpp
 )
 
 add_library(chem_mp ${SOURCES})

@@ -2,9 +2,7 @@
 #include <libint2/basis.h>
 #include <list>
 
-namespace desc {
-	
-static 
+namespace desc { 
 	
 vvshell split_atomic(vshell& basis) {
 	
@@ -226,4 +224,28 @@ std::vector<int> cluster_basis::cluster_sizes() const {
 	return m_cluster_sizes;
 }
 
+std::vector<int> cluster_basis::block_to_atom(std::vector<libint2::Atom>& atoms) const {
+	
+	std::vector<int> blk_to_atom(m_cluster_sizes.size());
+	
+	auto get_centre = [&atoms](libint2::Shell& s) {
+		for (int i = 0; i != atoms.size(); ++i) {
+			auto& a = atoms[i];
+			double d = sqrt(pow(s.O[0] - a.x, 2)
+				+ pow(s.O[1] - a.y,2)
+				+ pow(s.O[2] - a.z,2));
+			if (d < 1e-12) return i;
+		}
+		return -1;
+	};
+	
+	for (int iv = 0; iv != m_clusters.size(); ++iv) {
+		auto s = m_clusters[iv][0];
+		blk_to_atom[iv] = get_centre(s);
+	}
+	
+	return blk_to_atom;
+	
 }
+
+} // end namespace

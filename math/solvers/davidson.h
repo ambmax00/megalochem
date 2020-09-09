@@ -5,25 +5,21 @@
 #include <stdexcept>
 #include <optional>
 #include <Eigen/Eigenvalues>
-#include "utils/ppdirs.h"
-#include "tensor/dbcsr_conversions.h"
+#include <dbcsr_matrix_ops.hpp>
+#include <dbcsr_conversions.hpp>
+#include "utils/mpi_log.h"
 
 namespace math {
 
-template <int N>
-using tensor = dbcsr::tensor<N,double>;
-
-template <int N>
-using stensor = dbcsr::stensor<N,double>;
-
-using vtensor = std::vector<dbcsr::stensor<2>>;
+using smat = dbcsr::shared_matrix<double>;
 
 template <class MVFactory>
 class davidson {
 private:
-
-	stensor<2> m_diag; // diagonal of matrix
-	MVFactory& m_fac; // Matrix vector product engine
+	
+	util::mpi_log LOG;
+	smat m_diag; // diagonal of matrix
+	std::shared_ptr<MVFactory> m_fac; // Matrix vector product engine
 
 	int m_nroots; // targeted eigenvalue
 	int m_subspace; // current size of subspace
@@ -33,56 +29,57 @@ private:
 	
 	double m_eigval; // targeted eigenvalue
 	
-	vtensor m_vecs; // b vectors
-	vtensor m_sigmas; // Ab vectors
-	vtensor m_ritzvecs; // ritz vectors at end of computation
+	std::vector<smat> m_vecs; // b vectors
+	std::vector<smat> m_sigmas; // Ab vectors
+	std::vector<smat> m_ritzvecs; // ritz vectors at end of computation
 	
 	double m_conv;
 	int m_maxiter;
 		
 public:
-	
-	struct create {
-		make_param(create,factory,MVFactory,required,ref)
-		make_param(create,diag,stensor<2>,required,ref)
-		make_param(create,pseudo,bool,optional,val)
-		make_param(create,conv,double,optional,val)
-		make_param(create,maxiter,int,optional,val)
-		
-		public:
-		
-		create() {}
-		friend class davidson;
-		
-	};
-	
-	davidson(create& p) :
-		m_fac(*p.c_factory),
-		m_diag(*p.c_diag),
-		m_eigval(0.0),
-		m_pseudo((p.c_pseudo) ? *p.c_pseudo : false),
-		m_maxiter((p.c_maxiter) ? *p.c_maxiter : 20),
-		m_conv((p.c_conv) ? *p.c_conv : 1e-7),
-		m_converged(false)
-	{}	
 
-	void compute(vtensor& guess, int nroots, std::optional<double> omega = std::nullopt) {
+	davidson& set_factory(std::shared_ptr<MVFactory>& fac) {
+		m_fac = fac;
+		return *this;
+	}
+	
+	davidson& set_diag(smat& in) {
+		m_diag = in;
+		return *this;
+	}
+	
+	davidson& pseudo(bool is_pseudo) {
+		m_pseudo = is_pseudo;
+		return *this;
+	}
+	
+	davidson& conv(double c) {
+		m_conv = c;
+		return *this;
+	}
+	
+	davidson& maxiter(int maxi) {
+		m_maxiter = maxi;
+		return *this;
+	}
+	
+	davidson(MPI_Comm comm, int nprint) : 
+		LOG(comm, nprint),
+		m_eigval(0.0), 
+		m_converged(false) {}
+
+	void compute(std::vector<smat>& guess, int nroots, std::optional<double> omega = std::nullopt) {
+		
+		LOG.os<>("Launching davidson diagonalization.\n");
 		
 		if (!omega && m_pseudo) 
 			throw std::runtime_error("Davidson solver initialized as pseudo-eigenvalue problem, but no omega given.");
 		
 		m_vecs = guess;
 		
-		std::cout << "GUESS SIZE: " << m_vecs.size() << std::endl;
+		LOG.os<1>("GUESS SIZE: ", m_vecs.size(), '\n');
 		
 		m_nroots = nroots;
-		
-		auto blkoffs = m_vecs[0]->blk_offsets();
-		auto blksizes = m_vecs[0]->blk_sizes();
-		auto nfull = m_vecs[0]->nfull_total();
-		
-		int no = nfull[0];
-		int nv = nfull[1];
 		
 		double conv = 1e-6;
 		
@@ -94,7 +91,7 @@ public:
 		
 		for (int ITER = 0; ITER != m_maxiter; ++ITER) {
 			
-			std::cout << "DAVIDSON ITERATION: " << ITER << std::endl;
+			LOG.os<1>("DAVIDSON ITERATION: ", ITER, '\n');
 			
 			// current subspace size
 			m_subspace = m_vecs.size();
@@ -103,15 +100,16 @@ public:
 			// compute sigma vectors
 			std::cout << m_vecs.size() << std::endl;
 			
+			LOG.os<1>("Computing MV products.\n");
 			for (int i = prev_subspace; i != m_subspace; ++i) {
 				
-				std::cout << "GUESS VECTOR: " << i << std::endl;
+				//std::cout << "GUESS VECTOR: " << i << std::endl;
 				dbcsr::print(*m_vecs[i]);
 				
-				auto Av_i = (m_pseudo) ? m_fac.compute(m_vecs[i],*omega) : m_fac.compute(m_vecs[i]);
+				auto Av_i = (m_pseudo) ? m_fac->compute(m_vecs[i],*omega) : m_fac->compute(m_vecs[i]);
 				m_sigmas.push_back(Av_i);
 				
-				std::cout << "SIGMA VECTOR: " << i << std::endl;
+				//std::cout << "SIGMA VECTOR: " << i << std::endl;
 				dbcsr::print(*Av_i); 
 				
 			}
@@ -121,14 +119,14 @@ public:
 			
 			for (int i = prev_subspace; i != m_subspace; ++i) {
 				for (int j = 0; j != i+1; ++j) {
-					double val = dbcsr::dot<2>(*m_vecs[i],*m_sigmas[j]);
+					double val = m_vecs[i]->dot(*m_sigmas[j]);
 					Asub(i,j) = val;
 					Asub(j,i) = val;
 				}
 			}
 			
-			std::cout << "SUBSPACE MATRIX" << std::endl;
-			std::cout << Asub << std::endl;
+			LOG.os<1>("SUBSPACE MATRIX:\n");
+			LOG.os<1>(Asub, '\n');
 			
 			// diagonalize it
 			Eigen::SelfAdjointEigenSolver<Eigen::MatrixXd> es;
@@ -149,56 +147,63 @@ public:
 				
 			}
 			
-			std::cout << "EIGENVALUES: " << std::endl;
-			for (int i = 0; i != evals.size(); ++i) {
-				std::cout << evals[i] << " ";
-			} std::cout << std::endl;
+			if (LOG.global_plev() >= 1) {
+				LOG.os<1>("EIGENVALUES: \n");
+				for (int i = 0; i != evals.size(); ++i) {
+					LOG.os<1>(evals[i], " ");
+				} LOG.os<1>('\n');
+			}
 			
-			std::cout << "EIGENVECTORS: " << std::endl;
-			std::cout << evecs << std::endl;
+			LOG.os<1>("EIGENVECTORS: \n", evecs, '\n');
 			
 			// compute residual
 			// r_k = sum_i U_ik sigma_i - sum_i U_ik lambda_k b_i 
 			
-			std::cout << "SETUP" << std::endl;
+			LOG.os<1>("Computing residual.\n");
 			
 			// ======= r_k ========
 			
-			tensor<2> r_k = tensor<2>::create_template().tensor_in(*m_vecs[0]).name("r_k");
-			tensor<2> temp = tensor<2>::create_template().tensor_in(*m_vecs[0]).name("temp");
-			
-			std::cout << "LOOP" << std::endl;
-			
+			smat r_k = dbcsr::create_template<double>(m_vecs[0]).name("r_k").get();
+			smat temp = dbcsr::create_template<double>(m_vecs[0]).name("temp").get();
+						
 			for (int i = 0; i != m_subspace; ++i) {
 				
-				std::cout << "Copy" << std::endl;
-				dbcsr::copy(*m_sigmas[i], temp).perform();
+				temp->copy_in(*m_sigmas[i]);
 				
-				temp.scale(evecs(i,m_nroots-1));
+				//dbcsr::copy(*m_sigmas[i], temp).perform();
 				
-				dbcsr::copy(temp, r_k).sum(true).move_data(true).perform();
+				temp->scale(evecs(i,m_nroots-1));
 				
-				dbcsr::copy(*m_vecs[i], temp).perform();
+				r_k->add(1.0, 1.0, *temp);
+				//dbcsr::copy(temp, r_k).sum(true).move_data(true).perform();
 				
-				temp.scale(- evals(m_nroots - 1) * evecs(i,m_nroots-1));
+				temp->clear();
+				temp->copy_in(*m_vecs[i]);
+				//dbcsr::copy(*m_vecs[i], temp).perform();
 				
-				dbcsr::copy(temp, r_k).sum(true).move_data(true).perform();
+				temp->scale(- evals(m_nroots - 1) * evecs(i,m_nroots-1));
+				
+				r_k->add(1.0,1.0, *temp);
+				//dbcsr::copy(temp, r_k).sum(true).move_data(true).perform();
+				
+				temp->clear();
 				
 			}
 			
-			temp.destroy();
+			temp->release();
 			
-			std::cout << "RESIDUAL" << std::endl;
-			dbcsr::print(r_k);
+			if (LOG.global_plev() >= 2) {
+				dbcsr::print(*r_k);
+			}
 			
-			double rms = dbcsr::RMS(r_k);
-			std::cout << "RMS: " << rms << std::endl;
+			double rms = r_k->norm(dbcsr_norm_frobenius);
+			LOG.os<>("RMS: ", rms, '\n');
 			
 			// Convergence criteria
 			// Normal davidson: RMS of residual is below certain threshold
 			// pseudo davidson: RMS of residual is higher than |omega - omega'| 
 			
-			if (m_pseudo) std::cout << "EVALS: " << *omega << " " << evals(m_nroots-1) << std::endl;
+			if (m_pseudo) LOG.os<>("EVALS: ", *omega, " ", evals(m_nroots-1), '\n');
 			
 			m_converged = (m_pseudo) ? (rms < fabs(*omega - evals(m_nroots - 1))) : (rms < conv);
 			
@@ -208,16 +213,24 @@ public:
 			// Only Diagonal-Preconditioned-Residue for now (DPR)
 			// D_ia = (lamda_k - A_iaia)^-1
 			
-			tensor<2> D = tensor<2>::create_template().tensor_in(r_k).name("D");
+			LOG.os<1>("Computing preconditioner.\n");
 			
-			D.reserve_all();
+			smat D = dbcsr::create_template(r_k).name("D").get();
 			
-			dbcsr::iterator_t<2> d_iter(D);
+			D->reserve_all();
+			
+			D->set(evals(m_nroots - 1));
+			D->add(1.0,-1.0,*m_diag);
+			
+			D->apply(dbcsr::func::inverse);
+			
+			/*
+			dbcsr::iterator<double> d_iter(*D);
 			d_iter.start();
 			
 			while (d_iter.blocks_left()) {
 				
-				d_iter.next();
+				d_iter.next_block();
 				
 				auto& blksize = d_iter.size();
 				auto& idx = d_iter.idx();
@@ -226,7 +239,7 @@ public:
 				
 				dbcsr::block<2> d_blk(blksize);
 				dbcsr::block<2> diag_blk = 
-					m_diag->get_block(idx, blksize, found);
+					m_diag->get_block(irow, icol, blksize, found);
 			
 				if (found) {
 				
@@ -244,85 +257,88 @@ public:
 					
 				D.put_block(idx, d_blk);
 				
-			} //end while
+			} //end while*/
 			
-			std::cout << "PRECONDITIONER" << std::endl;
-			
-			dbcsr::print(D);
+			if (LOG.global_plev() >= 2) {			
+				dbcsr::print(*D);
+			}
 			
 			// form new vector
-			tensor<2> d_k = tensor<2>::create_template().tensor_in(r_k).name("d_k");
+			smat d_k = dbcsr::create_template(r_k).name("d_k").get();
 			
 			// d(k)_ia = D(k)_ia * q(k)_ia
 			
-			dbcsr::print(r_k);
+			//dbcsr::print(*r_k);
 			
-			dbcsr::ewmult<2>(r_k, D, d_k);
+			d_k->hadamard_product(*r_k, *D);
 			
-			r_k.destroy();
-			D.destroy();
+			//dbcsr::ewmult<2>(r_k, D, d_k);
 			
-			dbcsr::print(d_k);
+			r_k->release();
+			D->release();
+			
+			dbcsr::print(*d_k);
 			
 			// GRAM SCHMIDT
 			// b_new = d_k - sum_j proj_bi(d_k)
 			// where proj_b(v) = dot(b,v)/dot(b,b)
 			
-			tensor<2> bnew = tensor<2>::create_template().tensor_in(d_k).name("b_" + std::to_string(m_subspace));
-			tensor<2> temp2 = tensor<2>::create_template().tensor_in(d_k).name("temp2");
+			smat bnew = dbcsr::create_template(d_k).name("b_" + std::to_string(m_subspace)).get();
+			smat temp2 = dbcsr::create_template(d_k).name("temp2").get();
 			
-			dbcsr::copy(d_k, bnew).perform();
+			//dbcsr::copy(d_k, bnew).perform();
+			bnew->copy_in(*d_k);
 			
-			
-			std::cout << "LOOP" << std::endl;
+			LOG.os<1>("Computing new guess vector.\n");
 			for (int i = 0; i != m_vecs.size(); ++i) {
-				
-				std::cout << "STEP " << i << std::endl;
-				
-				dbcsr::copy(*m_vecs[i], temp2).perform();
+								
+				//dbcsr::copy(*m_vecs[i], temp2).perform();
+				temp2->copy_in(*m_vecs[i]);
 				
 				dbcsr::print(*m_vecs[i]);
-				dbcsr::print(temp2);
+				dbcsr::print(*temp2);
 				
-				double proj = dbcsr::dot(*m_vecs[i], d_k)/dbcsr::dot(*m_vecs[i],*m_vecs[i]);
+				double proj = (d_k->dot(*m_vecs[i])) / (m_vecs[i]->dot(*m_vecs[i]));
+				
+				//dbcsr::dot(*m_vecs[i], d_k)/dbcsr::dot(*m_vecs[i],*m_vecs[i]);
 				
 				std::cout << proj << std::endl;
 				
-				temp2.scale(-proj);
+				temp2->scale(-proj);
 				
-				dbcsr::copy(temp2, bnew).sum(true).perform();
+				bnew->add(1.0,1.0,*temp2);
 				
-				dbcsr::print(bnew);
+				//dbcsr::copy(temp2, bnew).sum(true).perform();
+				
+				dbcsr::print(*bnew);
 				
 			}
 				
-			temp2.destroy();
+			temp2->release();
 			
 			// normalize
-			double bnorm = sqrt(dbcsr::dot(bnew,bnew));
+			double bnorm = sqrt(bnew->dot(*bnew));
 			
-			dbcsr::print(bnew);
+			bnew->scale(1.0/bnorm);
 			
-			bnew.scale(1/bnorm);
-			
-			dbcsr::print(bnew);
-			
-			auto bnewptr = bnew.get_stensor();
-			
-			m_vecs.push_back(bnewptr);
+			if (LOG.global_plev() >= 2) {
+				dbcsr::print(*bnew);
+			}
+						
+			m_vecs.push_back(bnew);
 				
 		}
 		
 		m_eigval = evals(m_nroots-1);
 		
-		dbcsr::tensor<2> temp3 = tensor<2>::create_template().tensor_in(*m_vecs[0]).name("temp3");
+		smat temp3 = dbcsr::create_template<double>(m_vecs[0]).name("temp3").get();
 		
 		m_ritzvecs.clear();
 		
 		// Make sure that abs max element of eigenvectors is positive.
 		
-		std::cout << "EVECS" << std::endl;
-		std::cout << evecs << std::endl;
+		//std::cout << "EVECS" << std::endl;
+		//std::cout << evecs << std::endl;
 		
 		/*for (int i = 0; i != m_subspace; ++i) {
 				// get min and max coeff
@@ -334,37 +350,44 @@ public:
 				
 		}*/
 		
-		std::cout << "EVECS" << std::endl;
-		std::cout << evecs << std::endl;
+		//std::cout << "EVECS" << std::endl;
+		//std::cout << evecs << std::endl;
 		
+		LOG.os<1>("Forming Ritz vectors.\n");
 		// x_k = sum_i ^M U_ik * b_i
 		for (int k = 0; k != m_nroots; ++k) {
-			dbcsr::tensor<2> x_k = tensor<2>::create_template()
-				.tensor_in(*m_vecs[0]).name("new_guess_"+std::to_string(k)); 
+			
+			smat x_k = dbcsr::create_template(m_vecs[0])
+				.name("new_guess_"+std::to_string(k))
+				.get(); 
+			
 			for (int i = 0; i != m_vecs.size(); ++i) {
 				
-				dbcsr::print(*m_vecs[i]);
-				std::cout << evecs(i,k) << std::endl;
+				//dbcsr::print(*m_vecs[i]);
+				//std::cout << evecs(i,k) << std::endl;
 				
-				dbcsr::copy<2>(*m_vecs[i], temp3).perform();
-				temp3.scale(evecs(i,k));
+				temp3->copy_in(*m_vecs[i]);
+				//dbcsr::copy<2>(*m_vecs[i], temp3).perform();
+				temp3->scale(evecs(i,k));
 				
-				dbcsr::print(temp3);
+				//dbcsr::print(*temp3);
 				
-				dbcsr::copy(temp3, x_k).sum(true).move_data(true).perform();
+				x_k->add(1.0,1.0,*temp3);
+				//dbcsr::copy(temp3, x_k).sum(true).move_data(true).perform();
 				
 			}
 				
-			dbcsr::print(x_k);
-			m_ritzvecs.push_back(x_k.get_stensor());
+			//dbcsr::print(*x_k);
+			m_ritzvecs.push_back(x_k);
 			
 		}
 		
-		std::cout << "FINISHED COMPUTATION" << std::endl;
+		//std::cout << "FINISHED COMPUTATION" << std::endl;
+		LOG.os<>("Finished computation.\n");
 		
 	}
 	
-	vtensor ritz_vectors() {
+	std::vector<smat> ritz_vectors() {
 		
 		return m_ritzvecs;
 		
@@ -376,6 +399,7 @@ public:
 
 }; // end class 
 
+/*
 template <class MVFactory>
 class modified_davidson {
 private:
@@ -456,6 +480,7 @@ public:
 	}
 
 }; // end class
+*/
 
 } // end namespace
 

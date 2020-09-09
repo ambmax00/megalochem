@@ -2,6 +2,7 @@
 
 namespace adc {
 
+/*
 void get_diag_4(dbcsr::tensor<4>& t4, dbcsr::tensor<2>& t2, vec<int>& isizes, 
 	vec<int>& asizes, int order) {
 	
@@ -233,6 +234,59 @@ void adcmod::mo_compute_diag() {
 		diag_ia_2.destroy();
 		eps_ia.destroy();
 		
+}*/
+
+void adcmod::compute_diag() {
+	
+	// only zero order for now
+	
+	LOG.os<>("Computing zeroth order diagonal.\n");
+	
+	auto epso = m_hfwfn->eps_occ_A();
+	auto epsv = m_hfwfn->eps_vir_A();
+	
+	auto o = m_hfwfn->mol()->dims().oa();
+	auto v = m_hfwfn->mol()->dims().va();
+	
+	m_d_ov = dbcsr::create<double>()
+		.name("diag_ov")
+		.set_world(m_world)
+		.row_blk_sizes(o)
+		.col_blk_sizes(v)
+		.matrix_type(dbcsr::type::no_symmetry)
+		.get();
+		
+	m_d_ov->reserve_all();
+	
+	dbcsr::iterator<double> iter(*m_d_ov);
+	
+	iter.start();
+	
+	while (iter.blocks_left()) {
+		
+		iter.next_block();
+		
+		int roff = iter.row_offset();
+		int coff = iter.col_offset();
+		
+		int rsize = iter.row_size();
+		int csize = iter.col_size();
+		
+		for (int i = 0; i != rsize; ++i) {
+			for (int j = 0; j != csize; ++j) {
+				iter(i,j) = - epso->at(i + roff) 
+					+ epsv->at(j + coff);
+			}
+		}
+		
+	}
+	
+	iter.stop();
+	
+	if (LOG.global_plev() >= 2) dbcsr::print(*m_d_ov);
+	
+	LOG.os<>("Done with diagonal.\n");
+	
 }
 
 } // end namespace

@@ -31,18 +31,18 @@ protected:
 	bool m_SAD_iter;
 	int m_SAD_rank;
 	
-	std::shared_ptr<ints::aofactory> m_factory;
-	
+	bool m_sym = true;
+		
 public:
 	
-	JK_common(dbcsr::world& w, desc::options opt);
+	JK_common(dbcsr::world& w, desc::options opt, std::string name);
 	void set_density_alpha(dbcsr::shared_matrix<double>& ipA) { m_p_A = ipA; }
 	void set_density_beta(dbcsr::shared_matrix<double>& ipB) { m_p_B = ipB; }
 	void set_coeff_alpha(dbcsr::shared_matrix<double>& icA) { m_c_A = icA; }
 	void set_coeff_beta(dbcsr::shared_matrix<double>& icB) { m_c_B = icB; }
-	void set_factory(std::shared_ptr<ints::aofactory>& ifac) { 
-		m_factory = ifac; 
-		m_mol = m_factory->mol();
+	void set_sym(bool sym) { m_sym = sym; }
+	void set_mol(desc::smolecule& smol) { 
+		m_mol = smol;
 	}
 	void set_SAD(bool SAD, int rank) { 
 		m_SAD_iter = SAD; 
@@ -66,7 +66,7 @@ protected:
 	
 public:
 	
-	J(dbcsr::world& w, desc::options& opt) : JK_common(w,opt) {}
+	J(dbcsr::world& w, desc::options& opt, std::string name) : JK_common(w,opt,name) {}
 	virtual ~J() {}
 	virtual void compute_J() = 0;
 	virtual void init_tensors() = 0;
@@ -85,7 +85,7 @@ protected:
 	
 public:
 	
-	K(dbcsr::world& w, desc::options& opt) : JK_common(w,opt) {}
+	K(dbcsr::world& w, desc::options& opt, std::string name) : JK_common(w,opt,name) {}
 	virtual ~K() {}
 	virtual void compute_K() = 0;
 	virtual void init_tensors() = 0;
@@ -207,37 +207,72 @@ public:
 	~BATCHED_DFAO_K() {}
 	
 };
-/*
-class CADF_K : public K {
+
+class BATCHED_PARI_K : public K {
 private:
+
+	dbcsr::sbtensor<3,double> m_eri_batched;
+	dbcsr::shared_tensor<3,double> m_cfit_xbb;
 	
-	dbcsr::stensor2_d m_s_xx_inv;
-	dbcsr::smat_d m_s_xx;
+	dbcsr::shared_tensor<2,double> m_K_01;
+	dbcsr::shared_tensor<2,double> m_p_bb;
+	dbcsr::shared_tensor<2,double> m_s_xx;
 	
-	tensor::sbatchtensor<3,double> m_fit_batched;
-	tensor::sbatchtensor<3,double> m_eri_batched;
-	
-	std::shared_ptr<ints::screener> m_scr;
-	
-	arrvec<int,3> m_L3;
-	arrvec<int,3> m_LB;
-	
-	vec<int> m_blk_to_atom_x;
-	vec<int> m_blk_to_atom_b;
-	vec<vec<int>> m_atom_to_blk_x;
-	vec<vec<int>> m_atom_to_blk_b;
-	
-	void compute_fit();
-	void compute_L3();
-	void compute_LB();
+	dbcsr::shared_pgrid<2> m_spgrid2;
 	
 public:
 
-	CADF_K(dbcsr::world& w, desc::options& opt);
+	BATCHED_PARI_K(dbcsr::world& w, desc::options& opt);
 	void compute_K() override;
 	void init_tensors() override;
+	
+	~BATCHED_PARI_K() {}
+	
+};
 
-};*/
+inline std::shared_ptr<J> get_J(
+	std::string name, dbcsr::world& w, desc::options opt) {
+	
+	std::shared_ptr<J> out;
+	J* ptr = nullptr;
+	
+	if (name == "exact") {
+		ptr = new EXACT_J(w,opt);
+	} else if (name == "batchdf") {
+		ptr = new BATCHED_DF_J(w,opt);
+	}
+	
+	if (!ptr) {
+		throw std::runtime_error("INVALID J BUILDER SPECIFIED");
+	}
+	
+	out.reset(ptr);
+	return out;
+
+}
+
+inline std::shared_ptr<K> get_K(
+	std::string name, dbcsr::world& w, desc::options opt) {
+	
+	std::shared_ptr<K> out;
+	K* ptr = nullptr;
+	
+	if (name == "exact") {
+		ptr = new EXACT_K(w,opt);
+	} else if (name == "batchdfao") {
+		ptr = new BATCHED_DFAO_K(w,opt);
+	} else if (name == "batchdfmo") {
+		ptr = new BATCHED_DFMO_K(w,opt);
+	}
+	
+	if (!ptr) {
+		throw std::runtime_error("INVALID K BUILDER SPECIFIED");
+	}
+	
+	out.reset(ptr);
+	return out;
+
+}
 
 } // end namespace
 

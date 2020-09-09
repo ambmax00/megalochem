@@ -5,7 +5,7 @@ set(SOURCES
 	jkcommon.cpp
 	jkexact.cpp
 	jkdf.cpp
-	jkcadf.cpp
+	jkpari.cpp
 )
 
 add_library(chem_fock ${SOURCES})
@@ -17,4 +17,5 @@ target_link_libraries(
 	chem_math_linalg
 	chem_math_solvers
 	chem_dbcsrx
+	${LAPACK_LIBRARIES}
 )

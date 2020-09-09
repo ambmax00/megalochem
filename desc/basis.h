@@ -2,6 +2,7 @@
 #define DESC_BASIS_H
 
 #include <libint2/shell.h>
+#include <libint2/atom.h>
 
 using vshell = std::vector<libint2::Shell>;
 using vvshell = std::vector<vshell>;
@@ -68,6 +69,8 @@ public:
 	int shell_offset(int i) const {
 		return m_shell_offsets[i];
 	}
+	
+	std::vector<int> block_to_atom(std::vector<libint2::Atom>& atoms) const;
 
 };
 

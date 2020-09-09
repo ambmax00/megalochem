@@ -457,7 +457,18 @@ public:
 		
 	}
 	
-	int proc(index<N>& idx) {
+
+	T* get_block_p(const index<N>& idx, bool& found) {
+		
+		T* out = nullptr;
+		
+		c_dbcsr_t_get_block_p (m_tensor_ptr, idx.data(), &out, &found);
+		
+		return out;
+		
+	}
+
+	int proc(const index<N>& idx) {
 		int p = -1;
 		c_dbcsr_t_get_stored_coordinates(m_tensor_ptr, idx.data(), &p);
 		return p;
@@ -565,6 +576,7 @@ public:
 	}
     
 };
+
 
 template <int N, typename T = double>
 using shared_tensor = std::shared_ptr<tensor<N,T>>;

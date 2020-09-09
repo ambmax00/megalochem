@@ -63,18 +63,24 @@ static const json valid_keys =
 		{"c_os", 1.3},
 		{"eris", "core"},
 		{"intermeds", "core"},
-		{"force_sparsity", false}
+		{"force_sparsity", false},
+		{"build_Z", "LLMPFULL"}
 	}},
 	{"adc", {
 		{"print", 0},
 		{"c_os", 1.3},
 		{"c_os_coupling", 1.15},
+		{"dfbasis", "basis"},
+		{"nbatches", 3},
+		{"nlap", 5},
 		{"nroots", 0},
-		{"order", 0}, // wether to do ADC(0), ADC(1), ...
-		{"use_ao", false}, // use AO basis formulation
-		{"use_sos", false}, // use SOS approximation
-		{"use_lp", false}, // use laplace transform
-		{"diag_order", 0} // at which order to compute the ADC diagonal
+		{"method", "ADC1"}, /* what method? 
+			(ri-adc1, ri-adc2, sos-ri-adc, ao-ri-adc1, ao-ri-adc2) */
+		{"diag_order", 0}, // at which order to compute the ADC diagonal
+		{"build_K", "df"},
+		{"build_Z", "LLMPFULL"},
+		{"intermeds", "core"},
+		{"doubles", "full"}
 	}}	
 };
 

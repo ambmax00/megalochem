@@ -164,7 +164,8 @@ public:
         return out;
     }
     
-    void hadamard_product(const matrix& a, const matrix& b, std::optional<T> assume_value) {
+    void hadamard_product(const matrix& a, const matrix& b, 
+		std::optional<T> assume_value = std::nullopt) {
         c_dbcsr_hadamard_product(a.m_matrix_ptr, b.m_matrix_ptr, m_matrix_ptr, (assume_value) ? &*assume_value : nullptr); 
     }
     
@@ -174,6 +175,7 @@ public:
     
         c_dbcsr_get_block_p(m_matrix_ptr, row, col, &data, &found, &size[0], &size[1]);
         
+        //std::cout << "SIZES: " << size[0] << " " << size[1] << std::endl;
         return block<2,T>(size, data);
     }
     
@@ -366,10 +368,11 @@ public:
 #:if i % 2 != 0
     #:set rowcol = 'cols'
 #:endif
-        std::vector<int> out(this->nblk${rowcol}$_${loctot}$(),0);
+		int size = this->nblk${rowcol}$_${loctot}$();
+        std::vector<int> out(size,0);
         //std::cout << out.size() << std::endl;
         
-        c_dbcsr_get_${var}$(m_matrix_ptr, out.data());
+        c_dbcsr_get_${var}$(m_matrix_ptr, out.data(), size);
                              
         return out;
         

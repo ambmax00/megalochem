@@ -183,6 +183,8 @@ public:
 		
 	}
 	
+	btensor(const btensor& in) = default;
+	
 	void set_generator(generator_type& func) {
 		m_generator = func;
 	}
@@ -565,8 +567,44 @@ public:
 	
 	void reorder(vec<int> map1, vec<int> map2) {
 		
+		auto this_map1 = m_stensor->map1_2d();
+		auto this_map2 = m_stensor->map2_2d();
+		
+		/*
+		std::cout << "MAP1 vs MAP1 new" << std::endl;
+		auto prt = [](vec<int> m) {
+			for (auto i : m) {
+				std::cout << i << " ";
+			} std::cout << std::endl;
+		};
+		
+		prt(this_map1);
+		prt(map1);
+		
+		std::cout << "MAP2 vs MAP2 new" << std::endl;
+		prt(this_map2);
+		prt(map2);
+		*/
+		
+		if (map1 == this_map1 && map2 == this_map2) return;
+		
+		//std::cout << "REO" << std::endl;
+		
 		stensor<N,T> newtensor = tensor_create_template<N,T>(m_stensor)
 			.name(m_stensor->name()).map1(map1).map2(map2).get();
+			
+		if (m_type == core) {
+			dbcsr::copy(*m_stensor, *newtensor).move_data(true).perform();
+		}
+		
+		m_stensor = newtensor;
+		
+	}
+	
+	void reorder(shared_tensor<N,T> mytensor) {
+		
+		stensor<N,T> newtensor = tensor_create_template<N,T>(mytensor)
+			.name(m_stensor->name()).get();
 			
 		if (m_type == core) {
 			dbcsr::copy(*m_stensor, *newtensor).move_data(true).perform();
@@ -1148,6 +1186,8 @@ public:
 		return (double)m_nzetot / (double) tot;
 		
 	}
+	
+	btype get_type() { return m_type; }
 
 	
 }; //end class btensor

@@ -3,27 +3,32 @@
 
 #include "desc/options.h"
 #include "desc/wfn.h"
-#include "tensor/dbcsr.hpp"
 #include "utils/mpi_time.h"
 #include "adc/adc_defaults.h"
+#include "utils/registry.h"
+#include <dbcsr_matrix.hpp>
+#include <dbcsr_tensor.hpp>
 
 #include <mpi.h>
 
 namespace adc {
-
-struct dims {
 	
-	vec<int> b, o, v, x;
-	
+enum class method {
+	invalid,
+	ri_adc_1,
+	ri_adc_2,
+	sos_ri_adc_2,
+	ao_ri_adc_1,
+	ao_ri_adc_2
 };
-	
-struct moctx {
-	
-	svector<double> eps_o, eps_v;
-	dbcsr::stensor<3> b_xoo, b_xov, b_xvv;
-	dbcsr::stensor<4> t_ovov;
-	dbcsr::stensor<2> d_ov; // matrix diagonal
-	
+
+static const std::map<std::string,method> method_map = 
+{
+	{"ri_adc_1", method::ri_adc_1},
+	{"ri_adc_2", method::ri_adc_2},
+	{"sos_ri_adc_2", method::sos_ri_adc_2},
+	{"ao_ri_adc_1", method::ao_ri_adc_1},
+	{"ao_ri_adc_2", method::ao_ri_adc_2}
 };
 	
 class adcmod {
@@ -31,41 +36,53 @@ private:
 
 	desc::shf_wfn m_hfwfn;
 	desc::options m_opt;
-	MPI_Comm m_comm;
+	dbcsr::world m_world;
 	
 	util::mpi_time TIME;
 	util::mpi_log LOG;
 	
-	// have two structs: mo_ctx, ao_ctx
-	dims m_dims;
-	moctx m_mo;
-	
 	int m_order;
-	bool m_use_ao;
-	bool m_use_sos;
-	bool m_use_lp;
 	int m_diag_order;
 	
 	int m_nroots; 
 	
+	method m_method;
+	
 	double m_c_os;
 	double m_c_osc;
 	
-	void mo_load();
+	util::registry m_reg;
 	
-	void mo_compute_diag_0();
-	void mo_compute_diag_1();
-	void mo_compute_diag();
+	dbcsr::shared_pgrid<2> m_spgrid2;
+	dbcsr::shared_pgrid<2> m_spgrid2_bo;
+	dbcsr::shared_pgrid<2> m_spgrid2_bv;
+	dbcsr::shared_pgrid<3> m_spgrid3_xbb;
+	dbcsr::shared_pgrid<3> m_spgrid3_xoo;
+	dbcsr::shared_pgrid<3> m_spgrid3_xvv;
+	dbcsr::shared_pgrid<3> m_spgrid3_xov;
 	
-	void mo_amplitudes();
+	dbcsr::shared_matrix<double> m_d_ov;
 	
-	void antisym(dbcsr::tensor<4>& t, vec<int>& o, vec<int>& v);
+	void init();
+	void init_ao_tensors();
+	void init_mo_tensors();
+	void compute_diag();
 	
-	void scale(dbcsr::tensor<4>& t, vec<double>& eo, vec<double>& ev);
+	//void mo_load();
+	
+	//void mo_compute_diag_0();
+	//void mo_compute_diag_1();
+	//void mo_compute_diag();
+	
+	//void mo_amplitudes();
+	
+	//void antisym(dbcsr::tensor<4>& t, vec<int>& o, vec<int>& v);
+	
+	//void scale(dbcsr::tensor<4>& t, vec<double>& eo, vec<double>& ev);
 	
 public:	
 
-	adcmod(desc::shf_wfn hfref, desc::options& opt, MPI_Comm comm);
+	adcmod(desc::shf_wfn hfref, desc::options& opt, dbcsr::world& w);
 	~adcmod() {}
 	
 	void compute();

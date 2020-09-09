@@ -429,6 +429,33 @@ public:
 		
 	}
 	
+	void compute_3_partial(dbcsr::shared_tensor<3>& t_in, arrvec<int,3>& idx,
+		shared_screener s_scr) {
+			
+		auto scr = s_scr.get();
+		
+		arrvec<int,3> newblks;
+		
+		for (auto x : idx[0]) {
+			for (auto m : idx[1]) {
+				for (auto n : idx[2]) {
+					
+					if (scr->skip_block(x,m,n)) continue;
+					
+					newblks[0].push_back(x);
+					newblks[1].push_back(m);
+					newblks[2].push_back(n);
+			
+				}
+			}
+		}
+		
+		t_in->reserve(newblks);
+		
+		calc_ints(*t_in, m_eng_pool, m_basvec, scr); 
+		
+	}
+	
 	std::function<void(dbcsr::shared_tensor<3>&,vec<vec<int>>&)>
 	get_generator(shared_screener s_scr) {
 		
@@ -535,6 +562,13 @@ void aofactory::ao_3c2e_fill(dbcsr::shared_tensor<3,double>& t_in,
 	}
 }
 
+void aofactory::ao_3c2e_fill(dbcsr::shared_tensor<3>& t_in, 
+	arrvec<int,3>& idx, shared_screener s_scr) {
+	
+	pimpl->compute_3_partial(t_in, idx, s_scr);
+	
+}
+				
 void aofactory::ao_eri_fill(dbcsr::shared_tensor<4,double>& t_in, 
 	vec<vec<int>>& blkbounds, shared_screener scr, bool sym) {
 	

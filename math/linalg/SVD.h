@@ -28,6 +28,8 @@ public:
 	
 	void compute();
 	
+	dbcsr::shared_matrix<double> inverse();
+	
 };
 
 } // end namespace

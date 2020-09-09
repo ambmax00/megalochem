@@ -42,6 +42,7 @@ void fockmod::init() {
 	bool compute_eris_batched = false;
 	bool compute_3c2e_batched = false;
 	bool compute_s_xx = false;
+	bool s_xx_tensor = false;
 	bool compute_s_xx_inv = false;
 	bool compute_s_xx_invsqrt = false;
 	
@@ -82,7 +83,7 @@ void fockmod::init() {
 		compute_s_xx_inv = true;
 		compute_3c2e_batched = true;
 		
-	}  else if (k_method == "batchdfmo") {
+	} else if (k_method == "batchdfmo") {
 		
 		K* builder = new BATCHED_DFMO_K(m_world,m_opt);
 		m_K_builder.reset(builder);
@@ -90,6 +91,16 @@ void fockmod::init() {
 		compute_s_xx = true;
 		compute_s_xx_invsqrt = true;
 		compute_3c2e_batched = true;
+		
+	} else if (k_method == "batchpari") {
+		
+		K* builder = new BATCHED_PARI_K(m_world,m_opt);
+		m_K_builder.reset(builder);
+		
+		compute_s_xx = true;
+		compute_s_xx_inv = true;
+		compute_3c2e_batched = true;
+		s_xx_tensor = true;
 		
 	}
 	
@@ -106,13 +117,13 @@ void fockmod::init() {
 	m_J_builder->set_density_beta(m_p_B);
 	m_J_builder->set_coeff_alpha(m_c_A);
 	m_J_builder->set_coeff_beta(m_c_B);
-	m_J_builder->set_factory(aofac);
+	m_J_builder->set_mol(m_mol);
 	
 	m_K_builder->set_density_alpha(m_p_A);
 	m_K_builder->set_density_beta(m_p_B);
 	m_K_builder->set_coeff_alpha(m_c_A);
 	m_K_builder->set_coeff_beta(m_c_B);
-	m_K_builder->set_factory(aofac);
+	m_K_builder->set_mol(m_mol);
 	
 	// initialize pgrids
 	
@@ -173,15 +184,21 @@ void fockmod::init() {
 			
 		}
 		
-		auto x = m_mol->dims().x();
-		arrvec<int,2> xx = {x,x};
+		if (s_xx_tensor) {
+			
+			auto x = m_mol->dims().x();
+			arrvec<int,2> xx = {x,x};
+			
+			auto s_xx_01 = dbcsr::tensor_create<2>().name("s_xx")
+				.pgrid(spgrid2).map1({0}).map2({1}).blk_sizes(xx).get();
+				
+			dbcsr::copy_matrix_to_tensor(*c_s_xx, *s_xx_01);
+			m_reg.insert_tensor<2,double>("s_xx", s_xx_01);		
+				
+		}	
 		
-		auto s_xx_01 = dbcsr::tensor_create<2>().name("s_xx")
-			.pgrid(spgrid2).map1({0}).map2({1}).blk_sizes(xx).get();
-			
-		dbcsr::copy_matrix_to_tensor(*c_s_xx, *s_xx_01);
-		m_reg.insert_tensor<2,double>("s_xx", s_xx_01);		
-			
+		m_reg.insert_matrix<double>("s_xx_mat", c_s_xx);
+		
 		t_eri.finish();
 		
 	}

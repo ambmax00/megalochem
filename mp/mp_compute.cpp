@@ -1,5 +1,6 @@
 #include "mp/mpmod.h"
 #include "mp/mp_defaults.h"
+#include "mp/z_builder.h"
 #include "math/laplace/laplace.h"
 #include "math/solvers/hermitian_eigen_solver.h"
 #include "math/linalg/LLT.h"
@@ -36,22 +37,8 @@ void mpmod::compute_batch() {
 	auto& scrtime = TIME.sub("Computing screener");
 	auto& calcints = TIME.sub("Computing integrals");
 	auto& invtime = TIME.sub("Inverting metric");
-	auto& fetchints1 = TIME.sub("Fetching 3c2e ints (1)");
-	auto& fetchints2 = TIME.sub("Fetching 3c2e ints (2)");
 	auto& pseudotime = TIME.sub("Forming pseudo densities");
 	auto& pcholtime = TIME.sub("Pivoted cholesky decomposition");
-	auto& firsttran = TIME.sub("First transform");
-	auto& sectran = TIME.sub("Second transform");
-	auto& fintran = TIME.sub("Final transform");
-	auto& reo1 = TIME.sub("Reordering (1)");
-	auto& reo2 = TIME.sub("Reordering (2)");
-	auto& reo3 = TIME.sub("Reordering (3)");
-	auto& reo_ints1 = TIME.sub("Reordering ints (1)");
-	auto& reo_ints2 = TIME.sub("Reordering ints (2)");
-	auto& readtime = TIME.sub("Decompressing B_xBB");
-	auto& writetime = TIME.sub("Decompressing B_xBB");
-	auto& viewtime = TIME.sub("Setting view");
-	auto& formZ = TIME.sub("Forming Z");
 	auto& formZtilde = TIME.sub("Forming Z tilde");
 	auto& redtime = TIME.sub("Reduction");
 	
@@ -170,7 +157,7 @@ void mpmod::compute_batch() {
 		
 	for (int ix = 0; ix != nxbatches; ++ix) {
 		for (int inu = 0; inu != nnbatches; ++inu) {
-		
+			
 			vec<vec<int>> blkbounds = {
 				x_blk_bounds[ix],
 				mu_fullblk_bounds,
@@ -183,25 +170,15 @@ void mpmod::compute_batch() {
 			}
 			
 			B_xbb_batch->compress({ix,inu}, B_xbb);
-		
 		}
 		
 	}
 	
-	/*for (auto v : eri_blk_idx) {
-		std::cout << "BATCH" << std::endl;
-		for (auto a : v) {
-			for (auto i : a) {
-				std::cout << i << " ";
-			} std::cout << std::endl;
-		}
-	}*/
-	
-	auto eri = B_xbb_batch->get_stensor();
-	
-	//dbcsr::print(*eri);
-	
 	B_xbb_batch->compress_finalize();
+	
+	util::registry reg;
+	
+	reg.insert_btensor<3,double>("i_xbb_batched", B_xbb_batch);
 	
 	calcints.finish();
 	
@@ -283,40 +260,34 @@ void mpmod::compute_batch() {
 	auto pseudo_vir = dbcsr::create_template(p_vir)
 		.name("Pseudo Density (VIR)").get();
 		
-	auto Z_XX = dbcsr::create_template(Ctilde_xx)
-		.name("Z_xx")
-		.matrix_type(dbcsr::type::no_symmetry)
-		.get();
-		
 	auto Ztilde_XX = dbcsr::create_template(Ctilde_xx)
 		.name("Ztilde_xx")
 		.matrix_type(dbcsr::type::no_symmetry)
 		.get();
-	
-	arrvec<int,2> bb = {b,b};
-	arrvec<int,2> xx = {x,x};
-	
-	auto pseudo_vir_0_1 = dbcsr::tensor_create<2,double>()
-		.pgrid(spgrid2).name("pseudo_vir_0_1")
-		.map1({0}).map2({1}).blk_sizes(bb).get();
 		
-	auto Z_XX_0_1 = dbcsr::tensor_create<2,double>()
-		.pgrid(spgrid2).name("Z_xx_0_1")
-		.map1({0}).map2({1}).blk_sizes(xx).get();
-				
-	auto B_xBB_0_12_wr = dbcsr::tensor_create_template<3,double>(B_xbb)
-		.name("B_XBB_0_12").map1({0}).map2({1,2}).get();
-		
-	auto B_xBB_1_02 = dbcsr::tensor_create_template<3,double>(B_xbb)
-		.name("B_XBB_1_02").map1({1}).map2({0,2}).get();
-	
-	dbcsr::sbtensor<3,double> B_xBB_batch = 
-		std::make_shared<dbcsr::btensor<3,double>>(B_xBB_0_12_wr,nbatches,intermed_type,1);
-	
 	double mp2_energy = 0.0;
 	
 	//==================================================================
-	//                   BEGIN LAPLACE QUADRATURE
+	//                          SETUP Z BUILDER 
+	//==================================================================
+	
+	std::string zmethod = m_opt.get<std::string>("build_Z", MP_BUILD_Z);
+	
+	Z* zbuilder = nullptr;
+	
+	if (zmethod == "LLMPFULL") {
+		zbuilder = new LLMP_FULL_Z(m_world, m_opt);
+	} else if (zmethod == "LLMPMEM") {
+		zbuilder = new LLMP_MEM_Z(m_world, m_opt);
+	}
+	
+	if (zbuilder == nullptr) throw std::runtime_error("Invalid z builder!");
+	
+	zbuilder->set_reg(reg);
+	zbuilder->init_tensors();
+	
+	//==================================================================
+	//                      BEGIN LAPLACE QUADRATURE
 	//==================================================================
 	
 	for (int ilap = 0; ilap != nlap; ++ilap) {
@@ -382,277 +353,19 @@ void mpmod::compute_batch() {
 		
 		LOG.os<>("Occupancy of L: ", L_bu->occupation()*100, "%\n");
 		
-		arrvec<int,2> bu = {b,u};
-		arrvec<int,3> xub = {x,u,b};
-		
-		std::array<int,2> bu_sizes = {nbf, rank};
-		
-		std::array<int,3> xub_sizes = {dfnbf, rank, nbf};
-		
-		auto spgrid2_bu = dbcsr::create_pgrid<2>(m_world.comm())
-			.tensor_dims(bu_sizes).get();
-			
-		auto spgrid3_xub = dbcsr::create_pgrid<3>(m_world.comm())
-			.tensor_dims(xub_sizes).get();
-		
-		auto L_bu_0_1 = dbcsr::tensor_create<2,double>()
-			.pgrid(spgrid2_bu).name("L_bu_0_1")
-			.map1({0}).map2({1}).blk_sizes(bu).get();
-	
-		auto B_xub_1_02 = dbcsr::tensor_create<3,double>()
-			.pgrid(spgrid3_xub).name("B_Xub_1_02").map1({1}).map2({0,2})
-			.blk_sizes(xub).get();
-		
-		auto B_xub_2_01 = 
-			dbcsr::tensor_create_template<3,double>(B_xub_1_02)
-			.name("B_Xub_2_01").map1({2}).map2({0,1}).get();
-		
-		auto B_xuB_2_01 = 
-			dbcsr::tensor_create_template<3,double>(B_xub_1_02)
-			.name("B_XuB_2_01").map1({2}).map2({0,1}).get();
-		
-		//copy over
-		dbcsr::copy_matrix_to_tensor(*L_bu, *L_bu_0_1);
 		pcholtime.finish();
 				
 		//============== B_X,B,B = B_x,b,b * Lo_o,b * Pv_b,b 
 		
-		B_xbb_batch->decompress_init({0});
-		B_xBB_batch->compress_init({0,2});
+		zbuilder->set_occ_coeff(L_bu);
+		zbuilder->set_vir_density(pseudo_vir);
 		
-		LOG.os<1>("Starting batching over auxiliary functions.\n");
-				
-		// LOOP OVER BATCHES OF AUXILIARY FUNCTIONS 
-		for (int ix = 0; ix != B_xbb_batch->nbatches_dim(0); ++ix) {
-			
-			LOG.os<1>("-- (X) Batch ", ix, "\n");
-			
-			LOG.os<1>("-- Fetching ao ints...\n");
-			fetchints1.start();
-			B_xbb_batch->decompress({ix});
-			fetchints1.finish();
-			
-			auto B_xbb_1_02 = B_xbb_batch->get_stensor();
-						
-			// first transform 
-		    LOG.os<1>("-- First transform.\n");
-		    
-		    vec<vec<int>> x_nu_bounds = { 
-				B_xbb_batch->bounds(0)[ix], 
-				B_xbb_batch->full_bounds(2)
-			};
-		    
-		    firsttran.start();
-		    dbcsr::contract(*L_bu_0_1, *B_xbb_1_02, *B_xub_1_02)
-				.bounds3(x_nu_bounds).perform("mi, Xmn -> Xin");
-		    firsttran.finish();
-		    
-		    // reorder
-			LOG.os<1>("-- Reordering B_xob.\n");
-			reo1.start();
-			dbcsr::copy(*B_xub_1_02, *B_xub_2_01).move_data(true).perform();
-			reo1.finish();
-			
-			//dbcsr::print(*B_xob_2_01);
-			
-			//copy over vir density
-			dbcsr::copy_matrix_to_tensor(*pseudo_vir, *pseudo_vir_0_1);
+		zbuilder->compute();
+		auto Z_XX = zbuilder->zmat();
 		
-			// new loop over nu
-			for (int inu = 0; inu != B_xBB_batch->nbatches_dim(2); ++inu) {
-				
-				LOG.os<1>("---- (NU) Batch ", inu, "\n");
-				
-				// second transform
-				LOG.os<1>("---- Second transform.\n");
-				
-				vec<vec<int>> nu_bounds = { B_xBB_batch->bounds(2)[inu] };
-				vec<vec<int>> x_u_bounds = { 
-					B_xBB_batch->bounds(0)[ix],
-					vec<int>{0, rank - 1}
-				};
-				
-				sectran.start();
-				dbcsr::contract(*pseudo_vir_0_1, *B_xub_2_01, *B_xuB_2_01)
-					.bounds2(nu_bounds).bounds3(x_u_bounds)
-					.filter(dbcsr::global::filter_eps)
-					.perform("Nn, Xin -> XiN");
-				sectran.finish();
-			
-				// reorder
-				LOG.os<1>("---- Reordering B_xoB.\n");
-				reo2.start();
-				dbcsr::copy(*B_xuB_2_01, *B_xub_1_02).move_data(true).perform();
-				reo2.finish();
-				
-				//dbcsr::print(*B_xob_1_02);
+		dbcsr::print(*Z_XX);
 		
-				// final contraction
-				//B_xBB_1_02->reserve_template(*B_xbb_1_02);
-			
-				LOG.os<1>("-- Final transform.\n");
-				
-				vec<vec<int>> x_nu_bounds = {
-					B_xBB_batch->bounds(0)[ix],
-					B_xBB_batch->bounds(2)[inu]
-				};
-				
-				if (force_sparsity) {
-					
-					arrvec<int,3> res;
-					
-					auto nblksloc = B_xBB_1_02->nblks_local();
-					int nblksloctot = nblksloc[0] * nblksloc[1] * nblksloc[2];
-					
-					LOG.os<1>("LOCBLK: ", nblksloctot, '\n');
-					
-					for (auto& r : res) r.reserve(nblksloctot);
-					
-					// get relevant blocks using Z_mn matrix
-					auto B_xBB_blkidx = B_xBB_1_02->blks_local();
-					
-					for (auto imu : B_xBB_blkidx[1]) {
-						for (auto inu : B_xBB_blkidx[2]) {
-							
-							if (s_scr->blknorm_bb(imu,inu) < 
-								dbcsr::global::filter_eps)
-								continue; 
-							
-							for (auto ix : B_xBB_blkidx[0]) {
-								res[0].push_back(ix);
-								res[1].push_back(imu);
-								res[2].push_back(inu);
-							}
-						}
-					}
-					
-					B_xBB_1_02->reserve(res);
-					
-				}
-												
-				fintran.start();
-				dbcsr::contract(*L_bu_0_1, *B_xub_1_02, *B_xBB_1_02)
-					.bounds3(x_nu_bounds)
-					.retain_sparsity(force_sparsity)
-					.perform("Mi, XiN -> XMN");
-				fintran.finish();
-		
-				// reorder
-				LOG.os<1>("---- B_xBB.\n");
-				reo3.start();
-				dbcsr::copy(*B_xBB_1_02, *B_xBB_0_12_wr).move_data(true).perform();
-				reo3.finish();
-				
-				//dbcsr::print(*B_xBB_0_12_wr);
-				
-				//dbcsr::print(*B_xBB_0_12);
-				
-				LOG.os<1>("---- Writing B_xBB to disk.\n");
-				writetime.start();
-				B_xBB_batch->compress({ix,inu},B_xBB_0_12_wr);
-				writetime.finish();
-								
-			}
-			
-		}
-		
-		B_xbb_batch->decompress_finalize();
-		B_xBB_batch->compress_finalize();
-		
-		LOG.os<>("Occupation of B_xBB: ", B_xBB_batch->occupation()*100, "%\n"); 
-		
-		LOG.os<>("Finished batching.\n");
-		
-		LOG.os<>("Reordering ints 1|02 -> 0|12 \n");
-		
-		reo_ints1.start();
-		B_xbb_batch->reorder(vec<int>{0},vec<int>{1,2});
-		reo_ints1.finish();
-		
-		LOG.os<>("Setting up decompression.\n");
-		
-		viewtime.start();
-		B_xbb_batch->decompress_init({2});
-		B_xBB_batch->decompress_init({0,2});
-		viewtime.finish();
-		
-		auto x_bbounds = B_xbb_batch->bounds(0);
-		auto nu_bbounds = B_xbb_batch->bounds(2);
-		auto mu_bounds = B_xbb_batch->full_bounds(1);
-		
-		LOG.os<>("Computing Z_XY.\n");
-		
-		//Z_XX_0_1->batched_contract_init();
-		
-		for (int inu = 0; inu != nu_bbounds.size(); ++inu) {
-			
-			LOG.os<>("-- Fetching integral batch (n)", inu, "\n");
-				
-			fetchints2.start();
-			B_xbb_batch->decompress({2});
-			fetchints2.finish();
-			
-			B_xbb_batch->decompress({inu});
-			
-			auto B_xbb_0_12 = B_xbb_batch->get_stensor();
-			
-			for (int ix = 0; ix != x_bbounds.size(); ++ix) {
-				
-				LOG.os<>("---- Batch: ", inu, " ", ix, '\n');
-				
-				LOG.os<>("---- Fetching intermediate batch (x/n)",
-					ix, " ", inu, "\n");
-				
-				readtime.start();
-				B_xBB_batch->decompress({ix,inu});
-				readtime.finish();
-				
-				auto B_xBB_0_12 = B_xBB_batch->get_stensor();
-				
-				vec<vec<int>> mn_bounds = {
-					mu_bounds,
-					nu_bbounds[inu]
-				};
-				
-				vec<vec<int>> x_bounds = {
-					x_bbounds[ix]
-				};
-				
-				// form Z
-				LOG.os<>("---- Forming Z.\n");
-				
-				formZ.start();
-				dbcsr::contract(*B_xBB_0_12, *B_xbb_0_12, *Z_XX_0_1)
-					.beta(1.0)
-					.bounds1(mn_bounds)
-					.bounds3(x_bounds)
-					.filter(dbcsr::global::filter_eps/x_bbounds.size())
-					.perform("Mmn, Nmn -> MN");
-				formZ.finish();
-				
-			}
-		}
-		
-		B_xbb_batch->decompress_finalize();
-		B_xBB_batch->decompress_finalize();
-		
-		B_xBB_batch->reset();
-		
-		LOG.os<>("Reordering ints 0|12 -> 1|02 \n");
-		
-		reo_ints2.start();
-		B_xbb_batch->reorder(vec<int>{1},vec<int>{0,2});
-		reo_ints2.finish();
-		
-		//Z_XX_0_1->batched_contract_finalize();	
-		
-		LOG.os<1>("Finished batching.\n");
-
 		formZtilde.start();
-		
-		// copy
-		dbcsr::copy_tensor_to_matrix(*Z_XX_0_1, *Z_XX);
-		Z_XX_0_1->clear();
 		
 		// multiply
 		LOG.os<1>("Ztilde = Z * Jinv\n");
@@ -730,7 +443,10 @@ void mpmod::compute_batch() {
 	
 	TIME.finish();
 	
+	zbuilder->print_info();
 	TIME.print_info();
+	
+	delete zbuilder;
 	
 }
 

@@ -1,32 +1,37 @@
 #include "adc/adcmod.h"
-#include "adc/adc_ri_u1.h"
-#include "tensor/dbcsr_conversions.h"
+#include "adc/adc_mvp.h"
 #include "math/solvers/davidson.h"
 
-#include <algorithm>
-
-#include <fstream>
-#include <sstream>
+#include <dbcsr_conversions.hpp>
 
 namespace adc {
 
 void adcmod::compute() {
-
+	
+		// BEFORE: init tensors base (ints, metrics, etc..., put into m_reg)
+		
+		init_ao_tensors();
+		
+		// AFTER: init tensors (2) (mo-ints, diags, amplitudes ...) 
+		
+		init_mo_tensors();
+				
+		// SECOND: Generate guesses
+		
+		compute_diag();
+		
 		LOG.os<>("--- Starting Computation ---\n\n");
-		
-		dbcsr::pgrid<2> grid2(m_comm);
-		
+				
 		int nocc = m_hfwfn->mol()->nocc_alpha();
 		int nvir = m_hfwfn->mol()->nvir_alpha();
+		auto epso = m_hfwfn->eps_occ_A();
+		auto epsv = m_hfwfn->eps_vir_A();
 		
-		//exit(0);
-		
-		LOG.os<>("Computing Diagonal for Davidson Conditioning...\n\n");
-		mo_compute_diag();
-		
-		LOG.os<>("Conputing guess vectors...\n\n");
+		LOG.os<>("Computing guess vectors...\n");
 		// now order it : there is probably a better way to do it
-		auto eigen_ia = dbcsr::tensor_to_eigen(*m_mo.d_ov);
+		auto eigen_ia = dbcsr::matrix_to_eigen(m_d_ov);
+		
+		//std::cout << eigen_ia << std::endl;
 		
 		std::vector<int> index(eigen_ia.size(), 0);
 		for (int i = 0; i!= index.size(); ++i) {
@@ -38,75 +43,157 @@ void adcmod::compute() {
 				return (eigen_ia.data()[a] < eigen_ia.data()[b]);
 		});
 		
-		for (auto i : index) {
-			std::cout << i << " ";
-		} std::cout << std::endl;
-		
-		std::vector<dbcsr::stensor<2>> dav_guess(m_nroots);
+		std::vector<dbcsr::shared_matrix<double>> dav_guess(m_nroots);
 			
 		// generate the guesses
 		
-		vec<int> map1 = {0};
-		vec<int> map2 = {1};
-		arrvec<int,2> blksizes = {m_dims.o, m_dims.v};
+		auto o = m_hfwfn->mol()->dims().oa();
+		auto v = m_hfwfn->mol()->dims().va();
 		
 		for (int i = 0; i != m_nroots; ++i) {
 			
-			std::cout << "on guess: " << i << std::endl;
+			LOG.os<>("Guess ", i, '\n');
 			
 			Eigen::MatrixXd mat = Eigen::MatrixXd::Zero(nocc,nvir);
 			mat.data()[index[i]] = 1.0;
 			
 			std::string name = "guess_" + std::to_string(i);
-			std::cout << name << std::endl;
 			
-			auto ten = dbcsr::eigen_to_tensor(mat, name, grid2, map1, map2, blksizes);
-			auto sten = ten.get_stensor();
+			auto guessmat = dbcsr::eigen_to_matrix(mat, m_world, name,
+				o, v, dbcsr::type::no_symmetry);
 			
-			dav_guess[i] = sten;
+			dav_guess[i] = guessmat;
 			
-			dbcsr::print(*sten);
-			
-		}
-		
-		ri_adc1_u1 ri_adc1(m_mo.eps_o, m_mo.eps_v, m_mo.b_xoo, m_mo.b_xov, m_mo.b_xvv); 
-		
-		math::davidson<ri_adc1_u1> dav = math::davidson<ri_adc1_u1>::create()
-			.factory(ri_adc1).diag(m_mo.d_ov);
-		
-		LOG.os<>("Running ADC(1) davidson...\n\n");
-		dav.compute(dav_guess, m_nroots);
-		
-		auto rvs = dav.ritz_vectors();
-		
-		auto rn = rvs[m_nroots - 1];
-		double omega = dav.eigval();
-
-		// compute ADC2
-		if (!m_use_sos) {
-			
-			ri_adc2_diis_u1 ri_adc2(m_mo.eps_o, m_mo.eps_v, m_mo.b_xoo, m_mo.b_xov, m_mo.b_xvv, m_mo.t_ovov);
-		
-			math::modified_davidson<ri_adc2_diis_u1> dav
-				= math::modified_davidson<ri_adc2_diis_u1>::create()
-				.factory(ri_adc2).diag(m_mo.d_ov);
-			
-			LOG.os<>("Running RI-ADC(2)...\n\n");
-			dav.compute(rvs, m_nroots, omega);
-			
-		} else {
-			
-			std::cout << "SOS" << std::endl;
-			lp_ri_adc2_diis_u1 ri_adc2(m_mo.eps_o, m_mo.eps_v, m_mo.b_xoo, m_mo.b_xov, m_mo.b_xvv);
-		
-			//math::modified_davidson<lp_ri_adc2_diis_u1> dav 
-			//	= math::modified_davidson<lp_ri_adc2_diis_u1>::create()
-			//	.factory(ri_adc2).diag(m_mo.d_ov);
-			
-			LOG.os<>("Running SOS-RI-ADC(2)...\n\n");
-			//dav.compute(rvs, m_nroots, omega);
+			//dbcsr::print(*guessmat);
 			
 		}
+		
+		MVP* mvfacptr = new MVP_ao_ri_adc2(m_world, m_hfwfn->mol(), 
+			m_opt, m_reg, epso, epsv);
+		std::shared_ptr<MVP> mvfac(mvfacptr);
+		
+		mvfac->init();
+		auto out = mvfac->compute(dav_guess[0], 0.3); 
+		
+		double t = out->dot(*dav_guess[0]);
+		std::cout << "DOT: " << t << std::endl;
+		
+		exit(0); 
+		
+		math::davidson<MVP> dav(m_world.comm(), LOG.global_plev());
+		
+		dav.set_factory(mvfac);
+		dav.set_diag(m_d_ov);
+		dav.pseudo(false);
+		dav.conv(1e-6);
+		dav.maxiter(100);	
+		
+		int nroots = m_opt.get<int>("nroots", ADC_NROOTS);
+		
+		dav.compute(dav_guess, nroots);
+		
+		LOG.os<>("Excitation energy of state nr. ", m_nroots, ": ", dav.eigval(), '\n');
+		
+		auto rvecs = dav.ritz_vectors();
+		auto vec_k = rvecs[m_nroots-1];
+		
+		auto vec_k_e = dbcsr::matrix_to_eigen(vec_k);
+		double thresh = 1e-6;
+		
+		std::vector<int> occs, virs;
+		
+		LOG.os<>("State involves the orbital(s):\n");
+		for (int iocc = 0; iocc != vec_k_e.rows(); ++iocc) {
+			for (int ivir = 0; ivir != vec_k_e.cols(); ++ivir) {
+				if (fabs(vec_k_e(iocc,ivir)) >= thresh) {
+					LOG.os<>(iocc, " -> ", ivir, " : ", vec_k_e(iocc,ivir), '\n');
+					occs.push_back(iocc);
+					virs.push_back(ivir);
+				}
+			}
+		}
+		
+		auto get_unique = [](std::vector<int>& vec) {
+			std::sort(vec.begin(), vec.end());
+			vec.erase(unique( vec.begin(), vec.end() ), vec.end());
+		};
+		
+		// which AOs are involved?
+		get_unique(occs);
+		get_unique(virs);
+		
+		auto c_bo = m_hfwfn->c_bo_A();
+		auto c_bv = m_hfwfn->c_bv_A();
+		
+		auto c_bo_e = dbcsr::matrix_to_eigen(c_bo);
+		auto c_bv_e = dbcsr::matrix_to_eigen(c_bv);
+		
+		// OCC
+		std::vector<int> aolist;
+		
+		auto get_aos = [&](std::vector<int>& list, std::vector<int> mlist,
+			Eigen::MatrixXd& c_bm) {
+		
+			for (auto im : mlist) {
+				std::cout << "CHECKING " << im << std::endl;
+				for (int ibas = 0; ibas != c_bm.rows(); ++ibas) {
+					if (fabs(c_bm(ibas,im)) >= thresh) {
+						list.push_back(ibas);
+						std::cout << ibas << " ";
+					}
+				}
+				std::cout << std::endl;
+			}
+		};
+		
+		std::cout << "DO OCCS" << std::endl;
+		get_aos(aolist, occs, c_bo_e);
+		std::cout << "DO VIRS" << std::endl;
+		get_aos(aolist, virs, c_bv_e);
+		
+		get_unique(aolist);
+		
+		LOG.os<>("AOs involved: \n");
+		for (auto l : aolist) {
+			LOG.os<>(l, " ");
+		} LOG.os<>('\n');
+		
+		auto get_shell_to_block = [&](std::vector<int>& list, std::vector<int>& offs) {
+			
+			vec<int> ao_to_block;
+			
+			for (auto l : list) {
+			
+				int a = -1;
+			
+				for (int ioff = 0; ioff != offs.size()-1; ++ioff) {
+					if (l >= offs[ioff] && l < offs[ioff+1]) {
+						a = ioff;
+						ao_to_block.push_back(ioff);
+						break;
+					}
+				}
+				
+				if (a == -1) ao_to_block.push_back(offs.size()-1);
+				
+			}
+			
+			return ao_to_block;
+			
+		};
+		
+		auto boff = c_bo->row_blk_offsets();
+		
+		auto aoblk = get_shell_to_block(aolist, boff);
+		get_unique(aoblk);
+		
+		auto atoms = m_hfwfn->mol()->atoms();
+		auto blkatom = m_hfwfn->mol()->c_basis().block_to_atom(atoms);
+		
+		LOG.os<>("ATOM CENTRES:\n");
+		for (auto a : aoblk) {
+			LOG.os<>(blkatom[a], " ");
+		} LOG.os<>('\n');
 		
 }
 
