@@ -280,10 +280,14 @@ void fockmod::init() {
 		
 		auto eris = aofac->ao_eri_setup_tensor(spgrid4, vec<int>{0,1}, vec<int>{2,3});
 		
-		int nbatches = m_opt.get<int>("nbatches", 4);
+		int nbatches_b = m_opt.get<int>("nbatches_x", FOCK_NBATCHES_B);
+		std::array<int,4> bdims = {nbatches_b};
 		
-		dbcsr::sbtensor<4,double> eri_batched =
-			std::make_shared<dbcsr::btensor<4,double>>(eris,nbatches,dbcsr::core,LOG.global_plev());
+		auto eri_batched = dbcsr::btensor_create<4>(eris)
+			.batch_dims(bdims)
+			.btensor_type(dbcsr::btype::core)
+			.print(LOG.global_plev())
+			.get();
 					
 		eri_batched->compress_init({2,3});
 		
@@ -337,15 +341,18 @@ void fockmod::init() {
 		auto eri = aofac->ao_3c2e_setup_tensor(spgrid3_xbb, vec<int>{0}, vec<int>{1,2});
 		auto genfunc = aofac->get_generator(scr_s);
 		
-		dbcsr::btype mytype = dbcsr::core;
+		dbcsr::btype mytype = dbcsr::get_btype(eris_mem);
 		
-		if (eris_mem == "direct") mytype = dbcsr::direct;
-		if (eris_mem == "disk") mytype = dbcsr::disk; 
+		int nbatches_x = m_opt.get<int>("nbatches_x", FOCK_NBATCHES_X);
+		int nbatches_b = m_opt.get<int>("nbatches_b", FOCK_NBATCHES_B);
 		
-		int nbatches = m_opt.get<int>("nbatches", 4);
+		std::array<int,3> bdims = {nbatches_x,nbatches_b,nbatches_b};
 		
-		dbcsr::sbtensor<3,double> eribatch = 
-			std::make_shared<dbcsr::btensor<3,double>>(eri,nbatches,mytype,LOG.global_plev());
+		auto eribatch = dbcsr::btensor_create<3>(eri)
+			.batch_dims(bdims)
+			.btensor_type(mytype)
+			.print(LOG.global_plev())
+			.get();
 		
 		eribatch->set_generator(genfunc);
 		
@@ -363,7 +370,7 @@ void fockmod::init() {
 				bounds[1] = mufullblkbounds;
 				bounds[2] = nublkbounds[inu];
 				
-				if (mytype != dbcsr::direct) aofac->ao_3c2e_fill(eri,bounds,scr_s);
+				if (mytype != dbcsr::btype::direct) aofac->ao_3c2e_fill(eri,bounds,scr_s);
 				
 				//dbcsr::print(*eri);
 				eri->filter(dbcsr::global::filter_eps);

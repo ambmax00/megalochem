@@ -13,11 +13,18 @@
 
 namespace dbcsr {
 	
-enum btype {
+enum class btype {
 	invalid,
 	core,
 	disk,
 	direct
+};
+
+inline btype get_btype(std::string str) {
+	if (str == "core") return btype::core;
+	if (str == "disk") return btype::disk;
+	if (str == "direct") return btype::direct;
+	return btype::invalid;
 };
 
 inline vec<vec<int>> make_blk_bounds(std::vector<int> blksizes, int nbatches) {
@@ -54,7 +61,7 @@ inline vec<vec<int>> make_blk_bounds(std::vector<int> blksizes, int nbatches) {
 template <int N, typename T, 
 	typename = typename std::enable_if<(N >= 2 && N <= 4)>::type>
 class btensor {
-private:
+protected:
 
 	MPI_Comm m_comm;
 	util::mpi_log LOG;
@@ -118,7 +125,7 @@ private:
 public:
 
 	/* batchsize: given in MB */
-	btensor(dbcsr::stensor<N,T>& stensor_in, int nbatches, 
+	btensor(dbcsr::stensor<N,T>& stensor_in, std::array<int,N> nbatches, 
 		btype mytype, int print = -1) : 
 		m_comm(stensor_in->comm()),
 		m_filename(),
@@ -127,7 +134,7 @@ public:
 		m_type(mytype)
 	{
 		
-		if (m_type == invalid) {
+		if (m_type == btype::invalid) {
 			throw std::runtime_error("Invalid mode for batchtensor.\n");
 		}
 		
@@ -149,7 +156,7 @@ public:
 		auto blksizes = m_stensor->blk_sizes();
 		
 		for (int i = 0; i != N; ++i) {
-			m_blk_bounds[i] = make_blk_bounds(blksizes[i],nbatches);
+			m_blk_bounds[i] = make_blk_bounds(blksizes[i],nbatches[i]);
 			m_nbatches_dim[i] = m_blk_bounds[i].size();
 			// check if memory sufficient
 			
@@ -173,7 +180,7 @@ public:
 			} LOG.os<1>('\n');
 		}
 		
-		if (m_type == disk) {
+		if (m_type == btype::disk) {
 			create_file();
 		}
 		
@@ -240,14 +247,14 @@ public:
 		
 		m_stensor->clear();
 		reset_var();
-		if (m_type == disk) {
+		if (m_type == btype::disk) {
 			delete_file();
 			create_file();
 		}
 		
 	}
 	
-	~btensor() { if (m_type == disk) delete_file(); }
+	~btensor() { if (m_type == btype::disk) delete_file(); }
 	
 	int flatten(vec<int>& idx, vec<int>& dims) {
 		
@@ -340,11 +347,11 @@ public:
 		vec<int> idx = idx_list;
 		
 		switch(m_type) {
-			case disk: compress_disk(idx,tensor_in);
+			case btype::disk: compress_disk(idx,tensor_in);
 			break;
-			case core: compress_core(idx,tensor_in);
+			case btype::core: compress_core(idx,tensor_in);
 			break;
-			case direct: compress_direct(tensor_in);
+			case btype::direct: compress_direct(tensor_in);
 			break;
 		}
 		
@@ -555,7 +562,7 @@ public:
 	
 	void clear() {
 		
-		if (m_type != core) m_stensor->clear();
+		if (m_type != btype::core) m_stensor->clear();
 		
 	}
 	
@@ -593,7 +600,7 @@ public:
 		stensor<N,T> newtensor = tensor_create_template<N,T>(m_stensor)
 			.name(m_stensor->name()).map1(map1).map2(map2).get();
 			
-		if (m_type == core) {
+		if (m_type == btype::core) {
 			dbcsr::copy(*m_stensor, *newtensor).move_data(true).perform();
 		}
 		
@@ -606,7 +613,7 @@ public:
 		stensor<N,T> newtensor = tensor_create_template<N,T>(mytensor)
 			.name(m_stensor->name()).get();
 			
-		if (m_type == core) {
+		if (m_type == btype::core) {
 			dbcsr::copy(*m_stensor, *newtensor).move_data(true).perform();
 		}
 		
@@ -816,7 +823,7 @@ public:
 		m_read_current_is_contiguous = (dims == m_wrview.dims) ? true : false;
 		m_read_current_dims = dims;
 		
-		if (m_type != disk) return;
+		if (m_type != btype::disk) return;
 		
 		if (!m_read_current_is_contiguous) {
 			
@@ -840,11 +847,11 @@ public:
 		vec<int> idx = idx_list;
 		
 		switch(m_type) {
-			case disk : decompress_disk(idx);
+			case btype::disk : decompress_disk(idx);
 			break;
-			case direct : decompress_direct(idx);
+			case btype::direct : decompress_direct(idx);
 			break;
-			case core : decompress_core(idx);
+			case btype::core : decompress_core(idx);
 			break;
 		}
 		
@@ -1141,7 +1148,7 @@ public:
 	}
 	
 	void decompress_finalize() {
-		if (m_type != core) m_stensor->clear();
+		if (m_type != btype::core) m_stensor->clear();
 	}
 		
 	dbcsr::stensor<N,T> get_stensor() { return m_stensor; }
@@ -1188,13 +1195,53 @@ public:
 	}
 	
 	btype get_type() { return m_type; }
-
+	
+	std::array<int,N> batch_dims() {
+		return m_nbatches_dim;
+	}
 	
 }; //end class btensor
 
 template <int N, typename T>
 using sbtensor = std::shared_ptr<btensor<N,T>>;
+
+template <int N, typename T>
+class btensor_create_base {
+private:
+
+	shared_tensor<N,T> c_tplate;
+	std::array<int,N> c_bdims;
+	dbcsr::btype c_btype;
+	int c_print;
 	
+public:
+
+	btensor_create_base(dbcsr::shared_tensor<N,T>& tplate) : c_tplate(tplate) {}
+	
+	btensor_create_base& batch_dims(std::array<int,N> t_bdims) {
+		c_bdims = t_bdims; return *this;
+	}
+	
+	btensor_create_base& btensor_type(btype t_btype) {
+		c_btype = t_btype; return *this;
+	}
+	
+	btensor_create_base& print(int n) {
+		c_print = n; return *this;
+	}
+	
+	sbtensor<N,T> get() {
+		auto out = std::make_shared<btensor<N,T>>(c_tplate,c_bdims,c_btype,c_print);
+		return out;
+	}
+
+};
+
+template <int N, typename T = double>
+btensor_create_base<N,T> btensor_create(shared_tensor<N,T>& tplate) {
+	return btensor_create_base<N,T>(tplate);
+}
+
 } //end namespace
 
 #endif

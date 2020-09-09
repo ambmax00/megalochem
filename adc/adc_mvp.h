@@ -81,7 +81,7 @@ public:
 class MVP_ao_ri_adc2 : public MVP {
 private:
 
-	int m_nbatches;
+	std::array<int,3> m_nbatches;
 	dbcsr::btype m_bmethod;
 
 	smat m_c_bo;

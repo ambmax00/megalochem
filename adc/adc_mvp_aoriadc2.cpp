@@ -267,17 +267,6 @@ void MVP_ao_ri_adc2::init() {
 	
 	LOG.os<>("Initializing AO-ADC(2)\n");
 	
-	m_nbatches = m_opt.get<int>("nbatches", ADC_NBATCHES);
-	auto bmethod_str = m_opt.get<std::string>("intermeds", ADC_INTERMEDS);
-	
-	m_bmethod = dbcsr::invalid;
-	
-	if (bmethod_str == "core") {
-		m_bmethod = dbcsr::core;
-	} else if (bmethod_str == "disk") {
-		m_bmethod = dbcsr::disk;
-	}
-	
 	// laplace
 	LOG.os<>("Computing laplace points.\n");
 	
@@ -371,6 +360,11 @@ void MVP_ao_ri_adc2::init() {
 	m_s_xx_inv = m_reg.get_matrix<double>("s_xx_inv_mat");
 	
 	m_eri_batched = m_reg.get_btensor<3,double>("i_xbb_batched");
+	
+	m_nbatches = m_eri_batched->batch_dims();
+	auto bmethod_str = m_opt.get<std::string>("intermeds", ADC_INTERMEDS);
+	
+	m_bmethod = dbcsr::get_btype(bmethod_str);
 	
 	m_spgrid2 = dbcsr::create_pgrid<2>(m_world.comm()).get();
 	
@@ -665,10 +659,12 @@ dbcsr::sbtensor<3,double> MVP_ao_ri_adc2::compute_J(smat& u_ao) {
 		.name("J_xbb_2_01")
 		.map1({2}).map2({0,1})
 		.get();
-		
-	auto J_xbb_batched = 
-		std::make_shared<dbcsr::btensor<3,double>>
-			(J_xbb_0_12, m_nbatches, m_bmethod, LOG.global_plev());
+	
+	auto J_xbb_batched = dbcsr::btensor_create<3>(J_xbb_0_12)
+		.batch_dims(m_nbatches)
+		.btensor_type(m_bmethod)
+		.print(LOG.global_plev())
+		.get();
 			
 	// Form half-projected AO u
 	// u_v_mu,nu = u_mu,nu' * S_nu',nu
@@ -869,8 +865,11 @@ std::pair<smat,smat> MVP_ao_ri_adc2::compute_sigma_2e_ilap(
 		// Intermediate is held in-core/on-disk
 		auto eri = m_eri_batched->get_stensor();
 		
-		auto I_xbb_batched = std::make_shared<dbcsr::btensor<3,double>>(
-			eri, m_nbatches, m_bmethod, LOG.global_plev());
+		auto I_xbb_batched = dbcsr::btensor_create<3>(eri)
+			.batch_dims(m_nbatches)
+			.btensor_type(m_bmethod)
+			.print(LOG.global_plev())
+			.get();
 			
 		// Form I
 		I_xbb_batched->reorder(vec<int>{0},vec<int>{1,2});

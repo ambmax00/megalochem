@@ -44,7 +44,8 @@ static const json valid_keys =
 		{"intermeds", "core"}, // how intermediates are held in memory (core/disk)
 		{"df_metric", "coulomb"}, // which metric to use for batchdf
 		{"print", 0}, // print level (0, 1 or 2 at the moment, -1 for silent output)
-		{"nbatches", 4},
+		{"nbatches_x", 4},
+		{"nbatches_b", 4},
 		{"occ_nbatches", 2},
 		{"skip", false}, // skip hartree fock and read from files
 		{"max_iter", 10},
@@ -58,7 +59,8 @@ static const json valid_keys =
 	{"mp", {
 		{"print", 0},
 		{"nlap", 5}, // number of laplace points
-		{"nbatches", 3},
+		{"nbatches_b", 3},
+		{"nbatches_x", 3},
 		{"dfbasis", "basis"},
 		{"c_os", 1.3},
 		{"eris", "core"},
@@ -71,7 +73,8 @@ static const json valid_keys =
 		{"c_os", 1.3},
 		{"c_os_coupling", 1.15},
 		{"dfbasis", "basis"},
-		{"nbatches", 3},
+		{"nbatches_b", 3},
+		{"nbatches_x", 3},
 		{"nlap", 5},
 		{"nroots", 0},
 		{"method", "ADC1"}, /* what method? 

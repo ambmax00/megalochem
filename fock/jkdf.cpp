@@ -452,18 +452,21 @@ void BATCHED_DFAO_K::init_tensors() {
 	m_c_xbb_1_02 = 
 		dbcsr::tensor_create_template<3>(eri_0_12)
 		.name("c_xbb_1_02").map1({1}).map2({0,2}).get();
-	
-	dbcsr::btype mytype = dbcsr::invalid;
-	
+		
 	std::string intermeds = m_opt.get<std::string>("intermeds", "core");
 	
-	if (intermeds == "core") mytype = dbcsr::core;
-	if (intermeds == "disk") mytype = dbcsr::disk;
+	auto mytype = dbcsr::get_btype(intermeds);
 	
-	int nbatches = m_opt.get<int>("nbatches", 4);
+	int nbatches_x = m_eri_batched->nbatches_dim(0);
+	int nbatches_b = m_eri_batched->nbatches_dim(2);
 	
-	m_c_xbb_batched = std::make_shared<dbcsr::btensor<3,double>>(
-		m_c_xbb_1_02, nbatches, mytype, LOG.global_plev());
+	std::array<int,3> bdims = {nbatches_x,nbatches_b,nbatches_b};
+	
+	m_c_xbb_batched = dbcsr::btensor_create<3>(m_c_xbb_1_02)
+		.batch_dims(bdims)
+		.btensor_type(mytype)
+		.print(LOG.global_plev())
+		.get();
 	
 	auto& calc_c = TIME.sub("Computing (mu,nu|X)(X|Y)^-1");
 	auto& con = calc_c.sub("Contraction");

@@ -169,7 +169,6 @@ void adcmod::init_ao_tensors() {
 	
 	std::string metric = m_opt.get<std::string>("metric", ADC_METRIC);
 	std::string eris_mem = m_opt.get<std::string>("eris", ADC_ERIS);
-	int nbatches = m_opt.get<int>("nbatches", ADC_NBATCHES);
 	
 	std::shared_ptr<ints::aofactory> aofac = 
 		std::make_shared<ints::aofactory>(m_hfwfn->mol(), m_world);
@@ -340,15 +339,18 @@ void adcmod::init_ao_tensors() {
 			vec<int>{0}, vec<int>{1,2});
 		auto genfunc = aofac->get_generator(scr_s);
 		
-		dbcsr::btype mytype = dbcsr::core;
+		dbcsr::btype mytype = dbcsr::get_btype(eris_mem);
 		
-		if (eris_mem == "direct") mytype = dbcsr::direct;
-		if (eris_mem == "disk") mytype = dbcsr::disk; 
+		int nbatches_x = m_opt.get<int>("nbatches_x", ADC_NBATCHES_X);
+		int nbatches_b = m_opt.get<int>("nbatches_b", ADC_NBATCHES_B);
 		
-		int nbatches = m_opt.get<int>("nbatches", 5);
+		std::array<int,3> bdims = {nbatches_x,nbatches_b,nbatches_b};
 		
-		dbcsr::sbtensor<3,double> eribatch = 
-			std::make_shared<dbcsr::btensor<3,double>>(eri,nbatches,mytype,LOG.global_plev());
+		auto eribatch = dbcsr::btensor_create<3>(eri)
+			.batch_dims(bdims)
+			.btensor_type(mytype)
+			.print(LOG.global_plev())
+			.get();
 		
 		eribatch->set_generator(genfunc);
 		
@@ -366,7 +368,7 @@ void adcmod::init_ao_tensors() {
 				bounds[1] = mufullblkbounds;
 				bounds[2] = nublkbounds[inu];
 				
-				if (mytype != dbcsr::direct) aofac->ao_3c2e_fill(eri,bounds,scr_s);
+				if (mytype != dbcsr::btype::direct) aofac->ao_3c2e_fill(eri,bounds,scr_s);
 				
 				//dbcsr::print(*eri);
 				eri->filter(dbcsr::global::filter_eps);

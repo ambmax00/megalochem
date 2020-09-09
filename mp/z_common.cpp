@@ -30,7 +30,7 @@ Eigen::MatrixXi Z::get_shellpairs(dbcsr::sbtensor<3,double> eri_batched) {
 	
 	};
 	
-	if (eri_batched->get_type() == dbcsr::core) {
+	if (eri_batched->get_type() == dbcsr::btype::core) {
 		
 		add_idx();
 	

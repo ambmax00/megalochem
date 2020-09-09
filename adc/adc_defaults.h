@@ -8,7 +8,8 @@ namespace adc {
 static const int ADC_PRINT_LEVEL = 0;
 static const int ADC_NROOTS = 1;
 static const int ADC_ORDER = 0;
-static const int ADC_NBATCHES = 5;
+static const int ADC_NBATCHES_X = 5;
+static const int ADC_NBATCHES_B = 5;
 static const int ADC_NLAP = 5;
 
 static const double ADC_C_OS = 1.3;

@@ -33,18 +33,19 @@ void LLMP_FULL_Z::init_tensors() {
 		.blk_sizes(xx)
 		.get();
 		
-	int nbatches = m_opt.get<int>("nbatches", 5);
+	auto bdims = m_eri_batched->batch_dims();
+	
 	std::string intermedtype = m_opt.get<std::string>("intermeds", "core");
 	
-	dbcsr::btype intermedt = dbcsr::invalid;
-	
-	if (intermedtype == "core") intermedt = dbcsr::core;
-	if (intermedtype == "disk") intermedt = dbcsr::disk;
+	dbcsr::btype intermedt = dbcsr::get_btype(intermedtype);
 	
 	auto z_xbb = dbcsr::tensor_create_template(eri).name("z_xbb").get();
 	
-	m_z_xbb_batched = std::make_shared<dbcsr::btensor<3,double>>(
-		z_xbb, nbatches, intermedt, m_opt.get<int>("print", 0));
+	m_z_xbb_batched = dbcsr::btensor_create<3>(z_xbb)
+		.batch_dims(bdims)
+		.btensor_type(intermedt)
+		.print(m_opt.get<int>("print", 0))
+		.get();
 	
 	m_force_sparsity = m_opt.get<bool>("force_sparsity", false);
 	

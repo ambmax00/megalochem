@@ -6,6 +6,7 @@ dbcsr::sbtensor<3,double> transform3(dbcsr::sbtensor<3,double>& d_xbb_batched,
 	dbcsr::shared_tensor<2,double>& cm1, dbcsr::shared_tensor<2,double>& cm2, 
 	dbcsr::shared_pgrid<3> pgrid3, int nbatches, dbcsr::btype mtype, std::string name) {
 
+	/*
 	auto comm = cm1->comm();
 
 	auto d_xbb = d_xbb_batched->get_stensor();
@@ -58,6 +59,8 @@ dbcsr::sbtensor<3,double> transform3(dbcsr::sbtensor<3,double>& d_xbb_batched,
 		.map1({0,1}).map2({2})
 		.blk_sizes(blksizes_full)
 		.get();
+		
+	std::array 
 		
 	auto FTI_batched = std::make_shared<dbcsr::btensor<3,double>>(
 		FTI_0_12, nbatches, mtype, 1);
@@ -129,7 +132,7 @@ dbcsr::sbtensor<3,double> transform3(dbcsr::sbtensor<3,double>& d_xbb_batched,
 	
 	d_xbb_batched->reorder(vec<int>{0},vec<int>{1,2});
 	
-	return FTI_batched;
+	return FTI_batched;*/
 	
 }
 		

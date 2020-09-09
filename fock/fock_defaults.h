@@ -6,6 +6,8 @@
 namespace fock {
 	
 	inline const int FOCK_PRINT_LEVEL = 0;
+	inline const int FOCK_NBATCHES_X = 5;
+	inline const int FOCK_NBATCHES_B = 5;
 	
 	inline const std::string FOCK_BUILD_J = "exact";
 	inline const std::string FOCK_BUILD_K = "exact";

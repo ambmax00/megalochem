@@ -67,7 +67,10 @@ void mpmod::compute_batch() {
 	// options
 	int nlap = m_opt.get<int>("nlap",MP_NLAP);
 	double c_os = m_opt.get<double>("c_os",MP_C_OS);
-	int nbatches = m_opt.get<int>("nbatches", MP_NBATCHES);
+	
+	int nbatches_x = m_opt.get<int>("nbatches_x", MP_NBATCHES_X);
+	int nbatches_b = m_opt.get<int>("nbatches_b", MP_NBATCHES_B);
+	
 	std::string eri_method = m_opt.get<std::string>("eris", MP_ERIS);
 	std::string intermed_method = m_opt.get<std::string>("intermeds", MP_INTERMEDS);
 	bool force_sparsity = m_opt.get<bool>("force_sparsity", MP_FORCE_SPARSITY);
@@ -121,25 +124,17 @@ void mpmod::compute_batch() {
 	
 	auto B_xbb = aofac->ao_3c2e_setup_tensor(spgrid3_xbb, vec<int>{1},vec<int>{0,2});
 	
-	dbcsr::btype eri_type = dbcsr::invalid;
-	dbcsr::btype intermed_type = dbcsr::invalid;
+	dbcsr::btype eri_type = dbcsr::get_btype(eri_method);
+	dbcsr::btype intermed_type = dbcsr::get_btype(intermed_method);
 	
-	if (eri_method == "core") {
-		eri_type = dbcsr::core;
-	} else if (eri_method == "direct") {
-		eri_type = dbcsr::direct;
-	} else if (eri_method == "disk") {
-		eri_type = dbcsr::disk;
-	} 
-	
-	if (intermed_method == "core") {
-		intermed_type = dbcsr::core;
-	} else if (intermed_method == "disk") {
-		intermed_type = dbcsr::disk;
-	} 
+	std::array<int,3> bdims = {nbatches_x,nbatches_b,nbatches_b};
 	
 	dbcsr::sbtensor<3,double> B_xbb_batch = 
-		std::make_shared<dbcsr::btensor<3,double>>(B_xbb,nbatches,eri_type,1);
+		dbcsr::btensor_create<3>(B_xbb)
+		.batch_dims(bdims)
+		.btensor_type(eri_type)
+		.print(LOG.global_plev())
+		.get();
 	
 	auto gen_func = aofac->get_generator(s_scr);
 	B_xbb_batch->set_generator(gen_func);
@@ -164,7 +159,7 @@ void mpmod::compute_batch() {
 				nu_blk_bounds[inu]
 			};
 		
-			if (eri_type != dbcsr::direct) {
+			if (eri_type != dbcsr::btype::direct) {
 				aofac->ao_3c2e_fill(B_xbb, blkbounds, s_scr);
 				B_xbb->filter(dbcsr::global::filter_eps);
 			}
