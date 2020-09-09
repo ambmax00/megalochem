@@ -36,6 +36,7 @@ void mpmod::compute_batch() {
 	auto& laptime = TIME.sub("Computing laplace points");
 	auto& scrtime = TIME.sub("Computing screener");
 	auto& calcints = TIME.sub("Computing integrals");
+	auto& spinfotime = TIME.sub("Shellpair info");
 	auto& invtime = TIME.sub("Inverting metric");
 	auto& pseudotime = TIME.sub("Forming pseudo densities");
 	auto& pcholtime = TIME.sub("Pivoted cholesky decomposition");
@@ -166,7 +167,6 @@ void mpmod::compute_batch() {
 			
 			B_xbb_batch->compress({ix,inu}, B_xbb);
 		}
-		
 	}
 	
 	B_xbb_batch->compress_finalize();
@@ -176,6 +176,13 @@ void mpmod::compute_batch() {
 	reg.insert_btensor<3,double>("i_xbb_batched", B_xbb_batch);
 	
 	calcints.finish();
+	
+	spinfotime.start();
+	SMatrixXi spinfo = nullptr;
+	if (m_opt.get<bool>("force_sparsity", MP_FORCE_SPARSITY)) {
+		spinfo = get_shellpairs(B_xbb_batch);
+	}
+	spinfotime.finish();
 	
 	//==================================================================
 	//                          METRIC
@@ -279,7 +286,10 @@ void mpmod::compute_batch() {
 	if (zbuilder == nullptr) throw std::runtime_error("Invalid z builder!");
 	
 	zbuilder->set_reg(reg);
+	
 	zbuilder->init_tensors();
+	
+	zbuilder->set_shellpair_info(spinfo);
 	
 	//==================================================================
 	//                      BEGIN LAPLACE QUADRATURE

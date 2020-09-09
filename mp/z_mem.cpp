@@ -216,6 +216,37 @@ void LLMP_MEM_Z::compute() {
 			// final contraction
 			//B_xBB_1_02->reserve_template(*B_xbb_1_02);
 		
+			bool force_sparsity = false;
+			if (m_shellpair_info) {
+				
+				force_sparsity = true;
+				arrvec<int,3> res;
+				auto& shellmat = *m_shellpair_info;
+				
+				auto xblkbounds = m_eri_batched->blk_bounds(0)[ix];
+				auto bblkbounds = m_eri_batched->blk_bounds(1)[inu];
+
+				for (int mublk = 0; mublk != b.size(); ++mublk) {
+					for (int nublk = bblkbounds[0]; nublk != bblkbounds[1]+1; ++nublk) {
+						
+						if (!shellmat(mublk,nublk)) continue;
+						
+						for (int xblk = xblkbounds[0]; xblk != xblkbounds[1]+1; ++xblk) {
+							
+							std::array<int,3> idx = {xblk,mublk,nublk};
+							if (m_world.rank() != b2_xbb_1_02->proc(idx)) continue;
+
+							res[0].push_back(xblk);
+							res[1].push_back(mublk);
+							res[2].push_back(nublk);
+						}
+					}
+				}
+				
+				b2_xbb_1_02->reserve(res);
+
+			}
+		
 			LOG.os<1>("-- Final transform.\n");
 			
 			vec<vec<int>> x_nu_bounds = {
@@ -226,6 +257,7 @@ void LLMP_MEM_Z::compute() {
 			time_tran3.start();
 			dbcsr::contract(*m_locc_01, *b2_xob_1_02, *b2_xbb_1_02)
 				.bounds3(x_nu_bounds)
+				.retain_sparsity(force_sparsity)
 				.perform("Mi, XiN -> XMN");
 			time_tran3.finish();
 	

@@ -46,10 +46,6 @@ void LLMP_FULL_Z::init_tensors() {
 		.btensor_type(intermedt)
 		.print(m_opt.get<int>("print", 0))
 		.get();
-	
-	m_force_sparsity = m_opt.get<bool>("force_sparsity", false);
-	
-	if (m_force_sparsity) m_shell_idx = get_shellpairs(m_eri_batched);
 		
 }
 
@@ -224,7 +220,11 @@ void LLMP_FULL_Z::compute() {
 				bbounds[inu]
 			};
 			
-			if (m_force_sparsity) {
+			bool force_sparsity = false;
+			if (m_shellpair_info) {
+				
+				force_sparsity = true;
+				auto& shellmat = *m_shellpair_info;
 				
 				arrvec<int,3> res;
 				
@@ -234,7 +234,7 @@ void LLMP_FULL_Z::compute() {
 				for (int mublk = 0; mublk != b.size(); ++mublk) {
 					for (int nublk = bblkbounds[0]; nublk != bblkbounds[1]+1; ++nublk) {
 						
-						if (!m_shell_idx(mublk,nublk)) continue;
+						if (!shellmat(mublk,nublk)) continue;
 						
 						for (int xblk = xblkbounds[0]; xblk != xblkbounds[1]+1; ++xblk) {
 							
@@ -255,7 +255,7 @@ void LLMP_FULL_Z::compute() {
 			time_tran3.start();
 			dbcsr::contract(*m_locc_01, *b2_xob_1_02, *b2_xbb_1_02)
 				.bounds3(x_nu_bounds)
-				.retain_sparsity(m_force_sparsity)
+				.retain_sparsity(force_sparsity)
 				.perform("Mi, XiN -> XMN");
 			time_tran3.finish();
 	

@@ -12,6 +12,9 @@
 
 namespace mp {
 
+using SMatrixXi = std::shared_ptr<Eigen::MatrixXi>;
+SMatrixXi get_shellpairs(dbcsr::sbtensor<3,double> eri_batched);
+
 class Z {
 protected:
 
@@ -31,7 +34,7 @@ protected:
 	dbcsr::shared_matrix<double> m_locc;
 	dbcsr::shared_matrix<double> m_lvir;
 	
-	Eigen::MatrixXi get_shellpairs(dbcsr::sbtensor<3,double> eri_batched);
+	SMatrixXi m_shellpair_info;
 
 public:
 
@@ -65,6 +68,11 @@ public:
 		m_reg = reg;
 		return *this;
 	}
+	
+	Z& set_shellpair_info(SMatrixXi& spinfo) {
+		m_shellpair_info = spinfo;
+		return *this;
+	}
 	 
 	virtual void init_tensors() = 0;
 	virtual void compute() = 0;
@@ -90,10 +98,6 @@ private:
 	dbcsr::shared_tensor<2,double> m_locc_01;
 	dbcsr::shared_tensor<2,double> m_pvir_01;
 	
-	Eigen::MatrixXi m_shell_idx;
-	
-	bool m_force_sparsity;
-	
 public:
 
 	LLMP_FULL_Z(dbcsr::world& w, desc::options& opt) :
@@ -114,10 +118,6 @@ private:
 	
 	dbcsr::shared_tensor<2,double> m_locc_01;
 	dbcsr::shared_tensor<2,double> m_pvir_01;
-	
-	Eigen::MatrixXi m_shell_idx;
-	
-	bool m_force_sparsity;
 	
 public:
 
@@ -140,10 +140,6 @@ private:
 	
 	dbcsr::shared_tensor<2,double> m_locc_01;
 	dbcsr::shared_tensor<2,double> m_pvir_01;
-	
-	Eigen::MatrixXi m_shell_idx;
-	
-	bool m_force_sparsity;
 	
 public:
 
