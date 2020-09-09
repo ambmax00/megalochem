@@ -27,24 +27,11 @@ include_directories(
 	${DBCSR_INCLUDE_DIRS} 
 	${MPI_CXX_HEADER_DIR} 
 	${LIBINT2_INCLUDE_DIRS} 
-	${CMAKE_CURRENT_BINARY_DIR} 
-	${CMAKE_CURRENT_SOURCE_DIR}
+	#${CMAKE_CURRENT_BINARY_DIR} 
+	#${CMAKE_CURRENT_SOURCE_DIR}
 )
 
-add_subdirectory(dbcsrx)
-add_subdirectory(math)
-add_subdirectory(io)
-add_subdirectory(desc)
-add_subdirectory(ints)
-add_subdirectory(fock)
-add_subdirectory(hf)
-add_subdirectory(mp)
-add_subdirectory(adc)
-
-add_executable(
-	chem 
-	main.cpp 
-)
+add_subdirectory(src)
 
 target_link_libraries(
 	chem

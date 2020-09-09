@@ -14,8 +14,6 @@ Currently depends on:
 ```
 libint2
 ScaLAPACK
-boost 
-TBB
 DBCSR (fork)
 fypp (Fortran preprocessor)
 ```
@@ -26,25 +24,28 @@ Exact versions are going to follow
 In the build directory:
 
 ```
+export PKG_CONFIG_PATH=/path/to/libxsmm/lib
+pkg-config libxsmm --libs
+
 CMAKE_PREFIX_PATH=/my/dbcsr/install/location/usr/local/lib/cmake
 cmake 
     -DLibint2_DIR=(mylibint2_dir) 
     -DSCALAPACK_DIR=(myscalapack_dir)  
     -DCMAKE_C_COMPILER=(gcc/icc ...) 
     -DCMAKE_CXX_COMPILER=(g++/icpc ...)
-    -DCMAKE_Fortran_COMPILER=(gfortran/ifort) 
+    -DMPI_VENDOR=(openmpi/intelmpi ...)
+    -DCMAKE_Fortran_COMPILER=(gfortran/ifort)
+    -DEigen3_DIR=(Eigen3_dir) 
     ..
 ```
-
-Cmake recipie will be improved.
 
 Compilers need MPI/OpenMP support. C++ needs to have at least C++17 standard.
 
 ## Implemented
 
-* Hartree Fock (exact/df/df-mem)
-* MP2 (AOMP2)
-* ADC (RI-ADC1, RI-ADC2, SOS-RI-ADC2)
+* Hartree Fock (exact/df/df-mem/pari)
+* MP2 (SOS-AOMP2)
+* ADC (AO-ADC1, SOS-AO-ADC2)
 
 ## License
 
