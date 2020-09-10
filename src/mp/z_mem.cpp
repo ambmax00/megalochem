@@ -122,9 +122,9 @@ void LLMP_MEM_Z::compute() {
 		dbcsr::tensor_create_template<3,double>(eri)
 		.name("b2_xbb_0_12").map1({0}).map2({1,2}).get();
 	
-	//time_reo_int1.start();
-	//m_eri_batched->reorder(vec<int>{1},vec<int>{0,2});
-	//time_reo_int1.finish();
+	time_reo_int1.start();
+	m_eri_batched->reorder(vec<int>{0},vec<int>{1,2});
+	time_reo_int1.finish();
 	
 	m_eri_batched->decompress_init({0});
 	
@@ -148,7 +148,9 @@ void LLMP_MEM_Z::compute() {
 		m_eri_batched->decompress({ix});
 		time_fetchints1.finish();
 		
+		time_reo_int2.start();
 		auto eri_0_12 = m_eri_batched->get_stensor();
+		time_reo_int2.finish();
 		
 		vec<vec<int>> xbb_bounds = {
 			m_eri_batched->bounds(0)[ix],

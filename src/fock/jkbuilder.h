@@ -191,7 +191,7 @@ private:
 		
 	dbcsr::shared_tensor<3,double> m_c_xbb_1_02;
 	dbcsr::shared_tensor<3,double> m_cbar_xbb_01_2;
-	dbcsr::shared_tensor<3,double> m_cbar_xbb_02_1;
+	dbcsr::shared_tensor<3,double> m_cbar_xbb_1_02;
 	
 	dbcsr::shared_tensor<2,double> m_K_01;
 	dbcsr::shared_tensor<2,double> m_p_bb;
@@ -263,6 +263,8 @@ inline std::shared_ptr<K> get_K(
 		ptr = new BATCHED_DFAO_K(w,opt);
 	} else if (name == "batchdfmo") {
 		ptr = new BATCHED_DFMO_K(w,opt);
+	} else if (name == "batchpari") {
+		ptr = new BATCHED_PARI_K(w,opt);
 	}
 	
 	if (!ptr) {

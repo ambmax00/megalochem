@@ -123,7 +123,7 @@ void mpmod::compute_batch() {
 	
 	aofac->ao_3c2e_setup("erfc_coulomb");
 	
-	auto B_xbb = aofac->ao_3c2e_setup_tensor(spgrid3_xbb, vec<int>{1},vec<int>{0,2});
+	auto B_xbb = aofac->ao_3c2e_setup_tensor(spgrid3_xbb, vec<int>{0},vec<int>{1,2});
 	
 	dbcsr::btype eri_type = dbcsr::get_btype(eri_method);
 	dbcsr::btype intermed_type = dbcsr::get_btype(intermed_method);

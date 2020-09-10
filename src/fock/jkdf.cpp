@@ -549,9 +549,9 @@ void BATCHED_DFAO_K::init_tensors() {
 		dbcsr::tensor_create_template<3>(eri_0_12)
 		.name("Cbar_xbb_01_2").map1({0,1}).map2({2}).get();
 	
-	m_cbar_xbb_02_1 = 
+	m_cbar_xbb_1_02 = 
 		dbcsr::tensor_create_template<3>(eri_0_12)
-		.name("Cbar_xbb_02_1").map1({0,2}).map2({1}).get();
+		.name("Cbar_xbb_1_02").map1({1}).map2({0,2}).get();
 	
 	m_K_01 = dbcsr::tensor_create<2,double>().pgrid(m_spgrid2).name("K_01")
 		.map1({0}).map2({1}).blk_sizes(bb).get();
@@ -640,7 +640,7 @@ void BATCHED_DFAO_K::compute_K() {
 				};
 			
 				reo_1_batch.start();
-				dbcsr::copy(*m_cbar_xbb_01_2, *m_cbar_xbb_02_1)
+				dbcsr::copy(*m_cbar_xbb_01_2, *m_cbar_xbb_1_02)
 					.bounds(copy_bounds).move_data(true).perform();
 				reo_1_batch.finish();
 				
@@ -659,13 +659,13 @@ void BATCHED_DFAO_K::compute_K() {
 				vec<vec<int>> xs_bounds = { x_b[ix], nu_b[inu] };
 			
 				con_2_batch.start();
-				dbcsr::contract(*m_cbar_xbb_02_1, *c_xbb_1_02, *m_K_01)
+				dbcsr::contract(*c_xbb_1_02, *m_cbar_xbb_1_02, *m_K_01)
 					.bounds1(xs_bounds).beta(1.0)
 					.filter(dbcsr::global::filter_eps / nu_b.size())
-					.perform("XMS, XNS -> MN");
+					.perform("XNS, XMS -> MN");
 				con_2_batch.finish();
 								
-				m_cbar_xbb_02_1->clear();
+				m_cbar_xbb_1_02->clear();
 				
 			}
 			
