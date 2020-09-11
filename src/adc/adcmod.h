@@ -2,7 +2,7 @@
 #define ADC_ADCMOD_H
 
 #include "desc/options.h"
-#include "desc/wfn.h"
+#include "hf/hf_wfn.h"
 #include "utils/mpi_time.h"
 #include "adc/adc_defaults.h"
 #include "utils/registry.h"
@@ -34,7 +34,7 @@ static const std::map<std::string,method> method_map =
 class adcmod {
 private:
 
-	desc::shf_wfn m_hfwfn;
+	hf::shared_hf_wfn m_hfwfn;
 	desc::options m_opt;
 	dbcsr::world m_world;
 	
@@ -82,7 +82,7 @@ private:
 	
 public:	
 
-	adcmod(desc::shf_wfn hfref, desc::options& opt, dbcsr::world& w);
+	adcmod(hf::shared_hf_wfn hfref, desc::options& opt, dbcsr::world& w);
 	~adcmod() {}
 	
 	void compute();

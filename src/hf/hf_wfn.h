@@ -1,5 +1,5 @@
-#ifndef DESC_WFN_H
-#define DESC_WFN_H
+#ifndef HF_HF_WFN_H
+#define HF_HF_WFN_H
 
 #include "desc/molecule.h"
 #include "io/io.h"
@@ -10,15 +10,13 @@
 #include <fstream>
 
 namespace hf {
-	class hfmod;
-}
-
-namespace desc {
 	
+class hfmod;
+
 class hf_wfn {
 private:
 
-	smolecule m_mol;
+	desc::smolecule m_mol;
 
 	//dbcsr::smatrix<double> m_s_bb;
 	
@@ -45,11 +43,12 @@ private:
 	double m_nuc_energy;
 	double m_wfn_energy;
 	
-	friend class hf::hfmod;
+	friend class hfmod;
 	
 public:
 
 	hf_wfn() {};
+	hf_wfn(const hf_wfn& wfn_in) = default;
 	
 	desc::smolecule mol() { return m_mol; }
 	
@@ -116,7 +115,7 @@ public:
 		
 	}
 	
-	void read_from_file(smolecule& mol, dbcsr::world& w) {
+	void read_from_file(desc::smolecule& mol, dbcsr::world& w) {
 		
 		m_mol = mol;
 		
@@ -167,7 +166,7 @@ public:
 	}
 };
 
-using shf_wfn = std::shared_ptr<hf_wfn>;
+using shared_hf_wfn = std::shared_ptr<hf_wfn>;
 
 }
 	

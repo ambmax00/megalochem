@@ -13,7 +13,7 @@
 
 namespace mp {
 	
-mpmod::mpmod(desc::shf_wfn& wfn_in, desc::options& opt_in, dbcsr::world& w_in) :
+mpmod::mpmod(hf::shared_hf_wfn& wfn_in, desc::options& opt_in, dbcsr::world& w_in) :
 	m_hfwfn(wfn_in),
 	m_opt(opt_in),
 	m_world(w_in),
@@ -460,6 +460,11 @@ void mpmod::compute_batch() {
 	TIME.print_info();
 	
 	delete zbuilder;
+	
+	m_mpwfn = std::make_shared<mp_wfn>(*m_hfwfn);
+	m_mpwfn->m_mp_ss_energy = 0.0;
+	m_mpwfn->m_mp_os_energy = mp2_energy;
+	m_mpwfn->m_mp_energy = c_os * mp2_energy;
 	
 }
 

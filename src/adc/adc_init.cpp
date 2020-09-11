@@ -70,7 +70,7 @@ void adcmod::mo_load() {
 		
 }*/
 		
-adcmod::adcmod(desc::shf_wfn hfref, desc::options& opt, dbcsr::world& w) :
+adcmod::adcmod(hf::shared_hf_wfn hfref, desc::options& opt, dbcsr::world& w) :
 	m_hfwfn(hfref), 
 	m_opt(opt), 
 	m_world(w),

@@ -3,7 +3,7 @@
 
 #include "desc/molecule.h"
 #include "desc/options.h"
-#include "desc/wfn.h"
+#include "hf/hf_wfn.h"
 #include <dbcsr_conversions.hpp>
 #include "utils/mpi_time.h"
 
@@ -80,23 +80,16 @@ public:
 	
 	void compute();	
 	
-	desc::shf_wfn wfn() { 
+	hf::shared_hf_wfn wfn() { 
 		
-		desc::hf_wfn* ptr = new desc::hf_wfn();
+		hf::hf_wfn* ptr = new hf::hf_wfn();
 		
-		desc::shf_wfn out(ptr);
+		hf::shared_hf_wfn out(ptr);
 		
 		out->m_mol = m_mol;
-		
-		//out->m_s_bb = m_s_bb;
-	
-		out->m_f_bb_A = m_f_bb_A;
+			
 		out->m_po_bb_A = m_p_bb_A;
-		//out->m_pv_bb_A = m_pv_bb_A;
-	
-		out->m_f_bb_B = m_f_bb_B;
 		out->m_po_bb_B = m_p_bb_B;
-		//out->m_pv_bb_B = m_pv_bb_B;
 		
 		// compute virtual densities
 		compute_virtual_density();

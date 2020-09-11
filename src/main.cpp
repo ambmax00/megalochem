@@ -77,7 +77,7 @@ int main(int argc, char** argv) {
 	
 	auto hfopt = opt.subtext("hf");
 	
-	desc::shf_wfn myhfwfn = std::make_shared<desc::hf_wfn>();
+	hf::shared_hf_wfn myhfwfn = std::make_shared<hf::hf_wfn>();
 	hf::hfmod myhf(mol,hfopt,wrd);
 
 	bool skip_hf = hfopt.get<bool>("skip", false);
