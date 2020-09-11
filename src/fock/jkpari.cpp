@@ -47,7 +47,7 @@ void BATCHED_PARI_K::init_tensors() {
 	arrvec<int,2> xx = {x,x};
 	
 	auto cbas = m_mol->c_basis();
-	auto xbas = *m_mol->c_dfbasis();
+	auto xbas = m_mol->c_dfbasis();
 	
 	auto atoms = m_mol->atoms();
 	int natoms = atoms.size();
@@ -65,13 +65,13 @@ void BATCHED_PARI_K::init_tensors() {
 		return -1;
 	};
 	
-	for (int iv = 0; iv != cbas.size(); ++iv) {
-		auto s = cbas[iv][0];
+	for (int iv = 0; iv != cbas->size(); ++iv) {
+		auto s = cbas->at(iv)[0];
 		blk_to_atom_b[iv] = get_centre(s);
 	}
 	
-	for (int iv = 0; iv != xbas.size(); ++iv) {
-		auto s = xbas[iv][0];
+	for (int iv = 0; iv != xbas->size(); ++iv) {
+		auto s = xbas->at(iv)[0];
 		blk_to_atom_x[iv] = get_centre(s);
 	}
 	
@@ -93,7 +93,7 @@ void BATCHED_PARI_K::init_tensors() {
 	
 	// ==================== new atom centered dists ====================
 	
-	int nbf = m_mol->c_basis().nbf();
+	int nbf = m_mol->c_basis()->nbf();
 	int dfnbf = m_mol->c_dfbasis()->nbf();
 	
 	std::array<int,3> xbbsizes = {1,nbf,nbf};

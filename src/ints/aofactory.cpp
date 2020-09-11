@@ -17,8 +17,8 @@ protected:
 	dbcsr::world m_world;
 	
 	desc::smolecule m_mol;
-	const desc::cluster_basis m_cbas;
-	std::optional<const desc::cluster_basis> m_xbas;
+	desc::shared_cluster_basis m_cbas;
+	desc::shared_cluster_basis m_xbas;
 	
 	libint2::Operator m_Op = libint2::Operator::invalid;
 	libint2::BraKet m_BraKet = libint2::BraKet::invalid;
@@ -34,9 +34,7 @@ public:
 		m_world(w),
 		m_mol(mol),
 		m_cbas(m_mol->c_basis()),
-		m_xbas((m_mol->c_dfbasis()) ? 
-			std::make_optional<desc::cluster_basis>(*m_mol->c_dfbasis()) :
-			std::nullopt)
+		m_xbas(m_mol->c_dfbasis())
 		{ init(); }
 	
 	void init() {
@@ -65,15 +63,17 @@ public:
 	void set_braket(std::string dim) {
 		
 		if (dim == "bb") { 
-			m_basvec = {&m_cbas,&m_cbas};
+			m_basvec = {m_cbas.get(),m_cbas.get()};
 		} else if (dim == "xx") {
-			m_basvec = {&*m_xbas, &*m_xbas};
+			m_basvec = {m_xbas.get(),m_xbas.get()};
+			std::cout << "NNNN " << m_xbas->nbf() << std::endl;
 			m_BraKet = libint2::BraKet::xs_xs;
 		} else if (dim == "xbb") {
-			m_basvec = {&*m_xbas, &m_cbas, &m_cbas};
+			m_basvec = {m_xbas.get(), m_cbas.get(),m_cbas.get()};
 			m_BraKet = libint2::BraKet::xs_xx;
+			std::cout << "NNNN " << m_xbas->nbf() << std::endl;
 		} else if (dim == "bbbb") {
-			m_basvec = {&m_cbas, &m_cbas, &m_cbas, &m_cbas};
+			m_basvec = {m_cbas.get(),m_cbas.get(),m_cbas.get(),m_cbas.get()};
 			m_BraKet = libint2::BraKet::xx_xx;
 		} else {
 			throw std::runtime_error("Unsupported basis set specifications: "+ dim);
@@ -98,7 +98,16 @@ public:
 		libint2::Engine eng(m_Op, max_nprim, max_l, 0, std::numeric_limits<double>::epsilon());
 			
 		if (m_Op == libint2::Operator::nuclear) {
-			eng.set_params(make_point_charges(m_mol->atoms())); 
+			std::vector<libint2::Atom> latoms;
+			for (auto a : m_mol->atoms()) {
+				libint2::Atom a_out;
+				a_out.x = a.x;
+				a_out.y = a.y;
+				a_out.z = a.z;
+				a_out.atomic_number = a.atomic_number;
+				latoms.push_back(a_out);
+			}
+			eng.set_params(make_point_charges(latoms)); 
 		} else if (m_Op == libint2::Operator::erfc_coulomb) {
 			eng.set_params(global::omega);
 		}

@@ -132,7 +132,7 @@ void fockmod::init() {
 	}
 	
 	if (compute_3c2e_batched) {
-		int nbf_b = m_mol->c_basis().nbf();
+		int nbf_b = m_mol->c_basis()->nbf();
 		int nbf_x = m_mol->c_dfbasis()->nbf();
 		std::array<int,3> tsizes = {nbf_x, nbf_b, nbf_b};
 		

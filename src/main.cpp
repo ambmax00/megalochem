@@ -13,80 +13,9 @@
 
 #include "extern/scalapack.h"
 
-#include "math/linalg/LLT.h"
 #include <filesystem>
-
-template <int N>
-void fill_random(dbcsr::tensor<N,double>& t_in, arrvec<int,N>& nz) {
-	
-	int myrank, mpi_size;
-	
-	MPI_Comm_rank(MPI_COMM_WORLD, &myrank); 
-	MPI_Comm_size(MPI_COMM_WORLD, &mpi_size);
-	
-	if (myrank == 0) std::cout << "Filling Tensor..." << std::endl;
-	if (myrank == 0) std::cout << "Dimension: " << N << std::endl;
-	
-	int nblocks = nz[0].size();
-	arrvec<int,N> mynz;
-	dbcsr::index<N> idx;
-	
-	for (int i = 0; i != nblocks; ++i) {
-		
-		// make index out of nzblocks
-		for (int j = 0; j != N; ++j) idx[j] = nz[j][i];
-		
-		int proc = t_in.proc(idx);
-		
-		if (proc == myrank) {
-			for (int j = 0; j != N; ++j) 
-				mynz[j].push_back(idx[j]);
-		}		
-		
-	} 
-	
-	for (int i = 0; i != mpi_size; ++i) {
-		
-		if (myrank == i) {
-			
-			std::cout << "process: " << i << std::endl;
-		
-			for (auto x : mynz ) {
-				for (auto y : x) {
-					std::cout << y << " ";
-				} std::cout << std::endl;
-			}
-			
-		}
-		
-		MPI_Barrier(MPI_COMM_WORLD);
-		
-	}
-	
-	t_in.reserve(mynz);
-	
-	#pragma omp parallel 
-	{
-		dbcsr::iterator_t<N,double> iter(t_in);
-		
-		while (iter.blocks_left()) {
-			  
-			iter.next();
-			
-			dbcsr::block<N,double> blk(iter.size());
-			
-			blk.fill_rand(-1.0,1.0);
-			
-			auto idx = iter.idx();
-			t_in.put_block(idx, blk);
-				
-		}
-	}
-	
-	t_in.finalize();
-
-}
-
+#include <chrono>
+#include <thread>
 
 int main(int argc, char** argv) {
 
@@ -129,20 +58,17 @@ int main(int argc, char** argv) {
 	
 	time.start();
 	
+	try { // BEGIN MAIN CONTEXT
 	
-	{ // BEGIN MAIN CONTEXT
-	
-//#ifdef USE_SCALAPACK
 	int sysctxt = -1;
 	c_blacs_get(0, 0, &sysctxt);
 	int gridctxt = sysctxt;
 	c_blacs_gridinit(&gridctxt, 'R', wrd.nprow(), wrd.npcol());
 	scalapack::global_grid.set(gridctxt);
-//#endif
 	
 	filio::reader filereader(MPI_COMM_WORLD, filename);
 	
-	auto mol = std::make_shared<desc::molecule>(filereader.get_mol());
+	auto mol = filereader.get_mol();
 	auto opt = filereader.get_opt();
 	
 	if (wrd.rank() == 0) {
@@ -193,12 +119,43 @@ int main(int argc, char** argv) {
 		myadc.compute();
 	}
 	
-//#ifdef USE_SCALAPACK
 	scalapack::global_grid.free();
-	//c_blacs_exit(0);
-//#endif
 
-   } // END MAIN CONTEX*/
+   } catch (std::exception& e) {
+
+		if (wrd.rank() == 0) {
+			std::cout << "ERROR:";
+			std::cout << e.what() << std::endl;
+			std::string skull = R"(
+			
+			
+                  _( )                 ( )_
+                 (_, |      __ __      | ,_)
+                    \'\    /  ^  \    /'/
+                     '\'\,/\      \,/'/'
+                       '\| []   [] |/'
+                         (_  /^\  _)
+                           \  ~  /
+                           /HHHHH\
+                         /'/{^^^}\'\
+                     _,/'/'  ^^^  '\'\,_
+                    (_, |           | ,_)
+                      (_)           (_)
+
+            =====================================
+            =      MEGALOCHEM WAS ABORTED       =
+            =====================================
+		)";
+			std::cout << skull << std::endl;
+			MPI_Abort(wrd.comm(), MPI_ERR_OTHER);
+		} else {
+		
+			std::this_thread::sleep_for(std::chrono::milliseconds(10000));
+			MPI_Abort(wrd.comm(), MPI_ERR_OTHER);
+			
+		}
+	   
+   }
     
     LOG.os<>("THE END\n");
     

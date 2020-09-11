@@ -92,12 +92,12 @@ void hfmod::compute_guess() {
 		// divide up comm <- for later
 		
 		// get mol info, check for atom types...
-		std::vector<libint2::Atom> atypes;
+		std::vector<desc::Atom> atypes;
 		
 		for (auto atom1 : m_mol->atoms()) {
 			
 			auto found = std::find_if(atypes.begin(), atypes.end(), 
-				[&atom1](const libint2::Atom& atom2) {
+				[&atom1](const desc::Atom& atom2) {
 					return atom2.atomic_number == atom1.atomic_number;
 				});
 				
@@ -112,7 +112,7 @@ void hfmod::compute_guess() {
 		//	std::cout << a.atomic_number << std::endl;
 		//}
 		
-		auto are_oncentre = [&](libint2::Atom& atom, libint2::Shell& shell) {
+		auto are_oncentre = [&](desc::Atom& atom, libint2::Shell& shell) {
 			double lim = std::numeric_limits<double>::epsilon();
 			if ( fabs(atom.x - shell.O[0]) < lim &&
 				 fabs(atom.y - shell.O[1]) < lim &&
@@ -125,7 +125,7 @@ void hfmod::compute_guess() {
 		std::map<int,Eigen::MatrixXd> densitymap;
 		
 		// divide it up
-		std::vector<libint2::Atom> my_atypes;
+		std::vector<desc::Atom> my_atypes;
 		
 		for (int I = 0; I != atypes.size(); ++I) {
 			//if (m_world.rank() == I % m_world.size()) my_atypes.push_back(atypes[I]);
@@ -194,36 +194,52 @@ void hfmod::compute_guess() {
 			int charge = 0;
 			int mult = 0; // will be overwritten
 			
-			std::vector<libint2::Atom> atvec = {atom};
-			std::vector<libint2::Shell> at_basis;
-			optional<std::vector<libint2::Shell>,val> at_dfbasis;
+			std::vector<desc::Atom> atvec = {atom};
+			
+			std::vector<libint2::Shell> at_libint_basis, at_libint_dfbasis;
 			
 			// find basis functions
-			for (auto shell : m_mol->c_basis().libint_basis()) {
-				if (are_oncentre(atom, shell)) at_basis.push_back(shell);
+			for (auto shell : m_mol->c_basis()->libint_basis()) {
+				if (are_oncentre(atom, shell)) at_libint_basis.push_back(shell);
 			}
+			
+			desc::shared_cluster_basis at_basis = std::make_shared<desc::cluster_basis>(
+				at_libint_basis, "atomic", 1);
+			
+			desc::shared_cluster_basis at_dfbasis = nullptr;
 			
 			if (m_mol->c_dfbasis()) {
 				//std::cout << "INSIDE HERE." << std::endl;
-				std::vector<libint2::Shell> temp;
-				at_dfbasis = optional<std::vector<libint2::Shell>,val>(temp);
+				std::vector<libint2::Shell> at_libint_dfbasis;
 				for (auto shell : m_mol->c_dfbasis()->libint_basis()) {
-					if (are_oncentre(atom, shell)) at_dfbasis->push_back(shell);
+					if (are_oncentre(atom, shell)) at_libint_dfbasis.push_back(shell);
 				}
+				
+				at_dfbasis = std::make_shared<desc::cluster_basis>(
+					at_libint_dfbasis, "atomic", 1);;
+				
 			}
 			
 			std::string name = "ATOM_rank" + std::to_string(m_world.rank()) + "_" + std::to_string(Z);
 			
 			bool spinav = m_opt.get<bool>("SAD_spin_average",HF_SAD_SPIN_AVERAGE);
 			
-			desc::molecule at_mol = desc::molecule::create().name(name).atoms(atvec).charge(charge)
-				.mo_split(10).ao_split_method("atomic")
-				.mult(mult).basis(at_basis).dfbasis(at_dfbasis).fractional(true).spin_average(spinav);
+			desc::smolecule at_smol = desc::create_molecule()
+				.comm(mycomm)
+				.name(name)
+				.basis(at_basis)
+				.atoms(atvec)
+				.charge(charge)
+				.mo_split(10)
+				.mult(mult)
+				.fractional(true)
+				.spin_average(spinav)
+				.get();
 				
-			auto at_smol = std::make_shared<desc::molecule>(std::move(at_mol));
-				
+			if (at_dfbasis) at_smol->set_cluster_dfbasis(at_dfbasis);
+								
 			if (LOG.global_plev() >= 2) {
-				at_smol->print_info(mycomm,LOG.global_plev());
+				at_smol->print_info(LOG.global_plev());
 			}
 			
 			dbcsr::world at_world(mycomm);
@@ -344,7 +360,7 @@ void hfmod::compute_guess() {
 		}
 			
 		
-		size_t nbas = m_mol->c_basis().nbf();
+		size_t nbas = m_mol->c_basis()->nbf();
 		
 		Eigen::MatrixXd ptot_eigen = Eigen::MatrixXd::Zero(nbas,nbas);
 		auto csizes = m_mol->dims().b();
@@ -373,7 +389,7 @@ void hfmod::compute_guess() {
 		
 			math::hermitian_eigen_solver solver(m_p_bb_A, 'V', (LOG.global_plev() >= 2) ? true : false);
 			
-			m_SAD_rank = m_mol->c_basis().nbf();
+			m_SAD_rank = m_mol->c_basis()->nbf();
 			auto m = dbcsr::split_range(m_SAD_rank,m_mol->mo_split());
 			
 			solver.eigvec_colblks(m);

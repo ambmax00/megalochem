@@ -1,0 +1,4 @@
+Define in io a json output file
+Will output to two files: log file (current std out), out file (json result file) 
+then compare both fixed and generated output file
+test cases: h2o (hf: exact,df,pari mp: full,mem)

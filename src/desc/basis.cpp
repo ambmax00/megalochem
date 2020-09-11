@@ -130,13 +130,37 @@ vvshell split_multi_shell(vshell& basis, int nsplit, bool strict, bool sp) {
 	
 	
 
-cluster_basis::cluster_basis(vshell& basis, std::string method) : m_basis(basis) {
+cluster_basis::cluster_basis(std::string basname, std::vector<desc::Atom>& atoms_in,
+	std::string method, int nsplit) {
+	
+	std::vector<libint2::Atom> atoms;
+	
+	for (auto a_in : atoms_in) {
+		libint2::Atom a_out;
+		a_out.x = a_in.x;
+		a_out.y = a_in.y;
+		a_out.z = a_in.z;
+		a_out.atomic_number = a_in.atomic_number;
+		atoms.push_back(a_out);
+	}
+	
+	libint2::BasisSet full_basis(basname, atoms);
+	vshell basis = std::move(full_basis);
+	
+	cluster_basis c(basis, method, nsplit);
+	*this = c;
+	
+}
+
+cluster_basis::cluster_basis(vshell basis, std::string method, int nsplit)
+	: m_nsplit(nsplit), m_split_method(method) {
 	
 	int nbas = libint2::nbf(basis);
 	int vsize = basis.size();
+	m_basis = basis;
 	
-	//std::cout << "NBAS: " << nbas << std::endl;
-	//std::cout << "VSIZE: " << vsize << std::endl;
+	std::cout << "NBAS: " << nbas << std::endl;
+	std::cout << "VSIZE: " << vsize << std::endl;
 	
 	if (method == "atomic") {
 		
@@ -148,31 +172,22 @@ cluster_basis::cluster_basis(vshell& basis, std::string method) : m_basis(basis)
 	
 	} else if (method == "multi_shell") {
 		
-		m_clusters = split_multi_shell(basis,shell_split,false,false);
+		m_clusters = split_multi_shell(basis,m_nsplit,false,false);
 		
 	} else if (method == "multi_shell_strict") {
 		
-		m_clusters = split_multi_shell(basis,shell_split,true,false);
+		m_clusters = split_multi_shell(basis,m_nsplit,true,false);
 
 	} else if (method == "multi_shell_strict_sp") {
 		
-		m_clusters = split_multi_shell(basis,shell_split,true,true);
+		m_clusters = split_multi_shell(basis,m_nsplit,true,true);
 	
 	} else {
 		
-		throw std::runtime_error("Unknown splitting method.\n");
+		throw std::runtime_error("Unknown splitting method: " + method);
 		
 	}
-	
-	/*for (auto c : m_clusters) {
-		std::cout << c.size() << " ";
-	} std::cout << std::endl;
-	
-	for (auto c : m_clusters) {
-		std::cout << libint2::nbf(c) << " ";
-	} std::cout << std::endl;
-	
-	exit(0);*/
+
 	
 	for (auto c : m_clusters) {
 		m_cluster_sizes.push_back(libint2::nbf(c));
@@ -224,7 +239,7 @@ std::vector<int> cluster_basis::cluster_sizes() const {
 	return m_cluster_sizes;
 }
 
-std::vector<int> cluster_basis::block_to_atom(std::vector<libint2::Atom>& atoms) const {
+std::vector<int> cluster_basis::block_to_atom(std::vector<desc::Atom>& atoms) const {
 	
 	std::vector<int> blk_to_atom(m_cluster_sizes.size());
 	

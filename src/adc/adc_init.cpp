@@ -94,9 +94,13 @@ adcmod::adcmod(desc::shf_wfn hfref, desc::options& opt, dbcsr::world& w) :
 	m_method = miter->second;	
 	
 	std::string dfbasname = m_opt.get<std::string>("dfbasis");
+	int nsplit = m_hfwfn->mol()->c_basis()->nsplit();
+	std::string splitmethod = m_hfwfn->mol()->c_basis()->split_method();
+	auto atoms = m_hfwfn->mol()->atoms();
 	
-	libint2::BasisSet dfbas(dfbasname,m_hfwfn->mol()->atoms());
-	m_hfwfn->mol()->set_dfbasis(dfbas);
+	auto dfbasis = std::make_shared<desc::cluster_basis>(
+		dfbasname, atoms, splitmethod, nsplit);
+	m_hfwfn->mol()->set_cluster_dfbasis(dfbasis);
 	
 	init();
 	
@@ -109,7 +113,7 @@ void adcmod::init() {
 	// setup pgrids
 	m_spgrid2 = dbcsr::create_pgrid<2>(m_world.comm()).get();
 	
-	int nbf = m_hfwfn->mol()->c_basis().nbf();
+	int nbf = m_hfwfn->mol()->c_basis()->nbf();
 	int nocc = m_hfwfn->mol()->nocc_alpha();
 	int nvir = m_hfwfn->mol()->nvir_alpha();
 	int xnbf = m_hfwfn->mol()->c_dfbasis()->nbf();

@@ -11,8 +11,6 @@
 #include <dbcsr_tensor_ops.hpp>
 #include <dbcsr_btensor.hpp>
 
-#include <libint2/basis.h>
-
 namespace mp {
 	
 mpmod::mpmod(desc::shf_wfn& wfn_in, desc::options& opt_in, dbcsr::world& w_in) :
@@ -24,8 +22,16 @@ mpmod::mpmod(desc::shf_wfn& wfn_in, desc::options& opt_in, dbcsr::world& w_in) :
 {
 	std::string dfbasname = m_opt.get<std::string>("dfbasis");
 	
-	libint2::BasisSet dfbas(dfbasname,m_hfwfn->mol()->atoms());
-	m_hfwfn->mol()->set_dfbasis(dfbas);
+	int nsplit = m_hfwfn->mol()->c_basis()->nsplit();
+	std::string splitmethod = m_hfwfn->mol()->c_basis()->split_method();
+	auto atoms = m_hfwfn->mol()->atoms(); 
+	
+	auto dfbasis = std::make_shared<desc::cluster_basis>(
+		dfbasname, atoms, splitmethod, nsplit);
+	
+	m_hfwfn->mol()->set_cluster_dfbasis(dfbasis);
+	
+	std::cout << "SIZE: " << dfbasis->size() << std::endl;
 	
 }
 
@@ -64,6 +70,8 @@ void mpmod::compute_batch() {
 	
 	int nbf = std::accumulate(b.begin(), b.end(), 0);
 	int dfnbf = std::accumulate(x.begin(), x.end(), 0);
+	
+	std::cout << "NBFS: " << nbf << " " << dfnbf << std::endl;
 	
 	// options
 	int nlap = m_opt.get<int>("nlap",MP_NLAP);

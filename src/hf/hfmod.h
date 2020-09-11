@@ -126,7 +126,7 @@ public:
 				}
 				
 				b = m_mol->dims().b();
-				int nbas = m_mol->c_basis().nbf();
+				int nbas = m_mol->c_basis()->nbf();
 				
 				auto eigen_cbm = dbcsr::matrix_to_eigen(in);
 				

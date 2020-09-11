@@ -3,6 +3,7 @@
 
 #include "utils/params.hpp"
 #include "utils/ppdirs.h"
+#include "desc/atom.h"
 #include "desc/basis.h"
 
 #include <vector>
@@ -16,16 +17,19 @@ namespace desc {
 static const int MOLECULE_MO_SPLIT = 5;
 static const std::string MOLECULE_AO_SPLIT_METHOD = "atomic";
 
+class create_mol_base;
+
 class molecule {	
-private:
+protected:
 
 	std::string m_name;
+	MPI_Comm m_comm;
 
 	int m_mult;
 	int m_charge;
-	std::vector<libint2::Atom> m_atoms;
-	cluster_basis m_cluster_basis;
-	optional<cluster_basis,val> m_cluster_dfbasis;
+	std::vector<Atom> m_atoms;
+	shared_cluster_basis m_cluster_basis;
+	shared_cluster_basis m_cluster_dfbasis;
 	
 	int m_nocc_alpha;
 	int m_nocc_beta;
@@ -39,8 +43,8 @@ private:
 	double m_nele_alpha;
 	double m_nele_beta;
 	
-	optional<std::vector<double>,val> m_frac_occ_alpha;
-	optional<std::vector<double>,val> m_frac_occ_beta;
+	std::optional<std::vector<double>> m_frac_occ_alpha;
+	std::optional<std::vector<double>> m_frac_occ_beta;
 	
 	bool m_frac = false;
 	
@@ -55,8 +59,8 @@ private:
 		std::vector<int> m_tot_beta_sizes;
 		std::vector<int> m_bas_sizes;
 		std::vector<int> m_shell_sizes;
-		optional<std::vector<int>,val> m_dfbas_sizes;
-		optional<std::vector<int>,val> m_dfshell_sizes;
+		std::vector<int> m_dfbas_sizes;
+		std::vector<int> m_dfshell_sizes;
 	
 	public:
 	
@@ -77,16 +81,9 @@ private:
 				
 			m_tot_beta_sizes.insert(m_tot_beta_sizes.end(),
 				m_vir_beta_sizes.begin(),m_vir_beta_sizes.end());
+				
+			set_b(*mol.m_cluster_basis);
 			
-			m_bas_sizes = mol.m_cluster_basis.cluster_sizes();
-			
-			for (int i = 0; i != mol.m_cluster_basis.size(); ++i) {
-				m_shell_sizes.push_back(mol.m_cluster_basis[i].size());
-			}
-			
-			if (mol.m_cluster_dfbasis) {
-				set_x(*mol.m_cluster_dfbasis);
-			}	
 		}
 		
 		std::vector<int> oa() { return m_occ_alpha_sizes; }
@@ -96,32 +93,28 @@ private:
 		std::vector<int> ma() { return m_tot_alpha_sizes; }
 		std::vector<int> mb() { return m_tot_beta_sizes; }
 		std::vector<int> b() { return m_bas_sizes; }
-		std::vector<int> x() { 
-			if (m_dfbas_sizes) {
-				return *m_dfbas_sizes;
-			} else {
-				throw std::runtime_error("Df basis not given.");
-			}
-		}
+		std::vector<int> x() { return m_dfbas_sizes; }
 		std::vector<int> s() { return m_shell_sizes; }
-		std::vector<int> xs() {
-			if (m_dfshell_sizes) {
-				return *m_dfshell_sizes;
-			} else {
-				throw std::runtime_error("Df basis not given.");
+		std::vector<int> xs() { return m_dfshell_sizes; }
+		
+		void set_b(cluster_basis& c) {
+			
+			m_bas_sizes = c.cluster_sizes();
+			
+			for (int i = 0; i != c.size(); ++i) {
+				m_shell_sizes.push_back(c[i].size());
 			}
-		}
+			
+		}	
 		
 		void set_x(cluster_basis& cdf) {
 			
-			optional<std::vector<int>,val> opt(cdf.cluster_sizes());
-			m_dfbas_sizes = opt;
+			m_dfbas_sizes = cdf.cluster_sizes();
 			
-			opt->clear();
+			m_dfshell_sizes.clear();
 			for (int i = 0; i != cdf.size(); ++i) {
-				opt->push_back(cdf[i].size());
+				m_dfshell_sizes.push_back(cdf[i].size());
 			}
-			m_dfshell_sizes = opt;
 			
 		}			
 		
@@ -152,43 +145,24 @@ public:
 
 	molecule() {}
 	
-	struct create {
-		
-		make_param(create,name,std::string,required,val)
-		make_param(create,atoms,std::vector<libint2::Atom>,required,ref)
-		make_param(create,basis,std::vector<libint2::Shell>,required,ref)
-		make_param(create,charge,int,required,val)
-		make_param(create,mult,int,required,val)
-		make_param(create,mo_split,int,optional,val)
-		make_param(create,ao_split_method,std::string,optional,val)
-		make_param(create,dfbasis,std::vector<libint2::Shell>,optional,ref)
-		make_param(create,fractional,bool,optional,val)
-		make_param(create,spin_average,bool,optional,val)
-		
-		public:
-	
-		create() {}
-		friend class molecule;
-		
-	};
-		
-	molecule(create& p);
-
 	~molecule() {}
 	
-	void print_info(MPI_Comm comm, int level = 0);
+	void print_info(int level = 0);
 	
-	void set_dfbasis(std::vector<libint2::Shell>& dfbasis);
+	void set_cluster_dfbasis(shared_cluster_basis& df) {
+		m_cluster_dfbasis = df;
+		m_blocks.set_x(*df);
+	}
 	
-	cluster_basis c_basis() {
+	shared_cluster_basis c_basis() {
 		return m_cluster_basis;
 	}
 	
-	optional<cluster_basis,val> c_dfbasis() {
+	shared_cluster_basis c_dfbasis() {
 		return m_cluster_dfbasis;
 	}
 	
-	std::vector<libint2::Atom> atoms() {
+	std::vector<Atom> atoms() {
 		return m_atoms;
 	}
 	
@@ -223,25 +197,58 @@ public:
 	int mo_split() {
 		return m_mo_split;
 	}
-	
-	std::string ao_split_method() {
-		return m_ao_split_method;
-	}
 
-	optional<std::vector<double>,val> frac_occ_alpha() {
+	std::optional<std::vector<double>> frac_occ_alpha() {
 		return m_frac_occ_alpha;
 	}
-	optional<std::vector<double>,val> frac_occ_beta() {
+	std::optional<std::vector<double>> frac_occ_beta() {
 		return m_frac_occ_beta;
 	}
 	
 	std::string name() {
 		return m_name;
 	}
+	
+	friend class create_mol_base;
 
 };
 
 using smolecule = std::shared_ptr<molecule>;
+
+class create_mol_base {
+private:
+
+	shared_cluster_basis c_basis;
+	shared_cluster_basis c_dfbasis;
+	
+	make_param(create_mol_base,comm,MPI_Comm,required,val)
+	make_param(create_mol_base,name,std::string,required,val)
+	make_param(create_mol_base,atoms,std::vector<Atom>,required,ref)
+	make_param(create_mol_base,charge,int,required,val)
+	make_param(create_mol_base,mult,int,required,val)
+	make_param(create_mol_base,mo_split,int,optional,val)
+	make_param(create_mol_base,fractional,bool,optional,val)
+	make_param(create_mol_base,spin_average,bool,optional,val)
+
+public:
+
+	create_mol_base() {}
+
+	create_mol_base& basis(shared_cluster_basis& t_basis) {
+		c_basis = t_basis; return *this;
+	}
+	
+	create_mol_base& dfbasis(shared_cluster_basis& t_dfbasis) {
+		c_dfbasis = t_dfbasis; return *this;
+	}
+	
+	smolecule get();
+	
+};
+
+inline create_mol_base create_molecule() {
+	return create_mol_base();
+}
 
 } // end namespace
 

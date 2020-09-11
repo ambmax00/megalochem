@@ -17,6 +17,7 @@ include_directories(${dir})
 find_package(OpenMP REQUIRED)
 find_package(MPI REQUIRED)
 find_package(DBCSR 2.0.0 CONFIG REQUIRED)
+find_package(PythonLibs REQUIRED)
 find_package(PkgConfig)
 pkg_check_modules(deps REQUIRED IMPORTED_TARGET GLOBAL libxsmmf)
 find_package(Libint2 2.6.0 CONFIG REQUIRED)
@@ -27,6 +28,7 @@ include_directories(
 	${DBCSR_INCLUDE_DIRS} 
 	${MPI_CXX_HEADER_DIR} 
 	${LIBINT2_INCLUDE_DIRS} 
+	${PYTHON_INCLUDE_DIRS}
 	#${CMAKE_CURRENT_BINARY_DIR} 
 	#${CMAKE_CURRENT_SOURCE_DIR}
 )

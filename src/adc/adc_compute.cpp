@@ -188,7 +188,7 @@ void adcmod::compute() {
 		get_unique(aoblk);
 		
 		auto atoms = m_hfwfn->mol()->atoms();
-		auto blkatom = m_hfwfn->mol()->c_basis().block_to_atom(atoms);
+		auto blkatom = m_hfwfn->mol()->c_basis()->block_to_atom(atoms);
 		
 		LOG.os<>("ATOM CENTRES:\n");
 		for (auto a : aoblk) {

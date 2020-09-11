@@ -13,7 +13,7 @@ namespace filio {
 class reader {
 private:
 
-	desc::molecule m_mol;
+	desc::smolecule m_mol;
 	desc::options m_opt;
 	util::mpi_log LOG;
 	MPI_Comm m_comm;
@@ -22,7 +22,7 @@ public:
 	
 	reader(MPI_Comm comm, std::string filename, int print = 0);
 	
-	desc::molecule get_mol() {
+	desc::smolecule get_mol() {
 		return m_mol;
 	};
 	

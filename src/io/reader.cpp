@@ -17,30 +17,47 @@
 
 #include "math/other/rcm.h"
 
-#include <libint2/basis.h>
 #include <dbcsr_common.hpp>
 #include "ints/aofactory.h"
 
 #include <sys/types.h>
 #include <sys/stat.h>
 
+//#include <Python.h>
+
 namespace filio {
 
 void validate(std::string section, const json& j, const json& compare) {
 	
+	// check if all required keys are present
+	std::vector<std::string> reqkeys = compare["_required"];
+	
+	for (auto key : reqkeys) {
+		if (key == "none") break;
+		if (j.find(key) == j.end()) {
+			throw std::runtime_error("Key " + key + " is required.");
+		}
+	}
+	
+	// loop through objects in this section
 	for (auto it = j.begin(); it != j.end(); ++it) {
+		
+		// check if keys valid
 		if (compare.find(it.key()) == compare.end()){
 			throw std::runtime_error("Section " + section + ", invalid keyword: "+it.key());
 		}
+		
+		// go to nested section, if present
 		if (it->is_structured() && !it->is_array() && it.key() != "gen_basis") {
 			validate(it.key(), *it, compare[it.key()]);
 		}
 	}
+	
 }
 
-std::vector<libint2::Atom> get_geometry(const json& j, std::string filename, util::mpi_log& LOG) {
+std::vector<desc::Atom> get_geometry(const json& j, std::string filename, util::mpi_log& LOG) {
 	
-	std::vector<libint2::Atom> out;
+	std::vector<desc::Atom> out;
 	
 	if (j.find("file") == j.end()) {
 		// reading from input file
@@ -55,7 +72,7 @@ std::vector<libint2::Atom> get_geometry(const json& j, std::string filename, uti
 		}
 		
 		for (int i = 0; i != geometry.size()/3; ++i) {
-			libint2::Atom a;
+			desc::Atom a;
 			a.x = geometry.at(3*i);
 			a.y = geometry.at(3*i+1);
 			a.z = geometry.at(3*i+2);
@@ -90,7 +107,7 @@ std::vector<libint2::Atom> get_geometry(const json& j, std::string filename, uti
 			if (nline > 1) {
 				std::stringstream ss(line);
 				
-				libint2::Atom atom;
+				desc::Atom atom;
 				ss >> ele_name;
 				ss >> atom.x >> atom.y >> atom.z;
 				
@@ -130,108 +147,6 @@ std::vector<libint2::Atom> get_geometry(const json& j, std::string filename, uti
 	
 }
 
-std::vector<libint2::Shell> read_basis(const json &jbas, std::vector<libint2::Atom> &atoms, util::mpi_log& LOG) {
-	
-	//libint2::Shell::do_enforce_unit_normalization(false);
-	
-	/*
-	// check basis
-	auto name = j["basis"];
-	
-	libint2::BasisSet basis(name, atoms);
-	
-	std::vector<libint2::Shell> out = std::move(basis);
-	
-	std::cout << "BASIS" << std::endl;
-	
-	
-	// read input*/
-	
-	//read per atom basis
-	//auto& jbas = j["gen_basis"];
-	
-	std::map<int,std::vector<libint2::Shell>> basis_map;
-	
-	// basis name?
-	auto& jele = jbas["elements"];
-	
-	for (auto ele = jele.begin(); ele != jele.end(); ++ele) {
-      
-      auto strv_dv = [](std::vector<std::string>& str_v) {
-		  libint2::svector<double> v(str_v.size());
-		  for (int i = 0; i != v.size(); ++i) {
-			  v[i] = std::stod(str_v[i]);
-		  }
-		  return v;
-	  };
-      
-      auto& jshells = ele.value()["electron_shells"];
-      
-      std::vector<libint2::Shell> vecshell;
-      
-      for (auto& shell : jshells) {
-		  
-		  std::vector<int> ang_moms = shell["angular_momentum"];
-	
-		  std::vector<std::string> str_exp = shell["exponents"];
-		  auto exp = strv_dv(str_exp);
-		  
-		  auto& jcoeffs = shell["coefficients"];
-		  
-		  libint2::svector<double> max_ln(jcoeffs.size());
-		  libint2::svector<libint2::Shell::Contraction> veccons;
-		  
-		  for (int i = 0; i != jcoeffs.size(); ++i) {
-			  
-			std::vector<std::string> str_v = jcoeffs[i];
-			auto v = strv_dv(str_v);
-			
-			auto max = std::max_element(v.begin(), v.end());
-			max_ln[i] = log(*max);
-			
-			libint2::Shell::Contraction c;
-			c.l = ang_moms[i];
-			c.pure = true; 
-			c.coeff = v;
-			
-			veccons.push_back(c);
-			
-		  }
-		  
-		  libint2::Shell s;
-		  s.alpha = exp;
-		  s.contr = veccons;
-		  s.max_ln_coeff = max_ln;
-		  
-		  vecshell.push_back(std::move(s));
-		  
-	  }
-		  
-	  int ele_num = std::stoi(ele.key());
-	  
-	  basis_map[ele_num] = vecshell;
-		  
-	}
-	
-	std::vector<libint2::Shell> tot_basis;
-	
-	for (auto a : atoms) {
-		auto& ele_basis = basis_map[a.atomic_number];
-		std::array<double,3> new_o = {a.x, a.y, a.z};
-		
-		for (auto& s : ele_basis) s.move(new_o);
-		
-		tot_basis.insert(tot_basis.end(), ele_basis.begin(), ele_basis.end());
-	}
-	
-	//for (auto b : tot_basis) {
-		//std::cout << b << std::endl;
-	//}
-	
-	return tot_basis;
-	
-}
-
 void unpack(const json& j_in, desc::options& opt, std::string root, util::mpi_log& LOG) {
 	
 	auto j = j_in[root];
@@ -256,7 +171,14 @@ void unpack(const json& j_in, desc::options& opt, std::string root, util::mpi_lo
 		//}
 		
 	}
-}	
+}
+
+template <typename T>
+T assign(json& j, std::string name, T default_val) {
+	auto it = j.find(name);
+	return (it != j.end()) ? (T)it.value() : default_val;
+}
+	  	
 
 reader::reader(MPI_Comm comm, std::string filename, int print) : m_comm(comm), LOG(comm, print) {
 	
@@ -268,7 +190,57 @@ reader::reader(MPI_Comm comm, std::string filename, int print) : m_comm(comm), L
 	}
 	
 	LOG.os<>("Reading input file...\n\n");
-	
+
+/*
+	std::string c_filename = filename + ".json";
+	std::string qcschema_validate = 
+R"(
+import json
+import qcschema
+
+def qcschema_validate(filename):
+	json_file = open(filename)
+	data  = json.load(json_file)
+	try:
+		qcschema.validate(data, 'input')
+		return str("success")
+	except Exception as inst:
+		return str(inst)
+)"; 
+
+    //std::cout << qcschema_validate << std::endl;
+    
+    Py_Initialize();
+   
+	PyObject *main_module, *global_dict, *expression, 
+		*result, *temp_bytes, *p_filename, *p_args;
+	char* cstr;
+   
+    PyRun_SimpleString(qcschema_validate.c_str());
+    main_module = PyImport_AddModule("__main__");
+    global_dict = PyModule_GetDict(main_module);
+    expression = PyDict_GetItemString(global_dict, "qcschema_validate");
+    p_filename = PyUnicode_FromString(c_filename.c_str());
+    p_args = PyTuple_New(1);
+    PyTuple_SetItem(p_args, 0, p_filename);
+    
+    result = PyObject_CallObject(expression, p_args);
+    
+    if (!result) {
+		PyErr_Print();
+		throw std::runtime_error("Something went wrong calling Python.");
+	}
+    
+	temp_bytes = PyUnicode_AsEncodedString(result, "UTF-8", "strict");
+	cstr = PyBytes_AS_STRING(temp_bytes);
+	cstr = strdup(cstr);
+    
+    if (cstr != "success") {
+		LOG.os<>(cstr);
+		throw std::runtime_error("Error while validating QCSchema");
+	}
+*/
+
 	json data;
 	
 	in >> data;
@@ -278,44 +250,30 @@ reader::reader(MPI_Comm comm, std::string filename, int print) : m_comm(comm), L
 	if (data.find("global") != data.end()) {
 		json& jglob = data["global"];
 		
-		if (jglob.find("block_threshold") != jglob.end()) {
-			dbcsr::global::filter_eps = jglob["block_threshold"];
-		}
-		
-		if (jglob.find("integral_precision") != jglob.end()) {
-			ints::global::precision = jglob["integral_precision"];
-		}
-		
-		if (jglob.find("integral_omega") != jglob.end()) {
-			ints::global::omega = jglob["integral_omega"];
-		}
+		dbcsr::global::filter_eps = assign<double>(jglob, "block_threshold", 1e-9);
+		ints::global::precision = assign<double>(jglob, "integral_precision", 1e-9);
+		ints::global::omega = assign<double>(jglob, "integral_omega", 0.1);
+
 	}
 	
 	json& jmol = data["molecule"];
 	
-	optional<int,val> opt_mo_split;
-	optional<std::string,val> opt_ao_split_method;
+	int mo_split;
+	std::string ao_split_method;
 	
-	if (jmol.find("mo_split") != jmol.end()) {
-		opt_mo_split = jmol["mo_split"];
-	}
-	
-	if (jmol.find("ao_split_method") != jmol.end()) {
-		opt_ao_split_method = jmol["ao_split_method"];
-	}
+	mo_split = assign<int>(jmol, "mo_split", 10);
+	ao_split_method = assign<std::string>(jmol, "ao_split_method", "atomic");
 	
 	LOG.os<>("Processing atomic coordinates...\n");
 	auto atoms = get_geometry(jmol,filename,LOG);
 	
-	bool reorder = (jmol.find("reorder") != jmol.end()) 
-		? jmol["reorder"].get<bool>() 
-		: true;
+	bool reorder = assign<bool>(jmol, "reorder", false);
 	
 	if (reorder) {
 		LOG.os<>("Reordering atoms...\n");
 		
-		math::rcm<libint2::Atom> sorter(atoms,5.0,
-			[](libint2::Atom a1, libint2::Atom a2) -> double {
+		math::rcm<desc::Atom> sorter(atoms,5.0,
+			[](desc::Atom a1, desc::Atom a2) -> double {
 				return sqrt(
 					pow(a1.x - a2.x,2) +
 					pow(a1.y - a2.y,2) +
@@ -333,25 +291,12 @@ reader::reader(MPI_Comm comm, std::string filename, int print) : m_comm(comm), L
 	
 	}
 	
-	if (jmol.find("ao_split") != jmol.end()) {
-		desc::cluster_basis::shell_split = jmol["ao_split"];
-	}
+	int ao_split = assign<int>(jmol, "ao_split", 10);
+	std::string basname = jmol["basis"];
 	
-	std::vector<libint2::Shell> basis;
-	if (jmol.find("basis") != jmol.end()) {	
-		libint2::BasisSet bas(jmol["basis"], atoms);
-		basis = std::move(bas);
-	} else { 
-		basis = read_basis(jmol["gen_basis"],atoms,LOG);
-	}
-	
-	optional<std::vector<libint2::Shell>,val> dfbasis;
-	if (jmol.find("dfbasis") != jmol.end()) {
-		auto b = libint2::BasisSet(jmol["dfbasis"], atoms);
-		dfbasis = optional<std::vector<libint2::Shell>,val>(std::move(b));
-	}
-	
-	//if (dfbasis) std::cout << "DFBASIS IS HERE." << std::endl;
+	desc::shared_cluster_basis cbas = 
+		std::make_shared<desc::cluster_basis>(
+			basname, atoms, ao_split_method, ao_split);
 	
 	int charge = jmol["charge"];
 	int mult = jmol["mult"];
@@ -375,11 +320,17 @@ reader::reader(MPI_Comm comm, std::string filename, int print) : m_comm(comm), L
 	
 	LOG.reset();
 	
-	desc::molecule mol = desc::molecule::create().name(name).atoms(atoms).charge(charge)
-		.mult(mult).mo_split(opt_mo_split).ao_split_method(opt_ao_split_method)
-		.basis(basis);
+	m_mol = desc::create_molecule()
+		.comm(m_comm)
+		.name(name)
+		.atoms(atoms)
+		.basis(cbas)
+		.charge(charge)
+		.mult(mult)
+		.mo_split(mo_split)
+		.get();
 		
-	mol.print_info(m_comm,1);
+	m_mol->print_info(1);
 	LOG.os<>('\n');
 	
 	desc::options opt;
@@ -405,7 +356,6 @@ reader::reader(MPI_Comm comm, std::string filename, int print) : m_comm(comm), L
 	//	std::cout << "Using DENSITY FITTING." << std::endl;
 	//}
 	
-	m_mol = mol;
 	m_opt = opt;
 	
 }

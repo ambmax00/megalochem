@@ -3,7 +3,6 @@
 #include "fock/fockmod.h"
 #include "ints/aofactory.h"
 #include "math/linalg/orthogonalizer.h"
-#include <libint2/basis.h>
 #include "math/solvers/diis.h"
 
 namespace hf {
@@ -99,10 +98,15 @@ hfmod::hfmod(desc::smolecule mol, desc::options opt, dbcsr::world& w)
 	if (m_opt.present("dfbasis")) {
 		 
 		std::string basname = m_opt.get<std::string>("dfbasis");
+		int nsplit = m_mol->c_basis()->nsplit();
+		auto smethod = m_mol->c_basis()->split_method();
+		auto atoms = m_mol->atoms();
+		
 		LOG.os<>("Setting df basis: ", basname, "\n\n");
-		libint2::BasisSet bas(basname,m_mol->atoms());
-		std::vector<libint2::Shell> vecbas = std::move(bas);
-		m_mol->set_dfbasis(vecbas);
+		auto dfbasis = std::make_shared<desc::cluster_basis>(
+			basname, atoms, smethod, nsplit);
+	
+		m_mol->set_cluster_dfbasis(dfbasis);
 		
 		auto x = m_mol->dims().x();
 		if (LOG.global_plev() >= 1) {
@@ -285,7 +289,7 @@ void hfmod::compute() {
 	dbcsr::shared_matrix<double> e_A;
 	dbcsr::shared_matrix<double> e_B;
 	
-	size_t nbas = m_mol->c_basis().nbf();
+	size_t nbas = m_mol->c_basis()->nbf();
 	
 	double norm_A = 10;
 	double norm_B = 10;
