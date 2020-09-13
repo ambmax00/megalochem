@@ -42,6 +42,7 @@ void LLMP_FULL_Z::init_tensors() {
 	auto z_xbb = dbcsr::tensor_create_template(eri).name("z_xbb").get();
 	
 	m_z_xbb_batched = dbcsr::btensor_create<3>(z_xbb)
+		.name(m_mol->name() + "_z_xbb_batched")
 		.batch_dims(bdims)
 		.btensor_type(intermedt)
 		.print(m_opt.get<int>("print", 0))

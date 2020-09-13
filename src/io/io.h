@@ -7,6 +7,7 @@
 #include <memory>
 #include <mpi.h>
 #include <dbcsr_conversions.hpp>
+#include "utils/json.hpp"
 
 namespace filio {
 
@@ -43,6 +44,13 @@ dbcsr::shared_matrix<double> read_matrix(std::string filename, std::string matna
 void write_vector(svector<double>& v_in, std::string filename, MPI_Comm comm);
 
 void read_vector(svector<double>& v_in, std::string filename);
+
+void write_matrix_to_json(nlohmann::json& j, dbcsr::shared_matrix<double>& mat,
+	std::string name);
+	
+void read_matrix_from_json(nlohmann::json& j, dbcsr::shared_matrix<double>& mat,
+	dbcsr::world w, std::string name, std::vector<int> rblk, std::vector<int> cblk,
+	dbcsr::type mtype);
 
 } // end namespace
 

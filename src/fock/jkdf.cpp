@@ -468,6 +468,7 @@ void BATCHED_DFAO_K::init_tensors() {
 	std::array<int,3> bdims = {nbatches_x,nbatches_b,nbatches_b};
 	
 	m_c_xbb_batched = dbcsr::btensor_create<3>(m_c_xbb_1_02)
+		.name(m_mol->name() + "_c_xbb_batched")
 		.batch_dims(bdims)
 		.btensor_type(mytype)
 		.print(LOG.global_plev())

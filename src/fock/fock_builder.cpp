@@ -284,6 +284,7 @@ void fockmod::init() {
 		std::array<int,4> bdims = {nbatches_b};
 		
 		auto eri_batched = dbcsr::btensor_create<4>(eris)
+			.name(m_mol->name() + "_eri_batched")
 			.batch_dims(bdims)
 			.btensor_type(dbcsr::btype::core)
 			.print(LOG.global_plev())
@@ -349,6 +350,7 @@ void fockmod::init() {
 		std::array<int,3> bdims = {nbatches_x,nbatches_b,nbatches_b};
 		
 		auto eribatch = dbcsr::btensor_create<3>(eri)
+			.name(m_mol->name() + "_eri_batched")
 			.batch_dims(bdims)
 			.btensor_type(mytype)
 			.print(LOG.global_plev())

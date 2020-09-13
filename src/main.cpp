@@ -49,7 +49,7 @@ int main(int argc, char** argv) {
 	std::filesystem::current_path(workdir);
 	
 	//create data and batching directory
-	std::filesystem::create_directory("data");
+	std::filesystem::create_directory(filename + "_data");
 	std::filesystem::create_directory("batching");
 	
 	dbcsr::init();
@@ -88,15 +88,17 @@ int main(int argc, char** argv) {
 		myhf.compute();
 		myhfwfn = myhf.wfn();
 		myhfwfn->write_to_file();
+		myhfwfn->write_results(filename + "_data/out.json");
 		
 	} else {
 		
 		LOG.os<>("Reading HF info from files...\n");
 		myhfwfn->read_from_file(mol,wrd);
+		myhfwfn->read_results(filename + "_data/out.json");
 		LOG.os<>("Done.\n");
 		
 	}
-	
+		
 	MPI_Barrier(MPI_COMM_WORLD);
 	
 	auto mpopt = opt.subtext("mp");

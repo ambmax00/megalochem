@@ -31,7 +31,7 @@ void MVP_ao_ri_adc2::compute_intermeds() {
 	LOG.os<>("Setting up ZBUILDER.\n"); 
 	
 	std::string zmethod = m_opt.get<std::string>("build_Z", ADC_BUILD_Z);
-	m_zbuilder = mp::get_Z(zmethod, m_world, m_opt);
+	m_zbuilder = mp::get_Z(zmethod, m_world, m_mol, m_opt);
 	
 	m_zbuilder->set_reg(m_reg);
 	m_zbuilder->init_tensors();
@@ -661,6 +661,7 @@ dbcsr::sbtensor<3,double> MVP_ao_ri_adc2::compute_J(smat& u_ao) {
 		.get();
 	
 	auto J_xbb_batched = dbcsr::btensor_create<3>(J_xbb_0_12)
+		.name(m_mol->name() + "_j_xbb_batched")
 		.batch_dims(m_nbatches)
 		.btensor_type(m_bmethod)
 		.print(LOG.global_plev())
@@ -866,6 +867,7 @@ std::pair<smat,smat> MVP_ao_ri_adc2::compute_sigma_2e_ilap(
 		auto eri = m_eri_batched->get_stensor();
 		
 		auto I_xbb_batched = dbcsr::btensor_create<3>(eri)
+			.name(m_mol->name() + "_i_xbb_batched")
 			.batch_dims(m_nbatches)
 			.btensor_type(m_bmethod)
 			.print(LOG.global_plev())
@@ -1151,7 +1153,7 @@ smat MVP_ao_ri_adc2::compute_sigma_2e(smat& u_ao, double omega) {
 	m_reg.insert_btensor<3,double>("t_xbb_batched", J_xbb_batched);
 	
 	// Prepare asym zbuilder
-	mp::LLMP_ASYM_Z zbuilder_asym(m_world, m_opt);
+	mp::LLMP_ASYM_Z zbuilder_asym(m_world, m_mol, m_opt);
 		
 	zbuilder_asym.set_reg(m_reg);
 	zbuilder_asym.init_tensors();

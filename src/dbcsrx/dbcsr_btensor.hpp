@@ -125,8 +125,8 @@ protected:
 public:
 
 	/* batchsize: given in MB */
-	btensor(dbcsr::stensor<N,T>& stensor_in, std::array<int,N> nbatches, 
-		btype mytype, int print = -1) : 
+	btensor(std::string name, dbcsr::stensor<N,T>& stensor_in, 
+		std::array<int,N> nbatches, btype mytype, int print = -1) : 
 		m_comm(stensor_in->comm()),
 		m_filename(),
 		m_mpirank(-1), m_mpisize(-1),
@@ -149,7 +149,7 @@ public:
 		std::string path = std::filesystem::current_path();
 		path += "/batching/";
 		
-		m_filename = path + m_stensor->name() + ".dat";
+		m_filename = path + name + ".dat";
 		
 		// divide dimensions
 		
@@ -1211,12 +1211,17 @@ private:
 
 	shared_tensor<N,T> c_tplate;
 	std::array<int,N> c_bdims;
+	std::string c_name;
 	dbcsr::btype c_btype;
 	int c_print;
 	
 public:
 
 	btensor_create_base(dbcsr::shared_tensor<N,T>& tplate) : c_tplate(tplate) {}
+	
+	btensor_create_base& name(std::string t_name) {
+		c_name = t_name; return *this;
+	}
 	
 	btensor_create_base& batch_dims(std::array<int,N> t_bdims) {
 		c_bdims = t_bdims; return *this;
@@ -1231,7 +1236,7 @@ public:
 	}
 	
 	sbtensor<N,T> get() {
-		auto out = std::make_shared<btensor<N,T>>(c_tplate,c_bdims,c_btype,c_print);
+		auto out = std::make_shared<btensor<N,T>>(c_name,c_tplate,c_bdims,c_btype,c_print);
 		return out;
 	}
 

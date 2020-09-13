@@ -9,6 +9,7 @@
 #include "utils/mpi_time.h"
 #include "utils/registry.h"
 #include "desc/options.h"
+#include "desc/molecule.h"
 
 namespace mp {
 
@@ -19,6 +20,7 @@ class Z {
 protected:
 
 	dbcsr::world m_world;
+	desc::smolecule m_mol;
 	desc::options m_opt;
 	util::registry m_reg;
 	util::mpi_log LOG;
@@ -38,8 +40,9 @@ protected:
 
 public:
 
-	Z(dbcsr::world& w, desc::options opt, std::string mname) : 
+	Z(dbcsr::world& w, desc::smolecule smol, desc::options opt, std::string mname) : 
 		m_world(w),
+		m_mol(smol),
 		m_opt(opt),
 		LOG(m_world.comm(), m_opt.get<int>("print", 0)),
 		TIME (m_world.comm(), mname) {}
@@ -100,8 +103,8 @@ private:
 	
 public:
 
-	LLMP_FULL_Z(dbcsr::world& w, desc::options& opt) :
-		Z(w,opt,"LLMP_FULL") {}
+	LLMP_FULL_Z(dbcsr::world& w, desc::smolecule smol, desc::options& opt) :
+		Z(w,smol,opt,"LLMP_FULL") {}
 
 	void init_tensors() override;
 	void compute() override;
@@ -121,8 +124,8 @@ private:
 	
 public:
 
-	LLMP_MEM_Z(dbcsr::world& w, desc::options& opt) :
-		Z(w,opt,"LLMP_MEM") {}
+	LLMP_MEM_Z(dbcsr::world& w, desc::smolecule smol, desc::options& opt) :
+		Z(w,smol,opt,"LLMP_MEM") {}
 
 	void init_tensors() override;
 	void compute() override;
@@ -143,8 +146,8 @@ private:
 	
 public:
 
-	LLMP_ASYM_Z(dbcsr::world& w, desc::options& opt) :
-		Z(w,opt,"LLMP_MEM") {}
+	LLMP_ASYM_Z(dbcsr::world& w, desc::smolecule& smol, desc::options& opt) :
+		Z(w,smol,opt,"LLMP_MEM") {}
 
 	void init_tensors() override;
 	void compute() override;
@@ -156,15 +159,15 @@ public:
 
 
 inline std::shared_ptr<Z> get_Z(
-	std::string name, dbcsr::world& w, desc::options opt) {
+	std::string name, dbcsr::world& w, desc::smolecule smol, desc::options opt) {
 	
 	std::shared_ptr<Z> out;
 	Z* ptr = nullptr;
 	
 	if (name == "LLMPFULL") {
-		ptr = new LLMP_FULL_Z(w,opt);
+		ptr = new LLMP_FULL_Z(w,smol,opt);
 	} else if (name == "LLMPMEM") {
-		ptr = new LLMP_MEM_Z(w,opt);
+		ptr = new LLMP_MEM_Z(w,smol,opt);
 	}
 	
 	if (!ptr) {

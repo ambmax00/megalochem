@@ -140,6 +140,7 @@ void mpmod::compute_batch() {
 	
 	dbcsr::sbtensor<3,double> B_xbb_batch = 
 		dbcsr::btensor_create<3>(B_xbb)
+		.name(mol->name() + "_eri_batched")
 		.batch_dims(bdims)
 		.btensor_type(eri_type)
 		.print(LOG.global_plev())
@@ -286,9 +287,9 @@ void mpmod::compute_batch() {
 	Z* zbuilder = nullptr;
 	
 	if (zmethod == "LLMPFULL") {
-		zbuilder = new LLMP_FULL_Z(m_world, m_opt);
+		zbuilder = new LLMP_FULL_Z(m_world, mol, m_opt);
 	} else if (zmethod == "LLMPMEM") {
-		zbuilder = new LLMP_MEM_Z(m_world, m_opt);
+		zbuilder = new LLMP_MEM_Z(m_world, mol, m_opt);
 	}
 	
 	if (zbuilder == nullptr) throw std::runtime_error("Invalid z builder!");

@@ -34,10 +34,6 @@ dbcsr::shared_matrix<double> read_matrix(std::string filename, std::string matna
 	
 	read_binary_mat(file_name.c_str(), eigen_mat);
 	
-	//std::cout << tensorname << std::endl;
-	//std::cout << eigen_mat << std::endl;
-	
-	//dbcsr::pgrid<2> grid2(comm);
 	return dbcsr::eigen_to_matrix(eigen_mat, wrld, matname, rowblksizes, colblksizes, mytype);
 	
 }
@@ -76,7 +72,6 @@ void read_vector(svector<double>& v_in, std::string filename) {
 		std::vector<double>(eigen_vec.data(), eigen_vec.data() + eigen_vec.size()));
 	
 	
-}
-	
+}	
 
 } // end namesapce 
