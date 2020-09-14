@@ -28,7 +28,7 @@ inline btype get_btype(std::string str) {
 };
 
 inline vec<vec<int>> make_blk_bounds(std::vector<int> blksizes, int nbatches) {
-	
+		
 	int nblks = blksizes.size();
 	int nele = std::accumulate(blksizes.begin(),blksizes.end(),0);
 	
@@ -156,6 +156,7 @@ public:
 		auto blksizes = m_stensor->blk_sizes();
 		
 		for (int i = 0; i != N; ++i) {
+			
 			m_blk_bounds[i] = make_blk_bounds(blksizes[i],nbatches[i]);
 			m_nbatches_dim[i] = m_blk_bounds[i].size();
 			// check if memory sufficient

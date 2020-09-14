@@ -163,7 +163,7 @@ int main(int argc, char** argv) {
 	   
    }
     
-    LOG.os<>("THE END\n");
+    LOG.os<>("Wrapping up...\n");
     
     time.finish();
 	
@@ -171,7 +171,7 @@ int main(int argc, char** argv) {
 	
 	dbcsr::print_statistics(true);
 
-	//dbcsr::finalize();
+	dbcsr::finalize();
 
 	LOG.os<>("========== FINISHED WITHOUT CRASHING ! =========\n");
 

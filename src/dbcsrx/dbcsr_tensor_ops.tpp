@@ -393,87 +393,6 @@ void copy_3Dtensor_to_2Dtensor(tensor<3,T>& t3, tensor<2,T>& t2, bool sum = fals
 }
 
 template <typename T>
-void copy_matrix_to_3Dtensor(matrix<T>& m, tensor<3,T>& t, bool sum = false, bool sym = false) {
-	
-	if (!sum) t.clear();
-	
-	iterator iter(m);
-    
-    iter.start();	
-    
-    dbcsr::idx3 idx = {0,0,0};
-    dbcsr::idx3 sizes = {0,0,1};
-    arrvec<int,3> res = {vec<int>{0},vec<int>{0},vec<int>{0}};
-    
-    char symtype = m.matrix_type();
-    
-    while (iter.blocks_left()) {
-		iter.next_block();
-		
-		int r = iter.row();
-		int c = iter.col();
-		
-		res[0].push_back(r);
-		res[1].push_back(c);
-		res[2].push_back(0);
-		
-		if (sym && symtype == dbcsr_type_symmetric && r != c) {
-			res[0].push_back(c);
-			res[1].push_back(r);
-			res[2].push_back(0);
-		} 
-		
-	}
-	
-	iter.stop();
-	
-	t.reserve(res);
-	
-	iter.start();
-	
-	while (iter.blocks_left()) {
-		
-		iter.next_block();
-				
-		idx[0] = iter.row();
-		idx[1] = iter.col();
-        		
-		sizes[0] = iter.row_size();
-		sizes[1] = iter.col_size();
-		block<3,T> blk(sizes,iter.data());
-		
-		t.put_block(idx, blk, sum);
-		
-		if (sym && symtype == dbcsr_type_symmetric && idx[0] != idx[1]) {
-			
-			sizes[0] = iter.col_size();
-			sizes[1] = iter.row_size();
-			
-			idx[0] = iter.col();
-			idx[1] = iter.row();
-			
-			block<3,T> blk(sizes);
-			
-			for (int i = 0; i != sizes[0]; ++i) {
-				for (int j = 0; j != sizes[1]; ++j) {
-					blk(i,j,0) = iter(j,i);
-				}
-			}
-			
-			t.put_block(idx, blk, sum);
-			
-		}
-		
-	}
-    
-    iter.stop();
-		
-    t.finalize();
-    m.finalize();
-	
-}
-
-template <typename T>
 void copy_matrix_to_3Dtensor_new(matrix<T>& m, tensor<3,T>& t, bool sym = false) {
 	
 	auto w = m.get_world();
@@ -525,21 +444,6 @@ void copy_matrix_to_3Dtensor_new(matrix<T>& m, tensor<3,T>& t, bool sym = false)
 	
 	// send info around
 	
-	/*for (int i = 0; i != mpisize; ++i) {
-		
-		if (i == mpirank) {
-			for (auto m : send_nblk_p) {
-				std::cout << m << " "; 
-			} std::cout << '\n';
-			for (auto m : send_nze_p) {
-				std::cout << m << " "; 
-			} std::cout << std::endl;
-		}
-		
-		MPI_Barrier(comm);	
-		
-	}*/
-	
 	for (int ip = 0; ip != mpisize; ++ip) {
 		
 		MPI_Gather(&send_nblk_p[ip],1,MPI_INT,recv_nblk_p.data(),1,
@@ -549,21 +453,6 @@ void copy_matrix_to_3Dtensor_new(matrix<T>& m, tensor<3,T>& t, bool sym = false)
 			MPI_INT,ip,comm);
 			
 	}
-	/*
-	for (int i = 0; i != mpisize; ++i) {
-		
-		if (i == mpirank) {
-			for (auto m : recv_nblk_p) {
-				std::cout << m << " "; 
-			} std::cout << '\n';
-			for (auto m : recv_nze_p) {
-				std::cout << m << " "; 
-			} std::cout << std::endl;
-		}
-		
-		MPI_Barrier(comm);	
-		
-	}*/
 	
 	// allocate space on sender
 	
@@ -638,21 +527,6 @@ void copy_matrix_to_3Dtensor_new(matrix<T>& m, tensor<3,T>& t, bool sym = false)
 			
 	}
 	
-	/*for (int i = 0; i != mpisize; ++i) {
-		
-		if (i == mpirank) {
-			std::cout << "RANK " << i << std::endl;
-			for (auto m : recv_blkidx) {
-				for (auto s : m) {
-					std::cout << s << " ";
-				} std::cout << std::endl;
-			}
-		}
-		
-		MPI_Barrier(comm);	
-		
-	}*/
-	
 	// send over block data
 	
 	for (int ip = 0; ip != mpisize; ++ip) {
@@ -662,21 +536,6 @@ void copy_matrix_to_3Dtensor_new(matrix<T>& m, tensor<3,T>& t, bool sym = false)
 			MPI_DOUBLE,ip,comm);
 			
 	}
-	
-	/*for (int i = 0; i != mpisize; ++i) {
-		
-		if (i == mpirank) {
-			std::cout << "RANK " << i << std::endl;
-			for (auto m : recv_blk_data) {
-					std::cout << m << " ";
-			} std::cout << std::endl;
-		}
-		
-		MPI_Barrier(comm);	
-		
-	}*/
-	
-	//std::cout << "0 " << recv_blk_data[0] << std::endl;
 	
 	// allocate blocks
 	
@@ -705,6 +564,10 @@ void copy_matrix_to_3Dtensor_new(matrix<T>& m, tensor<3,T>& t, bool sym = false)
 		
 		nzeoffset += sizes[0]*sizes[1];
 		
+	}
+	
+	if (sym) { 
+		m_ptr->release();
 	}
 	
 	//dbcsr::print(*m_ptr);
@@ -1036,53 +899,6 @@ void copy_3Dtensor_to_matrix_new(tensor<3,T>& t, matrix<T>& m) {
 	//dbcsr::print(m);
 		
 }	
-
-template <typename T>
-void copy_3Dtensor_to_matrix(tensor<3,T>& t, matrix<T>& m, bool sum = false) {
-	
-	if (sum) m.clear();
-	
-	iterator_t<3,double> iter3(t);
-    
-    iter3.start();
-    
-	vec<int> resrow, rescol;
-	std::array<int,2> size2 = {0,0};
-	resrow = rescol = {0};
-	
-	while (iter3.blocks_left()) {
-		
-		iter3.next();
-				
-		auto& idx = iter3.idx();
-		auto& size3 = iter3.size();
-		
-		bool found = true;
-	
-		block<3,T> blk3 = t.get_block(idx,size3,found);
-		
-		size2[0] = size3[0];
-		size2[1] = size3[1];
-		
-		block<2,T> blk2(size2,blk3.data());
-		
-		resrow[0] = idx[0];
-		rescol[0] = idx[1];
-		
-		t.reserve(resrow,rescol);
-		
-		t.put_block(idx,blk3);
-		
-	}
-    
-    iter3.stop();
-		
-    t.finalize();
-    m.finalize();
-	
-}
-
-
 
 template <int N>
 double dot(tensor<N,double>& t1, tensor<N,double>& t2) {

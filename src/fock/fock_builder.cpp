@@ -63,6 +63,10 @@ void fockmod::init() {
 		compute_s_xx_inv = true;
 		compute_3c2e_batched = true;
 		
+	} else {
+		
+		throw std::runtime_error("Unknown J method: " + j_method);
+		
 	}
 		
 	
@@ -101,6 +105,10 @@ void fockmod::init() {
 		compute_s_xx_inv = true;
 		compute_3c2e_batched = true;
 		s_xx_tensor = true;
+		
+	} else {
+		
+		throw std::runtime_error("Unknown K method: " + k_method);
 		
 	}
 	

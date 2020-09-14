@@ -58,19 +58,19 @@ void EXACT_J::compute_J() {
 	if (m_p_A && !m_p_B) {
 		ptot->copy_in(*m_p_A);
 		ptot->scale(2.0);
-		dbcsr::copy_matrix_to_3Dtensor_new(*ptot,*m_ptot_bbd,true);
+		dbcsr::copy_matrix_to_3Dtensor_new(*ptot,*m_ptot_bbd,m_sym);
 		ptot->clear();
 	} else {
 		ptot->copy_in(*m_p_A);
 		ptot->add(1.0, 1.0, *m_p_B);
-		dbcsr::copy_matrix_to_3Dtensor_new<double>(*ptot,*m_ptot_bbd,true);
+		dbcsr::copy_matrix_to_3Dtensor_new<double>(*ptot,*m_ptot_bbd,m_sym);
 		ptot->clear();
 	}
 	
 	if (LOG.global_plev() >= 3) {
 		dbcsr::print(*m_ptot_bbd);
 	}
-	
+		
 	m_ptot_bbd->filter(dbcsr::global::filter_eps);
 	
 	//m_J_bbd->batched_contract_init();
@@ -78,7 +78,7 @@ void EXACT_J::compute_J() {
 	
 	auto eri_01_23 = m_eri_batched->get_stensor();
 	//dbcsr::print(*eri_01_23);
-	
+		
 	for (int imu = 0; imu != m_eri_batched->nbatches_dim(2); ++imu) {
 		for (int inu = 0; inu != m_eri_batched->nbatches_dim(3); ++inu) {
 			
