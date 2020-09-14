@@ -368,24 +368,25 @@ void fockmod::init() {
 		
 		auto xfullblkbounds = eribatch->full_blk_bounds(0);
 		auto mufullblkbounds = eribatch->full_blk_bounds(1);
+		auto xblkbounds = eribatch->blk_bounds(0);
 		auto nublkbounds = eribatch->blk_bounds(2);
 		
-		eribatch->compress_init({2});
+		eribatch->compress_init({0});
 		
 		vec<vec<int>> bounds(3);
 		
-		for (int inu = 0; inu != nublkbounds.size(); ++inu) {
+		for (int ix = 0; ix != nublkbounds.size(); ++ix) {
 				
-				bounds[0] = xfullblkbounds;
+				bounds[0] = xblkbounds[ix];
 				bounds[1] = mufullblkbounds;
-				bounds[2] = nublkbounds[inu];
+				bounds[2] = mufullblkbounds;
 				
 				if (mytype != dbcsr::btype::direct) aofac->ao_3c2e_fill(eri,bounds,scr_s);
 				
 				//dbcsr::print(*eri);
 				eri->filter(dbcsr::global::filter_eps);
 				
-				eribatch->compress({inu}, eri);
+				eribatch->compress({ix}, eri);
 		}
 		
 		eribatch->compress_finalize();

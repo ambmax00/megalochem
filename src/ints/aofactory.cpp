@@ -66,12 +66,10 @@ public:
 			m_basvec = {m_cbas.get(),m_cbas.get()};
 		} else if (dim == "xx") {
 			m_basvec = {m_xbas.get(),m_xbas.get()};
-			std::cout << "NNNN " << m_xbas->nbf() << std::endl;
 			m_BraKet = libint2::BraKet::xs_xs;
 		} else if (dim == "xbb") {
 			m_basvec = {m_xbas.get(), m_cbas.get(),m_cbas.get()};
 			m_BraKet = libint2::BraKet::xs_xx;
-			std::cout << "NNNN " << m_xbas->nbf() << std::endl;
 		} else if (dim == "bbbb") {
 			m_basvec = {m_cbas.get(),m_cbas.get(),m_cbas.get(),m_cbas.get()};
 			m_BraKet = libint2::BraKet::xx_xx;

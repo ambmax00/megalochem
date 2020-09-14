@@ -81,32 +81,32 @@ void BATCHED_DF_J::compute_J() {
 	m_eri_batched->reorder(vec<int>{0},vec<int>{1,2});
 	reoint.finish();
 	
-	m_gp_xd->batched_contract_init();
-	m_ptot_bbd->batched_contract_init();
+	//m_gp_xd->batched_contract_init();
+	//m_ptot_bbd->batched_contract_init();
 		
-	m_eri_batched->decompress_init({2});
+	m_eri_batched->decompress_init({0});
 	
 	auto eri_0_12 = m_eri_batched->get_stensor();
 	
 	auto x_full_b = m_eri_batched->full_bounds(0);
 	auto mu_full_b = m_eri_batched->full_bounds(1);
+	auto x_b = m_eri_batched->bounds(0);
 	auto nu_b = m_eri_batched->bounds(2);
 	
-	for (int inu = 0; inu != nu_b.size(); ++inu) {
+	for (int ix = 0; ix != x_b.size(); ++ix) {
 			
 		fetch1.start();
-		m_eri_batched->decompress({inu});
+		m_eri_batched->decompress({ix});
 		fetch1.finish();
 		
 		con1.start();
 		
-		vec<vec<int>> bounds1 = {
-			mu_full_b,
-			nu_b[inu]
+		vec<vec<int>> bounds2 = {
+			x_b[ix],
 		};
 		
 		dbcsr::contract(*eri_0_12, *m_ptot_bbd, *m_gp_xd)
-			.bounds1(bounds1).beta(1.0)
+			.bounds2(bounds2).beta(1.0)
 			.filter(dbcsr::global::filter_eps)
 			.perform("XMN, MN_ -> X_");
 					
@@ -130,25 +130,24 @@ void BATCHED_DF_J::compute_J() {
 	
 	//dbcsr::print(*m_inv);
 	
-	m_J_bbd->batched_contract_init();
-	m_gq_xd->batched_contract_init();
-	m_eri_batched->decompress_init({2});
+	//m_J_bbd->batched_contract_init();
+	//m_gq_xd->batched_contract_init();
+	m_eri_batched->decompress_init({0});
 	
-	for (int inu = 0; inu != nu_b.size(); ++inu) {
+	for (int ix = 0; ix != x_b.size(); ++ix) {
 			
 		fetch2.start();
-		m_eri_batched->decompress({inu});
+		m_eri_batched->decompress({ix});
 		fetch2.finish();
 	
 		con2.start();
 			
-		vec<vec<int>> bounds3 = {
-			mu_full_b,
-			nu_b[inu]
+		vec<vec<int>> bounds1 = {
+			x_b[ix]
 		};
 	
 		dbcsr::contract(*m_gq_xd, *eri_0_12, *m_J_bbd)
-			.bounds3(bounds3).beta(1.0)
+			.bounds1(bounds1).beta(1.0)
 			.filter(dbcsr::global::filter_eps / nu_b.size())
 			.perform("X_, XMN -> MN_");
 					
@@ -158,8 +157,8 @@ void BATCHED_DF_J::compute_J() {
 	
 	m_eri_batched->decompress_finalize();
 	
-	m_J_bbd->batched_contract_finalize();
-	m_gq_xd->batched_contract_finalize();
+	//m_J_bbd->batched_contract_finalize();
+	//m_gq_xd->batched_contract_finalize();
 	
 	LOG.os<1>("Copy over...\n");
 	
@@ -484,7 +483,7 @@ void BATCHED_DFAO_K::init_tensors() {
 	
 	calc_c.start();
 	
-	m_eri_batched->decompress_init({2});
+	m_eri_batched->decompress_init({0});
 	m_c_xbb_batched->compress_init({2,0});
 		
 	auto mu_full_b = m_c_xbb_batched->full_bounds(1);
@@ -493,13 +492,13 @@ void BATCHED_DFAO_K::init_tensors() {
 	
 	//dbcsr::print(*inv);
 	
-	for (int inu = 0; inu != m_c_xbb_batched->nbatches_dim(2); ++inu) {
-		
+	for (int ix = 0; ix != m_c_xbb_batched->nbatches_dim(0); ++ix) {
+	
 		fetch.start();
-		m_eri_batched->decompress({inu});
+		m_eri_batched->decompress({ix});
 		fetch.finish();
 			
-		for (int ix = 0; ix != m_c_xbb_batched->nbatches_dim(0); ++ix) {
+		for (int inu = 0; inu != m_c_xbb_batched->nbatches_dim(2); ++inu) {
 			
 				vec<vec<int>> b2 = {
 					x_b[ix]
@@ -607,14 +606,14 @@ void BATCHED_DFAO_K::compute_K() {
 		auto full = eri_01_2->nfull_total();
 		int64_t nze_cbar_tot = (int64_t)full[0] * (int64_t)full[1] * (int64_t)full[2];
 		
-		for (int inu = 0; inu != nu_b.size(); ++inu) {
+		for (int ix = 0; ix != x_b.size(); ++ix) {
 			
-			for (int ix = 0; ix != x_b.size(); ++ix) {
-				
-				// fetch integrals
-				fetch.start();
-				m_eri_batched->decompress({ix});
-				fetch.finish();
+			// fetch integrals
+			fetch.start();
+			m_eri_batched->decompress({ix});
+			fetch.finish();
+			
+			for (int inu = 0; inu != nu_b.size(); ++inu) {
 				
 				//dbcsr::print(*eri_01_2);
 				
