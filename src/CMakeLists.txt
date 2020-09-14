@@ -18,8 +18,25 @@ add_executable(
         main.cpp
 )
 
+add_executable(
+	chem_test
+	main.cpp
+)
+
 set_target_properties(
-	chem 
-	PROPERTIES RUNTIME_OUTPUT_DIRECTORY 
-	"${CMAKE_BINARY_DIR}"
+        chem
+        PROPERTIES RUNTIME_OUTPUT_DIRECTORY
+        "${CMAKE_BINARY_DIR}/bin"
+)
+
+target_compile_definitions(
+	chem_test
+	PUBLIC
+	DO_TESTING
+)
+
+set_target_properties(
+	chem_test
+	PROPERTIES RUNTIME_OUTPUT_DIRECTORY
+        "${CMAKE_BINARY_DIR}/tests"
 )

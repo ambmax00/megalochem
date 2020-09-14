@@ -24,11 +24,15 @@ int main(int argc, char** argv) {
 	util::mpi_time time(MPI_COMM_WORLD, "Megalochem");
 	
 	util::mpi_log LOG(MPI_COMM_WORLD,0);
-	
+
+#ifndef DO_TESTING
 	if (argc != 3) {
 		LOG.os<>("Usage: ./chem [filename] [working_directory]\n");
 		exit(0);
 	}
+#else
+	LOG.os<>("MEGALOCHEM TEST RUN.\n");
+#endif
 	
 	std::string s = R"(|  \/  ||  ___|  __ \ / _ \ | |   |  _  /  __ \| | | ||  ___|  \/  |)""\n"
 					R"(| .  . || |__ | |  \// /_\ \| |   | | | | /  \/| |_| || |__ | .  . |)""\n"
@@ -87,13 +91,13 @@ int main(int argc, char** argv) {
 	
 		myhf.compute();
 		myhfwfn = myhf.wfn();
-		myhfwfn->write_to_file();
+		myhfwfn->write_to_file(filename);
 		myhfwfn->write_results(filename + "_data/out.json");
 		
 	} else {
 		
 		LOG.os<>("Reading HF info from files...\n");
-		myhfwfn->read_from_file(mol,wrd);
+		myhfwfn->read_from_file(filename,mol,wrd);
 		myhfwfn->read_results(filename + "_data/out.json");
 		LOG.os<>("Done.\n");
 		
@@ -167,9 +171,23 @@ int main(int argc, char** argv) {
 	
 	dbcsr::print_statistics(true);
 
-	dbcsr::finalize();
+	//dbcsr::finalize();
 
 	LOG.os<>("========== FINISHED WITHOUT CRASHING ! =========\n");
+
+#ifdef DO_TESTING
+	LOG.os<>("Now comparing reference to output\n");
+	std::string output_ref(argv[3]);
+	
+	if (wrd.rank() == 0) {
+		bool is_same = filio::compare_outputs(
+			filename + "_data/out.json", output_ref);
+		if (!is_same) {
+			LOG.os<>("Not the same\n");
+			MPI_Abort(wrd.comm(), MPI_ERR_OTHER);
+		}
+	}
+#endif 
 
 	MPI_Finalize();
 

@@ -45,12 +45,7 @@ void write_vector(svector<double>& v_in, std::string filename, MPI_Comm comm);
 
 void read_vector(svector<double>& v_in, std::string filename);
 
-void write_matrix_to_json(nlohmann::json& j, dbcsr::shared_matrix<double>& mat,
-	std::string name);
-	
-void read_matrix_from_json(nlohmann::json& j, dbcsr::shared_matrix<double>& mat,
-	dbcsr::world w, std::string name, std::vector<int> rblk, std::vector<int> cblk,
-	dbcsr::type mtype);
+bool compare_outputs(std::string filename, std::string ref_filename);
 
 } // end namespace
 

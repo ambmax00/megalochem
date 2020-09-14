@@ -460,13 +460,13 @@ public:
 		
 		c_blacs_barrier(global_grid.ctx(),'A');
 		
-		if (global_grid.mypnum() == 0) 
+		/*if (global_grid.mypnum() == 0) 
 			std::cout << "MATRIX SIZE: " << m_nrowstot 
 				<< " " << m_ncolstot << std::endl;
 				
 		if (global_grid.mypnum() == 0) 
 			std::cout << "LOCAL MATRIX SIZE: " << m_nrowsloc 
-				<< " " << m_ncolsloc << std::endl;
+				<< " " << m_ncolsloc << std::endl;*/
 		
 		for (int pi = 0; pi != global_grid.nprow(); ++pi) {
 			for (int pj = 0; pj != global_grid.npcol(); ++pj) {

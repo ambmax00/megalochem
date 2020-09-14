@@ -74,4 +74,55 @@ void read_vector(svector<double>& v_in, std::string filename) {
 	
 }	
 
+bool compare_outputs(std::string filename, std::string ref_filename) {
+	
+	nlohmann::json data, ref_data;
+	std::ifstream file, ref_file;
+	
+	file.open(filename);
+	ref_file.open(ref_filename);
+	
+	file >> data;
+	ref_file >> ref_data;
+	
+	double ref_prec = 1e-8;
+	
+	std::cout << "Output: " << std::endl;
+	std::cout << data.dump(4) << std::endl;
+	
+	std::cout << "Reference output: " << std::endl;
+	std::cout << ref_data.dump(4) << std::endl;
+	
+	std::function<bool(nlohmann::json&,nlohmann::json&)> validate;
+	
+	validate = [ref_prec,&validate](nlohmann::json& sub, nlohmann::json& sub_ref) {
+	
+		for (auto it = sub_ref.begin(); it != sub_ref.end(); ++it) {
+
+			if (sub.find(it.key()) == sub.end()) {
+				return false;
+			}
+
+			if (it->is_structured() && !it->is_array()) {
+				if (!validate(sub[it.key()],sub_ref[it.key()])) {
+					return false;
+				}
+			} else if (it->type() == nlohmann::json::value_t::number_float) {
+				if (!(fabs((double)it.value() - (double)sub[it.key()]) < ref_prec)) {
+					return false;
+				}
+			} else if (it.value() != sub[it.key()]) {
+				return false;
+			}
+	
+		}
+		
+		return true;
+		
+	};
+	
+	return validate(data, ref_data);
+	
+}
+
 } // end namesapce 

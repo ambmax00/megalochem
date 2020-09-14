@@ -40,13 +40,20 @@ target_link_libraries(
 	PUBLIC
 	chem_dbcsrx
 	chem_io
-	#	chem_math_laplace
 	MPI::MPI_CXX	
 	chem_hf
 	chem_mp
-	#chem_desc
-	chem_ints
-	chem_math_linalg
-	#	chem_math_solvers
 	chem_adc
 )
+
+target_link_libraries(
+        chem_test
+        PUBLIC
+        chem_dbcsrx
+        chem_io
+        MPI::MPI_CXX
+        chem_hf
+        chem_mp
+        chem_adc
+)
+

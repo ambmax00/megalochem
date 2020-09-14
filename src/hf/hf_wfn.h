@@ -71,9 +71,9 @@ public:
 	double nuc_energy() { return m_nuc_energy; }
 	double wfn_energy() { return m_wfn_energy; }
 	
-	void write_to_file() {
+	void write_to_file(std::string name) {
 		
-		std::string molname = m_mol->name();
+		std::string molname = name;
 		std::string prefix = molname + "_data/";
 		std::string suffix = ".dat";
 		
@@ -109,11 +109,11 @@ public:
 		
 	}
 	
-	void read_from_file(desc::smolecule& mol, dbcsr::world& w) {
+	void read_from_file(std::string name, desc::smolecule& mol, dbcsr::world& w) {
 		
 		m_mol = mol;
 		
-		std::string molname = m_mol->name();
+		std::string molname = name;
 		std::string prefix = molname + "_data/" ;
 		std::string suffix = ".dat";
 		
