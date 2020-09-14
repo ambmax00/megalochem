@@ -281,7 +281,7 @@ void fockmod::init() {
 		auto eris = aofac->ao_eri_setup_tensor(spgrid4, vec<int>{0,1}, vec<int>{2,3});
 		
 		int nbatches_b = m_opt.get<int>("nbatches_x", FOCK_NBATCHES_B);
-		std::array<int,4> bdims = {nbatches_b};
+		std::array<int,4> bdims = {nbatches_b,nbatches_b,nbatches_b,nbatches_b};
 		
 		auto eri_batched = dbcsr::btensor_create<4>(eris)
 			.name(m_mol->name() + "_eri_batched")
