@@ -483,8 +483,8 @@ void BATCHED_DFAO_K::init_tensors() {
 	
 	calc_c.start();
 	
-	m_eri_batched->decompress_init({0});
-	m_c_xbb_batched->compress_init({2,0});
+	m_eri_batched->decompress_init({2});
+	m_c_xbb_batched->compress_init({0,2});
 		
 	auto mu_full_b = m_c_xbb_batched->full_bounds(1);
 	auto x_b = m_c_xbb_batched->bounds(0);
@@ -492,13 +492,13 @@ void BATCHED_DFAO_K::init_tensors() {
 	
 	//dbcsr::print(*inv);
 	
-	for (int ix = 0; ix != m_c_xbb_batched->nbatches_dim(0); ++ix) {
+	for (int inu = 0; inu != m_c_xbb_batched->nbatches_dim(2); ++inu) {
 	
 		fetch.start();
-		m_eri_batched->decompress({ix});
+		m_eri_batched->decompress({inu});
 		fetch.finish();
-			
-		for (int inu = 0; inu != m_c_xbb_batched->nbatches_dim(2); ++inu) {
+		
+		for (int ix = 0; ix != m_c_xbb_batched->nbatches_dim(0); ++ix) {			
 			
 				vec<vec<int>> b2 = {
 					x_b[ix]
@@ -524,10 +524,13 @@ void BATCHED_DFAO_K::init_tensors() {
 				
 				//dbcsr::print(*m_c_xbb_1_02);
 				
-				m_c_xbb_batched->compress({inu,ix}, m_c_xbb_1_02);
+				m_c_xbb_batched->compress({ix,inu}, m_c_xbb_1_02);
 				
 		}
 	}
+	
+	m_eri_batched->decompress_finalize();
+	m_c_xbb_batched->compress_finalize();
 	
 	double c_occ = m_c_xbb_batched->occupation() * 100;
 	LOG.os<1>("Occupancy of c_xbb: ", c_occ, "%\n");
@@ -588,11 +591,9 @@ void BATCHED_DFAO_K::compute_K() {
 		reo_int.start();
 		m_eri_batched->reorder(vec<int>{0,1}, vec<int>{2});
 		reo_int.finish();
-		
-		auto eri_01_2 = m_eri_batched->get_stensor();
 	
 		m_eri_batched->decompress_init({0});
-		m_c_xbb_batched->decompress_init({2,0});
+		m_c_xbb_batched->decompress_init({0,2});
 		
 		m_K_01->batched_contract_init();
 		
@@ -601,6 +602,8 @@ void BATCHED_DFAO_K::compute_K() {
 		auto x_b = m_c_xbb_batched->bounds(0);
 		auto mu_full_b = m_c_xbb_batched->full_bounds(1);
 		auto nu_b = m_c_xbb_batched->bounds(2);
+		
+		auto eri_01_2 = m_eri_batched->get_stensor();
 		
 		int64_t nze_cbar = 0;
 		auto full = eri_01_2->nfull_total();
@@ -612,6 +615,8 @@ void BATCHED_DFAO_K::compute_K() {
 			fetch.start();
 			m_eri_batched->decompress({ix});
 			fetch.finish();
+			
+			eri_01_2->batched_contract_init();
 			
 			for (int inu = 0; inu != nu_b.size(); ++inu) {
 				
@@ -650,7 +655,7 @@ void BATCHED_DFAO_K::compute_K() {
 			
 				// get c_xbb
 				fetch2.start();
-				m_c_xbb_batched->decompress({inu,ix});
+				m_c_xbb_batched->decompress({ix,inu});
 				auto c_xbb_1_02 = m_c_xbb_batched->get_stensor();
 				fetch2.finish();
 				
@@ -669,7 +674,11 @@ void BATCHED_DFAO_K::compute_K() {
 				
 			}
 			
+			eri_01_2->batched_contract_finalize();
+			
 		}
+		
+		m_eri_batched->decompress_finalize();
 		
 		double occ_cbar = (double) nze_cbar / (double) nze_cbar_tot;
 		LOG.os<1>("Occupancy of cbar: ", occ_cbar, "%\n");
