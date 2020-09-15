@@ -599,19 +599,12 @@ void BATCHED_PARI_K::compute_K() {
 	int n_xbatches = m_eri_batched->nbatches_dim(0);
 	int n_bbatches = m_eri_batched->nbatches_dim(1);
 	
-	m_eri_batched->decompress_init({0});
+	m_eri_batched->decompress_init({0,2});
 	
 	dbcsr::copy_matrix_to_tensor(*m_p_A, *m_p_bb);
 	
 	// Loop Q
 	for (int ix = 0; ix != n_xbatches; ++ix) {
-		
-		LOG.os<1>("Fetching integrals.\n");
-		time_fetch_ints.start();
-		m_eri_batched->decompress({ix});
-		time_fetch_ints.finish();
-		auto eri_02_1 = m_eri_batched->get_stensor();
-		
 		// Loop sig
 		for (int isig = 0; isig != n_bbatches; ++isig) {
 			
@@ -680,6 +673,12 @@ void BATCHED_PARI_K::compute_K() {
 			time_reo_cbar.start();
 			dbcsr::copy(*cbar_xbb_01_2, *cbar_xbb_02_1).move_data(true).perform();
 			time_reo_cbar.finish();
+			
+			LOG.os<1>("Fetching integrals.\n");
+			time_fetch_ints.start();
+			m_eri_batched->decompress({ix,isig});
+			time_fetch_ints.finish();
+			auto eri_02_1 = m_eri_batched->get_stensor();
 			
 			vec<vec<int>> xs_bounds = {
 				xbounds[ix],
