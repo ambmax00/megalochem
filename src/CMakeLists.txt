@@ -10,8 +10,8 @@ add_subdirectory(desc)
 add_subdirectory(ints)
 add_subdirectory(fock)
 add_subdirectory(hf)
-add_subdirectory(mp)
-add_subdirectory(adc)
+#add_subdirectory(mp)
+#add_subdirectory(adc)
 
 add_executable(
         chem

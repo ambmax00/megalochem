@@ -8,6 +8,7 @@
 
 namespace fock {
 
+/*
 BATCHED_PARI_K::BATCHED_PARI_K(dbcsr::world& w, desc::options& opt) 
 	: K(w,opt,"PARI-K") {}
 
@@ -747,5 +748,6 @@ void BATCHED_PARI_K::compute_K() {
 	TIME.finish();
 			
 }
+*/
 
 } // end namespace

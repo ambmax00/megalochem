@@ -22,9 +22,10 @@ private:
 				throw std::runtime_error("Registry: Bad cast.");
 			}
 			out = std::any_cast<item>(m_map[intname]);
-		} else {
-			throw std::runtime_error("Could not find " + intname + " in registry!");
-		}
+		} //else {
+			//throw std::runtime_error("Could not find " + intname + " in registry!");
+			
+		//}
 		return out;
 	}
 	

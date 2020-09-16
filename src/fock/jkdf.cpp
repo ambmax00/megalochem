@@ -5,9 +5,6 @@
 
 namespace fock {
 
-BATCHED_DF_J::BATCHED_DF_J(dbcsr::world& w, desc::options& iopt) 
-	: J(w,iopt,"BATCHED_DF_J") {} 
-
 void BATCHED_DF_J::init_tensors() {
 	
 	auto b = m_mol->dims().b();
@@ -45,7 +42,46 @@ void BATCHED_DF_J::init_tensors() {
 	
 }
 
-void BATCHED_DF_J::compute_J() {
+void BATCHED_DF_J::batch_init() {
+	
+	// copy over density
+	
+	auto p_A = m_reg.get_matrix<double>("p_bb_A");
+	auto p_B = m_reg.get_matrix<double>("p_bb_B");
+	
+	auto ptot = dbcsr::create_template<double>(p_A)
+		.name("ptot").get();
+	
+	if (p_A && !p_B) {
+		ptot->copy_in(*p_A);
+		ptot->scale(2.0);
+		bool sym = ptot->has_symmetry();
+		dbcsr::copy_matrix_to_3Dtensor_new(*ptot,*m_ptot_bbd,sym);
+		//dbcsr::print(ptot);
+		ptot->clear();
+	} else {
+		ptot->copy_in(*p_A);
+		ptot->add(1.0, 1.0, *p_B);
+		bool sym = ptot->has_symmetry();
+		dbcsr::copy_matrix_to_3Dtensor_new<double>(*ptot,*m_ptot_bbd,sym);
+		ptot->clear();
+	}
+	
+	m_ptot_bbd->filter(dbcsr::global::filter_eps);
+	
+}
+
+void BATCHED_DF_J::batch_finalize() {
+	
+	//dbcsr::copy_3Dtensor_to_matrix_new(*m_J_bbd, *m_J);
+	
+	m_J_bbd->clear();
+	m_gp_xd->clear();
+	m_gq_xd->clear();
+	
+}
+
+void BATCHED_DF_J::compute_block(ilist idx_list) {
 	
 	auto& con1 = TIME.sub("first contraction");
 	auto& con2 = TIME.sub("second contraction");
@@ -55,28 +91,12 @@ void BATCHED_DF_J::compute_J() {
 	
 	TIME.start();
 	
-	// copy over density
+	std::vector<int> idx = idx_list;
+	int ix_0 = idx[0];
 	
-	auto ptot = dbcsr::create_template<double>(m_p_A)
-		.name("ptot").get();
+	exit(0);
 	
-	if (m_p_A && !m_p_B) {
-		ptot->copy_in(*m_p_A);
-		ptot->scale(2.0);
-		bool sym = ptot->has_symmetry();
-		dbcsr::copy_matrix_to_3Dtensor_new(*ptot,*m_ptot_bbd,sym);
-		//dbcsr::print(ptot);
-		ptot->clear();
-	} else {
-		ptot->copy_in(*m_p_A);
-		ptot->add(1.0, 1.0, *m_p_B);
-		bool sym = ptot->has_symmetry();
-		dbcsr::copy_matrix_to_3Dtensor_new<double>(*ptot,*m_ptot_bbd,sym);
-		ptot->clear();
-	}
-	
-	m_ptot_bbd->filter(dbcsr::global::filter_eps);
-	
+	/*
 	reoint.start();
 	m_eri_batched->reorder(vec<int>{0},vec<int>{1,2});
 	reoint.finish();
@@ -161,21 +181,13 @@ void BATCHED_DF_J::compute_J() {
 	m_J_bbd->batched_contract_finalize();
 	m_gq_xd->batched_contract_finalize();
 	
-	LOG.os<1>("Copy over...\n");
-	
-	dbcsr::copy_3Dtensor_to_matrix_new(*m_J_bbd, *m_J);
-	
-	m_J_bbd->clear();
-	m_gp_xd->clear();
-	m_gq_xd->clear();
-	
-	if (LOG.global_plev() >= 2) {
-		dbcsr::print(*m_J);
-	}
+	LOG.os<1>("Copy over...\n");*/
 	
 	TIME.finish();
 	
 }
+
+/*
 
 BATCHED_DFMO_K::BATCHED_DFMO_K(dbcsr::world& w, desc::options& opt) 
 	: K(w,opt,"BATCHED_DFMO_K") {}
@@ -702,6 +714,6 @@ void BATCHED_DFAO_K::compute_K() {
 	TIME.finish();
 			
 }
-	
+*/
 	
 } // end namespace

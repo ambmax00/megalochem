@@ -28,8 +28,8 @@ private:
 	dbcsr::shared_matrix<double> m_f_bb_A;
 	dbcsr::shared_matrix<double> m_f_bb_B;
 	
-	std::shared_ptr<J> m_J_builder;
-	std::shared_ptr<K> m_K_builder;
+	std::shared_ptr<JK> m_J_builder;
+	std::shared_ptr<JK> m_K_builder;
 	
 	dbcsr::shared_pgrid<2> spgrid2;
 	dbcsr::shared_pgrid<3> spgrid3_xbb;

@@ -4,18 +4,18 @@
 #include "ints/aofactory.h"
 #include "utils/registry.h"
 #include "desc/molecule.h"
-#include "desc/options.h"
 #include "utils/mpi_time.h"
 #include <dbcsr_btensor.hpp>
 #include <dbcsr_matrix.hpp>
 
 namespace fock {
 	
-class JK_common {
+using ilist = std::initializer_list<int>;
+	
+class JK {
 protected:
 	
 	desc::smolecule m_mol;
-	desc::options m_opt;
 	dbcsr::world m_world;
 	
 	util::registry m_reg;
@@ -23,82 +23,51 @@ protected:
 	util::mpi_log LOG;
 	util::mpi_time TIME;
 	
-	dbcsr::shared_matrix<double> m_p_A;
-	dbcsr::shared_matrix<double> m_p_B;
-	dbcsr::shared_matrix<double> m_c_A;
-	dbcsr::shared_matrix<double> m_c_B;
-	
 	bool m_SAD_iter;
 	int m_SAD_rank;
 	
 	bool m_sym = true;
-		
+	
+	dbcsr::shared_matrix<double> m_mat_A;
+	dbcsr::shared_matrix<double> m_mat_B;
+	
+	void init();
+	virtual void init_tensors() = 0;
+	
 public:
 	
-	JK_common(dbcsr::world& w, desc::options opt, std::string name);
-	void set_density_alpha(dbcsr::shared_matrix<double>& ipA) { m_p_A = ipA; }
-	void set_density_beta(dbcsr::shared_matrix<double>& ipB) { m_p_B = ipB; }
-	void set_coeff_alpha(dbcsr::shared_matrix<double>& icA) { m_c_A = icA; }
-	void set_coeff_beta(dbcsr::shared_matrix<double>& icB) { m_c_B = icB; }
-	void set_sym(bool sym) { m_sym = sym; }
-	void set_mol(desc::smolecule& smol) { 
-		m_mol = smol;
+	JK(dbcsr::world& w, desc::smolecule smol, util::registry reg, 
+		int print, std::string name) : 
+		m_world(w),
+		LOG(m_world.comm(),print),
+		TIME(m_world.comm(),name) 
+	{
+			init();
 	}
+	
+	void set_sym(bool sym) { m_sym = sym; }
+	
 	void set_SAD(bool SAD, int rank) { 
 		m_SAD_iter = SAD; 
 		m_SAD_rank = rank;
 	}
-	void set_reg(util::registry& reg) {
-		m_reg = reg;
-	}
 	
-	virtual ~JK_common() {}
+	virtual ~JK() {}
+	
+	virtual void batch_init() = 0;
+	virtual void batch_finalize() = 0;
 	
 	void print_info() { TIME.print_info(); }
 	
-};
-
-class J : public JK_common {
-protected: 
-
-	dbcsr::shared_matrix<double> m_J;
-	std::shared_ptr<J> m_builder;
+	virtual void compute_block(ilist idx) = 0;
 	
-public:
-	
-	J(dbcsr::world& w, desc::options& opt, std::string name) : JK_common(w,opt,name) {}
-	virtual ~J() {}
-	virtual void compute_J() = 0;
-	virtual void init_tensors() = 0;
-	
-	void init();
-	
-	dbcsr::shared_matrix<double> get_J() { return m_J; }	
-		
-};
-
-class K : public JK_common {
-protected:
-
-	dbcsr::shared_matrix<double> m_K_A;
-	dbcsr::shared_matrix<double> m_K_B;
-	
-public:
-	
-	K(dbcsr::world& w, desc::options& opt, std::string name) : JK_common(w,opt,name) {}
-	virtual ~K() {}
-	virtual void compute_K() = 0;
-	virtual void init_tensors() = 0;
-	
-	void init();
-	
-	dbcsr::shared_matrix<double> get_K_A() { return m_K_A; }
-	dbcsr::shared_matrix<double> get_K_B() { return m_K_B; }
+	dbcsr::shared_matrix<double> get_A() { return m_mat_A; }
+	dbcsr::shared_matrix<double> get_B() { return m_mat_B; }
 	
 };
 
-
-class EXACT_J : public J {
+/*
+class EXACT_J : public JK {
 private:
 
 	dbcsr::sbtensor<4,double> m_eri_batched;
@@ -109,13 +78,21 @@ private:
 
 public:
 	
-	EXACT_J(dbcsr::world& w, desc::options& opt);
-	void compute_J() override;
+	EXACT_J(dbcsr::world& w, desc::smolecule smol, int nprint) :
+		JK(w,mol,nprint,"EXACT_J") 
+	{
+		init_tensors();
+	}
+	
+	void batch_init() override;
+	void batch_finalize() override;
+		
+	void compute_Jblock(ilist idx) override;
 	void init_tensors() override;
 	
 };
 
-class EXACT_K : public K {
+class EXACT_K : public JK {
 private:
 
 	dbcsr::sbtensor<4,double> m_eri_batched;
@@ -126,13 +103,21 @@ private:
 	
 public:
 
-	EXACT_K(dbcsr::world& w, desc::options& opt);
-	void compute_K() override;
+	EXACT_K(dbcsr::world& w, desc::smolecule smol, int nprint) :
+		JK(w,mol,nprint,"EXACT_K")
+	{
+		init_tensors();
+	}
+	
+	void batch_init() override;
+	void batch_finalize() override;
+	
+	void compute_Kblock(ilist idx) override;
 	void init_tensors() override;
 	
-};
+};*/
 
-class BATCHED_DF_J : public J {
+class BATCHED_DF_J : public JK {
 private:
 
 	dbcsr::sbtensor<3,double> m_eri_batched;
@@ -148,16 +133,25 @@ private:
 
 public:
 
-	BATCHED_DF_J(dbcsr::world& w, desc::options& opt);
-	void compute_J() override;
+	BATCHED_DF_J(dbcsr::world& w, desc::smolecule mol, 
+		util::registry reg, int nprint) :
+		JK(w,mol,reg,nprint,"BATCHED_DF_J") 
+	{
+		init_tensors();
+	}
+	
+	void batch_init() override;
+	void batch_finalize() override;
+	
+	void compute_block(ilist idx) override;
 	void init_tensors() override;
 	
 	~BATCHED_DF_J() {}
 	
 };
 
-
-class BATCHED_DFMO_K : public K {
+/*
+class BATCHED_DFMO_K : public JK {
 private:
 	
 	dbcsr::sbtensor<3,double> m_eri_batched;
@@ -175,15 +169,23 @@ private:
 	
 public:
 
-	BATCHED_DFMO_K(dbcsr::world& w, desc::options& opt);
-	void compute_K() override;
+	BATCHED_DFMO_K(dbcsr::world& w, desc::smolecule mol, int nprint) :
+		JK(w,mol,nprint,"BATCHED_DFMO_K") 
+	{
+		init_tensors();
+	}
+	
+	void batch_init() override;
+	void batch_finalize() override;
+	
+	void compute_Kblock(ilist idx) override;
 	void init_tensors() override;
 	
 	~BATCHED_DFMO_K() {}
 	
 };
 
-class BATCHED_DFAO_K : public K {
+class BATCHED_DFAO_K : public JK {
 private:
 	
 	dbcsr::sbtensor<3,double> m_eri_batched;
@@ -200,15 +202,23 @@ private:
 	
 public:
 
-	BATCHED_DFAO_K(dbcsr::world& w, desc::options& opt);
-	void compute_K() override;
+	BATCHED_DFAO_K(dbcsr::world& w, desc::smolecule mol, int nprint) :
+		JK(w,mol,nprint,"BATCHED_DFAO_K") 
+	{
+		init_tensors();
+	}
+	
+	void batch_init() override;
+	void batch_finalize() override;
+	
+	void compute_Kblock(ilist idx) override;
 	void init_tensors() override;
 	
 	~BATCHED_DFAO_K() {}
 	
 };
 
-class BATCHED_PARI_K : public K {
+class BATCHED_PARI_K : public JK {
 private:
 
 	dbcsr::sbtensor<3,double> m_eri_batched;
@@ -222,53 +232,44 @@ private:
 	
 public:
 
-	BATCHED_PARI_K(dbcsr::world& w, desc::options& opt);
-	void compute_K() override;
+	BATCHED_PARI_K(dbcsr::world& w, desc::smolecule mol, int nprint) :
+		JK(w,mol,nprint,"BATCHED_PARI_K") 
+	{
+		init_tensors();
+	}
+	
+	void batch_init() override;
+	void batch_finalize() override;
+	
+	void compute_Kblock(int ix) override;
 	void init_tensors() override;
 	
 	~BATCHED_PARI_K() {}
 	
-};
+};*/
 
-inline std::shared_ptr<J> get_J(
-	std::string name, dbcsr::world& w, desc::options opt) {
+inline std::shared_ptr<JK> get_JK(
+	std::string name, dbcsr::world& w, desc::smolecule mol, util::registry reg, int nprint) {
 	
-	std::shared_ptr<J> out;
-	J* ptr = nullptr;
+	std::shared_ptr<JK> out;
+	JK* ptr = nullptr;
 	
-	if (name == "exact") {
-		ptr = new EXACT_J(w,opt);
-	} else if (name == "batchdf") {
-		ptr = new BATCHED_DF_J(w,opt);
+	if (name == "exact_J") {
+		ptr = nullptr; //new EXACT_J(w,opt,mol,nprint);
+	} else if (name == "batchdf_J") {
+		ptr = new BATCHED_DF_J(w,mol,reg,nprint);
+	} else if (name == "exact_K") {
+		ptr = nullptr; //new EXACT_K(w,mol,nprint);
+	} else if (name == "batchdfao_K") {
+		ptr = nullptr; //new BATCHED_DFAO_K(w,mol,nprint);
+	} else if (name == "batchdfmo_K") {
+		ptr = nullptr; //new BATCHED_DFMO_K(w,mol,nprint);
+	} else if (name == "batchpari_K") {
+		ptr = nullptr; //new BATCHED_PARI_K(w,mol,nprint);
 	}
 	
 	if (!ptr) {
-		throw std::runtime_error("INVALID J BUILDER SPECIFIED");
-	}
-	
-	out.reset(ptr);
-	return out;
-
-}
-
-inline std::shared_ptr<K> get_K(
-	std::string name, dbcsr::world& w, desc::options opt) {
-	
-	std::shared_ptr<K> out;
-	K* ptr = nullptr;
-	
-	if (name == "exact") {
-		ptr = new EXACT_K(w,opt);
-	} else if (name == "batchdfao") {
-		ptr = new BATCHED_DFAO_K(w,opt);
-	} else if (name == "batchdfmo") {
-		ptr = new BATCHED_DFMO_K(w,opt);
-	} else if (name == "batchpari") {
-		ptr = new BATCHED_PARI_K(w,opt);
-	}
-	
-	if (!ptr) {
-		throw std::runtime_error("INVALID K BUILDER SPECIFIED");
+		throw std::runtime_error("INVALID J/K BUILDER SPECIFIED");
 	}
 	
 	out.reset(ptr);

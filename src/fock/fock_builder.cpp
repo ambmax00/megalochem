@@ -48,16 +48,10 @@ void fockmod::init() {
 	
 	// set J
 	if (j_method == "exact") {
-		
-		J* builder = new EXACT_J(m_world, m_opt);
-		m_J_builder.reset(builder);
-		
+	
 		compute_eris_batched = true;
 		
 	} else if (j_method == "batchdf") {
-		
-		J* builder = new BATCHED_DF_J(m_world,m_opt);
-		m_J_builder.reset(builder);
 		
 		compute_s_xx = true;
 		compute_s_xx_inv = true;
@@ -68,39 +62,29 @@ void fockmod::init() {
 		throw std::runtime_error("Unknown J method: " + j_method);
 		
 	}
-		
+	
+	std::shared_ptr<ints::aofactory> aofac =
+		std::make_shared<ints::aofactory>(m_mol,m_world);
 	
 	// set K
 	if (k_method == "exact") {
 		
-		K* builder = new EXACT_K(m_world, m_opt);
-		m_K_builder.reset(builder);
-		
 		compute_eris_batched = true;
 		
 	} else if (k_method == "batchdfao") {
-		
-		K* builder = new BATCHED_DFAO_K(m_world,m_opt);
-		m_K_builder.reset(builder);
-		
+	
 		compute_s_xx = true;
 		compute_s_xx_inv = true;
 		compute_3c2e_batched = true;
 		
 	} else if (k_method == "batchdfmo") {
-		
-		K* builder = new BATCHED_DFMO_K(m_world,m_opt);
-		m_K_builder.reset(builder);
-		
+	
 		compute_s_xx = true;
 		compute_s_xx_invsqrt = true;
 		compute_3c2e_batched = true;
 		
 	} else if (k_method == "batchpari") {
-		
-		K* builder = new BATCHED_PARI_K(m_world,m_opt);
-		m_K_builder.reset(builder);
-		
+	
 		compute_s_xx = true;
 		compute_s_xx_inv = true;
 		compute_3c2e_batched = true;
@@ -111,27 +95,6 @@ void fockmod::init() {
 		throw std::runtime_error("Unknown K method: " + k_method);
 		
 	}
-	
-	LOG.os<>("Setting up JK builder.\n");
-	LOG.os<>("J method: ", j_method, '\n');
-	LOG.os<>("K method: ", k_method, '\n');
-	
-	std::shared_ptr<ints::aofactory> aofac =
-		std::make_shared<ints::aofactory>(m_mol,m_world);
-	
-	//dbcsr::print(*m_p_A);
-	
-	m_J_builder->set_density_alpha(m_p_A);
-	m_J_builder->set_density_beta(m_p_B);
-	m_J_builder->set_coeff_alpha(m_c_A);
-	m_J_builder->set_coeff_beta(m_c_B);
-	m_J_builder->set_mol(m_mol);
-	
-	m_K_builder->set_density_alpha(m_p_A);
-	m_K_builder->set_density_beta(m_p_B);
-	m_K_builder->set_coeff_alpha(m_c_A);
-	m_K_builder->set_coeff_beta(m_c_B);
-	m_K_builder->set_mol(m_mol);
 	
 	// initialize pgrids
 	
@@ -287,18 +250,21 @@ void fockmod::init() {
 		aofac->ao_eri_setup("coulomb");
 		
 		auto eris = aofac->ao_eri_setup_tensor(spgrid4, vec<int>{0,1}, vec<int>{2,3});
+		auto bbbb = eris->blk_sizes();
 		
 		int nbatches_b = m_opt.get<int>("nbatches_x", FOCK_NBATCHES_B);
 		std::array<int,4> bdims = {nbatches_b,nbatches_b,nbatches_b,nbatches_b};
 		
-		auto eri_batched = dbcsr::btensor_create<4>(eris)
+		auto eri_batched = dbcsr::btensor_create<4>()
 			.name(m_mol->name() + "_eri_batched")
+			.sgrid(spgrid4)
+			.blk_sizes(bbbb)
 			.batch_dims(bdims)
 			.btensor_type(dbcsr::btype::core)
 			.print(LOG.global_plev())
 			.get();
 					
-		eri_batched->compress_init({2,3});
+		eri_batched->compress_init({2,3},vec<int>{0,1},vec<int>{2,3});
 		
 		vec<vec<int>> bounds(4);
 		
@@ -348,6 +314,7 @@ void fockmod::init() {
 		
 		aofac->ao_3c2e_setup(metric);
 		auto eri = aofac->ao_3c2e_setup_tensor(spgrid3_xbb, vec<int>{0}, vec<int>{1,2});
+		auto xbb = eri->blk_sizes();
 		auto genfunc = aofac->get_generator(scr_s);
 		
 		dbcsr::btype mytype = dbcsr::get_btype(eris_mem);
@@ -357,8 +324,10 @@ void fockmod::init() {
 		
 		std::array<int,3> bdims = {nbatches_x,nbatches_b,nbatches_b};
 		
-		auto eribatch = dbcsr::btensor_create<3>(eri)
+		auto eribatch = dbcsr::btensor_create<3>()
 			.name(m_mol->name() + "_eri_batched")
+			.sgrid(spgrid3_xbb)
+			.blk_sizes(xbb)
 			.batch_dims(bdims)
 			.btensor_type(mytype)
 			.print(LOG.global_plev())
@@ -366,26 +335,25 @@ void fockmod::init() {
 		
 		eribatch->set_generator(genfunc);
 		
-		auto xfullblkbounds = eribatch->full_blk_bounds(0);
-		auto mufullblkbounds = eribatch->full_blk_bounds(1);
-		auto nublkbounds = eribatch->blk_bounds(2);
+		auto bfullblkbounds = eribatch->full_blk_bounds(1);
+		auto xblkbounds = eribatch->blk_bounds(0);
 		
-		eribatch->compress_init({2});
+		eribatch->compress_init({0},vec<int>{0},vec<int>{1,2});
 		
 		vec<vec<int>> bounds(3);
 		
-		for (int inu = 0; inu != nublkbounds.size(); ++inu) {
+		for (int ix = 0; ix != xblkbounds.size(); ++ix) {
 				
-				bounds[0] = xfullblkbounds;
-				bounds[1] = mufullblkbounds;
-				bounds[2] = nublkbounds[inu];
+				bounds[0] = xblkbounds[ix];
+				bounds[1] = bfullblkbounds;
+				bounds[2] = bfullblkbounds;
 				
 				if (mytype != dbcsr::btype::direct) aofac->ao_3c2e_fill(eri,bounds,scr_s);
 				
 				//dbcsr::print(*eri);
 				eri->filter(dbcsr::global::filter_eps);
 				
-				eribatch->compress({inu}, eri);
+				eribatch->compress({ix}, eri);
 		}
 		
 		eribatch->compress_finalize();
@@ -396,16 +364,23 @@ void fockmod::init() {
 		
 		LOG.os<1>("Occupation of 3c2e integrals: ", eribatch->occupation() * 100, "%\n");
 		
+		eribatch->debug_print();
+		
+		eribatch->decompress_init({2},vec<int>{0},vec<int>{1,2});
+		
+		eribatch->debug_print();
+		
+		eribatch->decompress_finalize();
+		
+		exit(0);
+		
 	}
 	
-	m_J_builder->set_reg(m_reg);
-	m_K_builder->set_reg(m_reg);
+	LOG.os<>("Setting up JK builder.\n");
+	LOG.os<>("J method: ", j_method, '\n');
+	LOG.os<>("K method: ", k_method, '\n');
 	
-	m_J_builder->init();
-	m_K_builder->init();
-	
-	m_J_builder->init_tensors();
-	m_K_builder->init_tensors();
+	m_J_builder = get_JK(j_method + "_J", m_world, m_mol, m_reg, LOG.global_plev());
 	
 	LOG.os<>("Finished setting up JK builder \n \n");
 	
@@ -416,29 +391,31 @@ void fockmod::compute(bool SAD_iter, int rank) {
 	TIME.start();
 	
 	m_J_builder->set_SAD(SAD_iter,rank);
-	m_K_builder->set_SAD(SAD_iter,rank);
+	//m_K_builder->set_SAD(SAD_iter,rank);
 	
 	auto& t_j = TIME.sub("J builder");
-	auto& t_k = TIME.sub("K builder");
+	//auto& t_k = TIME.sub("K builder");
 	
 	LOG.os<1>("Computing coulomb matrix.\n");
 	t_j.start();
-	m_J_builder->compute_J();
+	m_J_builder->batch_init();
+	m_J_builder->compute_block({0});
+	m_J_builder->batch_finalize();
 	t_j.finish();
 	
-	LOG.os<1>("Computing exchange matrix.\n");
-	t_k.start();	
-	m_K_builder->compute_K();
-	t_k.finish();
+	//LOG.os<1>("Computing exchange matrix.\n");
+	//t_k.start();	
+	//m_K_builder->compute_K();
+	//t_k.finish();
 	
-	auto Jmat = m_J_builder->get_J();
+	auto Jmat = m_J_builder->get_A();
 	
-	auto KmatA = m_K_builder->get_K_A();
-	auto KmatB = m_K_builder->get_K_B();
+	//auto KmatA = m_K_builder->get_K_A();
+	//auto KmatB = m_K_builder->get_K_B();
 	
 	m_f_bb_A->add(0.0,1.0,*m_core);
 	m_f_bb_A->add(1.0,1.0,*Jmat);
-	m_f_bb_A->add(1.0,1.0,*KmatA);
+	//m_f_bb_A->add(1.0,1.0,*KmatA);
 	//dbcsr::copy_tensor_to_matrix(*Jtensor,*m_f_bb_A,true);
 	//dbcsr::copy_tensor_to_matrix(*KtensorA,*m_f_bb_A,true);
 	
@@ -449,7 +426,7 @@ void fockmod::compute(bool SAD_iter, int rank) {
 	if (m_f_bb_B) {
 		m_f_bb_B->add(0.0,1.0,*m_core);
 		m_f_bb_B->add(1.0,1.0,*Jmat);
-		m_f_bb_B->add(1.0,1.0,*KmatB);
+		//m_f_bb_B->add(1.0,1.0,*KmatB);
 		//dbcsr::copy_tensor_to_matrix(*Jtensor,*m_f_bb_B,true);
 		//dbcsr::copy_tensor_to_matrix(*KtensorB,*m_f_bb_B,true);
 		

@@ -68,8 +68,15 @@ protected:
 	int m_mpirank;
 	int m_mpisize;
 	
-	dbcsr::stensor<N,T> m_stensor;
-	// underlying shared tensor
+	using tensor_map = std::map<std::vector<int>,shared_tensor<N,T>>;
+	
+	tensor_map m_stensors;
+	// underlying shared tensors
+	
+	std::string m_tensor_name;
+	arrvec<int,N> m_blk_sizes, m_blk_offsets;
+	shared_pgrid<N> m_spgrid_N;
+	std::array<int,N> m_sizes;
 	
 	std::string m_filename;
 	// root name for files
@@ -125,21 +132,22 @@ protected:
 public:
 
 	/* batchsize: given in MB */
-	btensor(std::string name, dbcsr::stensor<N,T>& stensor_in, 
-		std::array<int,N> nbatches, btype mytype, int print = -1) : 
-		m_comm(stensor_in->comm()),
+	btensor(std::string name, dbcsr::shared_pgrid<N> pgrid_in,
+		arrvec<int,N> blk_sizes, std::array<int,N> nbatches, 
+		btype mytype, int print = -1) :
+		m_tensor_name(name), 
+		m_spgrid_N(pgrid_in),
+		m_comm(pgrid_in->comm()),
 		m_filename(),
+		m_blk_sizes(blk_sizes),
 		m_mpirank(-1), m_mpisize(-1),
-		LOG(stensor_in->comm(),print),
+		LOG(pgrid_in->comm(),print),
 		m_type(mytype)
 	{
 		
 		if (m_type == btype::invalid) {
 			throw std::runtime_error("Invalid mode for batchtensor.\n");
 		}
-		
-		m_stensor = tensor_create_template<N,T>(stensor_in)
-			.name(stensor_in->name() + "_batched").get();
 		
 		MPI_Comm_rank(m_comm, &m_mpirank);
 		MPI_Comm_size(m_comm, &m_mpisize);
@@ -153,15 +161,13 @@ public:
 		
 		// divide dimensions
 		
-		auto blksizes = m_stensor->blk_sizes();
-		
 		for (int i = 0; i != N; ++i) {
 			
-			m_blk_bounds[i] = make_blk_bounds(blksizes[i],nbatches[i]);
+			m_blk_bounds[i] = make_blk_bounds(m_blk_sizes[i],nbatches[i]);
 			m_nbatches_dim[i] = m_blk_bounds[i].size();
 			// check if memory sufficient
 			
-			int nele = std::accumulate(blksizes[i].begin(),blksizes[i].end(),0);
+			int nele = std::accumulate(m_blk_sizes[i].begin(),m_blk_sizes[i].end(),0);
 			double nele_per_batch = (double) nele / (double) m_nbatches_dim[i];
 			
 			if (nele_per_batch * sizeof(T) >= 2 * 1e+9) {
@@ -185,6 +191,20 @@ public:
 			create_file();
 		}
 		
+		for (int n = 0; n != N; ++n) {
+			m_blk_offsets[n].resize(m_blk_sizes[n].size());
+			int tot = 0;
+			for (int i = 0; i != m_blk_sizes[n].size(); ++i) {
+				m_blk_offsets[n][i] = tot;
+				tot += m_blk_sizes[n][i];
+			}
+		}
+		
+		for (int i = 0; i != N; ++i) {
+			m_sizes[i] = std::accumulate(m_blk_sizes[i].begin(),
+				m_blk_sizes[i].end(),0);
+		}
+		
 		LOG.os<1>("Finished setting up batchtensor.\n");
 		
 		reset_var();
@@ -195,6 +215,60 @@ public:
 	
 	void set_generator(generator_type& func) {
 		m_generator = func;
+	}
+	
+	std::string vec_to_string(vec<int> idx) {
+		std::string out;
+		for (auto i : idx) {
+			out += "[" + std::to_string(i) + "]";
+		}
+		return out;
+	}
+	
+	tensor_map allocate_tensor_map(vec<int> dims, vec<int> map1, vec<int> map2) {
+		
+		tensor_map out;
+		
+		int dimsize = (int)dims.size();
+		int nbatches = 1;
+		vec<int> bsizes(dimsize);
+		
+		for (int i = 0; i != dimsize; ++i) {
+			nbatches *= m_nbatches_dim[dims[i]];
+			bsizes[i] = m_nbatches_dim[dims[i]];
+		}
+		
+		switch (dimsize) {
+			case 1:
+				for (int i = 0; i != nbatches; ++i) {
+					vec<int> idx = {i};
+					out[idx] = nullptr;
+				}
+				break;
+			case 2:
+				for (int i = 0; i != bsizes[0]; ++i) {
+					for (int j = 0; j != bsizes[1]; ++j) {
+						vec<int> idx = {i,j};
+						out[idx] = nullptr;
+					}
+				}
+				break;
+			default:
+				throw std::runtime_error("Splitting batchtensor along 3 dims NYI.");
+		}
+		
+		for (auto& p : out) {
+			auto name = m_tensor_name + "_" + vec_to_string(p.first);
+			p.second = tensor_create<N,T>()
+				.name(name)
+				.pgrid(m_spgrid_N)
+				.map1(map1).map2(map2)
+				.blk_sizes(m_blk_sizes)
+				.get();
+		}
+		
+		return out;
+		
 	}
 	
 	/* Create all necessary files. 
@@ -246,7 +320,7 @@ public:
 	
 	void reset() {
 		
-		m_stensor->clear();
+		m_stensors.clear();
 		reset_var();
 		if (m_type == btype::disk) {
 			delete_file();
@@ -278,8 +352,13 @@ public:
 		
 	}
 	
-	void compress_init(std::initializer_list<int> idx_list) 
+	void compress_init(std::initializer_list<int> idx_list, vec<int> map1, vec<int> map2) 
 	{
+		
+		if (m_stensors.size() != 0) {
+			throw std::runtime_error(
+				"Batched tensor: compression initialization failed.");
+		}
 		
 		LOG.os<1>("Initializing compression...\n");
 		
@@ -288,13 +367,18 @@ public:
 		m_wrview.nbatches = 1;
 		m_wrview.dims = idx;
 		m_wrview.is_contiguous = true;
-		m_wrview.map1 = m_stensor->map1_2d();
-		m_wrview.map2 = m_stensor->map2_2d();
+		m_wrview.map1 = map1;
+		m_wrview.map2 = map2;
 		
 		/* get total number of batches */
 		for (int i = 0; i != idx.size(); ++i) {
 			int idxi = idx[i];
 			m_wrview.nbatches *= m_nbatches_dim[idxi];
+		}
+		
+		/* create tensors */
+		if (m_type == btype::core) {
+			m_stensors = allocate_tensor_map(idx, map1, map2);
 		}
 		
 		LOG.os<1>("Total batches for writing: ", m_wrview.nbatches, '\n');
@@ -352,22 +436,26 @@ public:
 			break;
 			case btype::core: compress_core(idx,tensor_in);
 			break;
-			case btype::direct: compress_direct(tensor_in);
+			case btype::direct: compress_direct(idx,tensor_in);
 			break;
 		}
 		
 	}
 	
-	void compress_direct(stensor<N,T> tensor_in) {
+	void compress_direct(vec<int> idx, stensor<N,T> tensor_in) {
 		tensor_in->clear();
 		return;
 	}
 	
 	void compress_core(vec<int> idx, stensor<N,T> tensor_in) {
 		
-		LOG.os<1>("Compressing into core memory...\n");
+		LOG.os<1>("Compressing into core memory: ");
+		for (auto i : idx) { LOG.os<1>(i, " "); }
+		LOG.os<1>('\n');
 				
 		auto write_tensor = tensor_in;
+		auto dims = m_wrview.dims;
+		int ibatch = flatten(idx,dims);
 		
 		auto b = get_bounds(idx, m_wrview.dims);
     
@@ -375,8 +463,11 @@ public:
 		
 		m_nzetot += tensor_in->num_nze_total();
     
-		copy(*tensor_in, *m_stensor).bounds(b)
-			.move_data(true).sum(true).perform();
+		copy(*tensor_in, *m_stensors[idx])
+			.bounds(b)
+			.move_data(true)
+			.sum(true)
+			.perform();
 		
 		tensor_in->clear();
 		
@@ -563,7 +654,7 @@ public:
 	
 	void clear() {
 		
-		if (m_type != btype::core) m_stensor->clear();
+		if (m_type != btype::core) m_stensors.clear();
 		
 	}
 	
@@ -573,12 +664,12 @@ public:
 				
 	}
 	
+	/*
 	void reorder(vec<int> map1, vec<int> map2) {
 		
 		auto this_map1 = m_stensor->map1_2d();
 		auto this_map2 = m_stensor->map2_2d();
 		
-		/*
 		std::cout << "MAP1 vs MAP1 new" << std::endl;
 		auto prt = [](vec<int> m) {
 			for (auto i : m) {
@@ -592,7 +683,6 @@ public:
 		std::cout << "MAP2 vs MAP2 new" << std::endl;
 		prt(this_map2);
 		prt(map2);
-		*/
 		
 		if (map1 == this_map1 && map2 == this_map2) return;
 		
@@ -607,20 +697,7 @@ public:
 		
 		m_stensor = newtensor;
 		
-	}
-	
-	void reorder(shared_tensor<N,T> mytensor) {
-		
-		stensor<N,T> newtensor = tensor_create_template<N,T>(mytensor)
-			.name(m_stensor->name()).get();
-			
-		if (m_type == btype::core) {
-			dbcsr::copy(*m_stensor, *newtensor).move_data(true).perform();
-		}
-		
-		m_stensor = newtensor;
-		
-	}
+	}*/
 	
 	view set_view(vec<int> dims) {
 		
@@ -681,11 +758,9 @@ public:
 		// get nblk_per_batch for all dims
 		vec<double> nele_per_batch(N);
 		
-		auto blksizes = m_stensor->blk_sizes();
-		
 		for (int i = 0; i != N; ++i) {
-			int nele = std::accumulate(blksizes[i].begin(),
-				blksizes[i].end(),0);
+			int nele = std::accumulate(m_blk_sizes[i].begin(),
+				m_blk_sizes[i].end(),0);
 			int nbatch = m_nbatches_dim[i];
 			nele_per_batch[i] = (double) nele / (double) nbatch;
 			//std::cout << "NELE: " << nele_per_batch[i] << std::endl;
@@ -707,9 +782,10 @@ public:
 			
 			rview.nbatches = batchsize;
 			
-			auto sizes = m_stensor->blk_sizes();
-			auto full = m_stensor->nblks_total();
-			auto off = m_stensor->blk_offsets();
+			auto& sizes = m_blk_sizes;
+			auto& off = m_blk_offsets;
+			std::array<int,3> full = {(int)m_blk_sizes[0].size(), 
+					(int)m_blk_sizes[1].size(), (int)m_blk_sizes[2].size()};
 			
 			size_t nblks = std::accumulate(full.begin(),full.end(),
 				1, std::multiplies<size_t>());
@@ -814,7 +890,8 @@ public:
 	}
 		
 	
-	void decompress_init(std::initializer_list<int> dims_list) 
+	void decompress_init(std::initializer_list<int> dims_list, 
+		vec<int> map1, vec<int> map2) 
 	{
 		
 		vec<int> dims = dims_list;
@@ -824,69 +901,193 @@ public:
 		m_read_current_is_contiguous = (dims == m_wrview.dims) ? true : false;
 		m_read_current_dims = dims;
 		
-		if (m_type != btype::disk) return;
+		switch(m_type) {
+			case btype::disk : decompress_init_disk(dims,map1,map2);
+			break;
+			case btype::core : decompress_init_core(dims,map1,map2);
+			break;
+			case btype::direct : decompress_init_direct(dims,map1,map2);
+			break;
+		}
+		
+	}
+	
+	void get_copy_bounds(vec<vec<int>>& copy_bounds, vec<int> dims, vec<int> idx) {
+		
+		int dimsize = dims.size();
+		
+		for (int i = 0; i != dimsize; ++i) {
+			copy_bounds[dims[i]] = this->bounds(dims[i])[idx[i]];
+		}
+		
+	}
+	
+	void decompress_init_core(vec<int> idx, vec<int> map1, vec<int> map2) {
+		
+		int nbatches = 1;
+		for (auto i : idx) {
+			nbatches *= m_nbatches_dim[i];
+		}
+		
+		if (idx != m_wrview.dims) {
+			
+			LOG.os<1>("Fully reordering vector of core tensors.\n");
+			
+			/* need to reshuffle all tensors */
+			auto new_tensors = allocate_tensor_map(idx, map1, map2);
+			
+			for (auto& p1 : m_stensors) {
+				
+				// form bounds
+				vec<vec<int>> copy_bounds(N);
+				
+				for (auto& p2 : new_tensors) {
+				
+					for (int k = 0; k != N; ++k) {
+						copy_bounds[k] = this->full_bounds(k);
+					}
+					
+					get_copy_bounds(copy_bounds, m_wrview.dims, p1.first);
+					get_copy_bounds(copy_bounds, idx, p2.first);
+					
+					std::cout << "COPYBOUNDS" << std::endl;
+					for (auto c : copy_bounds) {
+						std::cout << c[0] << " " << c[1] << std::endl;
+					}
+					
+					// copy over tensor and delete
+					copy(*p1.second, *p2.second)
+						.bounds(copy_bounds)
+						.sum(true)
+						.perform();
+					
+				}
+				
+				p1.second->destroy();
+				
+			}
+			
+			// update
+			m_wrview.dims = idx;
+			m_wrview.map1 = map1;
+			m_wrview.map2 = map2;
+			m_wrview.nbatches = nbatches;
+			
+			m_stensors = new_tensors;
+			
+		} else if (m_wrview.map1 != map1 || m_wrview.map2 != map2) {
+			
+			LOG.os<1>("Reordering tensors.\n");
+			
+			/* need to reshuffle all tensors */
+			tensor_map new_stensors = allocate_tensor_map(idx, map1, map2);
+			
+			for (auto& p1 : m_stensors) {
+			
+				copy(*p1.second, *new_stensors[p1.first])
+					.move_data(true)
+					.perform();
+					
+				p1.second->destroy();
+			
+			}
+			
+			// update
+			m_wrview.map1 = map1;
+			m_wrview.map2 = map2;
+			m_stensors = new_stensors;
+			
+		} else {
+			
+			LOG.os<1>("Tensors are in correct order.\n");
+			
+		}	
+		
+	}
+	
+	void decompress_init_direct(vec<int> idx, vec<int> map1, vec<int> map2) {
+		
+		if (m_stensors.size() != 0) {
+			throw std::runtime_error("Decomp. initialization failed.");
+		}
+		
+		m_stensors = allocate_tensor_map(idx, map1, map2);
+		
+	}
+	
+	void decompress_init_disk(vec<int> idx, vec<int> map1, vec<int> map2) {
 		
 		if (!m_read_current_is_contiguous) {
 			
 			LOG.os<1>("Reading will be non-contiguous. ",
 				"Setting view of local block indices.\n");
 				
-			if (m_rdviewmap.find(dims) != m_rdviewmap.end()) {
+			if (m_rdviewmap.find(idx) != m_rdviewmap.end()) {
 				LOG.os<1>("View was already set previously. Using it.\n");
 			} else {
 				LOG.os<1>("View not yet computed. Doing it now...\n");
-				m_rdviewmap[dims] = set_view(dims);	
+				m_rdviewmap[idx] = set_view(idx);	
 			}
 			
 		}
 		
+		// set up tensors
+		m_stensors = allocate_tensor_map(idx, map1, map2);
+		
 	}
 	
-	// if tensor_in nullptr, then gives back m_stensor
-	void decompress(std::initializer_list<int> idx_list) {
+	shared_tensor<N,T> decompress(std::initializer_list<int> idx_list) {
 		
 		vec<int> idx = idx_list;
 		
 		switch(m_type) {
-			case btype::disk : decompress_disk(idx);
+			case btype::disk : return decompress_disk(idx);
 			break;
-			case btype::direct : decompress_direct(idx);
+			case btype::direct : return decompress_direct(idx);
 			break;
-			case btype::core : decompress_core(idx);
+			case btype::core : return decompress_core(idx);
 			break;
 		}
 		
 	}
 	
-	void decompress_direct(vec<int> idx) {
+	shared_tensor<N,T> decompress_direct(vec<int> idx) {
 		
-		m_stensor->clear();
+		int i = flatten(idx, m_read_current_dims);
+		
+		m_stensors[i]->clear();
 		
 		LOG.os<1>("Generating tensor entries...\n");
 		
-		auto read_tensor = m_stensor;
+		auto read_tensor = m_stensors[idx];
 		
 		auto b = get_blk_bounds(idx, m_read_current_dims);
 			
 		m_generator(read_tensor, b);
+		return read_tensor;
 		
 	}
 	
-	void decompress_core(vec<int> idx) {
+	shared_tensor<N,T> decompress_core(vec<int> idx) {
 		
 		LOG.os<1>("Decompressing from core...\n");
 		
-		return;
+		int i = flatten(idx, m_read_current_dims);
+		
+		return m_stensors[idx];
 				
 	}
 
-	void decompress_disk(vec<int> idx) {
+	shared_tensor<N,T> decompress_disk(vec<int> idx) {
 		
-		m_stensor->clear();
+		vec<int> dims = (m_read_current_is_contiguous) ?
+			m_wrview.dims : m_rdviewmap[m_read_current_dims].dims;
+		int ibatch = flatten(idx, dims);
+		m_stensors[idx]->clear();
 		
 		// check compatibility
-		vec<int> rmap1 = m_stensor->map1_2d();
-		vec<int> rmap2 = m_stensor->map2_2d();
+		vec<int> rmap1 = m_stensors.front().second->map1_2d();
+		vec<int> rmap2 = m_stensors.fornt().second->map2_2d();
 		
 		bool is_compatible = 
 			(rmap1 == m_wrview.map1 && rmap2 == m_wrview.map2) ? true : false;
@@ -895,18 +1096,14 @@ public:
 		
 		if (is_compatible) {
 			LOG.os<1>("Read and write mappings compatible.\n");
-			read_tensor = m_stensor;
+			read_tensor = m_stensors[idx];
 		} else {
 			LOG.os<1>("Read and write mappings incompatible.\n");
-			read_tensor = tensor_create_template<N,T>(m_stensor)
-				.name(m_stensor->name() + "_RD")
+			read_tensor = tensor_create_template<N,T>(m_stensors[idx])
+				.name(m_stensors[idx]->name() + "_RD")
 				.map1(m_wrview.map1).map2(m_wrview.map2).get();
 		}
 			
-		vec<int> dims = (m_read_current_is_contiguous) ?
-			m_wrview.dims : m_rdviewmap[m_read_current_dims].dims;
-		
-		int ibatch = flatten(idx, dims);
 		LOG.os<1>("Reading batch ", ibatch, '\n');
 		
 		// if reading is done in same way as writing
@@ -1077,7 +1274,7 @@ public:
 			read_tensor->reserve(rlocblkidx);
 			
 			vec<int> blksizes(nblk);
-			auto tsizes = m_stensor->blk_sizes();
+			auto tsizes = read_tensor->blk_sizes();
 			
 			LOG.os<1>("Computing block sizes.\n");
 			
@@ -1143,16 +1340,19 @@ public:
 		
 		if (!is_compatible) {
 			LOG.os<1>("Reordering tensor\n");
-			dbcsr::copy(*read_tensor, *m_stensor).move_data(true).perform();
+			dbcsr::copy(*read_tensor, *m_stensors[idx]).move_data(true).perform();
 		}
+		
+		return m_stensors[idx];
 
 	}
 	
 	void decompress_finalize() {
-		if (m_type != btype::core) m_stensor->clear();
+		if (m_type != btype::core) m_stensors.clear();
 	}
 		
-	dbcsr::stensor<N,T> get_stensor() { return m_stensor; }
+	//dbcsr::stensor<N,T> get_stensor() { return m_stensor; }
+	arrvec<int,N> blk_sizes() { return m_blk_sizes; }
 		
 	int nbatches_dim(int idim) {
 		return m_nbatches_dim[idim];
@@ -1164,30 +1364,31 @@ public:
 	
 	vec<vec<int>> bounds(int idim) {
 		auto out = this->blk_bounds(idim);
-		auto blkoffs = m_stensor->blk_offsets()[idim];
-		auto blksizes = m_stensor->blk_sizes()[idim];
+		auto& off = m_blk_offsets[idim];
+		auto& sizes = m_blk_sizes[idim];
 		for (int i = 0; i != out.size(); ++i) {
-			out[i][0] = blkoffs[out[i][0]];
-			out[i][1] = blkoffs[out[i][1]] + blksizes[out[i][1]] - 1;
+			out[i][0] = off[out[i][0]];
+			out[i][1] = off[out[i][1]] 
+				+ sizes[out[i][1]] - 1;
 		}
 		return out;
 	}
 	
 	vec<int> full_blk_bounds(int idim) {
-		auto full = m_stensor->nblks_total();
-		vec<int> out = {0,full[idim]-1};
+		int iblks = m_blk_sizes[idim].size();
+		vec<int> out = {0,iblks-1};
 		return out;
 	}
 	
 	vec<int> full_bounds(int idim) {
-		auto full = m_stensor->nfull_total();
-		vec<int> out = {0,full[idim]-1};
+		int iele = m_sizes[idim];
+		vec<int> out = {0,iele-1};
 		return out;
 	}
 	
 	double occupation() {
 		
-		auto full = m_stensor->nfull_total();
+		auto full = m_sizes;
 		int64_t tot = std::accumulate(full.begin(),full.end(),(int64_t)1,
 			std::multiplies<int64_t>());
 		
@@ -1201,6 +1402,29 @@ public:
 		return m_nbatches_dim;
 	}
 	
+	void debug_print() {
+		
+		switch (m_type) {
+			case btype::disk :  
+				LOG.os<>("This is a disk batchtensor.\n");
+				LOG.os<>("Data saved in file ", m_filename, '\n');
+				break;
+			case btype::direct :
+				LOG.os<>("This is a direct batchtensor.\n");
+				break;
+			case btype::core :
+				LOG.os<>("This is a core batchtensor.\n");
+				int ibatch = 0;
+				for (auto& t : m_stensors) {
+					LOG.os<>("BATCH ", ibatch++, '\n');
+					print(*t.second);
+				}
+				break;
+		}
+		
+	}
+		
+	
 }; //end class btensor
 
 template <int N, typename T>
@@ -1210,7 +1434,8 @@ template <int N, typename T>
 class btensor_create_base {
 private:
 
-	shared_tensor<N,T> c_tplate;
+	shared_pgrid<N> c_grid;
+	arrvec<int,N> c_blk_sizes;
 	std::array<int,N> c_bdims;
 	std::string c_name;
 	dbcsr::btype c_btype;
@@ -1218,7 +1443,15 @@ private:
 	
 public:
 
-	btensor_create_base(dbcsr::shared_tensor<N,T>& tplate) : c_tplate(tplate) {}
+	btensor_create_base() {}
+	
+	btensor_create_base& sgrid(shared_pgrid<N>& p) {
+		c_grid = p; return *this;
+	}
+	
+	btensor_create_base& blk_sizes(arrvec<int,N> b) {
+		c_blk_sizes = b; return *this;
+	}
 	
 	btensor_create_base& name(std::string t_name) {
 		c_name = t_name; return *this;
@@ -1237,15 +1470,15 @@ public:
 	}
 	
 	sbtensor<N,T> get() {
-		auto out = std::make_shared<btensor<N,T>>(c_name,c_tplate,c_bdims,c_btype,c_print);
+		auto out = std::make_shared<btensor<N,T>>(c_name,c_grid,c_blk_sizes,c_bdims,c_btype,c_print);
 		return out;
 	}
 
 };
 
 template <int N, typename T = double>
-btensor_create_base<N,T> btensor_create(shared_tensor<N,T>& tplate) {
-	return btensor_create_base<N,T>(tplate);
+btensor_create_base<N,T> btensor_create() {
+	return btensor_create_base<N,T>();
 }
 
 } //end namespace

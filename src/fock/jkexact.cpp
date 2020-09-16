@@ -5,6 +5,7 @@
 
 namespace fock {
 
+/*
 EXACT_J::EXACT_J(dbcsr::world& w, desc::options& iopt) : J(w,iopt,"EXACT_J") {} 
 EXACT_K::EXACT_K(dbcsr::world& w, desc::options& iopt) : K(w,iopt,"EXACT_K") {}
 
@@ -167,6 +168,6 @@ void EXACT_K::compute_K() {
 	m_eri_batched->reorder(vec<int>{0,1},vec<int>{2,3});
 	
 }
-	
+*/	
 	
 } // end namespace
