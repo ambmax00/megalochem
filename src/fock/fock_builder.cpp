@@ -286,35 +286,47 @@ void fockmod::init() {
 		
 		aofac->ao_eri_setup("coulomb");
 		
-		auto eris = aofac->ao_eri_setup_tensor(spgrid4, vec<int>{0,1}, vec<int>{2,3});
+		auto b = m_mol->dims().b();
+		arrvec<int,4> bbbb = {b,b,b,b};
 		
 		int nbatches_b = m_opt.get<int>("nbatches_x", FOCK_NBATCHES_B);
 		std::array<int,4> bdims = {nbatches_b,nbatches_b,nbatches_b,nbatches_b};
 		
-		auto eri_batched = dbcsr::btensor_create<4>(eris)
+		auto eri_batched = dbcsr::btensor_create<4>()
 			.name(m_mol->name() + "_eri_batched")
+			.pgrid(spgrid4)
+			.blk_sizes(bbbb)
 			.batch_dims(bdims)
 			.btensor_type(dbcsr::btype::core)
 			.print(LOG.global_plev())
 			.get();
-					
-		eri_batched->compress_init({2,3});
+			
+		auto eris_gen = dbcsr::tensor_create<4,double>()
+			.name("eris_4")
+			.pgrid(spgrid4)
+			.map1({0,1}).map2({2,3})
+			.blk_sizes(bbbb)
+			.get();
+		
+		vec<int> map1 = {0,1};
+		vec<int> map2 = {2,3};
+		eri_batched->compress_init({2,3},map1,map2);
 		
 		vec<vec<int>> bounds(4);
 		
-		for (int imu = 0; imu != eri_batched->nbatches_dim(2); ++imu) {
-			for (int inu = 0; inu != eri_batched->nbatches_dim(3); ++inu) {
+		for (int imu = 0; imu != eri_batched->nbatches(2); ++imu) {
+			for (int inu = 0; inu != eri_batched->nbatches(3); ++inu) {
 				
 				bounds[0] = eri_batched->full_blk_bounds(0);
 				bounds[1] = eri_batched->full_blk_bounds(1);
-				bounds[2] = eri_batched->blk_bounds(2)[imu];
-				bounds[3] = eri_batched->blk_bounds(3)[inu];
+				bounds[2] = eri_batched->blk_bounds(2, imu);
+				bounds[3] = eri_batched->blk_bounds(3, inu);
 				
-				aofac->ao_eri_fill(eris, bounds, nullptr);
+				aofac->ao_eri_fill(eris_gen, bounds, nullptr);
 				
-				eris->filter(dbcsr::global::filter_eps);
+				eris_gen->filter(dbcsr::global::filter_eps);
 				
-				eri_batched->compress({imu,inu},eris);
+				eri_batched->compress({imu,inu},eris_gen);
 				
 			}
 		}
@@ -347,7 +359,6 @@ void fockmod::init() {
 		t_eri_batched.start();
 		
 		aofac->ao_3c2e_setup(metric);
-		auto eri = aofac->ao_3c2e_setup_tensor(spgrid3_xbb, vec<int>{0}, vec<int>{1,2});
 		auto genfunc = aofac->get_generator(scr_s);
 		
 		dbcsr::btype mytype = dbcsr::get_btype(eris_mem);
@@ -355,46 +366,60 @@ void fockmod::init() {
 		int nbatches_x = m_opt.get<int>("nbatches_x", FOCK_NBATCHES_X);
 		int nbatches_b = m_opt.get<int>("nbatches_b", FOCK_NBATCHES_B);
 		
+		auto b = m_mol->dims().b();
+		auto x = m_mol->dims().x();
+		arrvec<int,3> xbb = {x,b,b};
+		
 		std::array<int,3> bdims = {nbatches_x,nbatches_b,nbatches_b};
 		
-		auto eribatch = dbcsr::btensor_create<3>(eri)
+		auto eri_batched = dbcsr::btensor_create<3>()
 			.name(m_mol->name() + "_eri_batched")
+			.pgrid(spgrid3_xbb)
+			.blk_sizes(xbb)
 			.batch_dims(bdims)
 			.btensor_type(mytype)
 			.print(LOG.global_plev())
 			.get();
+			
+		auto eris_gen = dbcsr::tensor_create<3,double>()
+			.name("eris_3")
+			.pgrid(spgrid3_xbb)
+			.map1({0}).map2({1,2})
+			.blk_sizes(xbb)
+			.get();
 		
-		eribatch->set_generator(genfunc);
-		
-		auto xfullblkbounds = eribatch->full_blk_bounds(0);
-		auto mufullblkbounds = eribatch->full_blk_bounds(1);
-		auto nublkbounds = eribatch->blk_bounds(2);
-		
-		eribatch->compress_init({2});
+		eri_batched->set_generator(genfunc);
+
+		vec<int> map1 = {0};
+		vec<int> map2 = {1,2};
+		eri_batched->compress_init({2},map1,map2);
 		
 		vec<vec<int>> bounds(3);
 		
-		for (int inu = 0; inu != nublkbounds.size(); ++inu) {
+		for (int inu = 0; inu != eri_batched->nbatches(2); ++inu) {
 				
-				bounds[0] = xfullblkbounds;
-				bounds[1] = mufullblkbounds;
-				bounds[2] = nublkbounds[inu];
+				bounds[0] = eri_batched->full_blk_bounds(0);
+				bounds[1] = eri_batched->full_blk_bounds(1);
+				bounds[2] = eri_batched->blk_bounds(1,inu);
 				
-				if (mytype != dbcsr::btype::direct) aofac->ao_3c2e_fill(eri,bounds,scr_s);
+				if (mytype != dbcsr::btype::direct) aofac->ao_3c2e_fill(eris_gen,bounds,scr_s);
 				
 				//dbcsr::print(*eri);
-				eri->filter(dbcsr::global::filter_eps);
+				eris_gen->filter(dbcsr::global::filter_eps);
 				
-				eribatch->compress({inu}, eri);
+				eri_batched->compress({inu}, eris_gen);
 		}
 		
-		eribatch->compress_finalize();
+		eri_batched->compress_finalize();
+		
+		auto eri = eri_batched->get_work_tensor();
+		dbcsr::print(*eri);
 		
 		t_eri_batched.finish();
 		
-		m_reg.insert_btensor<3,double>("i_xbb_batched", eribatch);
+		m_reg.insert_btensor<3,double>("i_xbb_batched", eri_batched);
 		
-		LOG.os<1>("Occupation of 3c2e integrals: ", eribatch->occupation() * 100, "%\n");
+		LOG.os<1>("Occupation of 3c2e integrals: ", eri_batched->occupation() * 100, "%\n");
 		
 	}
 	

@@ -77,32 +77,35 @@ void BATCHED_DF_J::compute_J() {
 	
 	m_ptot_bbd->filter(dbcsr::global::filter_eps);
 	
-	reoint.start();
-	m_eri_batched->reorder(vec<int>{0},vec<int>{1,2});
-	reoint.finish();
-	
 	m_gp_xd->batched_contract_init();
 	m_ptot_bbd->batched_contract_init();
 		
-	m_eri_batched->decompress_init({2});
+	std::cout << "HERE0" << std::endl;
+
+	reoint.start();
+	m_eri_batched->decompress_init({2}, vec<int>{0}, vec<int>{1,2});
+	reoint.finish();
 	
-	auto eri_0_12 = m_eri_batched->get_stensor();
+	std::cout << "HERE1" << std::endl;
 	
-	auto x_full_b = m_eri_batched->full_bounds(0);
-	auto mu_full_b = m_eri_batched->full_bounds(1);
-	auto nu_b = m_eri_batched->bounds(2);
+	int nbatches = m_eri_batched->nbatches(2);
 	
-	for (int inu = 0; inu != nu_b.size(); ++inu) {
+	for (int inu = 0; inu != nbatches; ++inu) {
 			
+		std::cout << "HERE2" << std::endl;
+		
 		fetch1.start();
 		m_eri_batched->decompress({inu});
+		auto eri_0_12 = m_eri_batched->get_work_tensor();
 		fetch1.finish();
+		
+		std::cout << "HERE3" << std::endl;
 		
 		con1.start();
 		
 		vec<vec<int>> bounds1 = {
-			mu_full_b,
-			nu_b[inu]
+			m_eri_batched->full_bounds(1),
+			m_eri_batched->bounds(2, inu)
 		};
 		
 		dbcsr::contract(*eri_0_12, *m_ptot_bbd, *m_gp_xd)
@@ -132,24 +135,26 @@ void BATCHED_DF_J::compute_J() {
 	
 	m_J_bbd->batched_contract_init();
 	m_gq_xd->batched_contract_init();
-	m_eri_batched->decompress_init({2});
 	
-	for (int inu = 0; inu != nu_b.size(); ++inu) {
+	m_eri_batched->decompress_init({2},vec<int>{0},vec<int>{1,2});
+	
+	for (int inu = 0; inu != nbatches; ++inu) {
 			
 		fetch2.start();
 		m_eri_batched->decompress({inu});
+		auto eri_0_12 = m_eri_batched->get_work_tensor();
 		fetch2.finish();
 	
 		con2.start();
 			
 		vec<vec<int>> bounds3 = {
-			mu_full_b,
-			nu_b[inu]
+			m_eri_batched->full_bounds(1),
+			m_eri_batched->bounds(2, inu)
 		};
 	
 		dbcsr::contract(*m_gq_xd, *eri_0_12, *m_J_bbd)
 			.bounds3(bounds3).beta(1.0)
-			.filter(dbcsr::global::filter_eps / nu_b.size())
+			.filter(dbcsr::global::filter_eps / nbatches)
 			.perform("X_, XMN -> MN_");
 					
 		con2.finish();
@@ -286,16 +291,6 @@ void BATCHED_DFMO_K::compute_K() {
 		m_HT2_xmb_01_2 = dbcsr::tensor_create_template<3>(m_HT1_xmb_02_1)
 			.name("HT2_xmb_01_2_" + x).map1({0,1}).map2({2}).get();
 		
-		reo0.start();
-		m_eri_batched->reorder(vec<int>{0,2},vec<int>{1});
-		reo0.finish();
-		
-		auto full_xb = m_eri_batched->full_bounds(0);
-		auto full_mb = m_eri_batched->full_bounds(1);
-		auto full_nb = m_eri_batched->full_bounds(2);
-		auto batch_nb = m_eri_batched->bounds(2);
-		auto batch_xb = m_eri_batched->bounds(0);
-		
 		int64_t nze_HTI = 0;
 		
 		auto full = m_HT1_xmb_02_1->nfull_total();
@@ -310,28 +305,30 @@ void BATCHED_DFMO_K::compute_K() {
 				o_bounds[iocc]
 			};
 			
-			m_eri_batched->decompress_init({2});
-			auto eri_xbb_02_1 = m_eri_batched->get_stensor();
+			reo0.start();
+			m_eri_batched->decompress_init({2}, vec<int>{0,2},vec<int>{1});
+			reo0.finish();
 			
 			m_c_bm->batched_contract_init();
 			
-			for (int inu = 0; inu != m_eri_batched->nbatches_dim(2); ++inu) {
+			for (int inu = 0; inu != m_eri_batched->nbatches(2); ++inu) {
 				
 				//std::cout << "MBATCH: " << M << std::endl;
 				
 				fetch1.start();
 				m_eri_batched->decompress({inu});
+				auto eri_xbb_02_1 = m_eri_batched->get_work_tensor();
 				fetch1.finish();
 				
 				vec<vec<int>> xn_bounds = {
-					full_xb,
-					batch_nb[inu]
+					m_eri_batched->full_bounds(0),
+					m_eri_batched->bounds(2, inu)
 				};
 				
 				con1.start();
 				dbcsr::contract(*eri_xbb_02_1,*m_c_bm,*m_HT1_xmb_02_1)
 					.bounds2(xn_bounds).bounds3(o_tbounds).beta(1.0)
-					.filter(dbcsr::global::filter_eps / batch_nb.size())
+					.filter(dbcsr::global::filter_eps / m_eri_batched->nbatches(2))
 					.perform("XMN, Mi -> XiN");
 				con1.finish();
 			
@@ -350,7 +347,7 @@ void BATCHED_DFMO_K::compute_K() {
 			
 			vec<vec<int>> nu_o_bounds = {
 				o_bounds[iocc],
-				full_nb
+				m_eri_batched->full_bounds(2)
 			};
 			
 			con2.start();
@@ -378,17 +375,17 @@ void BATCHED_DFMO_K::compute_K() {
 			
 			m_K_01->batched_contract_init();
 			
-			for (int ix = 0; ix != batch_xb.size(); ++ix) {
+			for (int ix = 0; ix != m_eri_batched->nbatches(0); ++ix) {
 			
 				vec<vec<int>> x_o_bounds = {
-					batch_xb[ix],
+					m_eri_batched->bounds(0,ix),
 					o_bounds[iocc]
 				};
 					
 				con3.start();
 				dbcsr::contract(*m_HT2_xmb_01_2,*HT2_xmb_01_2_copy,*m_K_01)
 					.bounds1(x_o_bounds).beta(1.0)
-					.filter(dbcsr::global::filter_eps/batch_xb.size())
+					.filter(dbcsr::global::filter_eps/m_eri_batched->nbatches(0))
 					.perform("XiM, XiN -> MN"); 
 				con3.finish();
 				
@@ -403,12 +400,6 @@ void BATCHED_DFMO_K::compute_K() {
 		
 		double HTI_occupancy = (double)nze_HTI / (double)nze_HTI_tot;
 		LOG.os<1>("Occupancy of HTI: ", HTI_occupancy * 100, "%\n");
-		
-		//retints.start();
-		//m_eri_batched->reorder(vec<int>{0},vec<int>{1,2});
-		//retints.finish();
-		
-		//dbcsr::print(*m_K_01);
 				
 		dbcsr::copy_tensor_to_matrix(*m_K_01,*k_bb);
 		m_K_01->clear();
@@ -446,29 +437,45 @@ void BATCHED_DFAO_K::init_tensors() {
 	
 	m_eri_batched = m_reg.get_btensor<3,double>("i_xbb_batched");
 	
-	auto eri_0_12 = m_eri_batched->get_stensor();
+	int nx = m_mol->c_dfbasis()->nbf();
+	int nb = m_mol->c_basis()->nbf();
+	std::array<int,3> xbb_size = {nx,nx,nb};
+	
+	auto b = m_mol->dims().b();
+	auto x = m_mol->dims().x();
+	
+	arrvec<int,3> xbb = {x,b,b};
+	
+	m_spgrid3_xbb = dbcsr::create_pgrid<3>(m_world.comm())
+		.tensor_dims(xbb_size).get();
 	
 	// ======== Compute inv_xx * i_xxb ==============
 	
-	dbcsr::shared_tensor<3> c_xbb_0_12 = 
-		dbcsr::tensor_create_template<3>(eri_0_12)
-		.name("c_xbb_0_12").map1({0}).map2({1,2}).get();
+	auto c_xbb_0_12 = dbcsr::tensor_create<3>()
+		.name("c_xbb_0_12")
+		.pgrid(m_spgrid3_xbb)
+		.blk_sizes(xbb)
+		.map1({0}).map2({1,2})
+		.get();
 	
-	m_c_xbb_1_02 = 
-		dbcsr::tensor_create_template<3>(eri_0_12)
-		.name("c_xbb_1_02").map1({1}).map2({0,2}).get();
+	auto c_xbb_1_02 = dbcsr::tensor_create_template<3>(c_xbb_0_12)
+		.name("c_xbb_1_02")
+		.map1({1}).map2({0,2})
+		.get();
 		
 	std::string intermeds = m_opt.get<std::string>("intermeds", "core");
 	
 	auto mytype = dbcsr::get_btype(intermeds);
 	
-	int nbatches_x = m_eri_batched->nbatches_dim(0);
-	int nbatches_b = m_eri_batched->nbatches_dim(2);
+	int nbatches_x = m_eri_batched->nbatches(0);
+	int nbatches_b = m_eri_batched->nbatches(2);
 	
 	std::array<int,3> bdims = {nbatches_x,nbatches_b,nbatches_b};
 	
-	m_c_xbb_batched = dbcsr::btensor_create<3>(m_c_xbb_1_02)
+	m_c_xbb_batched = dbcsr::btensor_create<3>()
 		.name(m_mol->name() + "_c_xbb_batched")
+		.pgrid(m_spgrid3_xbb)
+		.blk_sizes(xbb)
 		.batch_dims(bdims)
 		.btensor_type(mytype)
 		.print(LOG.global_plev())
@@ -484,30 +491,25 @@ void BATCHED_DFAO_K::init_tensors() {
 	
 	calc_c.start();
 	
-	m_eri_batched->decompress_init({2});
-	m_c_xbb_batched->compress_init({2,0});
-		
-	auto mu_full_b = m_c_xbb_batched->full_bounds(1);
-	auto x_b = m_c_xbb_batched->bounds(0);
-	auto nu_b = m_c_xbb_batched->bounds(2);
+	m_eri_batched->decompress_init({2},vec<int>{0},vec<int>{1,2});
+	m_c_xbb_batched->compress_init({2,0}, vec<int>{1}, vec<int>{0,2});
 	
-	//dbcsr::print(*inv);
-	
-	for (int inu = 0; inu != m_c_xbb_batched->nbatches_dim(2); ++inu) {
+	for (int inu = 0; inu != m_c_xbb_batched->nbatches(2); ++inu) {
 		
 		fetch.start();
 		m_eri_batched->decompress({inu});
+		auto eri_0_12 = m_eri_batched->get_work_tensor();
 		fetch.finish();
 			
-		for (int ix = 0; ix != m_c_xbb_batched->nbatches_dim(0); ++ix) {
+		for (int ix = 0; ix != m_c_xbb_batched->nbatches(0); ++ix) {
 			
 				vec<vec<int>> b2 = {
-					x_b[ix]
+					m_c_xbb_batched->bounds(0,ix)
 				};
 				
 				vec<vec<int>> b3 = {
-					mu_full_b,
-					nu_b[inu]
+					m_c_xbb_batched->full_bounds(1),
+					m_c_xbb_batched->bounds(2,inu)
 				};
 
 				con.start();
@@ -518,17 +520,20 @@ void BATCHED_DFAO_K::init_tensors() {
 				con.finish();
 				
 				reo.start();
-				dbcsr::copy(*c_xbb_0_12, *m_c_xbb_1_02)
+				dbcsr::copy(*c_xbb_0_12, *c_xbb_1_02)
 					.move_data(true)
 					.perform();
 				reo.finish();
 				
 				//dbcsr::print(*m_c_xbb_1_02);
 				
-				m_c_xbb_batched->compress({inu,ix}, m_c_xbb_1_02);
+				m_c_xbb_batched->compress({inu,ix}, c_xbb_1_02);
 				
 		}
 	}
+	
+	m_c_xbb_batched->compress_finalize();
+	m_eri_batched->decompress_finalize();
 	
 	double c_occ = m_c_xbb_batched->occupation() * 100;
 	LOG.os<1>("Occupancy of c_xbb: ", c_occ, "%\n");
@@ -539,19 +544,16 @@ void BATCHED_DFAO_K::init_tensors() {
 	
 	// ========== END ==========
 	
-	auto b = m_mol->dims().b();
-	auto x = m_mol->dims().x();
-	
 	arrvec<int,2> bb = {b,b};
 	
 	m_spgrid2 = dbcsr::create_pgrid<2>(m_world.comm()).get();
 	
 	m_cbar_xbb_01_2 = 
-		dbcsr::tensor_create_template<3>(eri_0_12)
+		dbcsr::tensor_create_template<3>(c_xbb_1_02)
 		.name("Cbar_xbb_01_2").map1({0,1}).map2({2}).get();
 	
 	m_cbar_xbb_1_02 = 
-		dbcsr::tensor_create_template<3>(eri_0_12)
+		dbcsr::tensor_create_template<3>(c_xbb_1_02)
 		.name("Cbar_xbb_1_02").map1({1}).map2({0,2}).get();
 	
 	m_K_01 = dbcsr::tensor_create<2,double>().pgrid(m_spgrid2).name("K_01")
@@ -587,41 +589,35 @@ void BATCHED_DFAO_K::compute_K() {
 		//auto& retint = TIME.sub("Returning integrals/batch " + x);
 		
 		reo_int.start();
-		m_eri_batched->reorder(vec<int>{0,1}, vec<int>{2});
+		m_eri_batched->decompress_init({2}, vec<int>{0,1}, vec<int>{2});
 		reo_int.finish();
-		
-		auto eri_01_2 = m_eri_batched->get_stensor();
 	
-		m_eri_batched->decompress_init({0});
-		m_c_xbb_batched->decompress_init({2,0});
+		m_c_xbb_batched->decompress_init({2,0}, vec<int>{1}, vec<int>{0,2});
 		
 		m_K_01->batched_contract_init();
 		
-		//vec<int> nubounds = m_eri_batched->bounds(1);
-		
-		auto x_b = m_c_xbb_batched->bounds(0);
-		auto mu_full_b = m_c_xbb_batched->full_bounds(1);
-		auto nu_b = m_c_xbb_batched->bounds(2);
-		
 		int64_t nze_cbar = 0;
-		auto full = eri_01_2->nfull_total();
-		int64_t nze_cbar_tot = (int64_t)full[0] * (int64_t)full[1] * (int64_t)full[2];
+		//auto full = eri_01_2->nfull_total();
+		//int64_t nze_cbar_tot = (int64_t)full[0] * (int64_t)full[1] * (int64_t)full[2];
 		
-		for (int inu = 0; inu != nu_b.size(); ++inu) {
+		for (int inu = 0; inu != m_eri_batched->nbatches(2); ++inu) {
 			
-			for (int ix = 0; ix != x_b.size(); ++ix) {
+			// fetch integrals
+			fetch.start();
+			m_eri_batched->decompress({inu});
+			auto eri_01_2 = m_eri_batched->get_work_tensor();
+			fetch.finish();
+			
+			for (int ix = 0; ix != m_eri_batched->nbatches(0); ++ix) {
 				
-				// fetch integrals
-				fetch.start();
-				m_eri_batched->decompress({ix});
-				fetch.finish();
+				vec<vec<int>> xm_bounds = { 
+					m_eri_batched->bounds(0,ix),
+					m_eri_batched->full_bounds(1)
+				};
 				
-				//dbcsr::print(*eri_01_2);
-				
-				//std::cout << "BATCH (x/n): " << ix << " " << inu << std::endl;
-	
-				vec<vec<int>> xm_bounds = { x_b[ix], mu_full_b };
-				vec<vec<int>> n_bounds = { nu_b[inu] };
+				vec<vec<int>> n_bounds = { 
+					m_eri_batched->bounds(2,inu)
+				};
 			
 				con_1_batch.start();
 				dbcsr::contract(*eri_01_2, *m_p_bb, *m_cbar_xbb_01_2)
@@ -635,9 +631,9 @@ void BATCHED_DFAO_K::compute_K() {
 				//m_cbar_xbb_01_2->filter(dbcsr::global::filter_eps);
 			
 				vec<vec<int>> copy_bounds = {
-					x_b[ix],
-					mu_full_b,
-					nu_b[inu]
+					m_eri_batched->bounds(0,ix),
+					m_eri_batched->full_bounds(1),
+					m_eri_batched->bounds(2,inu)
 				};
 			
 				reo_1_batch.start();
@@ -652,17 +648,20 @@ void BATCHED_DFAO_K::compute_K() {
 				// get c_xbb
 				fetch2.start();
 				m_c_xbb_batched->decompress({inu,ix});
-				auto c_xbb_1_02 = m_c_xbb_batched->get_stensor();
+				auto c_xbb_1_02 = m_c_xbb_batched->get_work_tensor();
 				fetch2.finish();
 				
 				//dbcsr::print(*c_xbb_1_02);
 				
-				vec<vec<int>> xs_bounds = { x_b[ix], nu_b[inu] };
+				vec<vec<int>> xs_bounds = { 
+					m_eri_batched->bounds(0,ix), 
+					m_eri_batched->bounds(2, inu) 
+				};
 			
 				con_2_batch.start();
 				dbcsr::contract(*c_xbb_1_02, *m_cbar_xbb_1_02, *m_K_01)
 					.bounds1(xs_bounds).beta(1.0)
-					.filter(dbcsr::global::filter_eps / nu_b.size())
+					.filter(dbcsr::global::filter_eps / m_eri_batched->nbatches(2))
 					.perform("XNS, XMS -> MN");
 				con_2_batch.finish();
 								
@@ -672,12 +671,11 @@ void BATCHED_DFAO_K::compute_K() {
 			
 		}
 		
-		double occ_cbar = (double) nze_cbar / (double) nze_cbar_tot;
-		LOG.os<1>("Occupancy of cbar: ", occ_cbar, "%\n");
+		m_eri_batched->decompress_finalize();
+		m_c_xbb_batched->decompress_finalize();
 		
-		//retint.start();
-		//m_eri_batched->reorder(vec<int>{0},vec<int>{1,2});
-		//retint.finish();
+		//double occ_cbar = (double) nze_cbar / (double) nze_cbar_tot;
+		//LOG.os<1>("Occupancy of cbar: ", occ_cbar, "%\n");
 		
 		m_K_01->batched_contract_finalize();
 		

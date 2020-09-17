@@ -42,8 +42,8 @@ target_link_libraries(
 	chem_io
 	MPI::MPI_CXX	
 	chem_hf
-	chem_mp
-	chem_adc
+	#chem_mp
+	#chem_adc
 )
 
 target_link_libraries(
@@ -53,7 +53,7 @@ target_link_libraries(
         chem_io
         MPI::MPI_CXX
         chem_hf
-        chem_mp
-        chem_adc
+	#chem_mp
+	#chem_adc
 )
 

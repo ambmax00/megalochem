@@ -189,7 +189,6 @@ private:
 	dbcsr::sbtensor<3,double> m_eri_batched;
 	dbcsr::sbtensor<3,double> m_c_xbb_batched;
 		
-	dbcsr::shared_tensor<3,double> m_c_xbb_1_02;
 	dbcsr::shared_tensor<3,double> m_cbar_xbb_01_2;
 	dbcsr::shared_tensor<3,double> m_cbar_xbb_1_02;
 	
@@ -197,6 +196,7 @@ private:
 	dbcsr::shared_tensor<2,double> m_p_bb;
 	
 	dbcsr::shared_pgrid<2> m_spgrid2;
+	dbcsr::shared_pgrid<3> m_spgrid3_xbb;
 	
 public:
 
@@ -219,6 +219,7 @@ private:
 	dbcsr::shared_tensor<2,double> m_s_xx;
 	
 	dbcsr::shared_pgrid<2> m_spgrid2;
+	dbcsr::shared_pgrid<3> m_spgrid3_xbb;
 	
 public:
 
