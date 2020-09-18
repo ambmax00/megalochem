@@ -591,19 +591,19 @@ void BATCHED_PARI_K::compute_K() {
 	
 	dbcsr::copy_matrix_to_tensor(*m_p_A, *m_p_bb);
 	
-	// Loop isig
-	for (int isig = 0; isig != m_eri_batched->nbatches(2); ++isig) {
+	// Loop ix
+	for (int ix = 0; ix != m_eri_batched->nbatches(0); ++ix) {
 		
 		LOG.os<1>("Fetching integrals.\n");
 		time_fetch_ints.start();
-		m_eri_batched->decompress({isig});
+		m_eri_batched->decompress({ix});
 		auto eri_02_1 = m_eri_batched->get_work_tensor();
 		time_fetch_ints.finish();
 		
-		// Loop ix
-		for (int ix= 0; ix != m_eri_batched->nbatches(0); ++ix) {
+		// Loop inu
+		for (int isig = 0; isig != m_eri_batched->nbatches(2); ++isig) {
 			
-			LOG.os<1>("Loop PARI K, batch nr ", isig, " ", ix, '\n');
+			LOG.os<1>("Loop PARI K, batch nr ", ix, " ", isig, '\n');
 			
 			vec<vec<int>> xm_bounds = {
 				m_eri_batched->bounds(0,ix),
@@ -627,7 +627,7 @@ void BATCHED_PARI_K::compute_K() {
 			time_form_cbar.finish();	
 				
 			vec<vec<int>> rns_bounds = {
-				m_eri_batched->bounds(0,ix),
+				m_eri_batched->full_bounds(0),
 				m_eri_batched->full_bounds(1),
 				m_eri_batched->bounds(2,isig)
 			};

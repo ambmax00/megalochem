@@ -525,8 +525,8 @@ void BATCHED_DFAO_K::init_tensors() {
 					.perform();
 				reo.finish();
 				
-				//dbcsr::print(*m_c_xbb_1_02);
-				
+				//dbcsr::print(*c_xbb_1_02);
+			
 				m_c_xbb_batched->compress({inu,ix}, c_xbb_1_02);
 				
 		}
@@ -587,10 +587,6 @@ void BATCHED_DFAO_K::compute_K() {
 		auto& fetch = TIME.sub("Fetching integrals/batch " + x);
 		auto& fetch2 = TIME.sub("Fetching fitting coeffs/batch " + x);
 		//auto& retint = TIME.sub("Returning integrals/batch " + x);
-		
-		reo_int.start();
-		m_eri_batched->decompress_init({2}, vec<int>{0,1}, vec<int>{2});
-		reo_int.finish();
 	
 		m_c_xbb_batched->decompress_init({2,0}, vec<int>{1}, vec<int>{0,2});
 		
@@ -600,15 +596,19 @@ void BATCHED_DFAO_K::compute_K() {
 		//auto full = eri_01_2->nfull_total();
 		//int64_t nze_cbar_tot = (int64_t)full[0] * (int64_t)full[1] * (int64_t)full[2];
 		
-		for (int inu = 0; inu != m_eri_batched->nbatches(2); ++inu) {
+		reo_int.start();
+		m_eri_batched->decompress_init({0}, vec<int>{0,1}, vec<int>{2});
+		reo_int.finish();
+		
+		for (int ix = 0; ix != m_eri_batched->nbatches(0); ++ix) {	
 			
 			// fetch integrals
 			fetch.start();
-			m_eri_batched->decompress({inu});
+			m_eri_batched->decompress({ix});
 			auto eri_01_2 = m_eri_batched->get_work_tensor();
 			fetch.finish();
 			
-			for (int ix = 0; ix != m_eri_batched->nbatches(0); ++ix) {
+			for (int inu = 0; inu != m_eri_batched->nbatches(2); ++inu) {
 				
 				vec<vec<int>> xm_bounds = { 
 					m_eri_batched->bounds(0,ix),
@@ -621,9 +621,10 @@ void BATCHED_DFAO_K::compute_K() {
 			
 				con_1_batch.start();
 				dbcsr::contract(*eri_01_2, *m_p_bb, *m_cbar_xbb_01_2)
-					.bounds2(xm_bounds).bounds3(n_bounds)
+					.bounds2(xm_bounds)
+					.bounds3(n_bounds)
 					.filter(dbcsr::global::filter_eps)
-					.perform("XML, LN -> XMN");
+					.perform("XLM, LN -> XMN");
 				con_1_batch.finish();
 			
 				nze_cbar += m_cbar_xbb_01_2->num_nze_total();
@@ -672,6 +673,7 @@ void BATCHED_DFAO_K::compute_K() {
 		}
 		
 		m_eri_batched->decompress_finalize();
+		
 		m_c_xbb_batched->decompress_finalize();
 		
 		//double occ_cbar = (double) nze_cbar / (double) nze_cbar_tot;

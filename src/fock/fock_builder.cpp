@@ -392,28 +392,28 @@ void fockmod::init() {
 
 		vec<int> map1 = {0};
 		vec<int> map2 = {1,2};
-		eri_batched->compress_init({2},map1,map2);
+		eri_batched->compress_init({0},map1,map2);
 		
 		vec<vec<int>> bounds(3);
 		
-		for (int inu = 0; inu != eri_batched->nbatches(2); ++inu) {
+		for (int ix = 0; ix != eri_batched->nbatches(0); ++ix) {
 				
-				bounds[0] = eri_batched->full_blk_bounds(0);
+				bounds[0] = eri_batched->blk_bounds(0,ix);
 				bounds[1] = eri_batched->full_blk_bounds(1);
-				bounds[2] = eri_batched->blk_bounds(1,inu);
+				bounds[2] = eri_batched->full_blk_bounds(2);
 				
 				if (mytype != dbcsr::btype::direct) aofac->ao_3c2e_fill(eris_gen,bounds,scr_s);
 				
 				//dbcsr::print(*eri);
 				eris_gen->filter(dbcsr::global::filter_eps);
 				
-				eri_batched->compress({inu}, eris_gen);
+				eri_batched->compress({ix}, eris_gen);
 		}
 		
 		eri_batched->compress_finalize();
 		
-		auto eri = eri_batched->get_work_tensor();
-		dbcsr::print(*eri);
+		//auto eri = eri_batched->get_work_tensor();
+		//dbcsr::print(*eri);
 		
 		t_eri_batched.finish();
 		
