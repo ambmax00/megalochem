@@ -287,8 +287,8 @@ public:
 	
 	void reset() {
 		
-		m_work_tensor->clear();
-		m_read_tensor->clear();
+		if (m_work_tensor) m_work_tensor->clear();
+		if (m_read_tensor) m_read_tensor->clear();
 		reset_var();
 		if (m_type == btype::disk) {
 			delete_file();
@@ -1302,6 +1302,18 @@ public:
 		
 		return (double)m_nzetot / (double) tot;
 		
+	}
+	
+	arrvec<int,N> blk_sizes() {
+		return m_blk_sizes;
+	}
+	
+	MPI_Comm comm() {
+		return m_spgrid_N->comm();
+	}
+	
+	shared_pgrid<N> spgrid() {
+		return m_spgrid_N;
 	}
 	
 	btype get_type() { return m_type; }

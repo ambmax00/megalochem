@@ -135,6 +135,7 @@ public:
 	
 };
 
+/*
 class LLMP_ASYM_Z : public Z {
 private:	
 	
@@ -156,7 +157,7 @@ public:
 	
 	
 };
-
+*/
 
 inline std::shared_ptr<Z> get_Z(
 	std::string name, dbcsr::world& w, desc::smolecule smol, desc::options opt) {

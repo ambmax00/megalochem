@@ -7,7 +7,7 @@
 #include <dbcsr_matrix_ops.hpp>
 #include "io/reader.h"
 #include "hf/hfmod.h"
-//#include "mp/mpmod.h"
+#include "mp/mpmod.h"
 //#include "adc/adcmod.h"
 #include "utils/mpi_time.h"
 
@@ -105,7 +105,6 @@ int main(int argc, char** argv) {
 		
 	MPI_Barrier(MPI_COMM_WORLD);
 	
-	/*
 	auto mpopt = opt.subtext("mp");
 	
 	bool do_mp = opt.get<bool>("do_mp");
@@ -116,7 +115,7 @@ int main(int argc, char** argv) {
 		mymp.compute_batch();
 		
 	}
-	
+	/*
 	auto adcopt = opt.subtext("adc");
 	bool do_adc = opt.get<bool>("do_adc");
 	

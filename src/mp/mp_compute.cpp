@@ -64,9 +64,10 @@ void mpmod::compute_batch() {
 	
 	auto o = mol->dims().oa();
 	auto v = mol->dims().va();
-	auto b = 
-	mol->dims().b();
+	auto b = mol->dims().b();
 	auto x = mol->dims().x();
+	
+	arrvec<int,3> xbb = {x,b,b};
 	
 	int nbf = std::accumulate(b.begin(), b.end(), 0);
 	int dfnbf = std::accumulate(x.begin(), x.end(), 0);
@@ -130,17 +131,18 @@ void mpmod::compute_batch() {
 	scrtime.finish();
 	
 	aofac->ao_3c2e_setup("erfc_coulomb");
-	
-	auto B_xbb = aofac->ao_3c2e_setup_tensor(spgrid3_xbb, vec<int>{0},vec<int>{1,2});
-	
+	auto B_xbb = aofac->ao_3c2e_setup_tensor(spgrid3_xbb, vec<int>{0}, vec<int>{1,2});
+		
 	dbcsr::btype eri_type = dbcsr::get_btype(eri_method);
 	dbcsr::btype intermed_type = dbcsr::get_btype(intermed_method);
 	
 	std::array<int,3> bdims = {nbatches_x,nbatches_b,nbatches_b};
 	
 	dbcsr::sbtensor<3,double> B_xbb_batch = 
-		dbcsr::btensor_create<3>(B_xbb)
+		dbcsr::btensor_create<3>()
 		.name(mol->name() + "_eri_batched")
+		.pgrid(spgrid3_xbb)
+		.blk_sizes(xbb)
 		.batch_dims(bdims)
 		.btensor_type(eri_type)
 		.print(LOG.global_plev())
@@ -151,22 +153,14 @@ void mpmod::compute_batch() {
 	
 	calcints.start();
 	
-	B_xbb_batch->compress_init({0,2});
+	B_xbb_batch->compress_init({0}, vec<int>{0}, vec<int>{1,2});
 	
-	auto x_blk_bounds = B_xbb_batch->blk_bounds(0);
-	auto mu_fullblk_bounds = B_xbb_batch->full_blk_bounds(1);
-	auto nu_blk_bounds = B_xbb_batch->blk_bounds(2);
-	
-	int nxbatches = x_blk_bounds.size();
-	int nnbatches = nu_blk_bounds.size();
-		
-	for (int ix = 0; ix != nxbatches; ++ix) {
-		for (int inu = 0; inu != nnbatches; ++inu) {
+	for (int ix = 0; ix != B_xbb_batch->nbatches(0); ++ix) {
 			
 			vec<vec<int>> blkbounds = {
-				x_blk_bounds[ix],
-				mu_fullblk_bounds,
-				nu_blk_bounds[inu]
+				B_xbb_batch->blk_bounds(0,ix),
+				B_xbb_batch->full_blk_bounds(1),
+				B_xbb_batch->full_blk_bounds(2)
 			};
 		
 			if (eri_type != dbcsr::btype::direct) {
@@ -174,8 +168,7 @@ void mpmod::compute_batch() {
 				B_xbb->filter(dbcsr::global::filter_eps);
 			}
 			
-			B_xbb_batch->compress({ix,inu}, B_xbb);
-		}
+			B_xbb_batch->compress({ix}, B_xbb);
 	}
 	
 	B_xbb_batch->compress_finalize();

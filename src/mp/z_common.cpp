@@ -4,15 +4,14 @@ namespace mp {
 	
 SMatrixXi get_shellpairs(dbcsr::sbtensor<3,double> eri_batched) {
 	
-	auto eri = eri_batched->get_stensor();
-	auto ndims = eri->nblks_total();
-	
-	int nblkb = ndims[1];
+	auto blksizes = eri_batched->blk_sizes();
+		
+	int nblkb = blksizes[1].size();
 	
 	Eigen::MatrixXi idx_loc = Eigen::MatrixXi::Zero(nblkb,nblkb);
 	Eigen::MatrixXi idx_tot = Eigen::MatrixXi::Zero(nblkb,nblkb);
 	
-	auto add_idx = [&eri,&idx_loc]() {
+	auto add_idx = [&idx_loc](dbcsr::shared_tensor<3,double> eri) {
 		
 		dbcsr::iterator_t<3,double> iter(*eri);
 		iter.start();
@@ -32,17 +31,16 @@ SMatrixXi get_shellpairs(dbcsr::sbtensor<3,double> eri_batched) {
 	
 	if (eri_batched->get_type() == dbcsr::btype::core) {
 		
-		add_idx();
+		add_idx(eri_batched->get_work_tensor());
 	
 	} else {
 		 
-		eri_batched->decompress_init({0});
+		eri_batched->decompress_init({0}, vec<int>{0}, vec<int>{1,2});
 		
-		for (int ix = 0; ix != eri_batched->nbatches_dim(0); ++ix) {
+		for (int ix = 0; ix != eri_batched->nbatches(0); ++ix) {
 			
 			eri_batched->decompress({ix});
-			
-			add_idx();
+			add_idx(eri_batched->get_work_tensor());
 			
 		}
 		
@@ -51,7 +49,7 @@ SMatrixXi get_shellpairs(dbcsr::sbtensor<3,double> eri_batched) {
 	} 
 	
 	MPI_Allreduce(idx_loc.data(), idx_tot.data(), nblkb*nblkb, MPI_INT,
-		MPI_LOR, eri->comm());
+		MPI_LOR, eri_batched->comm());
 	
 	//std::cout << "IDXLOC" << std::endl;
 	//std::cout << idx_loc << std::endl;

@@ -7,9 +7,8 @@ void LLMP_MEM_Z::init_tensors() {
 	LOG.os<>("Setting up tensors in LLMP_MEM.\n");
 	
 	m_eri_batched = m_reg.get_btensor<3,double>("i_xbb_batched");
-	auto eri = m_eri_batched->get_stensor();
 	
-	auto xbb = eri->blk_sizes();
+	auto xbb = m_eri_batched->blk_sizes();
 	
 	auto x = xbb[0];
 	auto b = xbb[1];
@@ -61,6 +60,7 @@ void LLMP_MEM_Z::compute() {
 	arrvec<int,2> bo = {b,o};
 	arrvec<int,2> bb = {b,b};
 	arrvec<int,3> xob = {x,o,b};
+	arrvec<int,3> xbb = {x,b,b};
 	
 	int nbtot = std::accumulate(b.begin(),b.end(),0);
 	int notot = std::accumulate(o.begin(),o.end(),0);
@@ -87,8 +87,8 @@ void LLMP_MEM_Z::compute() {
 	
 	// ============= TAKE CARE OF TENSOR STUFF =============
 	
-	auto eri = m_eri_batched->get_stensor();
-	
+	auto spgrid3_xbb = m_eri_batched->spgrid();
+		
 	auto spgrid3_xob = dbcsr::create_pgrid<3>(m_world.comm())
 		.tensor_dims(xobsizes).get();
 	
@@ -110,33 +110,29 @@ void LLMP_MEM_Z::compute() {
 		dbcsr::tensor_create_template<3,double>(b_xob_1_02)
 		.name("b2_xob_1_02").map1({1}).map2({0,2}).get();
 	
-	auto eri_1_02 = 
-		dbcsr::tensor_create_template<3,double>(eri)
-		.name("eri_1_02").map1({1}).map2({0,2}).get();
+	auto eri_1_02 = dbcsr::tensor_create<3,double>()
+		.name("eri_1_02")
+		.pgrid(spgrid3_xbb)
+		.blk_sizes(xbb)
+		.map1({1}).map2({0,2})
+		.get();
 	
 	auto b2_xbb_1_02 = 
-		dbcsr::tensor_create_template<3,double>(eri)
+		dbcsr::tensor_create_template<3,double>(eri_1_02)
 		.name("b2_xbb_1_02").map1({1}).map2({0,2}).get();
 	
 	auto b2_xbb_0_12 =  
-		dbcsr::tensor_create_template<3,double>(eri)
+		dbcsr::tensor_create_template<3,double>(eri_1_02)
 		.name("b2_xbb_0_12").map1({0}).map2({1,2}).get();
 	
 	time_reo_int1.start();
-	m_eri_batched->reorder(vec<int>{0},vec<int>{1,2});
+	m_eri_batched->decompress_init({0}, vec<int>{0}, vec<int>{1,2});
 	time_reo_int1.finish();
-	
-	m_eri_batched->decompress_init({0});
-	
-	dbcsr::sbtensor<3,double> eri2_batched
-		= std::make_shared<dbcsr::btensor<3,double>>(*m_eri_batched);
-		
-	eri2_batched->decompress_init({0,2});
 	
 	LOG.os<>("Starting batching over auxiliary functions.\n");
 	
-	int nxbatches = m_eri_batched->nbatches_dim(0);
-	int nnbatches = m_eri_batched->nbatches_dim(2);
+	int nxbatches = m_eri_batched->nbatches(0);
+	int nnbatches = m_eri_batched->nbatches(2);
 		
 	// ===== LOOP OVER BATCHES OF AUXILIARY FUNCTIONS ==================
 	for (int ix = 0; ix != nxbatches; ++ix) {
@@ -146,40 +142,48 @@ void LLMP_MEM_Z::compute() {
 		LOG.os<1>("-- Fetching ao ints...\n");
 		time_fetchints1.start();
 		m_eri_batched->decompress({ix});
+		auto eri_0_12 = m_eri_batched->get_work_tensor();
 		time_fetchints1.finish();
 		
-		time_reo_int2.start();
-		auto eri_0_12 = m_eri_batched->get_stensor();
-		time_reo_int2.finish();
+		// batch inits
+		for (int inu = 0; inu != nnbatches; ++inu) {
 		
-		vec<vec<int>> xbb_bounds = {
-			m_eri_batched->bounds(0)[ix],
-			m_eri_batched->full_bounds(1),
-			m_eri_batched->full_bounds(2)
-		};
-		
-		dbcsr::copy(*eri_0_12, *eri_1_02).bounds(xbb_bounds).perform(); 
-		
-		// first transform 
-	    LOG.os<1>("-- First transform.\n");
-	    
-	    vec<vec<int>> x_nu_bounds = { 
-			m_eri_batched->bounds(0)[ix], 
-			m_eri_batched->full_bounds(2)
-		};
-	    
-	    time_tran1.start();
-	    dbcsr::contract(*m_locc_01, *eri_1_02, *b_xob_1_02)
-			.bounds3(x_nu_bounds).perform("mi, Xmn -> Xin");
-	    time_tran1.finish();
-	    
-	    eri_1_02->clear();
-	    
-	    // reorder
-		LOG.os<1>("-- Reordering B_xob.\n");
-		time_reo1.start();
-		dbcsr::copy(*b_xob_1_02, *b_xob_2_01).move_data(true).perform();
-		time_reo1.finish();
+			vec<vec<int>> xbb_bounds = {
+				m_eri_batched->bounds(0,ix),
+				m_eri_batched->full_bounds(1),
+				m_eri_batched->bounds(2,inu)
+			};
+			
+			dbcsr::copy(*eri_0_12, *eri_1_02)
+				.bounds(xbb_bounds)
+				.perform(); 
+					
+			// first transform 
+			LOG.os<1>("-- First transform.\n");
+			
+			vec<vec<int>> x_nu_bounds = { 
+				m_eri_batched->bounds(0,ix), 
+				m_eri_batched->bounds(2,inu)
+			};
+			
+			time_tran1.start();
+			dbcsr::contract(*m_locc_01, *eri_1_02, *b_xob_1_02)
+				.bounds3(x_nu_bounds)
+				.perform("mi, Xmn -> Xin");
+			time_tran1.finish();
+			
+			eri_1_02->clear();
+			
+			 // reorder
+			LOG.os<1>("-- Reordering B_xob.\n");
+			time_reo1.start();
+			dbcsr::copy(*b_xob_1_02, *b_xob_2_01)
+				.move_data(true)
+				.sum(true)
+				.perform();
+			time_reo1.finish();
+			
+		}
 		
 		//dbcsr::print(*B_xob_2_01);
 		
@@ -194,9 +198,12 @@ void LLMP_MEM_Z::compute() {
 			// second transform
 			LOG.os<1>("---- Second transform.\n");
 			
-			vec<vec<int>> nu_bounds = { m_eri_batched->bounds(2)[inu] };
+			vec<vec<int>> nu_bounds = { 
+				m_eri_batched->bounds(2,inu)
+			};
+			
 			vec<vec<int>> x_u_bounds = { 
-				m_eri_batched->bounds(0)[ix],
+				m_eri_batched->bounds(0,ix),
 				vec<int>{0, notot - 1}
 			};
 			
@@ -213,20 +220,18 @@ void LLMP_MEM_Z::compute() {
 			dbcsr::copy(*b2_xob_2_01, *b2_xob_1_02).move_data(true).perform();
 			time_reo2.finish();
 			
-			//dbcsr::print(*B_xob_1_02);
-	
 			// final contraction
 			//B_xBB_1_02->reserve_template(*B_xbb_1_02);
 		
 			bool force_sparsity = false;
-			if (m_shellpair_info) {
+			if (true) {
 				
 				force_sparsity = true;
 				arrvec<int,3> res;
 				auto& shellmat = *m_shellpair_info;
 				
-				auto xblkbounds = m_eri_batched->blk_bounds(0)[ix];
-				auto bblkbounds = m_eri_batched->blk_bounds(1)[inu];
+				auto xblkbounds = m_eri_batched->blk_bounds(0,ix);
+				auto bblkbounds = m_eri_batched->blk_bounds(1,inu);
 
 				for (int mublk = 0; mublk != b.size(); ++mublk) {
 					for (int nublk = bblkbounds[0]; nublk != bblkbounds[1]+1; ++nublk) {
@@ -252,8 +257,8 @@ void LLMP_MEM_Z::compute() {
 			LOG.os<1>("-- Final transform.\n");
 			
 			vec<vec<int>> x_nu_bounds = {
-				m_eri_batched->bounds(0)[ix],
-				m_eri_batched->bounds(2)[inu]
+				m_eri_batched->bounds(0,ix),
+				m_eri_batched->bounds(2,inu)
 			};
 											
 			time_tran3.start();
@@ -266,47 +271,43 @@ void LLMP_MEM_Z::compute() {
 			// reorder
 			LOG.os<1>("---- B_xBB.\n");
 			time_reo3.start();
-			dbcsr::copy(*b2_xbb_1_02, *b2_xbb_0_12).move_data(true).perform();
+			dbcsr::copy(*b2_xbb_1_02, *b2_xbb_0_12)
+				.move_data(true)
+				.sum(true)
+				.perform();
 			time_reo3.finish(); 
 			
-			for (int iy = 0; iy != m_eri_batched->nbatches_dim(0); ++iy) {
-				
-				eri2_batched->decompress({iy,inu});
-				auto eri2_0_12 = eri2_batched->get_stensor();
-				
-				vec<vec<int>> mn_bounds = {
-					m_eri_batched->full_bounds(1),
-					m_eri_batched->bounds(1)[inu]
-				};
-				
-				vec<vec<int>> x_bounds = {
-					m_eri_batched->bounds(0)[ix]
-				};
-				
-				vec<vec<int>> y_bounds = {
-					m_eri_batched->bounds(0)[iy]
-				};
-				
-				time_formz.start();
-				dbcsr::contract(*b2_xbb_0_12, *eri2_0_12, *m_zmat_01)
-					.beta(1.0)
-					.bounds1(mn_bounds)
-					.bounds2(x_bounds)
-					.bounds3(y_bounds)
-					.filter(dbcsr::global::filter_eps / nxbatches)
-					.perform("Mmn, Nmn -> MN");
-				time_formz.finish();
-				
-			}
+		}
 			
-			b2_xbb_0_12->clear();
-						
+		for (int iy = 0; iy != m_eri_batched->nbatches(0); ++iy) {
+			
+			m_eri_batched->decompress({iy});
+			auto eri_0_12 = m_eri_batched->get_work_tensor();
+			
+			vec<vec<int>> x_bounds = {
+				m_eri_batched->bounds(0,ix)
+			};
+			
+			vec<vec<int>> y_bounds = {
+				m_eri_batched->bounds(0,iy)
+			};
+			
+			time_formz.start();
+			dbcsr::contract(*b2_xbb_0_12, *eri_0_12, *m_zmat_01)
+				.beta(1.0)
+				.bounds2(x_bounds)
+				.bounds3(y_bounds)
+				.filter(dbcsr::global::filter_eps)
+				.perform("Mmn, Nmn -> MN");
+			time_formz.finish();
+			
 		}
 		
+		b2_xbb_0_12->clear();
+					
 	}
 	
 	m_eri_batched->decompress_finalize();
-	eri2_batched->decompress_finalize();
 	
 	LOG.os<>("Finished batching.\n");
 	
@@ -319,6 +320,7 @@ void LLMP_MEM_Z::compute() {
 	
 }
 
+/*
 void LLMP_ASYM_Z::init_tensors() {
 	
 	LOG.os<>("Setting up tensors in LLMP_ASYM.\n");
@@ -584,6 +586,6 @@ void LLMP_ASYM_Z::compute() {
 	
 	TIME.finish();
 	
-}
+}*/
 	
 } // end namespace

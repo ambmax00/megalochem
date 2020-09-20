@@ -68,7 +68,7 @@ static const json valid_keys =
 		{"c_os", 1.3},
 		{"eris", "core"},
 		{"intermeds", "core"},
-		{"force_sparsity", false},
+		//{"force_sparsity", false},
 		{"build_Z", "LLMPFULL"},
 		{"_required", {"dfbasis"}}
 	}},
