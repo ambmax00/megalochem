@@ -1,5 +1,6 @@
 #include "fock/jkbuilder.h"
 #include "fock/fock_defaults.h"
+#include "ints/fitting.h"
 #include "math/linalg/LLT.h"
 #include <dbcsr_tensor_ops.hpp>
 
@@ -436,111 +437,14 @@ void BATCHED_DFAO_K::init_tensors() {
 	auto inv = m_reg.get_tensor<2,double>("s_xx_inv");
 	
 	m_eri_batched = m_reg.get_btensor<3,double>("i_xbb_batched");
-	
-	int nx = m_mol->c_dfbasis()->nbf();
-	int nb = m_mol->c_basis()->nbf();
-	std::array<int,3> xbb_size = {nx,nx,nb};
+	m_c_xbb_batched = m_reg.get_btensor<3,double>("c_xbb_batched");
 	
 	auto b = m_mol->dims().b();
 	auto x = m_mol->dims().x();
 	
 	arrvec<int,3> xbb = {x,b,b};
 	
-	m_spgrid3_xbb = dbcsr::create_pgrid<3>(m_world.comm())
-		.tensor_dims(xbb_size).get();
-	
-	// ======== Compute inv_xx * i_xxb ==============
-	
-	auto c_xbb_0_12 = dbcsr::tensor_create<3>()
-		.name("c_xbb_0_12")
-		.pgrid(m_spgrid3_xbb)
-		.blk_sizes(xbb)
-		.map1({0}).map2({1,2})
-		.get();
-	
-	auto c_xbb_1_02 = dbcsr::tensor_create_template<3>(c_xbb_0_12)
-		.name("c_xbb_1_02")
-		.map1({1}).map2({0,2})
-		.get();
-		
-	std::string intermeds = m_opt.get<std::string>("intermeds", "core");
-	
-	auto mytype = dbcsr::get_btype(intermeds);
-	
-	int nbatches_x = m_eri_batched->nbatches(0);
-	int nbatches_b = m_eri_batched->nbatches(2);
-	
-	std::array<int,3> bdims = {nbatches_x,nbatches_b,nbatches_b};
-	
-	m_c_xbb_batched = dbcsr::btensor_create<3>()
-		.name(m_mol->name() + "_c_xbb_batched")
-		.pgrid(m_spgrid3_xbb)
-		.blk_sizes(xbb)
-		.batch_dims(bdims)
-		.btensor_type(mytype)
-		.print(LOG.global_plev())
-		.get();
-	
-	auto& calc_c = TIME.sub("Computing (mu,nu|X)(X|Y)^-1");
-	auto& con = calc_c.sub("Contraction");
-	auto& reo = calc_c.sub("Reordering");
-	auto& write = calc_c.sub("Writing");
-	auto& fetch = calc_c.sub("Fetching ints");
-	
-	LOG.os<1>("Computing C_xbb.\n");
-	
-	calc_c.start();
-	
-	m_eri_batched->decompress_init({2},vec<int>{0},vec<int>{1,2});
-	m_c_xbb_batched->compress_init({2,0}, vec<int>{1}, vec<int>{0,2});
-	
-	for (int inu = 0; inu != m_c_xbb_batched->nbatches(2); ++inu) {
-		
-		fetch.start();
-		m_eri_batched->decompress({inu});
-		auto eri_0_12 = m_eri_batched->get_work_tensor();
-		fetch.finish();
-			
-		for (int ix = 0; ix != m_c_xbb_batched->nbatches(0); ++ix) {
-			
-				vec<vec<int>> b2 = {
-					m_c_xbb_batched->bounds(0,ix)
-				};
-				
-				vec<vec<int>> b3 = {
-					m_c_xbb_batched->full_bounds(1),
-					m_c_xbb_batched->bounds(2,inu)
-				};
-
-				con.start();
-				dbcsr::contract(*inv, *eri_0_12, *c_xbb_0_12)
-					.bounds2(b2).bounds3(b3)
-					.filter(dbcsr::global::filter_eps)
-					.perform("XY, YMN -> XMN");
-				con.finish();
-				
-				reo.start();
-				dbcsr::copy(*c_xbb_0_12, *c_xbb_1_02)
-					.move_data(true)
-					.perform();
-				reo.finish();
-				
-				//dbcsr::print(*c_xbb_1_02);
-			
-				m_c_xbb_batched->compress({inu,ix}, c_xbb_1_02);
-				
-		}
-	}
-	
-	m_c_xbb_batched->compress_finalize();
-	m_eri_batched->decompress_finalize();
-	
-	double c_occ = m_c_xbb_batched->occupation() * 100;
-	LOG.os<1>("Occupancy of c_xbb: ", c_occ, "%\n");
-
-	calc_c.finish();
-	
-	LOG.os<1>("Done.\n");
+	m_spgrid3_xbb = m_eri_batched->spgrid();
 	
 	// ========== END ==========
 	
@@ -548,12 +452,15 @@ void BATCHED_DFAO_K::init_tensors() {
 	
 	m_spgrid2 = dbcsr::create_pgrid<2>(m_world.comm()).get();
 	
-	m_cbar_xbb_01_2 = 
-		dbcsr::tensor_create_template<3>(c_xbb_1_02)
-		.name("Cbar_xbb_01_2").map1({0,1}).map2({2}).get();
+	m_cbar_xbb_01_2 = dbcsr::tensor_create<3,double>()
+		.name("Cbar_xbb_01_2")
+		.pgrid(m_spgrid3_xbb)
+		.blk_sizes(xbb)
+		.map1({0,1}).map2({2})
+		.get();
 	
 	m_cbar_xbb_1_02 = 
-		dbcsr::tensor_create_template<3>(c_xbb_1_02)
+		dbcsr::tensor_create_template<3>(m_cbar_xbb_01_2)
 		.name("Cbar_xbb_1_02").map1({1}).map2({0,2}).get();
 	
 	m_K_01 = dbcsr::tensor_create<2,double>().pgrid(m_spgrid2).name("K_01")

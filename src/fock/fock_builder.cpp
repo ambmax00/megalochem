@@ -339,6 +339,7 @@ void fockmod::init() {
 		
 	}
 	
+	std::shared_ptr<ints::screener> scr_s;
 	
 	if (compute_3c2e_batched) {
 		
@@ -348,8 +349,7 @@ void fockmod::init() {
 		
 		t_screen.start();
 		
-		std::shared_ptr<ints::screener> scr_s(
-			new ints::schwarz_screener(aofac,metric));
+		scr_s.reset(new ints::schwarz_screener(aofac,metric));
 		scr_s->compute();
 				
 		t_screen.finish();
@@ -421,6 +421,27 @@ void fockmod::init() {
 		
 		LOG.os<1>("Occupation of 3c2e integrals: ", eri_batched->occupation() * 100, "%\n");
 		
+	}
+	
+	if (k_method == "batchdfao") {
+		
+		auto eri_batched = m_reg.get_btensor<3,double>("i_xbb_batched");
+		auto inv = m_reg.get_tensor<2,double>("s_xx_inv");
+		m_dfit = std::make_shared<ints::dfitting>(m_world, m_mol, LOG.global_plev());
+		auto c_xbb_batched = m_dfit->compute(eri_batched, inv, 
+			m_opt.get<std::string>("intermeds", FOCK_INTERMEDS));
+		m_reg.insert_btensor<3,double>("c_xbb_batched", c_xbb_batched);
+	
+	}
+	
+	if (k_method == "batchpari") {
+		
+		auto eri_batched = m_reg.get_btensor<3,double>("i_xbb_batched");
+		auto s_xx = m_reg.get_matrix<double>("s_xx_mat");
+		m_dfit = std::make_shared<ints::dfitting>(m_world, m_mol, LOG.global_plev());
+		auto c_xbb_pari = m_dfit->compute_pari(eri_batched, s_xx, scr_s);
+		m_reg.insert_tensor<3,double>("c_xbb_pari", c_xbb_pari);
+	
 	}
 	
 	m_J_builder->set_reg(m_reg);

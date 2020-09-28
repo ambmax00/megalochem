@@ -13,6 +13,7 @@ namespace fock {
 	inline const std::string FOCK_BUILD_K = "exact";
 	inline const std::string FOCK_METRIC = "coulomb";
 	inline const std::string FOCK_ERIS = "core";
+	inline const std::string FOCK_INTERMEDS = "core";
 	
 } // end namespace
 

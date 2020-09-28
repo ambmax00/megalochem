@@ -7,6 +7,8 @@ set(SOURCES
 	gentran.cpp
 	screening.h
 	screening.cpp
+	fitting.h
+	fitting.cpp
 )
 
 add_library(chem_ints ${SOURCES})
@@ -24,4 +26,5 @@ target_link_libraries(
 	#chem_math_linalg
 	OpenMP::OpenMP_CXX
 	Libint2::cxx
+	${LAPACK_LIBRARIES}
 )
