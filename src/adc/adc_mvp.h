@@ -135,7 +135,11 @@ private:
 	std::vector<smat> m_FS;
 	stensor3 m_I;
 #endif
+
+	arrvec<int,2> bb;
+	arrvec<int,3> xbb;
 	
+	std::shared_ptr<ints::dfitting> m_dfit;
 	
 public:
 

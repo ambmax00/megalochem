@@ -28,6 +28,9 @@ public:
 		LOG(w.comm(), print),
 		TIME(w.comm(), "Fitting Coefficients")
 	{}
+	
+	dbcsr::sbtensor<3,double> compute(dbcsr::sbtensor<3,double> eris, 
+		dbcsr::shared_matrix<double> s_inv, std::string cfit_btype);
 
 	dbcsr::sbtensor<3,double> compute(dbcsr::sbtensor<3,double> eris, 
 		dbcsr::shared_tensor<2,double> s_inv, std::string cfit_btype);

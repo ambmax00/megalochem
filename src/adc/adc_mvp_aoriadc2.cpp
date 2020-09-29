@@ -149,6 +149,8 @@ void MVP_ao_ri_adc2::compute_intermeds() {
 		
 		util::registry reg_ilap;
 		
+		auto 
+		
 		reg_ilap.insert_btensor<3,double>("i_xbb_batched", m_eri_batched);
 		reg_ilap.insert_tensor<2,double>("s_xx_inv", f_xx_01);
 		
@@ -398,6 +400,14 @@ void MVP_ao_ri_adc2::init() {
 	m_kbuilder->init();
 	m_kbuilder->init_tensors();
 	
+	auto b = m_mol->dims().b();
+	auto x = m_mol->dims().x();
+	
+	m_xbb = {x,b,b};
+	m_bb = {b,b};
+	
+	m_dfit = std::make_shared<ints::dfitting>(m_world, m_mol, LOG.global_plev());
+	
 	LOG.os<>("Done with setting up.\n");
 	
 }
@@ -645,17 +655,20 @@ dbcsr::sbtensor<3,double> MVP_ao_ri_adc2::compute_J(smat& u_ao) {
 	
 	LOG.os<>("Forming J_xbb\n");
 	// form J
-	auto eri = m_eri_batched->get_stensor();
 	
-	auto J_xbb_0_12 = dbcsr::tensor_create_template<3,double>(eri)
-		.name("J_xbb_0_12").get();
+	auto J_xbb_0_12 = dbcsr::tensor_create<3,double>()
+		.name("J_xbb_0_12")
+		.pgrid(m_spgrid3_xbb)
+		.map1({0}).map2({1,2})
+		.blk_sizes(xbb)
+		.get();
 		
-	auto J_xbb_2_01_t = dbcsr::tensor_create_template<3,double>(eri)
+	auto J_xbb_2_01_t = dbcsr::tensor_create_template<3,double>(J_xbb_0_12)
 		.name("J_xbb_2_01_t")
 		.map1({2}).map2({0,1})
 		.get();
 		
-	auto J_xbb_2_01 = dbcsr::tensor_create_template<3,double>(eri)
+	auto J_xbb_2_01 = dbcsr::tensor_create_template<3,double>(J_xbb_0_12)
 		.name("J_xbb_2_01")
 		.map1({2}).map2({0,1})
 		.get();

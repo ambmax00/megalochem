@@ -9,7 +9,9 @@ namespace fock {
 BATCHED_DF_J::BATCHED_DF_J(dbcsr::world& w, desc::options& iopt) 
 	: J(w,iopt,"BATCHED_DF_J") {} 
 
-void BATCHED_DF_J::init_tensors() {
+void BATCHED_DF_J::init() {
+	
+	init_base();
 	
 	auto b = m_mol->dims().b();
 	auto x = m_mol->dims().x();
@@ -20,9 +22,12 @@ void BATCHED_DF_J::init_tensors() {
 	
 	arrvec<int,3> bbd = {b,b,d};
 	arrvec<int,2> xd = {x,d};
+	arrvec<int,2> xx = {x,x};
 	
 	std::array<int,2> tsizes2 = {xnbf,1};
 	std::array<int,3> tsizes3 = {nbf,nbf,1};
+	
+	m_spgrid2 = dbcsr::create_pgrid<2>(m_world.comm()).get();
 	
 	m_spgrid_xd = dbcsr::create_pgrid<2>(m_world.comm())
 		.tensor_dims(tsizes2).get();
@@ -40,7 +45,13 @@ void BATCHED_DF_J::init_tensors() {
 	
 	m_ptot_bbd = dbcsr::tensor_create_template<3>(m_J_bbd).name("ptot_bbd").get();
 	
-	m_inv = m_reg.get_tensor<2,double>("s_xx_inv");
+	m_inv_mat = m_reg.get_matrix<double>("s_xx_inv");
+	m_inv = dbcsr::tensor_create<2,double>()
+		.name("inv")
+		.pgrid(m_spgrid2)
+		.blk_sizes(xx)
+		.map1({0}).map2({1})
+		.get();
 	
 	m_eri_batched = m_reg.get_btensor<3,double>("i_xbb_batched");
 	
@@ -127,9 +138,12 @@ void BATCHED_DF_J::compute_J() {
 	
 	LOG.os<1>("X_, XY -> Y_\n");
 	
+	dbcsr::copy_matrix_to_tensor(*m_inv_mat, *m_inv);
+	
 	dbcsr::contract(*m_gp_xd, *m_inv, *m_gq_xd)
 		.filter(dbcsr::global::filter_eps).perform("X_, XY -> Y_");
 	
+	m_inv->clear();
 	//dbcsr::print(*m_gq_xd);
 	
 	//dbcsr::print(*m_inv);
@@ -186,17 +200,24 @@ void BATCHED_DF_J::compute_J() {
 BATCHED_DFMO_K::BATCHED_DFMO_K(dbcsr::world& w, desc::options& opt) 
 	: K(w,opt,"BATCHED_DFMO_K") {}
 
-void BATCHED_DFMO_K::init_tensors() {
+void BATCHED_DFMO_K::init() {
+	
+	init_base();
 	
 	auto b = m_p_A->row_blk_sizes();
+	auto x = m_mol->dims().x();
 	arrvec<int,2> bb = {b,b};
+	arrvec<int,2> xx = {x,x};
 	
 	m_spgrid2 = dbcsr::create_pgrid<2>(m_world.comm()).get();
 	
 	m_K_01 = dbcsr::tensor_create<2>().pgrid(m_spgrid2).name("K_01")
 		.map1({0}).map2({1}).blk_sizes(bb).get();
-		
-	m_invsqrt = m_reg.get_tensor<2,double>("s_xx_invsqrt");
+	
+	auto invsqrt_mat = m_reg.get_matrix<double>("s_xx_invsqrt");
+	m_invsqrt = dbcsr::tensor_create<2>().pgrid(m_spgrid2).name("s_xx_invsqrt")
+		.map1({0}).map2({1}).blk_sizes(xx).get();
+	dbcsr::copy_matrix_to_tensor(*invsqrt_mat, *m_invsqrt);
 	
 	m_eri_batched = m_reg.get_btensor<3,double>("i_xbb_batched");
 		
@@ -432,10 +453,10 @@ void BATCHED_DFMO_K::compute_K() {
 
 BATCHED_DFAO_K::BATCHED_DFAO_K(dbcsr::world& w, desc::options& opt) 
 	: K(w,opt,"BATCHED_DFAO_K") {}
-void BATCHED_DFAO_K::init_tensors() {
+void BATCHED_DFAO_K::init() {
 	
-	auto inv = m_reg.get_tensor<2,double>("s_xx_inv");
-	
+	init_base();
+		
 	m_eri_batched = m_reg.get_btensor<3,double>("i_xbb_batched");
 	m_c_xbb_batched = m_reg.get_btensor<3,double>("c_xbb_batched");
 	

@@ -42,7 +42,7 @@ public:
 			throw std::runtime_error("Timer " + proc_name  + " has already been started!");
 		}
 		
-		MPI_Barrier(m_comm);
+		//MPI_Barrier(m_comm);
 		
 		time_ini = MPI_Wtime();
 		has_started = true;
@@ -54,7 +54,7 @@ public:
 		
 	void finish() {	
 		
-		MPI_Barrier(m_comm);
+		//MPI_Barrier(m_comm);
 		
 		if (!has_started) {
 			throw std::runtime_error("Timer " + proc_name  + " has not been started yet!");
@@ -88,7 +88,7 @@ public:
 		std::string pad(4*lev + 2, '-');
 		LOG.os<0>(pad, " ");
 		
-		MPI_Barrier(m_comm);
+		//MPI_Barrier(m_comm);
 		
 		LOG.os<0>(proc_name, " \t took \t ", tot, " s");
 		
@@ -101,7 +101,7 @@ public:
 			it.second.print_info();
 		}
 		
-		MPI_Barrier(m_comm);
+		//MPI_Barrier(m_comm);
 		
 		//--lev;
 		

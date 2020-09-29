@@ -11,7 +11,9 @@ namespace fock {
 BATCHED_PARI_K::BATCHED_PARI_K(dbcsr::world& w, desc::options& opt) 
 	: K(w,opt,"PARI-K") {}
 
-void BATCHED_PARI_K::init_tensors() {
+void BATCHED_PARI_K::init() {
+	
+	init_base();
 	
 	auto b = m_mol->dims().b();
 	arrvec<int,2> bb = {b,b};

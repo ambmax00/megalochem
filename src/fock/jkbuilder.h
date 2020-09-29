@@ -64,14 +64,15 @@ protected:
 	dbcsr::shared_matrix<double> m_J;
 	std::shared_ptr<J> m_builder;
 	
+	void init_base();
+	
 public:
 	
 	J(dbcsr::world& w, desc::options& opt, std::string name) : JK_common(w,opt,name) {}
 	virtual ~J() {}
 	virtual void compute_J() = 0;
-	virtual void init_tensors() = 0;
 	
-	void init();
+	virtual void init() = 0;
 	
 	dbcsr::shared_matrix<double> get_J() { return m_J; }	
 		
@@ -83,14 +84,15 @@ protected:
 	dbcsr::shared_matrix<double> m_K_A;
 	dbcsr::shared_matrix<double> m_K_B;
 	
+	void init_base();
+	
 public:
 	
 	K(dbcsr::world& w, desc::options& opt, std::string name) : JK_common(w,opt,name) {}
 	virtual ~K() {}
 	virtual void compute_K() = 0;
-	virtual void init_tensors() = 0;
 	
-	void init();
+	virtual void init() = 0;
 	
 	dbcsr::shared_matrix<double> get_K_A() { return m_K_A; }
 	dbcsr::shared_matrix<double> get_K_B() { return m_K_B; }
@@ -111,7 +113,7 @@ public:
 	
 	EXACT_J(dbcsr::world& w, desc::options& opt);
 	void compute_J() override;
-	void init_tensors() override;
+	void init() override;
 	
 };
 
@@ -128,7 +130,7 @@ public:
 
 	EXACT_K(dbcsr::world& w, desc::options& opt);
 	void compute_K() override;
-	void init_tensors() override;
+	void init() override;
 	
 };
 
@@ -142,15 +144,16 @@ private:
 	dbcsr::shared_tensor<2,double> m_gp_xd;
 	dbcsr::shared_tensor<2,double> m_gq_xd;
 	dbcsr::shared_tensor<2,double> m_inv;
+	dbcsr::shared_matrix<double> m_inv_mat;
 	
 	dbcsr::shared_pgrid<3> m_spgrid_bbd;
-	dbcsr::shared_pgrid<2> m_spgrid_xd;
+	dbcsr::shared_pgrid<2> m_spgrid_xd, m_spgrid2;
 
 public:
 
 	BATCHED_DF_J(dbcsr::world& w, desc::options& opt);
 	void compute_J() override;
-	void init_tensors() override;
+	void init() override;
 	
 	~BATCHED_DF_J() {}
 	
@@ -177,7 +180,7 @@ public:
 
 	BATCHED_DFMO_K(dbcsr::world& w, desc::options& opt);
 	void compute_K() override;
-	void init_tensors() override;
+	void init() override;
 	
 	~BATCHED_DFMO_K() {}
 	
@@ -202,7 +205,7 @@ public:
 
 	BATCHED_DFAO_K(dbcsr::world& w, desc::options& opt);
 	void compute_K() override;
-	void init_tensors() override;
+	void init() override;
 	
 	~BATCHED_DFAO_K() {}
 	
@@ -225,7 +228,7 @@ public:
 
 	BATCHED_PARI_K(dbcsr::world& w, desc::options& opt);
 	void compute_K() override;
-	void init_tensors() override;
+	void init() override;
 	
 	~BATCHED_PARI_K() {}
 	

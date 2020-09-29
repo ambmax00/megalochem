@@ -31,7 +31,7 @@ mpmod::mpmod(hf::shared_hf_wfn& wfn_in, desc::options& opt_in, dbcsr::world& w_i
 	
 	m_hfwfn->mol()->set_cluster_dfbasis(dfbasis);
 	
-	std::cout << "SIZE: " << dfbasis->size() << std::endl;
+	//std::cout << "SIZE: " << dfbasis->size() << std::endl;
 	
 }
 
@@ -72,7 +72,7 @@ void mpmod::compute_batch() {
 	int nbf = std::accumulate(b.begin(), b.end(), 0);
 	int dfnbf = std::accumulate(x.begin(), x.end(), 0);
 	
-	std::cout << "NBFS: " << nbf << " " << dfnbf << std::endl;
+	//std::cout << "NBFS: " << nbf << " " << dfnbf << std::endl;
 	
 	// options
 	int nlap = m_opt.get<int>("nlap",MP_NLAP);

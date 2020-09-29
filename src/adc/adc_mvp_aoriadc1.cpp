@@ -9,7 +9,7 @@ void MVP_ao_ri_adc1::init() {
 	m_c_bo = m_reg.get_matrix<double>("c_bo");
 	m_c_bv = m_reg.get_matrix<double>("c_bv");
 	
-	auto kmethod = m_opt.get<std::string>("k_method", "df");
+	auto kmethod = m_opt.get<std::string>("k_method", "batchdfao");
 	
 	LOG.os<>("Setting up j builder for AO-ADC1.\n");
 	
@@ -21,14 +21,13 @@ void MVP_ao_ri_adc1::init() {
 	m_jbuilder->set_mol(m_mol);
 	
 	m_jbuilder->init();
-	m_jbuilder->init_tensors();
 	
 	LOG.os<>("Setting up k builder for AO-ADC1.\n");
 	
-	if (kmethod == "df") {
+	if (kmethod == "batchdf") {
 		fock::K* kbuilder = new fock::BATCHED_DFAO_K(m_world,m_opt);
 		m_kbuilder.reset(kbuilder);
-	} else if (kmethod == "pari") {
+	} else if (kmethod == "batchpari") {
 		fock::K* kbuilder = new fock::BATCHED_PARI_K(m_world,m_opt);
 		m_kbuilder.reset(kbuilder);
 	}
@@ -38,7 +37,6 @@ void MVP_ao_ri_adc1::init() {
 	m_kbuilder->set_mol(m_mol);
 	
 	m_kbuilder->init();
-	m_kbuilder->init_tensors();
 	
 	LOG.os<>("Done with setting up.\n");
 	

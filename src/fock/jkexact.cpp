@@ -8,7 +8,9 @@ namespace fock {
 EXACT_J::EXACT_J(dbcsr::world& w, desc::options& iopt) : J(w,iopt,"EXACT_J") {} 
 EXACT_K::EXACT_K(dbcsr::world& w, desc::options& iopt) : K(w,iopt,"EXACT_K") {}
 
-void EXACT_J::init_tensors() {
+void EXACT_J::init() {
+	
+	init_base();
 
 	auto b = m_p_A->row_blk_sizes();
 	vec<int> d = {1};
@@ -28,7 +30,9 @@ void EXACT_J::init_tensors() {
 	
 }
 
-void EXACT_K::init_tensors() {
+void EXACT_K::init() {
+	
+	init_base();
 	
 	auto b = m_p_A->row_blk_sizes();
 	vec<int> d = {1};

@@ -10,7 +10,7 @@ JK_common::JK_common(dbcsr::world& w, desc::options opt, std::string name) :
 	LOG(m_world.comm(),m_opt.get<int>("print", FOCK_PRINT_LEVEL)),
 	TIME(m_world.comm(), name, LOG.global_plev()) {}
 	
-void J::init() {
+void J::init_base() {
 	
 	// set up J
 	auto b = m_mol->dims().b();
@@ -25,7 +25,7 @@ void J::init() {
 	
 }
 
-void K::init() {
+void K::init_base() {
 	
 	// set up K's
 	auto b = m_mol->dims().b();

@@ -165,18 +165,13 @@ public:
 		std::ifstream in;
 		
 		int rank = m_c_bo_A->get_world().rank();
-		
-		in.open(filename);
-				
+					
 		if (std::filesystem::exists(filename) && rank == 0) {
-		
-			in >> data;
-			
+					
 			std::filesystem::remove(filename);
 			
 		}
 		
-		in.close();
 		out.open(filename);
 			
 		hfdata["scf_energy"] = m_scf_energy;

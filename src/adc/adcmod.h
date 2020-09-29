@@ -6,6 +6,7 @@
 #include "utils/mpi_time.h"
 #include "adc/adc_defaults.h"
 #include "utils/registry.h"
+#include "ints/fitting.h"
 #include <dbcsr_matrix.hpp>
 #include <dbcsr_tensor.hpp>
 
@@ -15,20 +16,20 @@ namespace adc {
 	
 enum class method {
 	invalid,
-	ri_adc_1,
-	ri_adc_2,
-	sos_ri_adc_2,
-	ao_ri_adc_1,
-	ao_ri_adc_2
+	//ri_adc_1,
+	//ri_adc_2,
+	//sos_ri_adc_2,
+	ao_adc_1,
+	ao_adc_2
 };
 
 static const std::map<std::string,method> method_map = 
 {
-	{"ri_adc_1", method::ri_adc_1},
-	{"ri_adc_2", method::ri_adc_2},
-	{"sos_ri_adc_2", method::sos_ri_adc_2},
-	{"ao_ri_adc_1", method::ao_ri_adc_1},
-	{"ao_ri_adc_2", method::ao_ri_adc_2}
+	//{"ri_adc_1", method::ri_adc_1},
+	//{"ri_adc_2", method::ri_adc_2},
+	//{"sos_ri_adc_2", method::sos_ri_adc_2},
+	{"ao_adc_1", method::ao_adc_1},
+	{"ao_adc_2", method::ao_adc_2}
 };
 	
 class adcmod {
@@ -48,6 +49,8 @@ private:
 	
 	method m_method;
 	
+	std::string m_jmethod, m_kmethod, m_zmethod;
+	
 	double m_c_os;
 	double m_c_osc;
 	
@@ -57,28 +60,15 @@ private:
 	dbcsr::shared_pgrid<2> m_spgrid2_bo;
 	dbcsr::shared_pgrid<2> m_spgrid2_bv;
 	dbcsr::shared_pgrid<3> m_spgrid3_xbb;
-	dbcsr::shared_pgrid<3> m_spgrid3_xoo;
-	dbcsr::shared_pgrid<3> m_spgrid3_xvv;
-	dbcsr::shared_pgrid<3> m_spgrid3_xov;
-	
+
 	dbcsr::shared_matrix<double> m_d_ov;
+	
+	std::shared_ptr<ints::dfitting> m_dfit;
 	
 	void init();
 	void init_ao_tensors();
 	void init_mo_tensors();
 	void compute_diag();
-	
-	//void mo_load();
-	
-	//void mo_compute_diag_0();
-	//void mo_compute_diag_1();
-	//void mo_compute_diag();
-	
-	//void mo_amplitudes();
-	
-	//void antisym(dbcsr::tensor<4>& t, vec<int>& o, vec<int>& v);
-	
-	//void scale(dbcsr::tensor<4>& t, vec<double>& eo, vec<double>& ev);
 	
 public:	
 

@@ -5,6 +5,7 @@
 #include <map>
 #include <dbcsr_tensor_ops.hpp>
 #include <dbcsr_btensor.hpp>
+#include "ints/screening.h"
 #include <stdexcept>
 
 namespace util {
@@ -50,6 +51,11 @@ public:
 		m_map[name] = in;
 	}; 
 	
+	void insert_screener(std::string name, ints::shared_screener scr) {
+		std::any in = std::any(scr);
+		m_map[name] = in;
+	};
+	
 	template <typename T>
 	dbcsr::smatrix<T> get_matrix(std::string intname) {
 		return get_item<dbcsr::smatrix<T>>(intname);
@@ -63,6 +69,10 @@ public:
 	template <int N, typename T>
 	dbcsr::sbtensor<N,T> get_btensor(std::string intname) {
 		return get_item<dbcsr::sbtensor<N,T>>(intname);
+	}
+	
+	ints::shared_screener get_screener(std::string name) {
+		return get_item<ints::shared_screener>(name);
 	}
 	
 	void clear() {

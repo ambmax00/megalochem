@@ -159,8 +159,8 @@ cluster_basis::cluster_basis(vshell basis, std::string method, int nsplit)
 	int vsize = basis.size();
 	m_basis = basis;
 	
-	std::cout << "NBAS: " << nbas << std::endl;
-	std::cout << "VSIZE: " << vsize << std::endl;
+	//std::cout << "NBAS: " << nbas << std::endl;
+	//std::cout << "VSIZE: " << vsize << std::endl;
 	
 	if (method == "atomic") {
 		

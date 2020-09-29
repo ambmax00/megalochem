@@ -192,20 +192,7 @@ void fockmod::init() {
 			
 		}
 		
-		if (s_xx_tensor) {
-			
-			auto x = m_mol->dims().x();
-			arrvec<int,2> xx = {x,x};
-			
-			auto s_xx_01 = dbcsr::tensor_create<2>().name("s_xx")
-				.pgrid(spgrid2).map1({0}).map2({1}).blk_sizes(xx).get();
-				
-			dbcsr::copy_matrix_to_tensor(*c_s_xx, *s_xx_01);
-			m_reg.insert_tensor<2,double>("s_xx", s_xx_01);		
-				
-		}	
-		
-		m_reg.insert_matrix<double>("s_xx_mat", c_s_xx);
+		m_reg.insert_matrix<double>("s_xx", c_s_xx);
 		
 		t_eri.finish();
 		
@@ -239,17 +226,9 @@ void fockmod::init() {
 			
 			dbcsr::multiply('T', 'N', *Linv, *Linv, *c_s_xx_inv).perform();
 			
-			auto s_xx_inv = dbcsr::tensor_create<2>().name("s_xx_inv")
-				.pgrid(spgrid2).map1({0}).map2({1}).blk_sizes(xx).get();
-				
-			dbcsr::copy_matrix_to_tensor(*c_s_xx_inv, *s_xx_inv);
+			c_s_xx_inv->filter(dbcsr::global::filter_eps);
 			
-			s_xx_inv->filter(dbcsr::global::filter_eps);
-			
-			//dbcsr::print(*c_s_xx);
-			//dbcsr::print(*s_xx_inv);
-			
-			m_reg.insert_tensor<2,double>("s_xx_inv", s_xx_inv);
+			m_reg.insert_matrix<double>("s_xx_inv", c_s_xx_inv);
 			
 		}
 		
@@ -257,20 +236,11 @@ void fockmod::init() {
 			
 			LOG.os<1>("Computing metric inverse square root...\n");
 
-			std::string name = m_mol->name() + "_s_xx_invsqrt_(0|1)";
-			
-			//dbcsr::print(*Linv);
-			
 			dbcsr::shared_matrix<double> c_s_xx_invsqrt = dbcsr::transpose(Linv).get();
 			
-			auto s_xx_invsqrt = dbcsr::tensor_create<2>().name("s_xx_invsqrt")
-				.pgrid(spgrid2).map1({0}).map2({1}).blk_sizes(xx).get();
+			c_s_xx_invsqrt->filter(dbcsr::global::filter_eps);
 				
-			dbcsr::copy_matrix_to_tensor(*c_s_xx_invsqrt, *s_xx_invsqrt);
-			
-			s_xx_invsqrt->filter(dbcsr::global::filter_eps);
-				
-			m_reg.insert_tensor<2,double>("s_xx_invsqrt", s_xx_invsqrt);
+			m_reg.insert_matrix<double>("s_xx_invsqrt", c_s_xx_invsqrt);
 			
 		}
 		
@@ -426,7 +396,7 @@ void fockmod::init() {
 	if (k_method == "batchdfao") {
 		
 		auto eri_batched = m_reg.get_btensor<3,double>("i_xbb_batched");
-		auto inv = m_reg.get_tensor<2,double>("s_xx_inv");
+		auto inv = m_reg.get_matrix<double>("s_xx_inv");
 		m_dfit = std::make_shared<ints::dfitting>(m_world, m_mol, LOG.global_plev());
 		auto c_xbb_batched = m_dfit->compute(eri_batched, inv, 
 			m_opt.get<std::string>("intermeds", FOCK_INTERMEDS));
@@ -437,7 +407,7 @@ void fockmod::init() {
 	if (k_method == "batchpari") {
 		
 		auto eri_batched = m_reg.get_btensor<3,double>("i_xbb_batched");
-		auto s_xx = m_reg.get_matrix<double>("s_xx_mat");
+		auto s_xx = m_reg.get_matrix<double>("s_xx");
 		m_dfit = std::make_shared<ints::dfitting>(m_world, m_mol, LOG.global_plev());
 		auto c_xbb_pari = m_dfit->compute_pari(eri_batched, s_xx, scr_s);
 		m_reg.insert_tensor<3,double>("c_xbb_pari", c_xbb_pari);
@@ -449,10 +419,7 @@ void fockmod::init() {
 	
 	m_J_builder->init();
 	m_K_builder->init();
-	
-	m_J_builder->init_tensors();
-	m_K_builder->init_tensors();
-	
+		
 	LOG.os<>("Finished setting up JK builder \n \n");
 	
 }

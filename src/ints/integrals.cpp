@@ -576,7 +576,7 @@ void calc_ints_schwarz_x(dbcsr::mat_d& m_out, util::ShrPool<libint2::Engine>& en
 			iter.next_block();		
 						
 			const auto& c1 = cbas1[iter.row()];
-			std::cout << iter.row() << std::endl;
+			//std::cout << iter.row() << std::endl;
 			
 			//block lower bounds
 			int lb1 = iter.row_offset();
