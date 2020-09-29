@@ -1322,6 +1322,21 @@ public:
 		return m_nbatches_dim;
 	}
 	
+	dbcsr::shared_tensor<N,T> get_template(std::string name, vec<int> map1,
+		vec<int> map2) 
+	{
+		auto out = dbcsr::tensor_create<N,T>()
+			.name(name)
+			.pgrid(m_spgrid_N)
+			.blk_sizes(m_blk_sizes)
+			.map1(map1).map2(map2)
+			.get();
+			
+		return out;
+	}
+			
+		
+	
 }; //end class btensor
 
 template <int N, typename T>

@@ -149,10 +149,11 @@ void MVP_ao_ri_adc2::compute_intermeds() {
 		
 		util::registry reg_ilap;
 		
-		auto 
+		auto cfit = m_dfit->compute(m_eri_batched, f_xx_01, "core");
 		
 		reg_ilap.insert_btensor<3,double>("i_xbb_batched", m_eri_batched);
-		reg_ilap.insert_tensor<2,double>("s_xx_inv", f_xx_01);
+		reg_ilap.insert_btensor<3,double>("c_xbb_batched", cfit);
+		//reg_ilap.insert_tensor<2,double>("s_xx_inv", f_xx_01);
 		
 		std::string kmethod = m_opt.get<std::string>("build_K", ADC_BUILD_K);
 		
@@ -359,7 +360,7 @@ void MVP_ao_ri_adc2::init() {
 	
 	m_s_bb = m_reg.get_matrix<double>("s_bb");
 	
-	m_s_xx_inv = m_reg.get_matrix<double>("s_xx_inv_mat");
+	m_s_xx_inv = m_reg.get_matrix<double>("s_xx_inv");
 	
 	m_eri_batched = m_reg.get_btensor<3,double>("i_xbb_batched");
 	
@@ -377,6 +378,7 @@ void MVP_ao_ri_adc2::init() {
 	
 	auto build_J = m_opt.get<std::string>("build_J", ADC_BUILD_J);
 	auto build_K = m_opt.get<std::string>("build_K", ADC_BUILD_K);
+	auto build_Z = m_opt.get<std::string>("build_Z", ADC_BUILD_Z);
 	
 	LOG.os<>("Setting up J builder.\n");
 	
@@ -387,7 +389,6 @@ void MVP_ao_ri_adc2::init() {
 	m_jbuilder->set_mol(m_mol);
 	
 	m_jbuilder->init();
-	m_jbuilder->init_tensors();
 	
 	LOG.os<>("Setting up K builder.\n");
 	
@@ -398,7 +399,11 @@ void MVP_ao_ri_adc2::init() {
 	m_kbuilder->set_mol(m_mol);
 	
 	m_kbuilder->init();
-	m_kbuilder->init_tensors();
+	
+	LOG.os<>("Setting up Z builder");
+	
+	m_zbuilder->set_reg(m_reg);
+	m_zbuilder->init_tensors();
 	
 	auto b = m_mol->dims().b();
 	auto x = m_mol->dims().x();
@@ -660,7 +665,7 @@ dbcsr::sbtensor<3,double> MVP_ao_ri_adc2::compute_J(smat& u_ao) {
 		.name("J_xbb_0_12")
 		.pgrid(m_spgrid3_xbb)
 		.map1({0}).map2({1,2})
-		.blk_sizes(xbb)
+		.blk_sizes(m_xbb)
 		.get();
 		
 	auto J_xbb_2_01_t = dbcsr::tensor_create_template<3,double>(J_xbb_0_12)
@@ -675,6 +680,8 @@ dbcsr::sbtensor<3,double> MVP_ao_ri_adc2::compute_J(smat& u_ao) {
 	
 	auto J_xbb_batched = dbcsr::btensor_create<3>(J_xbb_0_12)
 		.name(m_mol->name() + "_j_xbb_batched")
+		.pgrid(m_spgrid3_xbb)
+		.blk_sizes(xbb)
 		.batch_dims(m_nbatches)
 		.btensor_type(m_bmethod)
 		.print(LOG.global_plev())
@@ -712,35 +719,28 @@ dbcsr::sbtensor<3,double> MVP_ao_ri_adc2::compute_J(smat& u_ao) {
 
 	m_eri_batched->reorder(vec<int>{2},vec<int>{0,1});
 
-	m_eri_batched->decompress_init({0});
-	J_xbb_batched->compress_init({0,2});
+	m_eri_batched->decompress_init({0}, vec<int>{2}, vec<int>{0,1});
+	J_xbb_batched->compress_init({0,2}, vec<int>{0}, vec<int>{1,2});
 	
-	int nxbatches = m_eri_batched->nbatches_dim(0);
-	int nnbatches = m_eri_batched->nbatches_dim(2);
-	
-	auto xbounds = m_eri_batched->bounds(0);
-	auto bbounds = m_eri_batched->bounds(2);
-	auto fullbbounds = m_eri_batched->full_bounds(1);
-	
-	for (int ix = 0; ix != nxbatches; ++ix) {
+	for (int ix = 0; ix != m_eri_batched->nbatches(0); ++ix) {
 		
 		m_eri_batched->decompress({ix});
-		auto eri_2_01 = m_eri_batched->get_stensor();
+		auto eri_2_01 = m_eri_batched->get_work_tensor();
 		
-		for (int inu = 0; inu != nnbatches; ++inu) {
+		for (int inu = 0; inu != m_eri_batched->nbatches(2); ++inu) {
 			
 			vec<vec<int>> nu_bounds = {
-				bbounds[inu]
+				m_eri_batched->bounds(2,inu)
 			};
 			
 			vec<vec<int>> xmu_bounds = {
-				xbounds[ix],
-				fullbbounds
+				m_eri_batched->bounds(0,ix),
+				m_eri_batched->full_bounds(1)
 			};
 			
 			vec<vec<int>> xnu_bounds = {
-				xbounds[ix],
-				bbounds[inu]
+				m_eri_batched->bounds(0,ix),
+				m_eri_batched->bounds(2,inu)
 			};
 			
 			dbcsr::contract(*u_hto_01, *eri_2_01, *J_xbb_2_01_t)
@@ -770,6 +770,9 @@ dbcsr::sbtensor<3,double> MVP_ao_ri_adc2::compute_J(smat& u_ao) {
 			
 		}
 	}
+	
+	m_eri_batched->decompress_finalize();
+	J_xbb_batched->compress_finalize();
 	
 #if 0
 
@@ -877,45 +880,48 @@ std::pair<smat,smat> MVP_ao_ri_adc2::compute_sigma_2e_ilap(
 	if (imethod == "full") {
 		
 		// Intermediate is held in-core/on-disk
-		auto eri = m_eri_batched->get_stensor();
 		
-		auto I_xbb_batched = dbcsr::btensor_create<3>(eri)
+		auto I_xbb_batched = dbcsr::btensor_create<3>()
 			.name(m_mol->name() + "_i_xbb_batched")
+			.pgrid(m_spgrid3_xbb)
+			.blk_sizes(m_xbb)
 			.batch_dims(m_nbatches)
 			.btensor_type(m_bmethod)
 			.print(LOG.global_plev())
 			.get();
 			
+		auto I_xbb_0_12 = dbcsr::tensor_create_template<3,double>()
+			.name("I_xbb_0_12")
+			.pgrid(m_spgrid3_xbb)
+			.blk_sizes(xbb)
+			.map1({0}).map2({1,2}).get();
+			
 		// Form I
-		I_xbb_batched->reorder(vec<int>{0},vec<int>{1,2});
-		J_xbb_batched->reorder(vec<int>{0},vec<int>{1,2});
-		m_eri_batched->reorder(vec<int>{0},vec<int>{1,2});
+	
+		I_xbb_batched->compress_init({0,2}, vec<int>{0}, vec<int>{1,2});
 		
-		I_xbb_batched->compress_init({0,2});
-		
-		auto xbds = m_eri_batched->bounds(0);
-		auto bbds = m_eri_batched->bounds(2);
-		auto fullxb = m_eri_batched->full_bounds(0);
-		auto fullbb = m_eri_batched->full_bounds(2);
-		
-		auto I_xbb_0_12 = dbcsr::tensor_create_template<3,double>(eri)
-			.name("I_xbb_0_12").map1({0}).map2({1,2}).get();
-		
-		for (int ix = 0; ix != xbds.size(); ++ix) {
-			for (int inu = 0; inu != bbds.size(); ++inu) {
+		for (int ix = 0; ix != m_eri_batched->nbatches(0); ++ix) {
+			for (int inu = 0; inu != m_eri_batched->nbatches(2); ++inu) {
 				
 				//I_xbb_0_12->batched_contract_init();
 				
-				J_xbb_batched->decompress_init({0,2});
+				J_xbb_batched->decompress_init({0,2}, vec<int>{0}, vec<int>{1,2});
 				
-				for (int iy = 0; iy != xbds.size(); ++iy) {
+				for (int iy = 0; iy != m_eri_batched->nbatches(0); ++iy) {
 					
 					J_xbb_batched->decompress({iy,inu});
-					auto J_xbb_0_12 = J_xbb_batched->get_stensor();
+					auto J_xbb_0_12 = J_xbb_batched->get_work_tensor();
 					
-					vec<vec<int>> xbounds = { xbds[ix] };
-					vec<vec<int>> ybounds = { xbds[iy] };
-					vec<vec<int>> kabounds = { fullbb, bbds[inu] };
+					vec<vec<int>> xbounds = { 
+						m_eri_batched->bounds(0,ix)
+					};
+					vec<vec<int>> ybounds = { 
+						m_eri_batched->bounds(0,iy)
+					};
+					vec<vec<int>> kabounds = { 
+						m_eri_batched->full_bounds(1), 
+						m_eri_batched->bounds(2,inu)
+					};
 					
 					dbcsr::contract(*FA_01, *J_xbb_0_12, *I_xbb_0_12)
 						.bounds1(ybounds)
@@ -929,16 +935,23 @@ std::pair<smat,smat> MVP_ao_ri_adc2::compute_sigma_2e_ilap(
 				
 				J_xbb_batched->decompress_finalize();
 				
-				m_eri_batched->decompress_init({0,2});
+				m_eri_batched->decompress_init({0,2}, vec<int>{0}, vec<int>{1,2});
 				
-				for (int iy = 0; iy != xbds.size(); ++iy) {
+				for (int iy = 0; iy != m_eri_batched->nbatches(0); ++iy) {
 					
 					m_eri_batched->decompress({iy,inu});
-					auto eri_0_12 = m_eri_batched->get_stensor();
+					auto eri_0_12 = m_eri_batched->get_work_tensor();
 					
-					vec<vec<int>> xbounds = { xbds[ix] };
-					vec<vec<int>> ybounds = { xbds[iy] };
-					vec<vec<int>> kabounds = { fullbb, bbds[inu] };
+					vec<vec<int>> xbounds = { 
+						m_eri_batched->bounds(0,ix)
+					};
+					vec<vec<int>> ybounds = { 
+						m_eri_batched->bounds(0,iy)
+					};
+					vec<vec<int>> kabounds = { 
+						m_eri_batched->full_bounds(1), 
+						m_eri_batched->bounds(2,inu)
+					};
 					
 					dbcsr::contract(*FB_01, *eri_0_12, *I_xbb_0_12)
 						.bounds1(ybounds)
@@ -992,34 +1005,37 @@ std::pair<smat,smat> MVP_ao_ri_adc2::compute_sigma_2e_ilap(
 		m_eri_batched->reorder(vec<int>{1},vec<int>{0,2});
 		I_xbb_batched->reorder(vec<int>{0,1}, vec<int>{2});
 		
-		auto erireo = m_eri_batched->get_stensor();
-		
-		auto cbar_1_02 = dbcsr::tensor_create_template<3,double>(erireo)
+		auto cbar_1_02 = dbcsr::tensor_create_template<3,double>(I_xbb_0_12)
 			.map1({1}).map2({0,2})
 			.name("cbar_1_02").get();
 			
-		auto cbar_01_2 = dbcsr::tensor_create_template<3,double>(erireo)
+		auto cbar_01_2 = dbcsr::tensor_create_template<3,double>(I_xbb_0_12)
 			.map1({0,1}).map2({2})
 			.name("cbar_01_2")
 			.get();
 			
-		auto I_01_2 = dbcsr::tensor_create_template<3,double>(erireo)
+		auto I_01_2 = dbcsr::tensor_create_template<3,double>(I_xbb_0_12)
 			.map1({0,1}).map2({2})
 			.name("I_02_1")
 			.get();
 		
-		I_xbb_batched->decompress_init({0,1});
-		m_eri_batched->decompress_init({0});
+		I_xbb_batched->decompress_init({0,1},vec<int>{1},vec<int>{0,1});
+		m_eri_batched->decompress_init({0},vec<int>{0,1},vec<int>{2});
 		
-		for (int ix = 0; ix != xbds.size(); ++ix) {
+		for (int ix = 0; ix != m_eri_batched->nbatches(0); ++ix) {
 			
 			m_eri_batched->decompress({ix});
-			auto eri_1_02 = m_eri_batched->get_stensor();
+			auto eri_1_02 = m_eri_batched->get_work_tensor();
 			
-			for (int inu = 0; inu != bbds.size(); ++inu) {
+			for (int inu = 0; inu != m_eri_batched->nbatches(2); ++inu) {
 				
-				vec<vec<int>> xmbounds = {xbds[ix],fullbb};
-				vec<vec<int>> nbounds = {bbds[inu]};
+				vec<vec<int>> xmbounds = {
+					m_eri_batched->bounds(0,ix),
+					m_eri_batched->full_bounds
+				};
+				vec<vec<int>> nbounds = {
+					m_eri_batched->bounds(2,inu)
+				};
 				
 				// form cbar
 				dbcsr::contract(*eri_1_02, *po_01, *cbar_1_02)
@@ -1032,7 +1048,7 @@ std::pair<smat,smat> MVP_ao_ri_adc2::compute_sigma_2e_ilap(
 				dbcsr::copy(*cbar_1_02, *cbar_01_2).move_data(true).perform();
 				
 				I_xbb_batched->decompress({ix,inu});
-				auto I_xbb_01_2 = I_xbb_batched->get_stensor();
+				auto I_xbb_01_2 = I_xbb_batched->get_work_tensor();
 				
 				vec<vec<int>> xnubounds = {xbds[ix],bbds[inu]};
 				
@@ -1055,21 +1071,24 @@ std::pair<smat,smat> MVP_ao_ri_adc2::compute_sigma_2e_ilap(
 		
 		m_eri_batched->decompress_finalize();
 		I_xbb_batched->decompress_finalize();
+				
+		m_eri_batched->decompress_init({0},vec<int>{1},vec<int>{0,2});
+		I_xbb_batched->decompress_init({0,2},vec<int>{0,2},vec<int>{1});
 		
-		I_xbb_batched->reorder(vec<int>{0,2},vec<int>{1});
-		
-		m_eri_batched->decompress_init({0});
-		I_xbb_batched->decompress_init({0,2});
-		
-		for (int ix = 0; ix != xbds.size(); ++ix) {
+		for (int ix = 0; ix != m_eri_batched->nbatches(0); ++ix) {
 			
 			m_eri_batched->decompress({ix});
-			auto eri_1_02 = m_eri_batched->get_stensor();
+			auto eri_1_02 = m_eri_batched->get_work_tensor();
 			
-			for (int inu = 0; inu != bbds.size(); ++inu) {
+			for (int inu = 0; inu != m_eri_batched->get_work_tensor(); ++inu) {
 				
-				vec<vec<int>> xmbounds = {xbds[ix],fullbb};
-				vec<vec<int>> nbounds = {bbds[inu]};
+				vec<vec<int>> xmbounds = {
+					m_eri_batched->bounds(0,ix),
+					m_eri_batched->full_bounds
+				};
+				vec<vec<int>> nbounds = {
+					m_eri_batched->bounds(2,inu)
+				};
 				
 				// form cbar
 				dbcsr::contract(*eri_1_02, *pv_01, *cbar_1_02)
@@ -1105,19 +1124,15 @@ std::pair<smat,smat> MVP_ao_ri_adc2::compute_sigma_2e_ilap(
 		
 		I_xbb_batched->reset();		
 				
-	} else if (imethod == "mem") {
+	/*} else if (imethod == "mem") {
 		
-		std::cout << "NOTHING YET." << std::endl;		
+		std::cout << "NOTHING YET." << std::endl;	*/	
 		
 	} else {
 		
 		throw std::runtime_error("Invalid value for option doubles.");
 		
 	}
-	
-	//double xpt = m_xpoints_dd[ilap];
-	//sigma_ilap_A->scale(exp(omega * xpt));
-	//sigma_ilap_B->scale(exp(omega * xpt));
 	
 	std::pair<smat,smat> out = {sigma_ilap_A, sigma_ilap_B};
 	

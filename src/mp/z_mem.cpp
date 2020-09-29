@@ -326,11 +326,10 @@ void LLMP_ASYM_Z::init_tensors() {
 	LOG.os<>("Setting up tensors in LLMP_ASYM.\n");
 	
 	m_eri_batched = m_reg.get_btensor<3,double>("i_xbb_batched");
-	auto eri = m_eri_batched->get_stensor();
 	
 	m_t_batched = m_reg.get_btensor<3,double>("t_xbb_batched");
 	
-	auto xbb = eri->blk_sizes();
+	auto xbb = m_eri_batched->blk_sizes();
 	
 	auto x = xbb[0];
 	auto b = xbb[1];
@@ -404,8 +403,6 @@ void LLMP_ASYM_Z::compute() {
 	
 	// ============= TAKE CARE OF TENSOR STUFF =============
 	
-	auto eri = m_eri_batched->get_stensor();
-	
 	auto spgrid3_xob = dbcsr::create_pgrid<3>(m_world.comm())
 		.tensor_dims(xobsizes).get();
 	
@@ -427,13 +424,11 @@ void LLMP_ASYM_Z::compute() {
 		dbcsr::tensor_create_template<3,double>(b_xob_1_02)
 		.name("b2_xob_1_02").map1({1}).map2({0,2}).get();
 	
-	auto b2_xbb_1_02 = 
-		dbcsr::tensor_create_template<3,double>(eri)
-		.name("b2_xbb_1_02").map1({1}).map2({0,2}).get();
-	
-	auto b2_xbb_0_12 =  
-		dbcsr::tensor_create_template<3,double>(eri)
-		.name("b2_xbb_0_12").map1({0}).map2({1,2}).get();
+	auto b2_xbb_1_02 = m_eri_batched->get_template(
+		"b2_xbb_1_02", vec<int>{1}, vec<int>{0,2});
+		
+	auto b2_xbb_0_12 = m_eri_batched->get_template(
+		"b2_xbb_0_12", vec<int>{0}, vec<int>{1,2});
 	
 	time_reo_tensor.start();
 	m_t_batched->reorder(vec<int>{1},vec<int>{0,2});

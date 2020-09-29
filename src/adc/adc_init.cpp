@@ -107,9 +107,8 @@ void adcmod::init_ao_tensors() {
 	std::shared_ptr<ints::aofactory> aofac = 
 		std::make_shared<ints::aofactory>(m_hfwfn->mol(), m_world);
 	
-	dbcsr::shared_matrix<double> ao3c2e_overlap, s_bb;
-	dbcsr::shared_tensor<2,double> ao3c2e_overlap_inv;
-	dbcsr::shared_tensor<2,double> ao3c2e_overlap_invsqrt;
+	dbcsr::shared_matrix<double> ao3c2e_overlap, s_bb,
+		ao3c2e_overlap_inv, ao3c2e_overlap_invsqrt;
 	dbcsr::sbtensor<3,double> eri_batched;
 	ints::shared_screener s_scr;
 	
@@ -186,14 +185,9 @@ void adcmod::init_ao_tensors() {
 				.filter_eps(dbcsr::global::filter_eps)
 				.perform();
 										
-			auto s_xx_inv = dbcsr::tensor_create<2>().name("s_xx_inv")
-				.pgrid(m_spgrid2).map1({0}).map2({1}).blk_sizes(xx).get();
+			c_s_xx_inv->filter(dbcsr::global::filter_eps);
 			
-			dbcsr::copy_matrix_to_tensor(*c_s_xx_inv, *s_xx_inv);
-			
-			s_xx_inv->filter(dbcsr::global::filter_eps);
-			
-			ao3c2e_overlap_inv = s_xx_inv;
+			ao3c2e_overlap_inv = c_s_xx_inv;
 
 		}
 		
@@ -204,15 +198,10 @@ void adcmod::init_ao_tensors() {
 			std::string name = "s_xx_invsqrt_(0|1)";
 			
 			dbcsr::shared_matrix<double> c_s_xx_invsqrt = dbcsr::transpose(Linv).get();
-	
-			auto s_xx_invsqrt = dbcsr::tensor_create<2>().name("s_xx_invsqrt")
-				.pgrid(m_spgrid2).map1({0}).map2({1}).blk_sizes(xx).get();
-				
-			dbcsr::copy_matrix_to_tensor(*c_s_xx_invsqrt, *s_xx_invsqrt);
 			
-			s_xx_invsqrt->filter(dbcsr::global::filter_eps);
+			c_s_xx_invsqrt->filter(dbcsr::global::filter_eps);
 				
-			ao3c2e_overlap_invsqrt = s_xx_invsqrt;
+			ao3c2e_overlap_invsqrt = c_s_xx_invsqrt;
 			
 		}
 		
@@ -310,9 +299,9 @@ void adcmod::init_ao_tensors() {
 	}
 	
 	if (eri_batched) m_reg.insert_btensor<3,double>("i_xbb_batched", eri_batched);
-	if (ao3c2e_overlap_inv) m_reg.insert_tensor<2,double>("s_xx_inv", ao3c2e_overlap_inv);
+	if (ao3c2e_overlap_inv) m_reg.insert_matrix<double>("s_xx_inv", ao3c2e_overlap_inv);
 	if (ao3c2e_overlap_invsqrt) 
-		m_reg.insert_tensor<2,double>("s_xx_invsqrt", ao3c2e_oberlap_invsqrt);
+		m_reg.insert_matrix<double>("s_xx_invsqrt", ao3c2e_oberlap_invsqrt);
 	if (ao3c2e_overlap) m_reg.insert_matrix<double>("s_xx", ao3c2e_overlap);
 	if (s_scr) m_reg.insert_screener("screener", s_scr);
 	if (s_bb) m_reg.insert_matrix<double>("s_bb", s_bb);
