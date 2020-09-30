@@ -10,6 +10,13 @@
 #include <limits>
 
 namespace ints {
+
+using vshell_l = std::vector<libint2::Shell>;
+
+using vvshell_l = std::vector<std::vector<libint2::Shell>>;
+
+using shared_vvshell_l = std::shared_ptr<
+	std::vector<std::vector<libint2::Shell>>>;
 	
 class aofactory::impl {
 protected:
@@ -17,13 +24,13 @@ protected:
 	dbcsr::world m_world;
 	
 	desc::smolecule m_mol;
-	desc::shared_cluster_basis m_cbas;
-	desc::shared_cluster_basis m_xbas;
+	shared_vvshell_l m_cbas;
+	shared_vvshell_l m_xbas;
 	
 	libint2::Operator m_Op = libint2::Operator::invalid;
 	libint2::BraKet m_BraKet = libint2::BraKet::invalid;
 	
-	vec<const desc::cluster_basis*> m_basvec;
+	vec<const vvshell_l*> m_basvec;
 	util::ShrPool<libint2::Engine> m_eng_pool;
 	
 	std::string m_intname = "";
@@ -32,13 +39,86 @@ public:
 	
 	impl(desc::smolecule mol, dbcsr::world w) :
 		m_world(w),
-		m_mol(mol),
-		m_cbas(m_mol->c_basis()),
-		m_xbas(m_mol->c_dfbasis())
+		m_mol(mol)
 		{ init(); }
 	
 	void init() {
+		
 		libint2::initialize();
+		
+		// convert to libint format
+		auto cbas = m_mol->c_basis();
+		auto xbas = m_mol->c_dfbasis();
+		
+		auto convert_vec = [](std::vector<double> vec) {
+			libint2::svector<double> out;
+			for (auto e : vec) {
+				out.push_back(e);
+			} 
+			return out;
+		};
+		
+		auto convert_bas = [&convert_vec](auto& mega_bas) {
+			shared_vvshell_l libint_bas = 
+				std::make_shared<vvshell_l>(0);
+			
+			for (auto& cluster : mega_bas) {
+				vshell_l vs_l;
+				for (auto& s : cluster) {
+					
+					libint2::Shell s_l;
+					
+					s_l.O = s.O;
+					s_l.alpha = convert_vec(s.alpha);
+					
+					libint2::svector<libint2::Shell::Contraction> c_l(1);
+					
+					c_l[0].l = s.l;
+					c_l[0].pure = s.pure;
+					
+					auto coeff = convert_vec(s.coeff);
+					libint2::svector<double> max_ln_c(s.alpha.size(), 
+						-std::numeric_limits<double>::max());
+					
+					for (int i = 0; i != coeff.size(); ++i) {
+						max_ln_c[i] = std::max(max_ln_c[i], std::log(std::abs(coeff[i])));
+					}
+									
+					c_l[0].coeff = coeff;
+					
+					s_l.contr = c_l;
+					s_l.max_ln_coeff = max_ln_c;
+					vs_l.push_back(s_l);
+			
+				}
+				libint_bas->push_back(vs_l);
+			}
+			
+			return libint_bas;
+			
+		};
+		
+		if (cbas) m_cbas = convert_bas(*cbas);
+		if (xbas) m_xbas = convert_bas(*xbas);
+		
+		std::cout << "LIBINT2 BASIS:" << std::endl;
+		for (auto c : *m_cbas) {
+			std::cout << "CLUSTER: " << std::endl;
+			for (auto s : c) {
+				std::cout << s << std::endl;
+			}
+		}
+		
+		if (xbas) {
+			std::cout << "LIBINT2 X BASIS:" << std::endl;
+			for (auto c : *m_xbas) {
+				std::cout << "CLUSTER: " << std::endl;
+				for (auto s : c) {
+					std::cout << s << std::endl;
+				}
+			}
+		}
+		
 	}
 	
 	void set_operator(std::string op) {
@@ -89,10 +169,15 @@ public:
 		size_t max_nprim = 0;
 		int max_l = 0;
 		
-		for (int i = 0; i != m_basvec.size(); ++i) {
-			max_nprim = std::max(m_basvec[i]->max_nprim(), max_nprim);
-			max_l = std::max(m_basvec[i]->max_l(), max_l);
+		for (auto& c : m_basvec) {
+			for (auto& vs : *c) {
+				max_nprim = std::max(max_nprim, libint2::max_nprim(vs));
+				max_l = std::max(max_l, libint2::max_l(vs));
+			}
 		}
+		
+		std::cout << "MAX L:" << max_l << std::endl;
+		std::cout << "MAX_NPRIM:" << max_nprim << std::endl;
 		
 		libint2::Engine eng(m_Op, max_nprim, max_l, 0, std::numeric_limits<double>::epsilon());
 			
@@ -127,12 +212,30 @@ public:
 		libint2::finalize();
 	}
 	
+	std::vector<int> cluster_sizes(const vvshell_l& vvs) {
+		std::vector<int> out;
+		for (auto& c : vvs) {
+			int size = 0;
+			for (auto& s : c) {
+				size += (int)s.size();
+			}
+			out.push_back(size);
+		}
+		
+		std::cout << "SIZES: " << std::endl;
+		for (auto i : out) {
+			std::cout << i << " ";
+		} std::cout << std::endl;
+		
+		return out;
+	}
+	
 	template <int N, typename T = double>
 	dbcsr::stensor<N,T> setup_tensor(dbcsr::shared_pgrid<N> spgrid, vec<int> map1, vec<int> map2) {
 		
 		arrvec<int,N> blksizes; 
 		for (int i = 0; i != N; ++i) { 
-			blksizes[i] = m_basvec[i]->cluster_sizes(); 
+			blksizes[i] = cluster_sizes(*m_basvec[i]);
 		} 
 			
 		auto t_out = dbcsr::tensor_create<N,T>().name(m_intname)
@@ -144,8 +247,8 @@ public:
 	
 	dbcsr::shared_matrix<double> compute() {
 		
-		auto rowsizes = m_basvec[0]->cluster_sizes();
-		auto colsizes = m_basvec[1]->cluster_sizes();
+		auto rowsizes = cluster_sizes(*m_basvec[0]);
+		auto colsizes = cluster_sizes(*m_basvec[1]);
 		
 		auto m_ints = dbcsr::create<double>()
 			.name(m_intname)
@@ -229,7 +332,7 @@ public:
 		
 		arrvec<int,2> blksizes;
 		for (int i = 0; i != 2; ++i) { 
-			blksizes[i] = m_basvec[i]->cluster_sizes(); 
+			blksizes[i] = cluster_sizes(*m_basvec[i]); 
 		} 
 		
 		auto t_ints = dbcsr::tensor_create<2>()
@@ -482,8 +585,8 @@ public:
 aofactory::aofactory(desc::smolecule mol, dbcsr::world& w) : 
 	pimpl(new impl(mol, w))  {}
 	
-aofactory::~aofactory() { delete pimpl; };
-
+aofactory::~aofactory() { delete pimpl; }
+	
 dbcsr::shared_matrix<double> aofactory::ao_overlap() {
 	
 	std::string intname = "s_bb";

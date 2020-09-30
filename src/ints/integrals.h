@@ -12,24 +12,26 @@
 #include <libint2.hpp>
 
 namespace ints {
+	
+using cluster_vec = std::vector<const std::vector<std::vector<libint2::Shell>>*>;
 
 void calc_ints(dbcsr::mat_d& m_out, util::ShrPool<libint2::Engine>& engine,
-	std::vector<const desc::cluster_basis*>& basvec);
+	cluster_vec& basvec);
 
 void calc_ints(dbcsr::tensor<2>& t_out, util::ShrPool<libint2::Engine>& eng,
-	std::vector<const desc::cluster_basis*>& basvec);
+	cluster_vec& basvec);
 	
 void calc_ints(dbcsr::tensor<3>& t_out, util::ShrPool<libint2::Engine>& eng,
-	std::vector<const desc::cluster_basis*>& basvec, screener* scr = nullptr);
+	cluster_vec& basvec, screener* scr = nullptr);
 	
 void calc_ints(dbcsr::tensor<4>& t_out, util::ShrPool<libint2::Engine>& eng,
-	std::vector<const desc::cluster_basis*>& basvec);
+	cluster_vec& basvec);
 	
 void calc_ints_schwarz_mn(dbcsr::mat_d& m_out, util::ShrPool<libint2::Engine>& engine,
-	std::vector<const desc::cluster_basis*>& basvec);
+	cluster_vec& basvec);
 	
 void calc_ints_schwarz_x(dbcsr::mat_d& m_out, util::ShrPool<libint2::Engine>& engine,
-	std::vector<const desc::cluster_basis*>& basvec);
+	cluster_vec& basvec);
 
 }
 

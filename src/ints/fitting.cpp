@@ -170,7 +170,7 @@ dbcsr::shared_tensor<3,double> dfitting::compute_pari(dbcsr::sbtensor<3,double> 
 	
 	vec<int> blk_to_atom_b(b.size()), blk_to_atom_x(x.size());
 	
-	auto get_centre = [&atoms](libint2::Shell& s) {
+	auto get_centre = [&atoms](desc::Shell& s) {
 		for (int i = 0; i != atoms.size(); ++i) {
 			auto& a = atoms[i];
 			double d = sqrt(pow(s.O[0] - a.x, 2)

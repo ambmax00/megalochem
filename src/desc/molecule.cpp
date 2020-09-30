@@ -3,6 +3,7 @@
 #include <utility>
 #include <stdexcept>
 #include <iostream>
+#include <cmath>
 
 #define printvec(LOG, n, v) \
 	for (auto x : v) { \

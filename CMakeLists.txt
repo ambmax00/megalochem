@@ -23,11 +23,25 @@ pkg_check_modules(deps REQUIRED IMPORTED_TARGET GLOBAL libxsmmf)
 find_package(Libint2 2.6.0 CONFIG REQUIRED)
 find_package(SCALAPACK REQUIRED)
 
+if(DEFINED LIBCINT_DIR)
+	find_library(LIBCINT_LIBRARIES 
+		NAMES libcint.a 
+		PATHS ${LIBCINT_DIR}/lib/
+	)
+	set(LIBCINT_INCLUDE_DIRS ${LIBCINT_DIR}/include/)
+else()
+	message("NOT USING LIBCINT")
+endif()
+
+if (DEFINED libcint) 
+	message(STATUS "Found libcint: ${LIBCINT_LIBRARIES}")
+	message(STATUS "Include directories: ${LIBCINT_INCLUDE_DIRS}")
+endif()
+
 get_target_property(DBCSR_INCLUDE_DIRS DBCSR::dbcsr INTERFACE_INCLUDE_DIRECTORIES)
 include_directories(
 	${DBCSR_INCLUDE_DIRS} 
 	${MPI_CXX_HEADER_DIR} 
-	${LIBINT2_INCLUDE_DIRS} 
 	${PYTHON_INCLUDE_DIRS}
 	#${CMAKE_CURRENT_BINARY_DIR} 
 	#${CMAKE_CURRENT_SOURCE_DIR}
@@ -41,6 +55,7 @@ target_link_libraries(
 	chem_dbcsrx
 	chem_io
 	MPI::MPI_CXX	
+	#chem_ints
 	chem_hf
 	chem_mp
 	#chem_adc
@@ -52,7 +67,7 @@ target_link_libraries(
         chem_dbcsrx
         chem_io
         MPI::MPI_CXX
-        chem_hf
+	chem_hf
 	chem_mp
 	#chem_adc
 )

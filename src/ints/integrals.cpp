@@ -9,7 +9,7 @@
 namespace ints {
 
 void calc_ints(dbcsr::mat_d& m_out, util::ShrPool<libint2::Engine>& engine,
-	std::vector<const desc::cluster_basis*>& basvec) {
+	cluster_vec& basvec) {
 
 	auto my_world = m_out.get_world();
 	
@@ -58,9 +58,9 @@ void calc_ints(dbcsr::mat_d& m_out, util::ShrPool<libint2::Engine>& engine,
 					//std::cout << "Local offsets: " << locblkoff1 << " " << locblkoff2 << std::endl;
 					//std::cout << "MULT: " << multiplicity(toff1,toff2) << std::endl;
 					
-					//std::cout << "Shells: " << std::endl;
-					//std::cout << sh1 << std::endl;
-					//std::cout << sh2 << std::endl;	
+					std::cout << "Shells: " << std::endl;
+					std::cout << sh1 << std::endl;
+					std::cout << sh2 << std::endl;	
 					//if (is_canonical(toff1,toff2)) {
 						
 						//int sfac = multiplicity(toff1,toff2);
@@ -102,7 +102,7 @@ void calc_ints(dbcsr::mat_d& m_out, util::ShrPool<libint2::Engine>& engine,
 }
 
 void calc_ints(dbcsr::tensor<2>& t_out, util::ShrPool<libint2::Engine>& engine,
-	std::vector<const desc::cluster_basis*>& basvec) {
+	cluster_vec& basvec) {
 
 	int myrank = 0;
 	int mpi_size = 0;
@@ -210,7 +210,7 @@ void calc_ints(dbcsr::tensor<2>& t_out, util::ShrPool<libint2::Engine>& engine,
 }
 
 void calc_ints(dbcsr::tensor<3>& t_out, util::ShrPool<libint2::Engine>& engine,
-	std::vector<const desc::cluster_basis*>& basvec, screener* scr) {
+	cluster_vec& basvec, screener* scr) {
 	
 	int myrank = 0;
 	int mpi_size = 0;
@@ -320,7 +320,7 @@ void calc_ints(dbcsr::tensor<3>& t_out, util::ShrPool<libint2::Engine>& engine,
 }
 
 void calc_ints(dbcsr::tensor<4>& t_out, util::ShrPool<libint2::Engine>& engine,
-	std::vector<const desc::cluster_basis*>& basvec) {
+	cluster_vec& basvec) {
 	
 	int myrank = 0;
 	int mpi_size = 0;
@@ -454,7 +454,7 @@ void calc_ints(dbcsr::tensor<4>& t_out, util::ShrPool<libint2::Engine>& engine,
 }
 
 void calc_ints_schwarz_mn(dbcsr::mat_d& m_out, util::ShrPool<libint2::Engine>& engine,
-	std::vector<const desc::cluster_basis*>& basvec) {
+	cluster_vec& basvec) {
 
 	auto my_world = m_out.get_world();
 	
@@ -555,7 +555,7 @@ void calc_ints_schwarz_mn(dbcsr::mat_d& m_out, util::ShrPool<libint2::Engine>& e
 }
 
 void calc_ints_schwarz_x(dbcsr::mat_d& m_out, util::ShrPool<libint2::Engine>& engine,
-	std::vector<const desc::cluster_basis*>& basvec) {
+	cluster_vec& basvec) {
 
 	auto my_world = m_out.get_world();
 	

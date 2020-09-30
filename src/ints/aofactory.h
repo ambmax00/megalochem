@@ -36,7 +36,7 @@ public:
 
 	aofactory(desc::smolecule mol, dbcsr::world& w);
 	~aofactory();
-		
+	
 	dbcsr::shared_matrix<double> ao_overlap();
 	dbcsr::shared_matrix<double> ao_kinetic();
 	dbcsr::shared_matrix<double> ao_nuclear();

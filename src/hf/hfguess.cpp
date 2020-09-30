@@ -112,7 +112,7 @@ void hfmod::compute_guess() {
 		//	std::cout << a.atomic_number << std::endl;
 		//}
 		
-		auto are_oncentre = [&](desc::Atom& atom, libint2::Shell& shell) {
+		auto are_oncentre = [&](desc::Atom& atom, desc::Shell& shell) {
 			double lim = std::numeric_limits<double>::epsilon();
 			if ( fabs(atom.x - shell.O[0]) < lim &&
 				 fabs(atom.y - shell.O[1]) < lim &&
@@ -196,11 +196,13 @@ void hfmod::compute_guess() {
 			
 			std::vector<desc::Atom> atvec = {atom};
 			
-			std::vector<libint2::Shell> at_libint_basis, at_libint_dfbasis;
+			std::vector<desc::Shell> at_libint_basis;
 			
 			// find basis functions
-			for (auto shell : m_mol->c_basis()->libint_basis()) {
-				if (are_oncentre(atom, shell)) at_libint_basis.push_back(shell);
+			for (auto& c : *m_mol->c_basis()) {
+				for (auto& s : c) {
+					if (are_oncentre(atom, s)) at_libint_basis.push_back(s);
+				}
 			}
 			
 			desc::shared_cluster_basis at_basis = std::make_shared<desc::cluster_basis>(
@@ -210,9 +212,12 @@ void hfmod::compute_guess() {
 			
 			if (m_mol->c_dfbasis()) {
 				//std::cout << "INSIDE HERE." << std::endl;
-				std::vector<libint2::Shell> at_libint_dfbasis;
-				for (auto shell : m_mol->c_dfbasis()->libint_basis()) {
-					if (are_oncentre(atom, shell)) at_libint_dfbasis.push_back(shell);
+				std::vector<desc::Shell> at_libint_dfbasis;
+				
+				for (auto& c : *m_mol->c_dfbasis()) {
+					for (auto& s : c) {
+						if (are_oncentre(atom, s)) at_libint_dfbasis.push_back(s);
+					}
 				}
 				
 				at_dfbasis = std::make_shared<desc::cluster_basis>(
