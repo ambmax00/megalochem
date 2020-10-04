@@ -41,29 +41,24 @@ public:
 	dbcsr::shared_matrix<double> ao_kinetic();
 	dbcsr::shared_matrix<double> ao_nuclear();
 	
-	dbcsr::shared_matrix<double> ao_3coverlap(std::string metric);
+	dbcsr::shared_matrix<double> ao_2c2e(std::string metric);
+	dbcsr::shared_matrix<double> ao_auxoverlap();
 	
-	dbcsr::shared_matrix<double> ao_schwarz(std::string metric);
-	dbcsr::shared_matrix<double> ao_3cschwarz(std::string metric);
+	dbcsr::shared_matrix<double> ao_schwarz();
+	dbcsr::shared_matrix<double> ao_3cschwarz();
 	
 	void ao_3c2e_setup(std::string metric);
-	
+
 	void ao_eri_setup(std::string metric);
 	
-	dbcsr::shared_tensor<3,double> ao_3c2e_setup_tensor(
-		dbcsr::shared_pgrid<3> spgrid, vec<int> map1, vec<int> map2);
-		
-	dbcsr::shared_tensor<4,double> ao_eri_setup_tensor(
-		dbcsr::shared_pgrid<4> spgrid, vec<int> map1, vec<int> map2);
-	
 	void ao_3c2e_fill(dbcsr::shared_tensor<3,double>& t_in, vec<vec<int>>& blkbounds, 
-		std::shared_ptr<screener> scr, bool sym = false);
-		
-	void ao_3c2e_fill(dbcsr::shared_tensor<3,double>& t_in, arrvec<int,3>& idx, 
+		std::shared_ptr<screener> scr);
+	
+	void ao_3c2e_fill_idx(dbcsr::shared_tensor<3,double>& t_in, arrvec<int,3>& idx, 
 		std::shared_ptr<screener> scr);
 		
 	void ao_eri_fill(dbcsr::shared_tensor<4,double>& t_in, vec<vec<int>>& blkbounds, 
-		std::shared_ptr<screener> scr, bool sym = false);
+		std::shared_ptr<screener> scr);
 		
 	std::function<void(dbcsr::shared_tensor<3,double>&,vec<vec<int>>&)>
 	get_generator(std::shared_ptr<screener> s_scr);

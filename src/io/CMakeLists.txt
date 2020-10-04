@@ -13,7 +13,6 @@ target_include_directories(chem_io
 )
 
 target_link_libraries(chem_io 
-	Libint2::cxx
 	chem_desc
 	chem_dbcsrx
 	Eigen3::Eigen

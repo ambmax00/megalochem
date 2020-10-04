@@ -502,7 +502,7 @@ void BATCHED_DFAO_K::compute_K() {
 		LOG.os<1>("Computing exchange part (", x, ")\n");
 		
 		dbcsr::copy_matrix_to_tensor(*p_bb, *m_p_bb);
-			
+				
 		//dbcsr::print(*c_bm);
 		//dbcsr::print(*m_c_bm);	
 		

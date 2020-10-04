@@ -11,7 +11,7 @@
 #include "utils/mpi_time.h"
 
 namespace ints {
-	
+
 class dfitting {
 private:
 

@@ -4,6 +4,8 @@
 #:include "dbcsr.fypp"
 #include <dbcsr_common.hpp>
 
+#include <iomanip>
+
 namespace dbcsr {
 
 class dist {
@@ -802,6 +804,8 @@ void print(matrix<T>& mat) {
 	world w = mat.get_world();
 	
 	iterator<T> iter(mat);
+	
+	//std::cout << std::scientific << std::setprecision(12);
 	
 	iter.start();
 	

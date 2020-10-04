@@ -20,6 +20,11 @@ void orthogonalizer::compute() {
 	auto eigvecs = solver.eigvecs();
 	auto eigvals = solver.eigvals();
 	
+	/*std::cout << "EIGVALS: " << std::endl;
+	for (auto d : eigvals) {
+		std::cout << d << std::endl;
+	}*/
+	
 	std::for_each(eigvals.begin(),eigvals.end(),[](double& d) { d = (d < threshold) ? 0 : 1/sqrt(d); });
 	
 	auto eigvec_copy = dbcsr::copy<double>(eigvecs).get();

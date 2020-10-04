@@ -13,18 +13,33 @@ set(SOURCES
 
 add_library(chem_ints ${SOURCES})
 
-target_include_directories(
-	chem_ints
-	PUBLIC
-	${LIBINT2_INCLUDE_DIRS}
-)
+if (${USE_LIBCINT})
+	target_compile_definitions(chem_ints PUBLIC USE_LIBCINT)
+	target_include_directories(
+		chem_ints
+		PUBLIC
+		${LIBCINT_INCLUDE_DIRS}
+	)
+	target_link_libraries(
+		chem_ints
+		${LIBCINT_LIBRARIES}
+        	chem_desc
+	        chem_dbcsrx
+	        OpenMP::OpenMP_CXX
+	)
+else()
+	target_compile_definitions(chem_ints PUBLIC USE_LIBINT)
+	target_include_directories(
+                chem_ints
+                PUBLIC
+                ${LIBINT2_INCLUDE_DIRS}
+        )
+        target_link_libraries(
+                chem_ints
+		Libint2::cxx
+	        chem_desc
+	        chem_dbcsrx
+	        OpenMP::OpenMP_CXX
+        )
+endif()
 
-target_link_libraries(
-	chem_ints
-	chem_desc
-	chem_dbcsrx
-	#chem_math_linalg
-	OpenMP::OpenMP_CXX
-	Libint2::cxx
-	${LAPACK_LIBRARIES}
-)

@@ -15,8 +15,8 @@ void schwarz_screener::compute() {
 	
 	m_metric = "coulomb";
 	
-	auto z_mn_dist = p_fac->ao_schwarz(m_metric);
-	auto z_x_dist = p_fac->ao_3cschwarz(m_metric);
+	auto z_mn_dist = p_fac->ao_schwarz();
+	auto z_x_dist = p_fac->ao_3cschwarz();
 	
 	//dbcsr::print(*z_mn_dist);
 	//dbcsr::print(*z_x_dist); 

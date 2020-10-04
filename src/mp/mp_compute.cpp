@@ -131,7 +131,12 @@ void mpmod::compute_batch() {
 	scrtime.finish();
 	
 	aofac->ao_3c2e_setup("erfc_coulomb");
-	auto B_xbb = aofac->ao_3c2e_setup_tensor(spgrid3_xbb, vec<int>{0}, vec<int>{1,2});
+	auto B_xbb = dbcsr::tensor_create<3,double>()
+		.name("i_xbb")
+		.pgrid(spgrid3_xbb)
+		.blk_sizes(xbb)
+		.map1({0}).map2({1,2})
+		.get();
 		
 	dbcsr::btype eri_type = dbcsr::get_btype(eri_method);
 	dbcsr::btype intermed_type = dbcsr::get_btype(intermed_method);
@@ -192,8 +197,8 @@ void mpmod::compute_batch() {
 	
 	invtime.start();
 	
-	auto C_xx = aofac->ao_3coverlap("coulomb");
-	auto S_erfc_xx = aofac->ao_3coverlap("erfc_coulomb");
+	auto C_xx = aofac->ao_2c2e("coulomb");
+	auto S_erfc_xx = aofac->ao_2c2e("erfc_coulomb");
 	
 	// Ctilde = (S C-1 S)-1
 	

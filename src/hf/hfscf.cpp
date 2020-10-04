@@ -263,7 +263,6 @@ void hfmod::compute() {
 	
 	compute_nucrep();
 	
-	
 	// Now enter loop
 	int iter = 0;
 	bool converged = false;
@@ -309,7 +308,7 @@ void hfmod::compute() {
 		double prod = m->dot(*m);
 		return sqrt(prod/(nbas*nbas));
 	};
-
+		
 	while (true) {
 		
 		// form fock matrix
@@ -318,7 +317,7 @@ void hfmod::compute() {
 		int rank = ((iter == 0) && (m_guess == "SAD" || m_guess == "SADNO")) ? m_SAD_rank : 0;
 		
 		fbuilder.compute(SAD_iter,rank);
-				
+						
 		m_f_bb_A = fbuilder.get_f_A();
 		m_f_bb_B = fbuilder.get_f_B();
 		

@@ -964,7 +964,7 @@ public:
 		}
 		
 		m_work_tensor->batched_contract_init();
-		std::cout << "NATCHED." << std::endl;
+		//std::cout << "NATCHED." << std::endl;
 		
 	}
 	

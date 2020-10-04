@@ -219,7 +219,8 @@ private:
 	
 	dbcsr::shared_tensor<2,double> m_K_01;
 	dbcsr::shared_tensor<2,double> m_p_bb;
-	dbcsr::shared_tensor<2,double> m_s_xx;
+	dbcsr::shared_tensor<2,double> m_s_xx_01;
+	dbcsr::shared_matrix<double> m_s_xx;
 	
 	dbcsr::shared_pgrid<2> m_spgrid2;
 	dbcsr::shared_pgrid<3> m_spgrid3_xbb;

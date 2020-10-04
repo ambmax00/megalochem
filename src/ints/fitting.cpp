@@ -5,7 +5,7 @@
 #include <Eigen/SVD>
 
 namespace ints {
-	
+
 dbcsr::sbtensor<3,double> dfitting::compute(dbcsr::sbtensor<3,double> eri_batched, 
 	dbcsr::shared_matrix<double> inv, std::string cfit_btype) {
 		
@@ -398,7 +398,7 @@ dbcsr::shared_tensor<3,double> dfitting::compute_pari(dbcsr::sbtensor<3,double> 
 			
 			arrvec<int,3> blks = {xab_idx, ma_idx, nb_idx};
 			
-			aofac->ao_3c2e_fill(eri_self, blks, scr_s);	
+			aofac->ao_3c2e_fill_idx(eri_self, blks, scr_s);	
 			
 			eri_self->filter(dbcsr::global::filter_eps);
 			

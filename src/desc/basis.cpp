@@ -208,7 +208,7 @@ cluster_basis::cluster_basis(std::string basname, std::vector<desc::Atom>& atoms
 					s.alpha = shell_alpha;
 					s.coeff = shell_coeff;
 					
-					std::cout << s << std::endl;
+					//std::cout << s << std::endl;
 					
 					basis.push_back(s);
 					
@@ -229,16 +229,11 @@ cluster_basis::cluster_basis(std::string basname, std::vector<desc::Atom>& atoms
 					
 					basis.push_back(s);
 					
-					std::cout << s << std::endl;
+					//std::cout << s << std::endl;
 					
 				}
 			}
 		}
-	}
-	
-	for (auto& s : basis) {
-		s.normalize();
-		std::cout << s << std::endl;
 	}
 	
 	*this = cluster_basis(basis, method, nsplit);

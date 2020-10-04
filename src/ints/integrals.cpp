@@ -8,6 +8,7 @@
 
 namespace ints {
 
+#ifdef USE_LIBINT
 void calc_ints(dbcsr::mat_d& m_out, util::ShrPool<libint2::Engine>& engine,
 	cluster_vec& basvec) {
 
@@ -58,9 +59,9 @@ void calc_ints(dbcsr::mat_d& m_out, util::ShrPool<libint2::Engine>& engine,
 					//std::cout << "Local offsets: " << locblkoff1 << " " << locblkoff2 << std::endl;
 					//std::cout << "MULT: " << multiplicity(toff1,toff2) << std::endl;
 					
-					std::cout << "Shells: " << std::endl;
-					std::cout << sh1 << std::endl;
-					std::cout << sh2 << std::endl;	
+					//std::cout << "Shells: " << std::endl;
+					//std::cout << sh1 << std::endl;
+					//std::cout << sh2 << std::endl;	
 					//if (is_canonical(toff1,toff2)) {
 						
 						//int sfac = multiplicity(toff1,toff2);
@@ -625,5 +626,641 @@ void calc_ints_schwarz_x(dbcsr::mat_d& m_out, util::ShrPool<libint2::Engine>& en
 		
 	//std::cout << "Done reading." << std::endl;
 }
+#endif
+
+#ifdef USE_LIBCINT
+
+// =====================================================================
+//                       LIBCINT
+// =====================================================================
+
+void calc_ints(dbcsr::mat_d& m_out, std::vector<std::vector<int>*> shell_offsets, 
+		std::vector<std::vector<int>*> nshells, CINTIntegralFunction& int_func,
+		FINT *atm, FINT natm, FINT* bas, FINT nbas, double* env) 
+{
+	
+	//std::cout << "NATOMS/NBAS: " << natm << " " << nbas << std::endl;
+	
+	auto my_world = m_out.get_world();
+	
+	auto& nshells0 = *nshells[0];
+	auto& nshells1 = *nshells[1];
+	auto& shell_offsets0 = *shell_offsets[0];
+	auto& shell_offsets1 = *shell_offsets[1]; 
+	
+	#pragma omp parallel 
+	{	
+		
+		dbcsr::iterator iter(m_out);
+		
+		iter.start();
+		
+		while (iter.blocks_left()) {	
+			
+			iter.next_block();		
+			
+			int r = iter.row();
+			int c = iter.col();
+			
+			//std::cout << "BLOCK: " << r << " " << c << std::endl;
+			
+			//block lower bounds
+			int lb0 = iter.row_offset();
+			int lb1 = iter.col_offset();
+			
+			// tensor offsets
+			int toff0 = lb0;
+			int toff1 = lb1;
+			// local Block offsets
+			int locblkoff0 = 0;
+			int locblkoff1 = 0;
+			
+			int soff0 = shell_offsets0[r];
+			int soff1 = shell_offsets1[c];
+			int nshell0 = nshells0[r];
+			int nshell1 = nshells1[c];
+			
+			double* buf;
+			int* shls = new int[2];
+			
+			//std::cout << "soffs: " << soff0 << " " << soff1 << std::endl;
+			//std::cout << "nshells: " << nshell0 << " " << nshell1 << std::endl;
+			
+			for (int s0 = soff0; s0 != soff0+nshell0; ++s0) {
+							
+				toff0 += locblkoff0;
+				int shellsize0 = CINTcgto_spheric(s0,bas);
+				shls[0] = s0;
+					
+				for (int s1 = soff1; s1 != soff1+nshell1; ++s1) {
+					
+					toff1 += locblkoff1;
+					int shellsize1 = CINTcgto_spheric(s1,bas);
+					shls[1] = s1;
+					
+					//std::cout << "PROCESSING SHELL: " << s0 << " " << s1 << std::endl;
+					
+					buf = new double[shellsize0*shellsize1];
+					int res = int_func(buf, shls, atm, natm, bas, nbas, env, nullptr);
+											
+					if (res != 0) {
+						int idx = 0;
+					
+						for (int j = 0; j != shellsize1; ++j) {
+							for (int i = 0; i != shellsize0; ++i) {
+								//std::cout << buf[idx] << " ";
+								iter(i + locblkoff0, j + locblkoff1) = buf[idx++];
+						}}// std::cout << std::endl;
+					}
+					
+					locblkoff1 += shellsize1;						
+				}//endfor s2
+				
+				toff1 = lb1;
+				locblkoff1 = 0;
+				locblkoff0 += shellsize0;
+			}//endfor s1
+			
+			delete [] buf;
+			delete [] shls;
+						
+		}//end BLOCK LOOP
+		
+		iter.stop();
+		m_out.finalize();
+		
+	}//end parallel omp	
+	
+}
+
+void calc_ints(dbcsr::tensor<3,double>& m_out, std::vector<std::vector<int>*> shell_offsets, 
+		std::vector<std::vector<int>*> nshells, CINTIntegralFunction& int_func,
+		FINT *atm, FINT natm, FINT* bas, FINT nbas, double* env)
+{
+	
+	auto& nshells0 = *nshells[0];
+	auto& nshells1 = *nshells[1];
+	auto& nshells2 = *nshells[2];
+	auto& shell_offsets0 = *shell_offsets[0];
+	auto& shell_offsets1 = *shell_offsets[1];
+	auto& shell_offsets2 = *shell_offsets[2];
+	
+	#pragma omp parallel 
+	{	
+		
+		dbcsr::iterator_t<3> iter(m_out);
+		
+		iter.start();
+		
+		while (iter.blocks_left()) {	
+			
+			iter.next();	
+			
+			auto& idx = iter.idx();
+			auto& size = iter.size();
+			auto& off = iter.offset();	
+			
+			//std::cout << "BLOCK: " << idx[0] << " " << idx[1] << " " << idx[2] << std::endl;
+			
+			//block lower bounds
+			int lb0 = off[0];
+			int lb1 = off[1];
+			int lb2 = off[2];
+			
+			// tensor offsets
+			int toff0 = lb0;
+			int toff1 = lb1;
+			int toff2 = lb2;
+			// local Block offsets
+			int locblkoff0 = 0;
+			int locblkoff1 = 0;
+			int locblkoff2 = 0;
+			
+			int& soff0 = shell_offsets0[idx[0]];
+			int& soff1 = shell_offsets1[idx[1]];
+			int& soff2 = shell_offsets2[idx[2]];
+			int& nshell0 = nshells0[idx[0]];
+			int& nshell1 = nshells1[idx[1]];
+			int& nshell2 = nshells2[idx[2]];
+			
+			double* buf;
+			int* shls = new int[4];
+			shls[1] = 0;
+			
+			//std::cout << "soffs: " << soff0 << " " << soff1 << std::endl;
+			//std::cout << "nshells: " << nshell0 << " " << nshell1 << std::endl;
+			
+			dbcsr::block<3,double> blk(size);
+			
+			for (int s0 = soff0; s0 != soff0+nshell0; ++s0) {
+							
+				toff0 += locblkoff0;
+				int shellsize0 = CINTcgto_spheric(s0,bas);
+				shls[0] = s0;
+					
+				for (int s1 = soff1; s1 != soff1+nshell1; ++s1) {
+					
+					toff1 += locblkoff1;
+					int shellsize1 = CINTcgto_spheric(s1,bas);
+					shls[2] = s1;
+					
+					for (int s2 = soff2; s2 != soff2+nshell2; ++s2) {
+						
+						toff2 += locblkoff2;
+						int shellsize2 = CINTcgto_spheric(s2,bas);
+						shls[3] = s2;
+					
+						//std::cout << "PROCESSING SHELL: " << s0 << " " << s1 << " " << s2 << std::endl;
+						//std::cout << "EXPOS: " << bas(PTR_EXP,s0) << " " << bas(PTR_EXP,0) <<  " " << bas(PTR_EXP,s1) 
+						//	<<  " " << bas(PTR_EXP,s2) << std::endl;
+						
+						buf = new double[shellsize0*shellsize1*shellsize2];
+						int res = int_func(buf, shls, atm, natm, bas, nbas, env, nullptr);
+												
+						if (res != 0) {
+							int idx = 0;
+						
+						for (int k = 0; k != shellsize2; ++k) {
+							for (int j = 0; j != shellsize1; ++j) {
+								for (int i = 0; i != shellsize0; ++i) {
+
+										//std::cout << buf[idx] << " ";
+										blk(i + locblkoff0, j + locblkoff1, k + locblkoff2) = buf[idx++];
+							
+							}}}// std::cout << std::endl;
+						}
+						
+						locblkoff2 += shellsize2;
+						
+					} // endfor s2
+					
+					toff2 = lb2;
+					locblkoff2 = 0;
+					locblkoff1 += shellsize1;						
+				}//endfor s1
+				
+				toff1 = lb1;
+				locblkoff1 = 0;
+				locblkoff0 += shellsize0;
+			}//endfor s0
+			
+			delete [] buf;
+			delete [] shls;
+			
+			m_out.put_block(idx, blk);
+						
+		}//end BLOCK LOOP
+		
+		iter.stop();
+		m_out.finalize();
+		
+	}//end parallel omp	
+	
+}
+
+void calc_ints(dbcsr::tensor<4,double>& m_out, std::vector<std::vector<int>*> shell_offsets, 
+		std::vector<std::vector<int>*> nshells, CINTIntegralFunction& int_func,
+		FINT *atm, FINT natm, FINT* bas, FINT nbas, double* env)
+{
+	const auto& nshells0 = *nshells[0];
+	const auto& nshells1 = *nshells[1];
+	const auto& nshells2 = *nshells[2];
+	const auto& nshells3 = *nshells[3];
+	const auto& shell_offsets0 = *shell_offsets[0];
+	const auto& shell_offsets1 = *shell_offsets[1];
+	const auto& shell_offsets2 = *shell_offsets[2];
+	const auto& shell_offsets3 = *shell_offsets[3];
+	
+	#pragma omp parallel 
+	{	
+		
+		dbcsr::iterator_t<4> iter(m_out);
+		
+		iter.start();
+		
+		while (iter.blocks_left()) {	
+			
+			iter.next();	
+			
+			auto& idx = iter.idx();
+			auto& size = iter.size();
+			auto& off = iter.offset();	
+						
+			//block lower bounds
+			const int lb0 = off[0];
+			const int lb1 = off[1];
+			const int lb2 = off[2];
+			const int lb3 = off[3];
+			
+			// tensor offsets
+			int toff0 = lb0;
+			int toff1 = lb1;
+			int toff2 = lb2;
+			int toff3 = lb3;
+			// local Block offsets
+			int locblkoff0 = 0;
+			int locblkoff1 = 0;
+			int locblkoff2 = 0;
+			int locblkoff3 = 0;
+			
+			const int& soff0 = shell_offsets0[idx[0]];
+			const int& soff1 = shell_offsets1[idx[1]];
+			const int& soff2 = shell_offsets2[idx[2]];
+			const int& soff3 = shell_offsets3[idx[3]];
+			const int& nshell0 = nshells0[idx[0]];
+			const int& nshell1 = nshells1[idx[1]];
+			const int& nshell2 = nshells2[idx[2]];
+			const int& nshell3 = nshells3[idx[3]];
+			
+			double* buf;
+			int* shls = new int[4];
+			
+			dbcsr::block<4,double> blk(size);
+			
+			for (int s0 = soff0; s0 != soff0+nshell0; ++s0) {
+							
+				toff0 += locblkoff0;
+				int shellsize0 = CINTcgto_spheric(s0,bas);
+				shls[0] = s0;
+					
+				for (int s1 = soff1; s1 != soff1+nshell1; ++s1) {
+					
+					toff1 += locblkoff1;
+					const int shellsize1 = CINTcgto_spheric(s1,bas);
+					shls[1] = s1;
+					
+					for (int s2 = soff2; s2 != soff2+nshell2; ++s2) {
+						
+						toff2 += locblkoff2;
+						const int shellsize2 = CINTcgto_spheric(s2,bas);
+						shls[2] = s2;
+					
+						for (int s3 = soff3; s3 != soff3+nshell3; ++s3) {
+						
+							toff3 += locblkoff3;
+							const int shellsize3 = CINTcgto_spheric(s3,bas);
+							shls[3] = s3;
+					
+							buf = new double[shellsize0*shellsize1*shellsize2*shellsize3];
+							int res = int_func(buf, shls, atm, natm, bas, nbas, env, nullptr);
+												
+							if (res != 0) {
+								int idx = 0;
+							
+								for (int l = 0; l != shellsize3; ++l) {
+									for (int k = 0; k != shellsize2; ++k) {
+										for (int j = 0; j != shellsize1; ++j) {
+											for (int i = 0; i != shellsize0; ++i) {
+																								
+											blk(i + locblkoff0, j + locblkoff1, k + locblkoff2,
+												l + locblkoff3) = buf[idx++];
+								}}}}	
+								
+							}
+							
+							locblkoff3 += shellsize3;
+							
+						} // endfor s3					
+						
+						toff3 = lb3;
+						locblkoff3 = 0;
+						locblkoff2 += shellsize2;
+						
+					} // endfor s2
+					
+					toff2 = lb2;
+					locblkoff2 = 0;
+					locblkoff1 += shellsize1;						
+				}//endfor s1
+				
+				toff1 = lb1;
+				locblkoff1 = 0;
+				locblkoff0 += shellsize0;
+			}//endfor s0
+			
+			delete [] buf;
+			delete [] shls;
+			
+			m_out.put_block(idx, blk);
+						
+		}//end BLOCK LOOP
+		
+		iter.stop();
+		m_out.finalize();
+		
+	}//end parallel omp	
+	
+}
+
+void calc_ints_xx(dbcsr::mat_d& m_out, std::vector<std::vector<int>*> shell_offsets, 
+		std::vector<std::vector<int>*> nshells, CINTIntegralFunction& int_func,
+		FINT *atm, FINT natm, FINT* bas, FINT nbas, double* env) 
+{
+		
+	auto my_world = m_out.get_world();
+	
+	auto& nshells0 = *nshells[0];
+	auto& nshells1 = *nshells[1];
+	auto& shell_offsets0 = *shell_offsets[0];
+	auto& shell_offsets1 = *shell_offsets[1]; 
+	
+	#pragma omp parallel 
+	{	
+		
+		dbcsr::iterator iter(m_out);
+		
+		iter.start();
+		
+		while (iter.blocks_left()) {	
+			
+			iter.next_block();		
+			
+			int r = iter.row();
+			int c = iter.col();
+						
+			//block lower bounds
+			int lb0 = iter.row_offset();
+			int lb1 = iter.col_offset();
+			
+			// tensor offsets
+			int toff0 = lb0;
+			int toff1 = lb1;
+			// local Block offsets
+			int locblkoff0 = 0;
+			int locblkoff1 = 0;
+			
+			int soff0 = shell_offsets0[r];
+			int soff1 = shell_offsets1[c];
+			int nshell0 = nshells0[r];
+			int nshell1 = nshells1[c];
+			
+			double* buf;
+			int* shls = new int[4];
+			shls[1] = 0;
+			shls[3] = 0;
+			
+			for (int s0 = soff0; s0 != soff0+nshell0; ++s0) {
+							
+				toff0 += locblkoff0;
+				int shellsize0 = CINTcgto_spheric(s0,bas);
+				shls[0] = s0;
+					
+				for (int s1 = soff1; s1 != soff1+nshell1; ++s1) {
+					
+					toff1 += locblkoff1;
+					int shellsize1 = CINTcgto_spheric(s1,bas);
+					shls[2] = s1;
+										
+					buf = new double[shellsize0*shellsize1];
+					int res = int_func(buf, shls, atm, natm, bas, nbas, env, nullptr);
+											
+					if (res != 0) {
+						int idx = 0;
+					
+						for (int j = 0; j != shellsize1; ++j) {
+							for (int i = 0; i != shellsize0; ++i) {
+								//std::cout << buf[idx] << " ";
+								iter(i + locblkoff0, j + locblkoff1) = buf[idx++];
+						}}// std::cout << std::endl;
+					}
+					
+					locblkoff1 += shellsize1;						
+				}//endfor s2
+				
+				toff1 = lb1;
+				locblkoff1 = 0;
+				locblkoff0 += shellsize0;
+			}//endfor s1
+			
+			delete [] buf;
+			delete [] shls;
+						
+		}//end BLOCK LOOP
+		
+		iter.stop();
+		m_out.finalize();
+		
+	}//end parallel omp	
+	
+}
+
+void calc_ints_schwarz_mn(dbcsr::mat_d& m_out, std::vector<std::vector<int>*> shell_offsets, 
+		std::vector<std::vector<int>*> nshells, CINTIntegralFunction& int_func,
+		FINT *atm, FINT natm, FINT* bas, FINT nbas, double* env) 
+{
+		
+	auto& nshells0 = *nshells[0];
+	auto& nshells1 = *nshells[1];
+	auto& shell_offsets0 = *shell_offsets[0];
+	auto& shell_offsets1 = *shell_offsets[1]; 
+	
+	#pragma omp parallel 
+	{	
+		
+		dbcsr::iterator iter(m_out);
+		
+		iter.start();
+		
+		while (iter.blocks_left()) {	
+			
+			iter.next_block();		
+			
+			int r = iter.row();
+			int c = iter.col();
+			
+			//std::cout << "BLOCK: " << r << " " << c << std::endl;
+			
+			//block lower bounds
+			int lb0 = iter.row_offset();
+			int lb1 = iter.col_offset();
+			
+			// tensor offsets
+			int toff0 = lb0;
+			int toff1 = lb1;
+			// local Block offsets
+			int locblkoff0 = 0;
+			int locblkoff1 = 0;
+			
+			int soff0 = shell_offsets0[r];
+			int soff1 = shell_offsets1[c];
+			int nshell0 = nshells0[r];
+			int nshell1 = nshells1[c];
+			
+			double* buf;
+			int* shls = new int[4];
+			
+			//std::cout << "nshells: " << nshell0 << " " << nshell1 << std::endl;
+			
+			int s0_idx = 0;
+			for (int s0 = soff0; s0 != soff0+nshell0; ++s0) {
+							
+				toff0 += locblkoff0;
+				int shellsize0 = CINTcgto_spheric(s0,bas);
+				shls[0] = s0;
+				shls[2] = s0;
+				
+				int s1_idx = 0;
+				for (int s1 = soff1; s1 != soff1+nshell1; ++s1) {
+					
+					toff1 += locblkoff1;
+					int shellsize1 = CINTcgto_spheric(s1,bas);
+					shls[1] = s1;
+					shls[3] = s1;
+					
+					//std::cout << "PROCESSING SHELL: " << s0 << " " << s1 << std::endl;
+					
+					buf = new double[shellsize0*shellsize1*shellsize0*shellsize1];
+					int res = int_func(buf, shls, atm, natm, bas, nbas, env, nullptr);
+					
+					double n = 0.0;
+							
+					if (res != 0) {
+						int idx = 0;
+					
+						for (int i = 0; i != shellsize0; ++i) {
+							for (int j = 0; j != shellsize1; ++j) {
+								n += fabs(buf[i + j * shellsize0 + i * shellsize0 * shellsize1
+									+ j * shellsize0 * shellsize1 * shellsize0]);
+						}} //std::cout << std::endl;
+					}
+					
+					iter(s0_idx,s1_idx) = sqrt(n);
+					
+					locblkoff1 += shellsize1;	
+					++s1_idx;					
+				}//endfor s2
+				
+				toff1 = lb1;
+				locblkoff1 = 0;
+				locblkoff0 += shellsize0;
+				++s0_idx;
+			}//endfor s1
+			
+			delete [] buf;
+			delete [] shls;
+						
+		}//end BLOCK LOOP
+		
+		iter.stop();
+		m_out.finalize();
+		
+	}//end parallel omp	
+	
+}
+
+void calc_ints_schwarz_x(dbcsr::mat_d& m_out, std::vector<std::vector<int>*> shell_offsets, 
+		std::vector<std::vector<int>*> nshells, CINTIntegralFunction& int_func,
+		FINT *atm, FINT natm, FINT* bas, FINT nbas, double* env) 
+{
+		
+	auto& nshells0 = *nshells[0];
+	auto& shell_offsets0 = *shell_offsets[0];
+	
+	#pragma omp parallel 
+	{	
+		
+		dbcsr::iterator iter(m_out);
+		
+		iter.start();
+		
+		while (iter.blocks_left()) {	
+			
+			iter.next_block();		
+			
+			int r = iter.row();
+			
+			//std::cout << "BLOCK: " << r << std::endl;
+			
+			int soff0 = shell_offsets0[r];
+			int nshell0 = nshells0[r];
+			
+			double* buf;
+			int* shls = new int[4];
+			
+			//std::cout << "soffs: " << soff0 << std::endl;
+			//std::cout << "nshells: " << nshell0 << std::endl;
+			
+			int idx = 0;
+			for (int s0 = soff0; s0 != soff0+nshell0; ++s0) {
+							
+				int shellsize0 = CINTcgto_spheric(s0,bas);
+				shls[0] = s0;
+				shls[1] = 0;
+				shls[2] = s0;
+				shls[3] = 0;
+					
+				//std::cout << "PROCESSING SHELL: " << s0 << std::endl;
+				
+				buf = new double[shellsize0*shellsize0];
+				int res = int_func(buf, shls, atm, natm, bas, nbas, env, nullptr);
+				
+				double n = 0.0;
+						
+				if (res != 0) {
+					int idx = 0;
+				
+					for (int i = 0; i != shellsize0; ++i) {
+							n += fabs(buf[i + i * shellsize0]);
+					} //std::cout << std::endl;
+				}
+					
+				iter(idx++,0) = sqrt(n);
+					
+			}//endfor s1
+			
+			delete [] buf;
+			delete [] shls;
+						
+		}//end BLOCK LOOP
+		
+		iter.stop();
+		m_out.finalize();
+		
+	}//end parallel omp	
+	
+}
+
+			
+#endif
 
 }

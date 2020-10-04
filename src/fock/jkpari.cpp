@@ -16,7 +16,9 @@ void BATCHED_PARI_K::init() {
 	init_base();
 	
 	auto b = m_mol->dims().b();
+	auto x = m_mol->dims().x();
 	arrvec<int,2> bb = {b,b};
+	arrvec<int,2> xx = {x,x};
 	
 	m_eri_batched = m_reg.get_btensor<3,double>("i_xbb_batched");
 	
@@ -30,7 +32,13 @@ void BATCHED_PARI_K::init() {
 	m_p_bb = dbcsr::tensor_create_template<2,double>(m_K_01)
 			.name("p_bb_0_1").map1({0}).map2({1}).get();
 	
-	m_s_xx = m_reg.get_tensor<2,double>("s_xx");
+	m_s_xx = m_reg.get_matrix<double>("s_xx");
+	m_s_xx_01 = dbcsr::tensor_create<2>()
+		.name("s_xx_01")
+		.pgrid(m_spgrid2)
+		.map1({0}).map2({1})
+		.blk_sizes(xx)
+		.get();
 	
 }
 
@@ -88,6 +96,7 @@ void BATCHED_PARI_K::compute_K() {
 	time_reo_int1.finish();	
 	
 	dbcsr::copy_matrix_to_tensor(*m_p_A, *m_p_bb);
+	dbcsr::copy_matrix_to_tensor(*m_s_xx, *m_s_xx_01);
 	
 	// Loop ix
 	for (int ix = 0; ix != m_eri_batched->nbatches(0); ++ix) {
@@ -148,7 +157,7 @@ void BATCHED_PARI_K::compute_K() {
 			
 			LOG.os<1>("Forming ctil.\n");
 			time_form_ctil.start();
-			dbcsr::contract(*cfit_xbb_0_12, *m_s_xx, *ctil_xbb_0_12)
+			dbcsr::contract(*cfit_xbb_0_12, *m_s_xx_01, *ctil_xbb_0_12)
 				.bounds2(ns_bounds)
 				.bounds3(x_bounds)
 				.filter(dbcsr::global::filter_eps)
@@ -201,7 +210,8 @@ void BATCHED_PARI_K::compute_K() {
 	} // end loop x
 	
 	m_eri_batched->decompress_finalize();
-		
+	m_s_xx_01->clear();
+	
 	K2->scale(-0.5);	
 	
 	//dbcsr::print(*K1);

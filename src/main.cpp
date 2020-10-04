@@ -25,6 +25,8 @@ int main(int argc, char** argv) {
 	util::mpi_time time(MPI_COMM_WORLD, "Megalochem");
 	
 	util::mpi_log LOG(MPI_COMM_WORLD,0);
+	
+	//std::cout << std::scientific;
 
 #ifndef DO_TESTING
 	if (argc != 3) {
@@ -41,8 +43,16 @@ int main(int argc, char** argv) {
 					R"(| |  | || |___| |_\ \| | | || |___\ \_/ / \__/\| | | || |___| |  | |)""\n"
 					R"(\_|  |_/\____/ \____/\_| |_/\_____/\___/ \____/\_| |_/\____/\_|  |_/)";
 	
-	
 	LOG.banner(s,90,'*');
+	LOG.os<>('\n');
+	
+#ifndef NDEBUG
+	LOG.os<>("Build type: DEBUG\n\n");
+#else 
+	LOG.os<>("Build type: RELEASE\n\n");
+#endif
+
+	LOG.os<>("Authors: \n \t M. A. Ambroise\n\n");
 	
 	std::string filename(argv[1]);
 	std::string workdir(argv[2]);
@@ -80,6 +90,54 @@ int main(int argc, char** argv) {
 		opt.print();
 	}
 	
+	/*
+	auto atoms = mol->atoms();
+	auto xbas = std::make_shared<desc::cluster_basis>("cc-pvdz-ri", atoms, "atomic", 1);
+	mol->set_cluster_dfbasis(xbas);
+	
+	ints::aofactory aofac(mol,wrd);
+	auto s = aofac.ao_overlap();
+	auto t = aofac.ao_kinetic();
+	auto v = aofac.ao_nuclear();
+	
+	dbcsr::print(*s);
+	dbcsr::print(*t);
+	dbcsr::print(*v);
+	
+	auto grid3 = dbcsr::create_pgrid<3>(wrd.comm()).get();
+	
+	arrvec<int,3> xbb = {mol->dims().x(), mol->dims().b(), mol->dims().b()};
+	
+	auto ten = dbcsr::tensor_create<3>()
+		.name("3c")
+		.pgrid(grid3)
+		.blk_sizes(xbb)
+		.map1({0}).map2({1,2})
+		.get();
+		
+	vec<vec<int>> bds = {
+		vec<int>{0,2},
+		vec<int>{0,2},
+		vec<int>{0,2}
+	};
+
+	aofac.ao_3c2e_setup("coulomb");
+	aofac.ao_3c2e_fill(ten, bds, nullptr);
+	
+	//dbcsr::print(*ten);
+	
+	auto ov = aofac.ao_2c2e("coulomb");
+	
+	auto scr = aofac.ao_schwarz();
+	auto xscr = aofac.ao_3cschwarz();
+	
+	dbcsr::print(*ov);
+	dbcsr::print(*scr);
+	dbcsr::print(*xscr);
+	
+	exit(0);
+*/	
+
 	auto hfopt = opt.subtext("hf");
 	
 	hf::shared_hf_wfn myhfwfn = std::make_shared<hf::hf_wfn>();
@@ -103,7 +161,7 @@ int main(int argc, char** argv) {
 		LOG.os<>("Done.\n");
 		
 	}
-		
+	
 	MPI_Barrier(MPI_COMM_WORLD);
 	
 	auto mpopt = opt.subtext("mp");
@@ -172,7 +230,7 @@ int main(int argc, char** argv) {
 	
 	dbcsr::print_statistics(true);
 
-	dbcsr::finalize();
+	//dbcsr::finalize();
 
 	LOG.os<>("========== FINISHED WITHOUT CRASHING ! =========\n");
 

@@ -164,14 +164,14 @@ void fockmod::init() {
 		
 		if (metric == "coulomb") {
 		
-			auto out = aofac->ao_3coverlap("coulomb");
+			auto out = aofac->ao_2c2e("coulomb");
 			out->filter(dbcsr::global::filter_eps);
 			c_s_xx = out;
 			
 		} else {
 			
-			auto coul_metric = aofac->ao_3coverlap("coulomb");
-			auto other_metric = aofac->ao_3coverlap(metric);
+			auto coul_metric = aofac->ao_2c2e("coulomb");
+			auto other_metric = aofac->ao_2c2e("erfc_coulomb");
 			
 			math::hermitian_eigen_solver solver(coul_metric, 'V');
 			solver.compute();
@@ -191,6 +191,8 @@ void fockmod::init() {
 			c_s_xx = coul_metric;
 			
 		}
+		
+		//dbcsr::print(*c_s_xx);
 		
 		m_reg.insert_matrix<double>("s_xx", c_s_xx);
 		
@@ -438,9 +440,9 @@ void fockmod::compute(bool SAD_iter, int rank) {
 	t_j.start();
 	m_J_builder->compute_J();
 	t_j.finish();
-	
+		
 	LOG.os<1>("Computing exchange matrix.\n");
-	t_k.start();	
+	t_k.start();
 	m_K_builder->compute_K();
 	t_k.finish();
 	

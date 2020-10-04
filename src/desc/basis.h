@@ -47,46 +47,6 @@ struct Shell {
 		alpha = std::vector<double>{0.0};
 		return out;
 	}
-	
-	void normalize() {
-		
-        const auto sqrt_Pi_cubed = double{5.56832799683170784528481798212};
-        const auto np = nprim();
-        
-        assert(l <= 15); // due to df_Kminus1[] a 64-bit integer type; kinda ridiculous restriction anyway
-		
-		for (int p = 0; p != np; ++p) {
-		
-			assert(alpha[p] >= 0);
-			
-			if (alpha[p] != 0) {
-			  const auto two_alpha = 2 * alpha[p];
-			  const auto two_alpha_to_am32 = std::pow(two_alpha,l+1) * std::sqrt(two_alpha);
-			  const auto normalization_factor = std::sqrt(std::pow(2,l) * two_alpha_to_am32/(sqrt_Pi_cubed * df_Kminus1[2*l] ));
-
-			  coeff[p] *= normalization_factor;
-			}
-			
-		}
-
-		// need to force normalization to unity?
-		if (true) {
-			// compute the self-overlap of the , scale coefficients by its inverse square root
-			double norm{0};
-			for(int p = 0; p != np; ++p) {
-			  for(int q = 0; q<=p; ++q) {
-				auto gamma = alpha[p] + alpha[q];
-				norm += (p==q ? 1 : 2) * df_Kminus1[2*l] * sqrt_Pi_cubed * coeff[p] * coeff[q] /
-						(std::pow(2,l) * std::pow(gamma,l+1) * std::sqrt(gamma));
-			  }
-			}
-			auto normalization_factor = 1 / sqrt(norm);
-			for(int p = 0; p != np; ++p) {
-			  coeff[p] *= normalization_factor;
-			}
-		}
-
-	}
 
 };
 
@@ -128,6 +88,18 @@ inline size_t max_l(vshell bas) {
 		n = std::max(n, s.l);
 	}
 	return n;
+}
+
+inline int atom_of(Shell& s, std::vector<Atom>& atoms) {
+	for (int i = 0; i != atoms.size(); ++i) {
+		double dist = sqrt(pow(s.O[0] - atoms[i].x,2.0)
+			+ pow(s.O[1] - atoms[i].y,2.0)
+			+ pow(s.O[2] - atoms[i].z,2.0));
+		if (dist < std::numeric_limits<double>::epsilon()) {
+			return i;
+		}
+	}
+	return -1;
 }
 
 class cluster_basis {
@@ -194,6 +166,14 @@ public:
 	
 	size_t size() const {
 		return m_clusters.size();
+	}
+	
+	size_t nshells() {
+		size_t n = 0;
+		for (auto& c : m_clusters) {
+			n += c.size();
+		}
+		return n;
 	}
 	
 	std::vector<int> cluster_sizes() const;
