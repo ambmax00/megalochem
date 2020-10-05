@@ -141,6 +141,61 @@ public:
         
     }
     
+    arrvec<int,N3> get_index() {
+		
+		long long int nblkmax = c_dbcsr_t_max_nblks_local(c_t3.m_tensor_ptr);
+		int* indices = new int[nblkmax];
+		int nblkloc = 0;
+		
+		int* f_b1 = (c_bounds1) ? unfold_bounds<int>(*c_bounds1) : nullptr;
+        int* f_b2 = (c_bounds2) ? unfold_bounds<int>(*c_bounds2) : nullptr;
+        int* f_b3 = (c_bounds3) ? unfold_bounds<int>(*c_bounds3) : nullptr;
+        
+        int rank = -1;
+        MPI_Comm_rank(c_t1.comm(),&rank);
+        
+        int out = (rank == 0) ? 6 : -1;
+        int* unit_nr = (c_print) ? ((*c_print) ? &out : nullptr) : nullptr;  
+        
+        c_dbcsr_t_contract_r_dp(
+            (c_alpha) ? *c_alpha : 1,
+            c_t1.m_tensor_ptr, c_t2.m_tensor_ptr,
+            (c_beta) ? *c_beta : 0,
+            c_t3.m_tensor_ptr, 
+            c_con1->data(), c_con1->size(), 
+            c_ncon1->data(), c_ncon1->size(),
+            c_con2->data(), c_con2->size(),
+            c_ncon2->data(), c_ncon2->size(),
+            c_map1->data(), c_map1->size(),
+            c_map2->data(), c_map2->size(), 
+            f_b1, f_b2, f_b3,
+            (c_filter) ? &*c_filter : nullptr,
+            &nblkloc, indices, nblkmax, N3);
+            
+        if (f_b1) delete [] f_b1;
+        if (f_b2) delete [] f_b2;
+        if (f_b3) delete [] f_b3;
+        
+		arrvec<int,N3> idx_out;
+		
+		for (int i = 0; i != N3; ++i) {
+			idx_out[i] = vec<int>(nblkloc);
+			std::copy(indices + i*nblkmax, indices + i*nblkmax + nblkloc, idx_out[i].data());
+		}
+		
+		delete[] indices;
+		
+		return idx_out;
+		
+	}  
+	
+	arrvec<int,N3> get_index(std::string formula) {
+        
+        eval(formula);
+        return get_index();
+        
+    }
+    
     void eval(std::string str) {
         
         std::vector<std::string> idxs(4);

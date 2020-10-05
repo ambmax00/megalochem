@@ -1,4 +1,5 @@
 #include <mpi.h>
+#include <omp.h>
 #include <random>
 #include <stdexcept>
 #include <string>
@@ -70,6 +71,8 @@ int main(int argc, char** argv) {
 	dbcsr::init();
 	
 	dbcsr::world wrd(MPI_COMM_WORLD);
+	
+	LOG.os<>("Running ", wrd.size(), " MPI processes with ", omp_get_max_threads(), " threads each.\n\n");
 	
 	time.start();
 	

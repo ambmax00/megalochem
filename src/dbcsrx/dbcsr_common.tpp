@@ -179,6 +179,9 @@ template <int N, typename T>
 class tensor_create_template_base;
 
 template <typename T>
+class tensor_create_matrix_base;
+
+template <typename T>
 void copy_tensor_to_matrix(tensor<2,T>& t_in, matrix<T>& m_out, std::optional<bool> summation = std::nullopt);
 
 template <typename T>

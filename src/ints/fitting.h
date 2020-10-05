@@ -37,6 +37,8 @@ public:
 		
 	dbcsr::shared_tensor<3,double> compute_pari(dbcsr::sbtensor<3,double> eris,
 		dbcsr::shared_matrix<double> s_xx, shared_screener scr_s);
+		
+	//void compute_qr(dbcsr::sbtensor<3,double> eris, dbcsr::shared_matrix<double> s_xx);
 	
 	void print_info() { TIME.print_info(); }
 

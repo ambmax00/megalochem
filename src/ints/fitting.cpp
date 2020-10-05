@@ -1,6 +1,7 @@
 #include "ints/fitting.h"
 #include "ints/aofactory.h"
 #include "extern/lapack.h"
+#include "math/solvers/hermitian_eigen_solver.h"
 #include <Eigen/Core>
 #include <Eigen/SVD>
 
@@ -644,5 +645,82 @@ dbcsr::shared_tensor<3,double> dfitting::compute_pari(dbcsr::sbtensor<3,double> 
 	return c_xbb_dist;
 	
 }
+/*
+void dfitting::compute_qr(dbcsr::sbtensor<3,double> eri_batched, dbcsr::shared_matrix<double> s_xx)
+{
+	
+	// invert overlap
+	math::hermitian_eigen_solver herm(s_xx, 'V', LOG.global_plev());
+	herm.compute();
+	
+	auto s_xx_inv = herm.inverse();
+	
+	auto s_xx_inv_01 = dbcsr::tensor_create_matrix(s_xx_inv).get();
+	s_xx_inv->release();
+	
+	auto x = m_mol->dims().x();
+	auto b = m_mol->dims().b();
+	arrvec<int,2> xx = {x,x};
+	arrvec<int,3> xbb = {x,b,b};
+	
+	// self tensors
+	auto spgrid3_self = dbcsr::create_pgrid<3>(MPI_COMM_SELF).get();
+	auto spgrid2_slef = dbcsr::create_pgrid<2>(MPI_COMM_SELF).get();
+	
+	auto C_xbb_self = dbcsr::tensor_create()
+		.name("C_xbb_self")
+		.pgrid(spgrid3_self)
+		.blk_sizes(xbb)
+		.map1({0}).map2({1,2})
+		.get();
+		
+	auto M_xx_self = dbcsr::tensor_create()
+		.name("M_xx_self")
+		.pgrid(spgrid2_self)
+		.blk_sizes(xx)
+		.map1({0}).map2({1})
+		.get();
+	
+	//create a distribution where each process possesses the full range of X
+	
+	auto spgrid3_xbb = eri_batched->spgrid();
+		
+	auto dims = spgrid3_xbb->dims();
+	
+	for (auto p : dims) {
+		LOG.os<1>(p, " ");
+	} LOG.os<1>('\n');
+	
+	LOG.os<>("Grid size: ", m_world.nprow(), " ", m_world.npcol(), '\n');
+		
+	vec<int> d0(x.size(),0.0);
+	vec<int> d1(b.size());
+	vec<int> d2(b.size());
+	
+	for (int i = 0; i != d1.size(); ++i) {
+		d1[i] = i % dims[1];
+		d2[i] = i % dims[2];
+	}
+	
+	arrvec<int,3> distsizes = {d0,d1,d2};
+	
+	dbcsr::dist_t<3> dist_fullx(spgrid3_xbb, distsizes);
+	
+	auto Q_xbb_fullx = dbcsr::tensor_create<3>()
+		.name("Q_xbb_fullx")
+		.ndist(cdist)
+		.blk_sizes(xbb)
+		.map1({0}).map2({1,2})
+		.get();
+		
+	auto eri_fullx = dbcsr::tensor_create_template(Q_xbb_fullx)
+		.name("eri_fullx")
+		.get();
+		
+		
+	
+	// Compute Q_mnP = S_PR^-1 (R|mn)
+	
+}*/
 	
 } // end namespace

@@ -114,6 +114,9 @@ public:
     friend class matrix_copy_base;
     
     template <typename D>
+    friend class tensor_create_matrix_base;
+    
+    template <typename D>
     friend class multiply_base;
     
 	template <typename D>

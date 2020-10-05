@@ -3,6 +3,7 @@
 
 #:include "dbcsr.fypp"
 #include <dbcsr_common.hpp>
+#include <dbcsr_matrix.hpp>
 #include <dbcsr_tensor.h>
 
 namespace dbcsr {
@@ -206,6 +207,9 @@ public:
 	
 	template <int M, typename D>
 	friend class tensor_create_base;
+	
+	template <typename D>
+	friend class tensor_create_matrix_base;
 	
 	template <int M, typename D>
 	friend class tensor_create_template_base;
@@ -695,6 +699,49 @@ inline tensor_create_template_base<N,T>
 	tensor_create_template(shared_tensor<N,T> tensor_in) 
 {
 	return tensor_create_template_base<N,T>(tensor_in);
+}
+
+template <typename T>
+class tensor_create_matrix_base {
+	
+	 #:set list = [ &
+        ['name', 'std::string', 'optional', 'val'],&
+        ['order', 'vec<int>', 'optional', 'val']]
+	
+	${make_param(structname='tensor_create_matrix_base',params=list)}$
+
+private:
+
+	shared_matrix<T> c_matrix;
+	
+public:
+    
+    tensor_create_matrix_base(shared_matrix<T> mat) :
+		c_matrix(mat) {}
+    
+    shared_tensor<2,T> get() {
+   
+		shared_tensor<2,T> stensor_out 
+			= std::make_shared<tensor<2,T>>();
+        
+        stensor_out->m_comm = c_matrix->get_world().comm();
+		
+		c_dbcsr_t_create_matrix(
+			c_matrix->m_matrix_ptr, &stensor_out->m_tensor_ptr, 
+			(c_order) ? c_order->data() : nullptr, 
+			(c_name) ? c_name->c_str() : nullptr);
+            
+       return stensor_out;
+		
+	}
+	
+};    
+
+template <typename T = double>
+inline tensor_create_matrix_base<T> 
+	tensor_create_matrix(shared_matrix<T> mat_in) 
+{
+	return tensor_create_matrix_base<T>(mat_in);
 }
 
 template <int N, typename T>
