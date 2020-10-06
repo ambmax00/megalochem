@@ -92,26 +92,18 @@ void BATCHED_DF_J::compute_J() {
 	m_gp_xd->batched_contract_init();
 	m_ptot_bbd->batched_contract_init();
 		
-	std::cout << "HERE0" << std::endl;
-
 	reoint.start();
 	m_eri_batched->decompress_init({2}, vec<int>{0}, vec<int>{1,2});
 	reoint.finish();
-	
-	std::cout << "HERE1" << std::endl;
 	
 	int nbatches = m_eri_batched->nbatches(2);
 	
 	for (int inu = 0; inu != nbatches; ++inu) {
 			
-		std::cout << "HERE2" << std::endl;
-		
 		fetch1.start();
 		m_eri_batched->decompress({inu});
 		auto eri_0_12 = m_eri_batched->get_work_tensor();
 		fetch1.finish();
-		
-		std::cout << "HERE3" << std::endl;
 		
 		con1.start();
 		
