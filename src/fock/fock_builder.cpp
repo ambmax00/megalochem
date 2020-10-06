@@ -159,6 +159,7 @@ void fockmod::init() {
 	if (compute_s_xx) {
 		
 		auto& t_eri = TIME.sub("Metric");
+		LOG.os<1>("Computing metric...\n");
 		
 		t_eri.start();
 		
@@ -195,6 +196,7 @@ void fockmod::init() {
 		//dbcsr::print(*c_s_xx);
 		
 		m_reg.insert_matrix<double>("s_xx", c_s_xx);
+		LOG.os<1>("Finished computing metric.\n");
 		
 		t_eri.finish();
 		
@@ -246,6 +248,7 @@ void fockmod::init() {
 			
 		}
 		
+		LOG.os<1>("Done with inverting.\n");
 		t_inv.finish();
 		
 	}
@@ -253,6 +256,7 @@ void fockmod::init() {
 	if (compute_eris_batched) {
 		
 		auto& t_ints = TIME.sub("Computing eris");
+		LOG.os<1>("Computing 2e integrals.\n");
 		
 		t_ints.start();
 		
@@ -308,6 +312,7 @@ void fockmod::init() {
 		t_ints.finish();
 		
 		m_reg.insert_btensor<4,double>("i_bbbb_batched", eri_batched);
+		LOG.os<1>("Done computing 2e integrals.\n");
 		
 	}
 	
@@ -316,6 +321,7 @@ void fockmod::init() {
 	if (compute_3c2e_batched) {
 		
 		auto& t_screen = TIME.sub("3c2e screening");
+		LOG.os<1>("Computing 3c2e integrals.\n");
 		
 		LOG.os<1>("Computing screening.\n");
 		
@@ -392,10 +398,13 @@ void fockmod::init() {
 		m_reg.insert_btensor<3,double>("i_xbb_batched", eri_batched);
 		
 		LOG.os<1>("Occupation of 3c2e integrals: ", eri_batched->occupation() * 100, "%\n");
+		LOG.os<1>("Done computing 3c2e integrals.\n");
 		
 	}
 	
 	if (k_method == "batchdfao") {
+		
+		LOG.os<1>("Computing fitting coefficients.\n");
 		
 		auto eri_batched = m_reg.get_btensor<3,double>("i_xbb_batched");
 		auto inv = m_reg.get_matrix<double>("s_xx_inv");
@@ -407,6 +416,8 @@ void fockmod::init() {
 	}
 	
 	if (k_method == "batchpari") {
+		
+		LOG.os<1>("Computing fitting coefficients.\n");
 		
 		auto eri_batched = m_reg.get_btensor<3,double>("i_xbb_batched");
 		auto s_xx = m_reg.get_matrix<double>("s_xx");
