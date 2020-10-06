@@ -49,6 +49,36 @@
                             "1.0000000"
                         ]
                     ]
+                },
+                {
+                    "function_type": "gto",
+                    "region": "",
+                    "angular_momentum": [
+                        0
+                    ],
+                    "exponents": [
+                        "0.0297400"
+                    ],
+                    "coefficients": [
+                        [
+                            "1.0000000"
+                        ]
+                    ]
+                },
+                {
+                    "function_type": "gto",
+                    "region": "",
+                    "angular_momentum": [
+                        1
+                    ],
+                    "exponents": [
+                        "0.1410000"
+                    ],
+                    "coefficients": [
+                        [
+                            "1.0000000"
+                        ]
+                    ]
                 }
             ],
             "references": [
@@ -56,6 +86,12 @@
                     "reference_description": "The cc-pVDZ basis set",
                     "reference_keys": [
                         "dunning1989a"
+                    ]
+                },
+                {
+                    "reference_description": "Augmenting functions for cc-pVDZ",
+                    "reference_keys": [
+                        "kendall1992a"
                     ]
                 }
             ]
@@ -103,11 +139,47 @@
                             "1.0000000"
                         ]
                     ]
+                },
+                {
+                    "function_type": "gto",
+                    "region": "",
+                    "angular_momentum": [
+                        0
+                    ],
+                    "exponents": [
+                        "0.0725500"
+                    ],
+                    "coefficients": [
+                        [
+                            "1.0000000"
+                        ]
+                    ]
+                },
+                {
+                    "function_type": "gto",
+                    "region": "",
+                    "angular_momentum": [
+                        1
+                    ],
+                    "exponents": [
+                        "0.2473000"
+                    ],
+                    "coefficients": [
+                        [
+                            "1.0000000"
+                        ]
+                    ]
                 }
             ],
             "references": [
                 {
                     "reference_description": "The cc-pVDZ basis set",
+                    "reference_keys": [
+                        "woon1994a"
+                    ]
+                },
+                {
+                    "reference_description": "Augmenting functions for cc-pVDZ",
                     "reference_keys": [
                         "woon1994a"
                     ]
@@ -210,11 +282,62 @@
                             "1.0000000"
                         ]
                     ]
+                },
+                {
+                    "function_type": "gto",
+                    "region": "",
+                    "angular_momentum": [
+                        0
+                    ],
+                    "exponents": [
+                        "8.600000E-03"
+                    ],
+                    "coefficients": [
+                        [
+                            "1.000000E+00"
+                        ]
+                    ]
+                },
+                {
+                    "function_type": "gto",
+                    "region": "",
+                    "angular_momentum": [
+                        1
+                    ],
+                    "exponents": [
+                        "5.800000E-03"
+                    ],
+                    "coefficients": [
+                        [
+                            "1.000000E+00"
+                        ]
+                    ]
+                },
+                {
+                    "function_type": "gto_spherical",
+                    "region": "",
+                    "angular_momentum": [
+                        2
+                    ],
+                    "exponents": [
+                        "7.330000E-02"
+                    ],
+                    "coefficients": [
+                        [
+                            "1.000000E+00"
+                        ]
+                    ]
                 }
             ],
             "references": [
                 {
                     "reference_description": "Common functions for cc-pVDZ and similar",
+                    "reference_keys": [
+                        "prascher2011a"
+                    ]
+                },
+                {
+                    "reference_description": "Augmenting functions for cc-pVDZ",
                     "reference_keys": [
                         "prascher2011a"
                     ]
@@ -317,11 +440,62 @@
                             "1.0000000"
                         ]
                     ]
+                },
+                {
+                    "function_type": "gto",
+                    "region": "",
+                    "angular_momentum": [
+                        0
+                    ],
+                    "exponents": [
+                        "1.790000E-02"
+                    ],
+                    "coefficients": [
+                        [
+                            "1.000000E+00"
+                        ]
+                    ]
+                },
+                {
+                    "function_type": "gto",
+                    "region": "",
+                    "angular_momentum": [
+                        1
+                    ],
+                    "exponents": [
+                        "1.110000E-02"
+                    ],
+                    "coefficients": [
+                        [
+                            "1.000000E+00"
+                        ]
+                    ]
+                },
+                {
+                    "function_type": "gto_spherical",
+                    "region": "",
+                    "angular_momentum": [
+                        2
+                    ],
+                    "exponents": [
+                        "7.220000E-02"
+                    ],
+                    "coefficients": [
+                        [
+                            "1.000000E+00"
+                        ]
+                    ]
                 }
             ],
             "references": [
                 {
                     "reference_description": "Common functions for cc-pVDZ and similar",
+                    "reference_keys": [
+                        "prascher2011a"
+                    ]
+                },
+                {
+                    "reference_description": "Augmenting functions for cc-pVDZ",
                     "reference_keys": [
                         "prascher2011a"
                     ]
@@ -424,6 +598,51 @@
                             "1.0000000"
                         ]
                     ]
+                },
+                {
+                    "function_type": "gto",
+                    "region": "",
+                    "angular_momentum": [
+                        0
+                    ],
+                    "exponents": [
+                        "0.0310500"
+                    ],
+                    "coefficients": [
+                        [
+                            "1.0000000"
+                        ]
+                    ]
+                },
+                {
+                    "function_type": "gto",
+                    "region": "",
+                    "angular_momentum": [
+                        1
+                    ],
+                    "exponents": [
+                        "0.0237800"
+                    ],
+                    "coefficients": [
+                        [
+                            "1.0000000"
+                        ]
+                    ]
+                },
+                {
+                    "function_type": "gto_spherical",
+                    "region": "",
+                    "angular_momentum": [
+                        2
+                    ],
+                    "exponents": [
+                        "0.0904000"
+                    ],
+                    "coefficients": [
+                        [
+                            "1.0000000"
+                        ]
+                    ]
                 }
             ],
             "references": [
@@ -431,6 +650,12 @@
                     "reference_description": "The cc-pVDZ basis set",
                     "reference_keys": [
                         "dunning1989a"
+                    ]
+                },
+                {
+                    "reference_description": "Augmenting functions for cc-pVDZ",
+                    "reference_keys": [
+                        "kendall1992a"
                     ]
                 }
             ]
@@ -531,6 +756,51 @@
                             "1.0000000"
                         ]
                     ]
+                },
+                {
+                    "function_type": "gto",
+                    "region": "",
+                    "angular_momentum": [
+                        0
+                    ],
+                    "exponents": [
+                        "0.0469000"
+                    ],
+                    "coefficients": [
+                        [
+                            "1.0000000"
+                        ]
+                    ]
+                },
+                {
+                    "function_type": "gto",
+                    "region": "",
+                    "angular_momentum": [
+                        1
+                    ],
+                    "exponents": [
+                        "0.0404100"
+                    ],
+                    "coefficients": [
+                        [
+                            "1.0000000"
+                        ]
+                    ]
+                },
+                {
+                    "function_type": "gto_spherical",
+                    "region": "",
+                    "angular_momentum": [
+                        2
+                    ],
+                    "exponents": [
+                        "0.1510000"
+                    ],
+                    "coefficients": [
+                        [
+                            "1.0000000"
+                        ]
+                    ]
                 }
             ],
             "references": [
@@ -538,6 +808,12 @@
                     "reference_description": "The cc-pVDZ basis set",
                     "reference_keys": [
                         "dunning1989a"
+                    ]
+                },
+                {
+                    "reference_description": "Augmenting functions for cc-pVDZ",
+                    "reference_keys": [
+                        "kendall1992a"
                     ]
                 }
             ]
@@ -638,6 +914,51 @@
                             "1.0000000"
                         ]
                     ]
+                },
+                {
+                    "function_type": "gto",
+                    "region": "",
+                    "angular_momentum": [
+                        0
+                    ],
+                    "exponents": [
+                        "0.0612400"
+                    ],
+                    "coefficients": [
+                        [
+                            "1.0000000"
+                        ]
+                    ]
+                },
+                {
+                    "function_type": "gto",
+                    "region": "",
+                    "angular_momentum": [
+                        1
+                    ],
+                    "exponents": [
+                        "0.0561100"
+                    ],
+                    "coefficients": [
+                        [
+                            "1.0000000"
+                        ]
+                    ]
+                },
+                {
+                    "function_type": "gto_spherical",
+                    "region": "",
+                    "angular_momentum": [
+                        2
+                    ],
+                    "exponents": [
+                        "0.2300000"
+                    ],
+                    "coefficients": [
+                        [
+                            "1.0000000"
+                        ]
+                    ]
                 }
             ],
             "references": [
@@ -645,6 +966,12 @@
                     "reference_description": "The cc-pVDZ basis set",
                     "reference_keys": [
                         "dunning1989a"
+                    ]
+                },
+                {
+                    "reference_description": "Augmenting functions for cc-pVDZ",
+                    "reference_keys": [
+                        "kendall1992a"
                     ]
                 }
             ]
@@ -745,6 +1072,51 @@
                             "1.0000000"
                         ]
                     ]
+                },
+                {
+                    "function_type": "gto",
+                    "region": "",
+                    "angular_momentum": [
+                        0
+                    ],
+                    "exponents": [
+                        "0.0789600"
+                    ],
+                    "coefficients": [
+                        [
+                            "1.0000000"
+                        ]
+                    ]
+                },
+                {
+                    "function_type": "gto",
+                    "region": "",
+                    "angular_momentum": [
+                        1
+                    ],
+                    "exponents": [
+                        "0.0685600"
+                    ],
+                    "coefficients": [
+                        [
+                            "1.0000000"
+                        ]
+                    ]
+                },
+                {
+                    "function_type": "gto_spherical",
+                    "region": "",
+                    "angular_momentum": [
+                        2
+                    ],
+                    "exponents": [
+                        "0.3320000"
+                    ],
+                    "coefficients": [
+                        [
+                            "1.0000000"
+                        ]
+                    ]
                 }
             ],
             "references": [
@@ -752,6 +1124,12 @@
                     "reference_description": "The cc-pVDZ basis set",
                     "reference_keys": [
                         "dunning1989a"
+                    ]
+                },
+                {
+                    "reference_description": "Augmenting functions for cc-pVDZ",
+                    "reference_keys": [
+                        "kendall1992a"
                     ]
                 }
             ]
@@ -852,6 +1230,51 @@
                             "1.0000000"
                         ]
                     ]
+                },
+                {
+                    "function_type": "gto",
+                    "region": "",
+                    "angular_momentum": [
+                        0
+                    ],
+                    "exponents": [
+                        "0.0986300"
+                    ],
+                    "coefficients": [
+                        [
+                            "1.0000000"
+                        ]
+                    ]
+                },
+                {
+                    "function_type": "gto",
+                    "region": "",
+                    "angular_momentum": [
+                        1
+                    ],
+                    "exponents": [
+                        "0.0850200"
+                    ],
+                    "coefficients": [
+                        [
+                            "1.0000000"
+                        ]
+                    ]
+                },
+                {
+                    "function_type": "gto_spherical",
+                    "region": "",
+                    "angular_momentum": [
+                        2
+                    ],
+                    "exponents": [
+                        "0.4640000"
+                    ],
+                    "coefficients": [
+                        [
+                            "1.0000000"
+                        ]
+                    ]
                 }
             ],
             "references": [
@@ -859,6 +1282,12 @@
                     "reference_description": "The cc-pVDZ basis set",
                     "reference_keys": [
                         "dunning1989a"
+                    ]
+                },
+                {
+                    "reference_description": "Augmenting functions for cc-pVDZ",
+                    "reference_keys": [
+                        "kendall1992a"
                     ]
                 }
             ]
@@ -959,6 +1388,51 @@
                             "1.0000000"
                         ]
                     ]
+                },
+                {
+                    "function_type": "gto",
+                    "region": "",
+                    "angular_momentum": [
+                        0
+                    ],
+                    "exponents": [
+                        "0.1230000"
+                    ],
+                    "coefficients": [
+                        [
+                            "1.0000000"
+                        ]
+                    ]
+                },
+                {
+                    "function_type": "gto",
+                    "region": "",
+                    "angular_momentum": [
+                        1
+                    ],
+                    "exponents": [
+                        "0.1064000"
+                    ],
+                    "coefficients": [
+                        [
+                            "1.0000000"
+                        ]
+                    ]
+                },
+                {
+                    "function_type": "gto_spherical",
+                    "region": "",
+                    "angular_momentum": [
+                        2
+                    ],
+                    "exponents": [
+                        "0.6310000"
+                    ],
+                    "coefficients": [
+                        [
+                            "1.0000000"
+                        ]
+                    ]
                 }
             ],
             "references": [
@@ -966,6 +1440,12 @@
                     "reference_description": "The cc-pVDZ basis set",
                     "reference_keys": [
                         "dunning1989a"
+                    ]
+                },
+                {
+                    "reference_description": "Augmenting functions for cc-pVDZ",
+                    "reference_keys": [
+                        "kendall1992a"
                     ]
                 }
             ]
@@ -1114,6 +1594,51 @@
                             "1.0000000"
                         ]
                     ]
+                },
+                {
+                    "function_type": "gto",
+                    "region": "",
+                    "angular_momentum": [
+                        0
+                    ],
+                    "exponents": [
+                        "7.200000E-03"
+                    ],
+                    "coefficients": [
+                        [
+                            "1.000000E+00"
+                        ]
+                    ]
+                },
+                {
+                    "function_type": "gto",
+                    "region": "",
+                    "angular_momentum": [
+                        1
+                    ],
+                    "exponents": [
+                        "5.700000E-03"
+                    ],
+                    "coefficients": [
+                        [
+                            "1.000000E+00"
+                        ]
+                    ]
+                },
+                {
+                    "function_type": "gto_spherical",
+                    "region": "",
+                    "angular_momentum": [
+                        2
+                    ],
+                    "exponents": [
+                        "4.800000E-02"
+                    ],
+                    "coefficients": [
+                        [
+                            "1.000000E+00"
+                        ]
+                    ]
                 }
             ],
             "references": [
@@ -1125,6 +1650,12 @@
                 },
                 {
                     "reference_description": "Additional functions to form cc-pVDZ",
+                    "reference_keys": [
+                        "prascher2011a"
+                    ]
+                },
+                {
+                    "reference_description": "Augmenting functions for cc-pVDZ",
                     "reference_keys": [
                         "prascher2011a"
                     ]
@@ -1275,6 +1806,51 @@
                             "1.0000000"
                         ]
                     ]
+                },
+                {
+                    "function_type": "gto",
+                    "region": "",
+                    "angular_momentum": [
+                        0
+                    ],
+                    "exponents": [
+                        "1.420000E-02"
+                    ],
+                    "coefficients": [
+                        [
+                            "1.000000E+00"
+                        ]
+                    ]
+                },
+                {
+                    "function_type": "gto",
+                    "region": "",
+                    "angular_momentum": [
+                        1
+                    ],
+                    "exponents": [
+                        "1.050000E-02"
+                    ],
+                    "coefficients": [
+                        [
+                            "1.000000E+00"
+                        ]
+                    ]
+                },
+                {
+                    "function_type": "gto_spherical",
+                    "region": "",
+                    "angular_momentum": [
+                        2
+                    ],
+                    "exponents": [
+                        "6.050000E-02"
+                    ],
+                    "coefficients": [
+                        [
+                            "1.000000E+00"
+                        ]
+                    ]
                 }
             ],
             "references": [
@@ -1286,6 +1862,12 @@
                 },
                 {
                     "reference_description": "Additional functions to form cc-pVDZ",
+                    "reference_keys": [
+                        "prascher2011a"
+                    ]
+                },
+                {
+                    "reference_description": "Augmenting functions for cc-pVDZ",
                     "reference_keys": [
                         "prascher2011a"
                     ]
@@ -1436,6 +2018,51 @@
                             "1.0000000"
                         ]
                     ]
+                },
+                {
+                    "function_type": "gto",
+                    "region": "",
+                    "angular_momentum": [
+                        0
+                    ],
+                    "exponents": [
+                        "0.0231000"
+                    ],
+                    "coefficients": [
+                        [
+                            "1.0000000"
+                        ]
+                    ]
+                },
+                {
+                    "function_type": "gto",
+                    "region": "",
+                    "angular_momentum": [
+                        1
+                    ],
+                    "exponents": [
+                        "0.0153000"
+                    ],
+                    "coefficients": [
+                        [
+                            "1.0000000"
+                        ]
+                    ]
+                },
+                {
+                    "function_type": "gto_spherical",
+                    "region": "",
+                    "angular_momentum": [
+                        2
+                    ],
+                    "exponents": [
+                        "0.0535000"
+                    ],
+                    "coefficients": [
+                        [
+                            "1.0000000"
+                        ]
+                    ]
                 }
             ],
             "references": [
@@ -1447,6 +2074,12 @@
                 },
                 {
                     "reference_description": "Additional functions to form cc-pVDZ",
+                    "reference_keys": [
+                        "woon1993a"
+                    ]
+                },
+                {
+                    "reference_description": "Augmenting functions for cc-pVDZ",
                     "reference_keys": [
                         "woon1993a"
                     ]
@@ -1597,6 +2230,51 @@
                             "1.0000000"
                         ]
                     ]
+                },
+                {
+                    "function_type": "gto",
+                    "region": "",
+                    "angular_momentum": [
+                        0
+                    ],
+                    "exponents": [
+                        "0.0332000"
+                    ],
+                    "coefficients": [
+                        [
+                            "1.0000000"
+                        ]
+                    ]
+                },
+                {
+                    "function_type": "gto",
+                    "region": "",
+                    "angular_momentum": [
+                        1
+                    ],
+                    "exponents": [
+                        "0.0250000"
+                    ],
+                    "coefficients": [
+                        [
+                            "1.0000000"
+                        ]
+                    ]
+                },
+                {
+                    "function_type": "gto_spherical",
+                    "region": "",
+                    "angular_momentum": [
+                        2
+                    ],
+                    "exponents": [
+                        "0.0823000"
+                    ],
+                    "coefficients": [
+                        [
+                            "1.0000000"
+                        ]
+                    ]
                 }
             ],
             "references": [
@@ -1608,6 +2286,12 @@
                 },
                 {
                     "reference_description": "Additional functions to form cc-pVDZ",
+                    "reference_keys": [
+                        "woon1993a"
+                    ]
+                },
+                {
+                    "reference_description": "Augmenting functions for cc-pVDZ",
                     "reference_keys": [
                         "woon1993a"
                     ]
@@ -1758,6 +2442,51 @@
                             "1.0000000"
                         ]
                     ]
+                },
+                {
+                    "function_type": "gto",
+                    "region": "",
+                    "angular_momentum": [
+                        0
+                    ],
+                    "exponents": [
+                        "0.0417000"
+                    ],
+                    "coefficients": [
+                        [
+                            "1.0000000"
+                        ]
+                    ]
+                },
+                {
+                    "function_type": "gto",
+                    "region": "",
+                    "angular_momentum": [
+                        1
+                    ],
+                    "exponents": [
+                        "0.0343000"
+                    ],
+                    "coefficients": [
+                        [
+                            "1.0000000"
+                        ]
+                    ]
+                },
+                {
+                    "function_type": "gto_spherical",
+                    "region": "",
+                    "angular_momentum": [
+                        2
+                    ],
+                    "exponents": [
+                        "0.1130000"
+                    ],
+                    "coefficients": [
+                        [
+                            "1.0000000"
+                        ]
+                    ]
                 }
             ],
             "references": [
@@ -1769,6 +2498,12 @@
                 },
                 {
                     "reference_description": "Additional functions to form cc-pVDZ",
+                    "reference_keys": [
+                        "woon1993a"
+                    ]
+                },
+                {
+                    "reference_description": "Augmenting functions for cc-pVDZ",
                     "reference_keys": [
                         "woon1993a"
                     ]
@@ -1919,6 +2654,51 @@
                             "1.0000000"
                         ]
                     ]
+                },
+                {
+                    "function_type": "gto",
+                    "region": "",
+                    "angular_momentum": [
+                        0
+                    ],
+                    "exponents": [
+                        "0.0507000"
+                    ],
+                    "coefficients": [
+                        [
+                            "1.0000000"
+                        ]
+                    ]
+                },
+                {
+                    "function_type": "gto",
+                    "region": "",
+                    "angular_momentum": [
+                        1
+                    ],
+                    "exponents": [
+                        "0.0399000"
+                    ],
+                    "coefficients": [
+                        [
+                            "1.0000000"
+                        ]
+                    ]
+                },
+                {
+                    "function_type": "gto_spherical",
+                    "region": "",
+                    "angular_momentum": [
+                        2
+                    ],
+                    "exponents": [
+                        "0.1520000"
+                    ],
+                    "coefficients": [
+                        [
+                            "1.0000000"
+                        ]
+                    ]
                 }
             ],
             "references": [
@@ -1930,6 +2710,12 @@
                 },
                 {
                     "reference_description": "Additional functions to form cc-pVDZ",
+                    "reference_keys": [
+                        "woon1993a"
+                    ]
+                },
+                {
+                    "reference_description": "Augmenting functions for cc-pVDZ",
                     "reference_keys": [
                         "woon1993a"
                     ]
@@ -2080,6 +2866,51 @@
                             "1.0000000"
                         ]
                     ]
+                },
+                {
+                    "function_type": "gto",
+                    "region": "",
+                    "angular_momentum": [
+                        0
+                    ],
+                    "exponents": [
+                        "0.0608000"
+                    ],
+                    "coefficients": [
+                        [
+                            "1.0000000"
+                        ]
+                    ]
+                },
+                {
+                    "function_type": "gto",
+                    "region": "",
+                    "angular_momentum": [
+                        1
+                    ],
+                    "exponents": [
+                        "0.0466000"
+                    ],
+                    "coefficients": [
+                        [
+                            "1.0000000"
+                        ]
+                    ]
+                },
+                {
+                    "function_type": "gto_spherical",
+                    "region": "",
+                    "angular_momentum": [
+                        2
+                    ],
+                    "exponents": [
+                        "0.1960000"
+                    ],
+                    "coefficients": [
+                        [
+                            "1.0000000"
+                        ]
+                    ]
                 }
             ],
             "references": [
@@ -2091,6 +2922,12 @@
                 },
                 {
                     "reference_description": "Additional functions to form cc-pVDZ",
+                    "reference_keys": [
+                        "woon1993a"
+                    ]
+                },
+                {
+                    "reference_description": "Augmenting functions for cc-pVDZ",
                     "reference_keys": [
                         "woon1993a"
                     ]
@@ -2241,6 +3078,51 @@
                             "1.0000000"
                         ]
                     ]
+                },
+                {
+                    "function_type": "gto",
+                    "region": "",
+                    "angular_momentum": [
+                        0
+                    ],
+                    "exponents": [
+                        "0.0709000"
+                    ],
+                    "coefficients": [
+                        [
+                            "1.0000000"
+                        ]
+                    ]
+                },
+                {
+                    "function_type": "gto",
+                    "region": "",
+                    "angular_momentum": [
+                        1
+                    ],
+                    "exponents": [
+                        "0.0533000"
+                    ],
+                    "coefficients": [
+                        [
+                            "1.0000000"
+                        ]
+                    ]
+                },
+                {
+                    "function_type": "gto_spherical",
+                    "region": "",
+                    "angular_momentum": [
+                        2
+                    ],
+                    "exponents": [
+                        "0.2400000"
+                    ],
+                    "coefficients": [
+                        [
+                            "1.0000000"
+                        ]
+                    ]
                 }
             ],
             "references": [
@@ -2255,226 +3137,11 @@
                     "reference_keys": [
                         "woon1993a"
                     ]
-                }
-            ]
-        },
-        "20": {
-            "electron_shells": [
-                {
-                    "function_type": "gto",
-                    "region": "",
-                    "angular_momentum": [
-                        0
-                    ],
-                    "exponents": [
-                        "1.900007E+05",
-                        "2.848146E+04",
-                        "6.482701E+03",
-                        "1.835891E+03",
-                        "5.987243E+02",
-                        "2.158841E+02",
-                        "8.401242E+01",
-                        "3.422488E+01",
-                        "1.002497E+01",
-                        "4.055920E+00",
-                        "1.020261E+00",
-                        "4.268650E-01",
-                        "6.334700E-02",
-                        "2.630100E-02"
-                    ],
-                    "coefficients": [
-                        [
-                            "2.214500E-04",
-                            "1.718300E-03",
-                            "8.923480E-03",
-                            "3.630183E-02",
-                            "1.176222E-01",
-                            "2.860435E-01",
-                            "4.226071E-01",
-                            "2.577437E-01",
-                            "2.391893E-02",
-                            "-4.952180E-03",
-                            "1.717790E-03",
-                            "-8.920900E-04",
-                            "2.451000E-04",
-                            "-1.239500E-04"
-                        ],
-                        [
-                            "-6.453000E-05",
-                            "-4.966200E-04",
-                            "-2.628260E-03",
-                            "-1.066845E-02",
-                            "-3.713509E-02",
-                            "-9.804284E-02",
-                            "-2.034269E-01",
-                            "-1.524465E-01",
-                            "4.827941E-01",
-                            "6.292384E-01",
-                            "6.164842E-02",
-                            "-1.479971E-02",
-                            "3.610890E-03",
-                            "-1.792730E-03"
-                        ],
-                        [
-                            "2.223000E-05",
-                            "1.717000E-04",
-                            "9.045200E-04",
-                            "3.703430E-03",
-                            "1.283750E-02",
-                            "3.475459E-02",
-                            "7.303491E-02",
-                            "6.100083E-02",
-                            "-2.429293E-01",
-                            "-4.870850E-01",
-                            "5.650280E-01",
-                            "6.557439E-01",
-                            "2.672894E-02",
-                            "-9.999590E-03"
-                        ],
-                        [
-                            "5.310000E-06",
-                            "4.111000E-05",
-                            "2.156800E-04",
-                            "8.882700E-04",
-                            "3.058130E-03",
-                            "8.376080E-03",
-                            "1.741056E-02",
-                            "1.515453E-02",
-                            "-6.207919E-02",
-                            "-1.261180E-01",
-                            "1.736069E-01",
-                            "3.782294E-01",
-                            "-6.596470E-01",
-                            "-4.902216E-01"
-                        ],
-                        [
-                            "0.000000E+00",
-                            "0.000000E+00",
-                            "0.000000E+00",
-                            "0.000000E+00",
-                            "0.000000E+00",
-                            "0.000000E+00",
-                            "0.000000E+00",
-                            "0.000000E+00",
-                            "0.000000E+00",
-                            "0.000000E+00",
-                            "0.000000E+00",
-                            "0.000000E+00",
-                            "0.000000E+00",
-                            "1.000000E+00"
-                        ]
-                    ]
                 },
                 {
-                    "function_type": "gto",
-                    "region": "",
-                    "angular_momentum": [
-                        1
-                    ],
-                    "exponents": [
-                        "1.072043E+03",
-                        "2.538439E+02",
-                        "8.131626E+01",
-                        "3.024183E+01",
-                        "1.210110E+01",
-                        "5.022554E+00",
-                        "1.909220E+00",
-                        "7.713040E-01",
-                        "3.005700E-01",
-                        "7.664900E-02",
-                        "2.777200E-02"
-                    ],
-                    "coefficients": [
-                        [
-                            "1.981660E-03",
-                            "1.612944E-02",
-                            "7.657851E-02",
-                            "2.326959E-01",
-                            "4.244521E-01",
-                            "3.732640E-01",
-                            "7.868530E-02",
-                            "-5.999270E-03",
-                            "2.642570E-03",
-                            "-8.569400E-04",
-                            "3.314700E-04"
-                        ],
-                        [
-                            "-6.489100E-04",
-                            "-5.279070E-03",
-                            "-2.581131E-02",
-                            "-8.062892E-02",
-                            "-1.584655E-01",
-                            "-1.281682E-01",
-                            "2.561010E-01",
-                            "5.872407E-01",
-                            "3.037256E-01",
-                            "1.416451E-02",
-                            "-1.152240E-03"
-                        ],
-                        [
-                            "1.359500E-04",
-                            "1.094200E-03",
-                            "5.426800E-03",
-                            "1.674718E-02",
-                            "3.389863E-02",
-                            "2.531183E-02",
-                            "-5.895713E-02",
-                            "-1.587612E-01",
-                            "-8.554523E-02",
-                            "5.446467E-01",
-                            "5.663128E-01"
-                        ],
-                        [
-                            "0.000000E+00",
-                            "0.000000E+00",
-                            "0.000000E+00",
-                            "0.000000E+00",
-                            "0.000000E+00",
-                            "0.000000E+00",
-                            "0.000000E+00",
-                            "0.000000E+00",
-                            "0.000000E+00",
-                            "0.000000E+00",
-                            "1.000000E+00"
-                        ]
-                    ]
-                },
-                {
-                    "function_type": "gto_spherical",
-                    "region": "",
-                    "angular_momentum": [
-                        2
-                    ],
-                    "exponents": [
-                        "1.031820E+01",
-                        "2.592420E+00",
-                        "7.617000E-01",
-                        "2.083800E-01",
-                        "5.370000E-02"
-                    ],
-                    "coefficients": [
-                        [
-                            "3.284900E-02",
-                            "1.481920E-01",
-                            "3.109210E-01",
-                            "4.521950E-01",
-                            "4.808650E-01"
-                        ],
-                        [
-                            "0.000000E+00",
-                            "0.000000E+00",
-                            "0.000000E+00",
-                            "0.000000E+00",
-                            "1.000000E+00"
-                        ]
-                    ]
-                }
-            ],
-            "references": [
-                {
-                    "reference_description": "The cc-pVDZ basis set",
+                    "reference_description": "Augmenting functions for cc-pVDZ",
                     "reference_keys": [
-                        "koput2002a"
+                        "woon1993a"
                     ]
                 }
             ]
@@ -2826,11 +3493,78 @@
                             "8.218680E-01"
                         ]
                     ]
+                },
+                {
+                    "function_type": "gto",
+                    "region": "",
+                    "angular_momentum": [
+                        0
+                    ],
+                    "exponents": [
+                        "1.110000E-02"
+                    ],
+                    "coefficients": [
+                        [
+                            "1.000000E+00"
+                        ]
+                    ]
+                },
+                {
+                    "function_type": "gto",
+                    "region": "",
+                    "angular_momentum": [
+                        1
+                    ],
+                    "exponents": [
+                        "1.066000E-02"
+                    ],
+                    "coefficients": [
+                        [
+                            "1.000000E+00"
+                        ]
+                    ]
+                },
+                {
+                    "function_type": "gto_spherical",
+                    "region": "",
+                    "angular_momentum": [
+                        2
+                    ],
+                    "exponents": [
+                        "1.244000E-02"
+                    ],
+                    "coefficients": [
+                        [
+                            "1.000000E+00"
+                        ]
+                    ]
+                },
+                {
+                    "function_type": "gto_spherical",
+                    "region": "",
+                    "angular_momentum": [
+                        3
+                    ],
+                    "exponents": [
+                        "4.063000E-02"
+                    ],
+                    "coefficients": [
+                        [
+                            "1.000000E+00"
+                        ]
+                    ]
                 }
             ],
             "references": [
                 {
                     "reference_description": "The cc-pVDZ basis set",
+                    "reference_keys": [
+                        "balabanov2005a",
+                        "balabanov2006a"
+                    ]
+                },
+                {
+                    "reference_description": "Augmenting functions for cc-pVDZ",
                     "reference_keys": [
                         "balabanov2005a",
                         "balabanov2006a"
@@ -3185,11 +3919,78 @@
                             "8.257940E-01"
                         ]
                     ]
+                },
+                {
+                    "function_type": "gto",
+                    "region": "",
+                    "angular_momentum": [
+                        0
+                    ],
+                    "exponents": [
+                        "1.173000E-02"
+                    ],
+                    "coefficients": [
+                        [
+                            "1.000000E+00"
+                        ]
+                    ]
+                },
+                {
+                    "function_type": "gto",
+                    "region": "",
+                    "angular_momentum": [
+                        1
+                    ],
+                    "exponents": [
+                        "1.176000E-02"
+                    ],
+                    "coefficients": [
+                        [
+                            "1.000000E+00"
+                        ]
+                    ]
+                },
+                {
+                    "function_type": "gto_spherical",
+                    "region": "",
+                    "angular_momentum": [
+                        2
+                    ],
+                    "exponents": [
+                        "1.726000E-02"
+                    ],
+                    "coefficients": [
+                        [
+                            "1.000000E+00"
+                        ]
+                    ]
+                },
+                {
+                    "function_type": "gto_spherical",
+                    "region": "",
+                    "angular_momentum": [
+                        3
+                    ],
+                    "exponents": [
+                        "8.266000E-02"
+                    ],
+                    "coefficients": [
+                        [
+                            "1.000000E+00"
+                        ]
+                    ]
                 }
             ],
             "references": [
                 {
                     "reference_description": "The cc-pVDZ basis set",
+                    "reference_keys": [
+                        "balabanov2005a",
+                        "balabanov2006a"
+                    ]
+                },
+                {
+                    "reference_description": "Augmenting functions for cc-pVDZ",
                     "reference_keys": [
                         "balabanov2005a",
                         "balabanov2006a"
@@ -3544,11 +4345,78 @@
                             "8.008410E-01"
                         ]
                     ]
+                },
+                {
+                    "function_type": "gto",
+                    "region": "",
+                    "angular_momentum": [
+                        0
+                    ],
+                    "exponents": [
+                        "1.232000E-02"
+                    ],
+                    "coefficients": [
+                        [
+                            "1.000000E+00"
+                        ]
+                    ]
+                },
+                {
+                    "function_type": "gto",
+                    "region": "",
+                    "angular_momentum": [
+                        1
+                    ],
+                    "exponents": [
+                        "1.244000E-02"
+                    ],
+                    "coefficients": [
+                        [
+                            "1.000000E+00"
+                        ]
+                    ]
+                },
+                {
+                    "function_type": "gto_spherical",
+                    "region": "",
+                    "angular_momentum": [
+                        2
+                    ],
+                    "exponents": [
+                        "2.256000E-02"
+                    ],
+                    "coefficients": [
+                        [
+                            "1.000000E+00"
+                        ]
+                    ]
+                },
+                {
+                    "function_type": "gto_spherical",
+                    "region": "",
+                    "angular_momentum": [
+                        3
+                    ],
+                    "exponents": [
+                        "1.311200E-01"
+                    ],
+                    "coefficients": [
+                        [
+                            "1.000000E+00"
+                        ]
+                    ]
                 }
             ],
             "references": [
                 {
                     "reference_description": "The cc-pVDZ basis set",
+                    "reference_keys": [
+                        "balabanov2005a",
+                        "balabanov2006a"
+                    ]
+                },
+                {
+                    "reference_description": "Augmenting functions for cc-pVDZ",
                     "reference_keys": [
                         "balabanov2005a",
                         "balabanov2006a"
@@ -3903,11 +4771,78 @@
                             "7.741140E-01"
                         ]
                     ]
+                },
+                {
+                    "function_type": "gto",
+                    "region": "",
+                    "angular_momentum": [
+                        0
+                    ],
+                    "exponents": [
+                        "1.247000E-02"
+                    ],
+                    "coefficients": [
+                        [
+                            "1.000000E+00"
+                        ]
+                    ]
+                },
+                {
+                    "function_type": "gto",
+                    "region": "",
+                    "angular_momentum": [
+                        1
+                    ],
+                    "exponents": [
+                        "1.307000E-02"
+                    ],
+                    "coefficients": [
+                        [
+                            "1.000000E+00"
+                        ]
+                    ]
+                },
+                {
+                    "function_type": "gto_spherical",
+                    "region": "",
+                    "angular_momentum": [
+                        2
+                    ],
+                    "exponents": [
+                        "2.517000E-02"
+                    ],
+                    "coefficients": [
+                        [
+                            "1.000000E+00"
+                        ]
+                    ]
+                },
+                {
+                    "function_type": "gto_spherical",
+                    "region": "",
+                    "angular_momentum": [
+                        3
+                    ],
+                    "exponents": [
+                        "1.763600E-01"
+                    ],
+                    "coefficients": [
+                        [
+                            "1.000000E+00"
+                        ]
+                    ]
                 }
             ],
             "references": [
                 {
                     "reference_description": "The cc-pVDZ basis set",
+                    "reference_keys": [
+                        "balabanov2005a",
+                        "balabanov2006a"
+                    ]
+                },
+                {
+                    "reference_description": "Augmenting functions for cc-pVDZ",
                     "reference_keys": [
                         "balabanov2005a",
                         "balabanov2006a"
@@ -4262,11 +5197,78 @@
                             "7.697990E-01"
                         ]
                     ]
+                },
+                {
+                    "function_type": "gto",
+                    "region": "",
+                    "angular_momentum": [
+                        0
+                    ],
+                    "exponents": [
+                        "1.335000E-02"
+                    ],
+                    "coefficients": [
+                        [
+                            "1.000000E+00"
+                        ]
+                    ]
+                },
+                {
+                    "function_type": "gto",
+                    "region": "",
+                    "angular_momentum": [
+                        1
+                    ],
+                    "exponents": [
+                        "1.380000E-02"
+                    ],
+                    "coefficients": [
+                        [
+                            "1.000000E+00"
+                        ]
+                    ]
+                },
+                {
+                    "function_type": "gto_spherical",
+                    "region": "",
+                    "angular_momentum": [
+                        2
+                    ],
+                    "exponents": [
+                        "2.875000E-02"
+                    ],
+                    "coefficients": [
+                        [
+                            "1.000000E+00"
+                        ]
+                    ]
+                },
+                {
+                    "function_type": "gto_spherical",
+                    "region": "",
+                    "angular_momentum": [
+                        3
+                    ],
+                    "exponents": [
+                        "2.226000E-01"
+                    ],
+                    "coefficients": [
+                        [
+                            "1.000000E+00"
+                        ]
+                    ]
                 }
             ],
             "references": [
                 {
                     "reference_description": "The cc-pVDZ basis set",
+                    "reference_keys": [
+                        "balabanov2005a",
+                        "balabanov2006a"
+                    ]
+                },
+                {
+                    "reference_description": "Augmenting functions for cc-pVDZ",
                     "reference_keys": [
                         "balabanov2005a",
                         "balabanov2006a"
@@ -4621,11 +5623,78 @@
                             "7.714680E-01"
                         ]
                     ]
+                },
+                {
+                    "function_type": "gto",
+                    "region": "",
+                    "angular_momentum": [
+                        0
+                    ],
+                    "exponents": [
+                        "1.401000E-02"
+                    ],
+                    "coefficients": [
+                        [
+                            "1.000000E+00"
+                        ]
+                    ]
+                },
+                {
+                    "function_type": "gto",
+                    "region": "",
+                    "angular_momentum": [
+                        1
+                    ],
+                    "exponents": [
+                        "1.407000E-02"
+                    ],
+                    "coefficients": [
+                        [
+                            "1.000000E+00"
+                        ]
+                    ]
+                },
+                {
+                    "function_type": "gto_spherical",
+                    "region": "",
+                    "angular_momentum": [
+                        2
+                    ],
+                    "exponents": [
+                        "3.243000E-02"
+                    ],
+                    "coefficients": [
+                        [
+                            "1.000000E+00"
+                        ]
+                    ]
+                },
+                {
+                    "function_type": "gto_spherical",
+                    "region": "",
+                    "angular_momentum": [
+                        3
+                    ],
+                    "exponents": [
+                        "2.749000E-01"
+                    ],
+                    "coefficients": [
+                        [
+                            "1.000000E+00"
+                        ]
+                    ]
                 }
             ],
             "references": [
                 {
                     "reference_description": "The cc-pVDZ basis set",
+                    "reference_keys": [
+                        "balabanov2005a",
+                        "balabanov2006a"
+                    ]
+                },
+                {
+                    "reference_description": "Augmenting functions for cc-pVDZ",
                     "reference_keys": [
                         "balabanov2005a",
                         "balabanov2006a"
@@ -4980,11 +6049,78 @@
                             "7.684290E-01"
                         ]
                     ]
+                },
+                {
+                    "function_type": "gto",
+                    "region": "",
+                    "angular_momentum": [
+                        0
+                    ],
+                    "exponents": [
+                        "1.459000E-02"
+                    ],
+                    "coefficients": [
+                        [
+                            "1.000000E+00"
+                        ]
+                    ]
+                },
+                {
+                    "function_type": "gto",
+                    "region": "",
+                    "angular_momentum": [
+                        1
+                    ],
+                    "exponents": [
+                        "1.525000E-02"
+                    ],
+                    "coefficients": [
+                        [
+                            "1.000000E+00"
+                        ]
+                    ]
+                },
+                {
+                    "function_type": "gto_spherical",
+                    "region": "",
+                    "angular_momentum": [
+                        2
+                    ],
+                    "exponents": [
+                        "3.625000E-02"
+                    ],
+                    "coefficients": [
+                        [
+                            "1.000000E+00"
+                        ]
+                    ]
+                },
+                {
+                    "function_type": "gto_spherical",
+                    "region": "",
+                    "angular_momentum": [
+                        3
+                    ],
+                    "exponents": [
+                        "3.271500E-01"
+                    ],
+                    "coefficients": [
+                        [
+                            "1.000000E+00"
+                        ]
+                    ]
                 }
             ],
             "references": [
                 {
                     "reference_description": "The cc-pVDZ basis set",
+                    "reference_keys": [
+                        "balabanov2005a",
+                        "balabanov2006a"
+                    ]
+                },
+                {
+                    "reference_description": "Augmenting functions for cc-pVDZ",
                     "reference_keys": [
                         "balabanov2005a",
                         "balabanov2006a"
@@ -5339,11 +6475,78 @@
                             "7.714830E-01"
                         ]
                     ]
+                },
+                {
+                    "function_type": "gto",
+                    "region": "",
+                    "angular_momentum": [
+                        0
+                    ],
+                    "exponents": [
+                        "1.516000E-02"
+                    ],
+                    "coefficients": [
+                        [
+                            "1.000000E+00"
+                        ]
+                    ]
+                },
+                {
+                    "function_type": "gto",
+                    "region": "",
+                    "angular_momentum": [
+                        1
+                    ],
+                    "exponents": [
+                        "1.502000E-02"
+                    ],
+                    "coefficients": [
+                        [
+                            "1.000000E+00"
+                        ]
+                    ]
+                },
+                {
+                    "function_type": "gto_spherical",
+                    "region": "",
+                    "angular_momentum": [
+                        2
+                    ],
+                    "exponents": [
+                        "4.067000E-02"
+                    ],
+                    "coefficients": [
+                        [
+                            "1.000000E+00"
+                        ]
+                    ]
+                },
+                {
+                    "function_type": "gto_spherical",
+                    "region": "",
+                    "angular_momentum": [
+                        3
+                    ],
+                    "exponents": [
+                        "4.083000E-01"
+                    ],
+                    "coefficients": [
+                        [
+                            "1.000000E+00"
+                        ]
+                    ]
                 }
             ],
             "references": [
                 {
                     "reference_description": "The cc-pVDZ basis set",
+                    "reference_keys": [
+                        "balabanov2005a",
+                        "balabanov2006a"
+                    ]
+                },
+                {
+                    "reference_description": "Augmenting functions for cc-pVDZ",
                     "reference_keys": [
                         "balabanov2005a",
                         "balabanov2006a"
@@ -5698,11 +6901,78 @@
                             "7.630250E-01"
                         ]
                     ]
+                },
+                {
+                    "function_type": "gto",
+                    "region": "",
+                    "angular_momentum": [
+                        0
+                    ],
+                    "exponents": [
+                        "1.572000E-02"
+                    ],
+                    "coefficients": [
+                        [
+                            "1.000000E+00"
+                        ]
+                    ]
+                },
+                {
+                    "function_type": "gto",
+                    "region": "",
+                    "angular_momentum": [
+                        1
+                    ],
+                    "exponents": [
+                        "1.545000E-02"
+                    ],
+                    "coefficients": [
+                        [
+                            "1.000000E+00"
+                        ]
+                    ]
+                },
+                {
+                    "function_type": "gto_spherical",
+                    "region": "",
+                    "angular_momentum": [
+                        2
+                    ],
+                    "exponents": [
+                        "6.591000E-02"
+                    ],
+                    "coefficients": [
+                        [
+                            "1.000000E+00"
+                        ]
+                    ]
+                },
+                {
+                    "function_type": "gto_spherical",
+                    "region": "",
+                    "angular_momentum": [
+                        3
+                    ],
+                    "exponents": [
+                        "4.617200E-01"
+                    ],
+                    "coefficients": [
+                        [
+                            "1.000000E+00"
+                        ]
+                    ]
                 }
             ],
             "references": [
                 {
                     "reference_description": "The cc-pVDZ basis set",
+                    "reference_keys": [
+                        "balabanov2005a",
+                        "balabanov2006a"
+                    ]
+                },
+                {
+                    "reference_description": "Augmenting functions for cc-pVDZ",
                     "reference_keys": [
                         "balabanov2005a",
                         "balabanov2006a"
@@ -6057,11 +7327,78 @@
                             "7.546420E-01"
                         ]
                     ]
+                },
+                {
+                    "function_type": "gto",
+                    "region": "",
+                    "angular_momentum": [
+                        0
+                    ],
+                    "exponents": [
+                        "1.623000E-02"
+                    ],
+                    "coefficients": [
+                        [
+                            "1.000000E+00"
+                        ]
+                    ]
+                },
+                {
+                    "function_type": "gto",
+                    "region": "",
+                    "angular_momentum": [
+                        1
+                    ],
+                    "exponents": [
+                        "1.592000E-02"
+                    ],
+                    "coefficients": [
+                        [
+                            "1.000000E+00"
+                        ]
+                    ]
+                },
+                {
+                    "function_type": "gto_spherical",
+                    "region": "",
+                    "angular_momentum": [
+                        2
+                    ],
+                    "exponents": [
+                        "9.049000E-02"
+                    ],
+                    "coefficients": [
+                        [
+                            "1.000000E+00"
+                        ]
+                    ]
+                },
+                {
+                    "function_type": "gto_spherical",
+                    "region": "",
+                    "angular_momentum": [
+                        3
+                    ],
+                    "exponents": [
+                        "5.486100E-01"
+                    ],
+                    "coefficients": [
+                        [
+                            "1.000000E+00"
+                        ]
+                    ]
                 }
             ],
             "references": [
                 {
                     "reference_description": "The cc-pVDZ basis set",
+                    "reference_keys": [
+                        "balabanov2005a",
+                        "balabanov2006a"
+                    ]
+                },
+                {
+                    "reference_description": "Augmenting functions for cc-pVDZ",
                     "reference_keys": [
                         "balabanov2005a",
                         "balabanov2006a"
@@ -6282,11 +7619,62 @@
                             "1.000000E+00"
                         ]
                     ]
+                },
+                {
+                    "function_type": "gto",
+                    "region": "",
+                    "angular_momentum": [
+                        0
+                    ],
+                    "exponents": [
+                        "0.0243480"
+                    ],
+                    "coefficients": [
+                        [
+                            "1.0000000"
+                        ]
+                    ]
+                },
+                {
+                    "function_type": "gto",
+                    "region": "",
+                    "angular_momentum": [
+                        1
+                    ],
+                    "exponents": [
+                        "0.0151640"
+                    ],
+                    "coefficients": [
+                        [
+                            "1.0000000"
+                        ]
+                    ]
+                },
+                {
+                    "function_type": "gto_spherical",
+                    "region": "",
+                    "angular_momentum": [
+                        2
+                    ],
+                    "exponents": [
+                        "0.0537000"
+                    ],
+                    "coefficients": [
+                        [
+                            "1.0000000"
+                        ]
+                    ]
                 }
             ],
             "references": [
                 {
                     "reference_description": "The cc-pVDZ basis set",
+                    "reference_keys": [
+                        "wilson1999a"
+                    ]
+                },
+                {
+                    "reference_description": "Augmenting functions for cc-pVDZ",
                     "reference_keys": [
                         "wilson1999a"
                     ]
@@ -6506,11 +7894,62 @@
                             "1.000000E+00"
                         ]
                     ]
+                },
+                {
+                    "function_type": "gto",
+                    "region": "",
+                    "angular_momentum": [
+                        0
+                    ],
+                    "exponents": [
+                        "0.0339610"
+                    ],
+                    "coefficients": [
+                        [
+                            "1.0000000"
+                        ]
+                    ]
+                },
+                {
+                    "function_type": "gto",
+                    "region": "",
+                    "angular_momentum": [
+                        1
+                    ],
+                    "exponents": [
+                        "0.0239450"
+                    ],
+                    "coefficients": [
+                        [
+                            "1.0000000"
+                        ]
+                    ]
+                },
+                {
+                    "function_type": "gto_spherical",
+                    "region": "",
+                    "angular_momentum": [
+                        2
+                    ],
+                    "exponents": [
+                        "0.0771000"
+                    ],
+                    "coefficients": [
+                        [
+                            "1.0000000"
+                        ]
+                    ]
                 }
             ],
             "references": [
                 {
                     "reference_description": "The cc-pVDZ basis set",
+                    "reference_keys": [
+                        "wilson1999a"
+                    ]
+                },
+                {
+                    "reference_description": "Augmenting functions for cc-pVDZ",
                     "reference_keys": [
                         "wilson1999a"
                     ]
@@ -6730,11 +8169,62 @@
                             "1.000000E+00"
                         ]
                     ]
+                },
+                {
+                    "function_type": "gto",
+                    "region": "",
+                    "angular_momentum": [
+                        0
+                    ],
+                    "exponents": [
+                        "0.0411520"
+                    ],
+                    "coefficients": [
+                        [
+                            "1.0000000"
+                        ]
+                    ]
+                },
+                {
+                    "function_type": "gto",
+                    "region": "",
+                    "angular_momentum": [
+                        1
+                    ],
+                    "exponents": [
+                        "0.0312680"
+                    ],
+                    "coefficients": [
+                        [
+                            "1.0000000"
+                        ]
+                    ]
+                },
+                {
+                    "function_type": "gto_spherical",
+                    "region": "",
+                    "angular_momentum": [
+                        2
+                    ],
+                    "exponents": [
+                        "0.1078000"
+                    ],
+                    "coefficients": [
+                        [
+                            "1.0000000"
+                        ]
+                    ]
                 }
             ],
             "references": [
                 {
                     "reference_description": "The cc-pVDZ basis set",
+                    "reference_keys": [
+                        "wilson1999a"
+                    ]
+                },
+                {
+                    "reference_description": "Augmenting functions for cc-pVDZ",
                     "reference_keys": [
                         "wilson1999a"
                     ]
@@ -6954,11 +8444,62 @@
                             "1.000000E+00"
                         ]
                     ]
+                },
+                {
+                    "function_type": "gto",
+                    "region": "",
+                    "angular_momentum": [
+                        0
+                    ],
+                    "exponents": [
+                        "0.0487470"
+                    ],
+                    "coefficients": [
+                        [
+                            "1.0000000"
+                        ]
+                    ]
+                },
+                {
+                    "function_type": "gto",
+                    "region": "",
+                    "angular_momentum": [
+                        1
+                    ],
+                    "exponents": [
+                        "0.0354920"
+                    ],
+                    "coefficients": [
+                        [
+                            "1.0000000"
+                        ]
+                    ]
+                },
+                {
+                    "function_type": "gto_spherical",
+                    "region": "",
+                    "angular_momentum": [
+                        2
+                    ],
+                    "exponents": [
+                        "0.1283000"
+                    ],
+                    "coefficients": [
+                        [
+                            "1.0000000"
+                        ]
+                    ]
                 }
             ],
             "references": [
                 {
                     "reference_description": "The cc-pVDZ basis set",
+                    "reference_keys": [
+                        "wilson1999a"
+                    ]
+                },
+                {
+                    "reference_description": "Augmenting functions for cc-pVDZ",
                     "reference_keys": [
                         "wilson1999a"
                     ]
@@ -7178,11 +8719,62 @@
                             "1.000000E+00"
                         ]
                     ]
+                },
+                {
+                    "function_type": "gto",
+                    "region": "",
+                    "angular_momentum": [
+                        0
+                    ],
+                    "exponents": [
+                        "0.0569460"
+                    ],
+                    "coefficients": [
+                        [
+                            "1.0000000"
+                        ]
+                    ]
+                },
+                {
+                    "function_type": "gto",
+                    "region": "",
+                    "angular_momentum": [
+                        1
+                    ],
+                    "exponents": [
+                        "0.0410490"
+                    ],
+                    "coefficients": [
+                        [
+                            "1.0000000"
+                        ]
+                    ]
+                },
+                {
+                    "function_type": "gto_spherical",
+                    "region": "",
+                    "angular_momentum": [
+                        2
+                    ],
+                    "exponents": [
+                        "0.1719000"
+                    ],
+                    "coefficients": [
+                        [
+                            "1.0000000"
+                        ]
+                    ]
                 }
             ],
             "references": [
                 {
                     "reference_description": "The cc-pVDZ basis set",
+                    "reference_keys": [
+                        "wilson1999a"
+                    ]
+                },
+                {
+                    "reference_description": "Augmenting functions for cc-pVDZ",
                     "reference_keys": [
                         "wilson1999a"
                     ]
@@ -7402,11 +8994,62 @@
                             "1.000000E+00"
                         ]
                     ]
+                },
+                {
+                    "function_type": "gto",
+                    "region": "",
+                    "angular_momentum": [
+                        0
+                    ],
+                    "exponents": [
+                        "0.0651450"
+                    ],
+                    "coefficients": [
+                        [
+                            "1.0000000"
+                        ]
+                    ]
+                },
+                {
+                    "function_type": "gto",
+                    "region": "",
+                    "angular_momentum": [
+                        1
+                    ],
+                    "exponents": [
+                        "0.0466060"
+                    ],
+                    "coefficients": [
+                        [
+                            "1.0000000"
+                        ]
+                    ]
+                },
+                {
+                    "function_type": "gto_spherical",
+                    "region": "",
+                    "angular_momentum": [
+                        2
+                    ],
+                    "exponents": [
+                        "0.2155000"
+                    ],
+                    "coefficients": [
+                        [
+                            "1.0000000"
+                        ]
+                    ]
                 }
             ],
             "references": [
                 {
                     "reference_description": "The cc-pVDZ basis set",
+                    "reference_keys": [
+                        "wilson1999a"
+                    ]
+                },
+                {
+                    "reference_description": "Augmenting functions for cc-pVDZ",
                     "reference_keys": [
                         "wilson1999a"
                     ]
@@ -7420,14 +9063,15 @@
         "gto_spherical"
     ],
     "names": [
-        "cc-pVDZ"
+        "aug-cc-pVDZ"
     ],
     "tags": [],
     "family": "dunning",
-    "description": "cc-pVDZ",
+    "description": "aug-cc-pVDZ",
     "role": "orbital",
     "auxiliaries": {
-        "rifit": "cc-pvdz-rifit"
+        "rifit": "aug-cc-pvdz-rifit",
+        "optri": "aug-cc-pvdz-optri"
     },
-    "name": "cc-pVDZ"
+    "name": "aug-cc-pVDZ"
 }
