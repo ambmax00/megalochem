@@ -881,11 +881,28 @@ public:
 		m_read_current_dims = dims;
 		
 		if (m_type == btype::core) {
+			/*
+			std::cout << "MAPS: " << std::endl;
+			for (auto i : map1) {
+				std::cout << i << " ";
+			} std::cout << std::endl;
+			for (auto i : map2) {
+				std::cout << i << " ";
+			} std::cout << std::endl;
+			
+			std::cout << "WMAPS: " << std::endl;
+			for (auto i : m_wrview.map1) {
+				std::cout << i << " ";
+			} std::cout << std::endl;
+			for (auto i : m_wrview.map2) {
+				std::cout << i << " ";
+			} std::cout << std::endl;*/
 			
 			if (m_wrview.map1 != map1 || m_wrview.map2 != map2) {
 				
 				LOG.os<1>("Reordering core tensor.\n");
 				auto new_work_tensor = tensor_create_template<N,T>(m_work_tensor)
+					.map1(map1).map2(map2)
 					.name(m_name + "_work_core").get();
 				copy(*m_work_tensor, *new_work_tensor)
 					.move_data(true)
@@ -896,6 +913,8 @@ public:
 				m_wrview.map1 = map1;
 				m_wrview.map2 = map2;
 				m_wrview.nbatches = get_nbatches(dims);
+				
+				m_work_tensor.reset();
 				
 				m_work_tensor = new_work_tensor;
 					
