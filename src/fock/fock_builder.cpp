@@ -333,8 +333,12 @@ void fockmod::init() {
 		t_screen.finish();
 		
 		auto& t_eri_batched = TIME.sub("3c2e integrals batched");
+		auto& t_calc = t_eri_batched.sub("calc");
+		auto& t_setup = t_eri_batched.sub("setup");
+		auto& t_compress = t_eri_batched.sub("Compress");
 		
 		t_eri_batched.start();
+		t_setup.start();
 		
 		aofac->ao_3c2e_setup(metric);
 		auto genfunc = aofac->get_generator(scr_s);
@@ -374,18 +378,22 @@ void fockmod::init() {
 		
 		vec<vec<int>> bounds(3);
 		
+		t_setup.finish();
+		
 		for (int ix = 0; ix != eri_batched->nbatches(0); ++ix) {
 				
 				bounds[0] = eri_batched->blk_bounds(0,ix);
 				bounds[1] = eri_batched->full_blk_bounds(1);
 				bounds[2] = eri_batched->full_blk_bounds(2);
 				
+				t_calc.start();
 				if (mytype != dbcsr::btype::direct) aofac->ao_3c2e_fill(eris_gen,bounds,scr_s);
-				
+				t_calc.finish();
 				//dbcsr::print(*eri);
 				eris_gen->filter(dbcsr::global::filter_eps);
-				
+				t_compress.start();
 				eri_batched->compress({ix}, eris_gen);
+				t_compress.finish();
 		}
 		
 		eri_batched->compress_finalize();
