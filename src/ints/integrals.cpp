@@ -766,8 +766,6 @@ void calc_ints(dbcsr::tensor<3,double>& m_out, std::vector<std::vector<int>*> sh
 			auto& size = iter.size();
 			auto& off = iter.offset();	
 			
-			//std::cout << "BLOCK: " << idx[0] << " " << idx[1] << " " << idx[2] << std::endl;
-			
 			//block lower bounds
 			int lb0 = off[0];
 			int lb1 = off[1];
@@ -821,16 +819,14 @@ void calc_ints(dbcsr::tensor<3,double>& m_out, std::vector<std::vector<int>*> sh
 						int res = int_func(buf, shls, atm, natm, bas, nbas, env, nullptr);
 												
 						if (res != 0) {
-							int idx = 0;
+							int iidx = 0;
 						
-						for (int k = 0; k != shellsize2; ++k) {
-							for (int j = 0; j != shellsize1; ++j) {
-								for (int i = 0; i != shellsize0; ++i) {
-
-										//std::cout << buf[idx] << " ";
-										blk(i + locblkoff0, j + locblkoff1, k + locblkoff2) = buf[idx++];
-							
-							}}}// std::cout << std::endl;
+							for (int k = 0; k != shellsize2; ++k) {
+								for (int j = 0; j != shellsize1; ++j) {
+									for (int i = 0; i != shellsize0; ++i) {
+											blk(i + locblkoff0, j + locblkoff1, k + locblkoff2) = buf[iidx++];
+								
+								}}}// std::cout << std::endl;
 						}
 						
 						locblkoff2 += shellsize2;

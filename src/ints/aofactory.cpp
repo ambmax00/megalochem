@@ -671,7 +671,12 @@ public:
 		auto add_basis = [this,&atoms,&off](desc::cluster_basis& cbas) 
 		{
 			for (auto& cluster : cbas) {
+				
+				//std::cout << "CLUSTER" << std::endl;
+				
 				for (auto& shell : cluster) {
+					
+					//std::cout << shell << std::endl;
 					
 					m_max_l = std::max((size_t)m_max_l, shell.l);
 					
@@ -711,9 +716,9 @@ public:
 			} std::cout << std::endl;
 		};
 		
-		//print(m_atm);
-		//print(m_bas);
-		//print(m_env);
+		/*print(m_atm);
+		print(m_bas);
+		print(m_env);*/
 		
 		// offsets
 		
@@ -727,20 +732,30 @@ public:
 			off += s[i];
 		}
 		
+		//std::cout << "OFFSETS" << std::endl;
+		
 		m_b_nshells = s;
 		m_b_offsets = s_off;
+		
+		//print(s);
+		//print(s_off);
 		
 		if (xbas) {
 			auto xs = m_mol->dims().xs();
 			auto xs_off = xs;
-			for (int i = 0; i != s.size(); ++i) {
+			for (int i = 0; i != xs.size(); ++i) {
 				xs_off[i] = off;
 				off += xs[i];
 			}
 			
+			//print(xs);
+			//print(xs_off);
+			
 			m_x_nshells = xs;
 			m_x_offsets = xs_off;
 		}
+		
+		
 			
 				
 	}

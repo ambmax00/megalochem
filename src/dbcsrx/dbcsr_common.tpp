@@ -505,7 +505,8 @@ public:
         ,
         #:endif
     #:endfor
-    ) { return m_data[
+    ) {
+    return m_data[
     #:for n in range(0,idim)
         ${make_idx(n)}$
     #:endfor
