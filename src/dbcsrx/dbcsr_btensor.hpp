@@ -79,6 +79,7 @@ protected:
 	arrvec<int,N> m_blk_sizes;
 	
 	std::string m_filename;
+	std::string m_path;
 	// root name for files
 	
 	btype m_type;
@@ -117,10 +118,9 @@ protected:
 		bool is_contiguous;
 		int nbatches;
 		vec<int> map1, map2;
-		arrvec<int,N> locblkidx;
-		vec<MPI_Aint> locblkoff;
 		vec<vec<int>> nblksprocbatch;
 		vec<vec<int>> nzeprocbatch;
+		std::string file_name;
 	};
 	
 	view m_wrview;
@@ -160,6 +160,7 @@ public:
 		std::string path = std::filesystem::current_path();
 		path += "/batching/";
 		
+		m_path = path;
 		m_filename = path + name + ".dat";
 		
 		// divide dimensions
@@ -272,15 +273,15 @@ public:
 		m_nzeloc = 0; 
 		m_nblktot = 0; 
 		m_nzetot = 0; 
-		
-		for (auto& v : m_wrview.locblkidx) {
-			v.clear();
-		}
-		
-		m_wrview.locblkoff.clear();		
+				
 		m_wrview.nblksprocbatch.clear();
 		m_wrview.nzeprocbatch.clear();
 	
+		MPI_File_delete(m_wrview.file_name.c_str(), MPI_INFO_NULL);
+	
+		for (auto& rview : m_rdviewmap) {
+			MPI_File_delete(rview.second.file_name.c_str(), MPI_INFO_NULL);
+		}
 		m_rdviewmap.clear();
 	
 	}
@@ -297,7 +298,10 @@ public:
 		
 	}
 	
-	~btensor() { if (m_type == btype::disk) delete_file(); }
+	~btensor() { 
+		if (m_type == btype::disk) delete_file();  
+		reset_var();
+	}
 	
 	int flatten(vec<int>& idx, vec<int>& dims) {
 		
@@ -549,7 +553,7 @@ public:
 		// offsets
 		MPI_Offset data_batch_offset = 0;
 		
-		//int64_t nblkprev = 0;
+		int64_t nblkprev = 0;
 		int64_t ndataprev = 0;
 		
 		// global batch offset
@@ -557,12 +561,16 @@ public:
 				
 			ndataprev += std::accumulate(nzeprocbatch[i].begin(),
 				nzeprocbatch[i].end(),int64_t(0));
+				
+			nblkprev += std::accumulate(nblksprocbatch[i].begin(),
+				nblksprocbatch[i].end(),int64_t(0));
 			
 		}
 		
 		// local processor dependent offset
 		for (int i = 0; i < m_mpirank; ++i) {
 			ndataprev += nzeprocbatch[ibatch][i];
+			nblkprev += nblksprocbatch[ibatch][i];
 		}
 		
 		data_batch_offset = ndataprev;
@@ -572,21 +580,27 @@ public:
 			off += data_batch_offset;
 		}
 		
-		// concatenate indices and offsets
-		LOG.os<1>("Adding offsets to vector...\n");
+		// write indices and offsets to file
+		std::string idx_filename = m_path + m_name + "_idx_write.dat";
 		
-		auto& locblkidx = m_wrview.locblkidx;
-		auto& locblkoff = m_wrview.locblkoff;
+		//std::cout << "IDX FILENAME: " << idx_filename << std::endl;
 		
+		MPI_File fh_info;
+		MPI_File_open(m_comm,idx_filename.c_str(),MPI_MODE_WRONLY | MPI_MODE_CREATE,
+			MPI_INFO_NULL,&fh_info);
+			
+		MPI_Offset idx_offset = nblkprev * (sizeof(int) * N + sizeof(MPI_Offset));
 		for (int i = 0; i != N; ++i) {
-			locblkidx[i].insert(locblkidx[i].end(),
-				blkidxbatch[i].begin(),blkidxbatch[i].end());
-			blkidxbatch[i].clear();
+			MPI_File_write_at_all(fh_info,idx_offset,blkidxbatch[i].data(),
+				nblocks,MPI_INT,MPI_STATUS_IGNORE);
+			idx_offset += (MPI_Offset)nblocks * sizeof(int);
 		}
-		
-		locblkoff.insert(locblkoff.end(),
-			blkoffbatch.begin(),blkoffbatch.end());
-		blkoffbatch.clear();
+		MPI_File_write_at_all(fh_info,idx_offset,blkoffbatch.data(),
+			nblocks,MPI_OFFSET,MPI_STATUS_IGNORE);
+			
+		m_wrview.file_name = idx_filename;
+			
+		MPI_File_close(&fh_info);
 	
 		// write data to file 
 		
@@ -607,11 +621,11 @@ public:
 		
 		if (LOG.global_plev() >= 10) {
 			std::cout << "LOC BLK IDX AND OFFSET." << std::endl;
-			for (int i = 0; i != locblkidx[0].size(); ++i) {
+			for (int i = 0; i != blkidxbatch[0].size(); ++i) {
 				for (int j = 0; j != N; ++j) {
-					std::cout << locblkidx[j][i] << " ";
+					std::cout << blkidxbatch[j][i] << " ";
 				}
-				std::cout << locblkoff[i] << std::endl;
+				std::cout << blkoffbatch[i] << std::endl;
 			}
 		}
 		
@@ -725,10 +739,76 @@ public:
 		
 		auto& nblksprocbatch = rview.nblksprocbatch;
 		auto& nzeprocbatch = rview.nzeprocbatch;
-		auto& rlocblkidx = rview.locblkidx;
-		auto& rlocblkoff = rview.locblkoff;
-		auto& wlocblkidx = m_wrview.locblkidx;
-		auto& wlocblkoff = m_wrview.locblkoff;
+		arrvec<int,N> rlocblkidx, wlocblkidx; 
+		vec<MPI_Offset> rlocblkoff, wlocblkoff;
+		
+		int nblkloctot = 0;
+		
+		for (int ibatch = 0; ibatch != m_wrview.nbatches; ++ibatch) {
+			nblkloctot += m_wrview.nblksprocbatch[ibatch][m_mpirank];
+		}
+		
+		for (auto& a : wlocblkidx) {
+			a.resize(nblkloctot);
+		}
+		wlocblkoff.resize(nblkloctot);
+		
+		MPI_File fh_info;
+		MPI_File_open(m_comm,m_wrview.file_name.c_str(),MPI_MODE_RDONLY,
+			MPI_INFO_NULL,&fh_info);
+			
+		MPI_Offset idx_offset = 0;
+		size_t loc_offset = 0;
+		
+		for (int ibatch = 0; ibatch != m_wrview.nbatches; ++ibatch) {
+			for (int r = 0; r != m_mpisize; ++r) {
+				
+				int nblk = m_wrview.nblksprocbatch[ibatch][r];
+				
+				for (int i = 0; i != N; ++i) {
+					
+					if (r == m_mpirank) {
+						MPI_File_read_at_all(fh_info, idx_offset, 
+							wlocblkidx[i].data() + loc_offset,
+							nblk, MPI_INT,MPI_STATUS_IGNORE); 
+					}
+						
+					idx_offset += nblk * sizeof(int);
+				}
+				
+				if (r == m_mpirank) {
+					MPI_File_read_at_all(fh_info, idx_offset, 
+							wlocblkoff.data() + loc_offset,
+							nblk, MPI_OFFSET,MPI_STATUS_IGNORE);
+					loc_offset += nblk;
+				}
+				
+				idx_offset += nblk * sizeof(MPI_Offset);
+				
+			}
+		}
+						
+		MPI_File_close(&fh_info);
+		
+		if (LOG.global_plev() >= 10) {
+			for (int m = 0; m != m_mpisize; ++m) {
+				
+				if (m == m_mpirank) {
+					std::cout << "RANK " << m << std::endl;
+					for (auto a : wlocblkidx) {
+						for (auto e : a) {
+							std::cout << e << " ";
+						} std::cout << std::endl;
+					}
+					for (auto e : wlocblkoff) {
+						std::cout << e << " ";
+					} std::cout << std::endl;
+				}
+				MPI_Barrier(m_comm);
+			}
+		}		
+					
+		// prepare
 		
 		vec<size_t> perm(wlocblkidx[0].size()), superidx(wlocblkidx[0].size());
 		
@@ -864,6 +944,52 @@ public:
 				LOG.os<1>(a, " ");
 			} LOG.os<1>('\n');
 		}
+		
+		std::string suffix;
+		for (auto v : dims) {
+			suffix += std::to_string(v);
+		}
+		
+		rview.file_name = m_path + m_name + "_idx_read_" + suffix + ".dat";
+		
+		//std::cout << "FILENAME READ: " << rview.file_name << std::endl;
+		
+		MPI_File fh_read;
+		MPI_File_open(m_comm,rview.file_name.c_str(),MPI_MODE_WRONLY | MPI_MODE_CREATE,
+			MPI_INFO_NULL,&fh_read);
+			
+		idx_offset = 0;
+		loc_offset = 0;
+		
+		for (int ibatch = 0; ibatch != rview.nbatches; ++ibatch) {
+			for (int r = 0; r != m_mpisize; ++r) {
+				
+				int nblk = rview.nblksprocbatch[ibatch][r];
+				
+				for (int i = 0; i != N; ++i) {
+					
+					if (r == m_mpirank) {
+						MPI_File_write_at_all(fh_read, idx_offset, 
+							rlocblkidx[i].data() + loc_offset,
+							nblk, MPI_INT,MPI_STATUS_IGNORE); 
+					}
+						
+					idx_offset += nblk * sizeof(int);
+				}
+				
+				if (r == m_mpirank) {
+					MPI_File_write_at_all(fh_read, idx_offset, 
+							rlocblkoff.data() + loc_offset,
+							nblk, MPI_OFFSET,MPI_STATUS_IGNORE);
+					loc_offset += nblk;
+				}
+				
+				idx_offset += nblk * sizeof(MPI_Offset);
+				
+			}
+		}
+						
+		MPI_File_close(&fh_read);
 		
 		return rview;
 			
@@ -1045,8 +1171,6 @@ public:
 			
 			auto& nzeprocbatch = m_wrview.nzeprocbatch;
 			auto& nblksprocbatch = m_wrview.nblksprocbatch;
-			auto& locblkidx = m_wrview.locblkidx;
-			auto& locblkoff = m_wrview.locblkoff;
 		
 			int nze = nzeprocbatch[ibatch][m_mpirank];
 			int nblk = nblksprocbatch[ibatch][m_mpirank];
@@ -1065,17 +1189,44 @@ public:
 			for (int i = 0; i < ibatch; ++i) {
 				blkoff += nblksprocbatch[i][m_mpirank];
 			}
-				
-			arrvec<int,N> rlocblkidx;
 			
-			LOG(-1).os<1>("Offset: ", blkoff, '\n');
-			LOG(-1).os<1>("NBLKTOTBATCH: ", nblktotbatch, '\n');
-			//// setting
-			for (int i = 0; i != N; ++i) {
-				rlocblkidx[i].insert(rlocblkidx[i].end(),
-					locblkidx[i].begin() + blkoff,
-					locblkidx[i].begin() + blkoff + nblk);
+			// read idx and offset
+			
+			int64_t nblk_prev = 0;
+			
+			// global offset
+			for (int i = 0; i != ibatch; ++i) {
+				for (int m = 0; m != m_mpisize; ++m) {
+					nblk_prev += nblksprocbatch[i][m];
+				}
 			}
+			// local offset
+			for (int m = 0; m != m_mpirank; ++m) {
+				nblk_prev += nblksprocbatch[ibatch][m];
+			}
+			
+			arrvec<int,N> newlocblkidx;
+			vec<MPI_Offset> newlocblkoff;
+			
+			for (auto& l : newlocblkidx) l.resize(nblk);
+			newlocblkoff.resize(nblk);
+			
+			MPI_File fh_idx;
+			
+			MPI_File_open(m_comm,m_wrview.file_name.c_str(),MPI_MODE_RDONLY,
+				MPI_INFO_NULL,&fh_idx);
+			
+			MPI_Offset idx_offset = nblk_prev * (N * sizeof(int) + sizeof(MPI_Offset));
+			
+			for (auto& l : newlocblkidx) {
+				MPI_File_read_at_all(fh_idx,idx_offset,l.data(),
+					nblk,MPI_INT,MPI_STATUS_IGNORE);
+				idx_offset += nblk * sizeof(int);
+			}
+			MPI_File_read_at_all(fh_idx,idx_offset,newlocblkoff.data(),
+				nblk,MPI_OFFSET,MPI_STATUS_IGNORE);
+			
+			MPI_File_close(&fh_idx);
 			
 			if (LOG.global_plev() >= 10) {
 			
@@ -1084,8 +1235,9 @@ public:
 				for (int i = 0; i != m_mpisize; ++i) {
 				
 					if (i == m_mpirank) {
-					
-						for (auto a : rlocblkidx) {
+						
+						std::cout << "NEW" << std::endl;
+						for (auto a : newlocblkidx) {
 							for (auto l : a) {
 								std::cout << l << " ";
 							} std::cout << std::endl;
@@ -1093,22 +1245,22 @@ public:
 						
 					}
 				
-				MPI_Barrier(m_comm);
+					MPI_Barrier(m_comm);
 				
 				}
 				
 			}
 			
 			//// reserving
-			m_read_tensor->reserve(rlocblkidx);
+			m_read_tensor->reserve(newlocblkidx);
 			
-			for (auto& v : rlocblkidx) v.resize(0);
+			for (auto& v : newlocblkidx) v.resize(0);
 			
 			// === Reading from file ===
 			//// Allocating
 			
 			//// Offset
-			MPI_Offset data_batch_offset = locblkoff[blkoff];
+			MPI_Offset data_batch_offset = (nblk == 0) ? 0 : newlocblkoff[0];
 			
 			//// Opening File
 			std::string fname = m_filename;
@@ -1136,8 +1288,6 @@ public:
 			
 			auto& nzeprocbatch = rdview.nzeprocbatch;
 			auto& nblksprocbatch = rdview.nblksprocbatch;
-			auto& locblkidx = rdview.locblkidx;
-			auto& locblkoff = rdview.locblkoff;
 		
 			int nze = nzeprocbatch[ibatch][m_mpirank];
 			int nblk = nblksprocbatch[ibatch][m_mpirank];
@@ -1156,21 +1306,49 @@ public:
 			for (int i = 0; i < ibatch; ++i) {
 				blkoff += nblksprocbatch[i][m_mpirank];
 			}
-				
-			arrvec<int,N> rlocblkidx;
-			vec<MPI_Aint> blkoffsets(nblk);
 			
-			LOG(-1).os<1>("Offset: ", blkoff, '\n');
-			LOG(-1).os<1>("NBLKTOTBATCH: ", nblktotbatch, '\n');
-			//// setting
-			for (int i = 0; i != N; ++i) {
-				rlocblkidx[i].insert(rlocblkidx[i].end(),
-					locblkidx[i].begin() + blkoff,
-					locblkidx[i].begin() + blkoff + nblk);
+			// read idx and offset
+			
+			int64_t nblk_prev = 0;
+			
+			// global offset
+			for (int i = 0; i != ibatch; ++i) {
+				for (int m = 0; m != m_mpisize; ++m) {
+					nblk_prev += nblksprocbatch[i][m];
+				}
+			}
+			// local offset
+			for (int m = 0; m != m_mpirank; ++m) {
+				nblk_prev += nblksprocbatch[ibatch][m];
 			}
 			
+			arrvec<int,N> newlocblkidx;
+			vec<MPI_Offset> newlocblkoff;
+			
+			for (auto& l : newlocblkidx) l.resize(nblk);
+			newlocblkoff.resize(nblk);
+			
+			MPI_File fh_idx;
+			
+			MPI_File_open(m_comm,rdview.file_name.c_str(),MPI_MODE_RDONLY,
+				MPI_INFO_NULL,&fh_idx);
+			
+			MPI_Offset idx_offset = nblk_prev * (N * sizeof(int) + sizeof(MPI_Offset));
+			
+			for (auto& l : newlocblkidx) {
+				MPI_File_read_at_all(fh_idx,idx_offset,l.data(),
+					nblk,MPI_INT,MPI_STATUS_IGNORE);
+				idx_offset += nblk * sizeof(int);
+			}
+			MPI_File_read_at_all(fh_idx,idx_offset,newlocblkoff.data(),
+				nblk,MPI_OFFSET,MPI_STATUS_IGNORE);
+			
+			MPI_File_close(&fh_idx);
+				
+			vec<MPI_Aint> blkoffsets(nblk);
+			
 			for (size_t i = 0; i != nblk; ++i) {
-				blkoffsets[i] = locblkoff[i + blkoff] * sizeof(T);
+				blkoffsets[i] = newlocblkoff[i] * sizeof(T);
 			}
 			
 			if (LOG.global_plev() >= 10) {
@@ -1183,7 +1361,8 @@ public:
 				
 					if (i == m_mpirank) {
 						
-						for (auto a : rlocblkidx) {
+						std::cout << "NEW" << std::endl;
+						for (auto a : newlocblkidx) {
 							for (auto l : a) {
 								std::cout << l << " ";
 							} std::cout << std::endl;
@@ -1196,14 +1375,14 @@ public:
 						
 					}
 				
-				MPI_Barrier(m_comm);
+					MPI_Barrier(m_comm);
 				
 				}
 				
 			}
 			
 			//// reserving
-			m_read_tensor->reserve(rlocblkidx);
+			m_read_tensor->reserve(newlocblkidx);
 			
 			vec<int> blksizes(nblk);
 			auto& tsizes = m_blk_sizes;
@@ -1213,14 +1392,14 @@ public:
 			for (int i = 0; i != nblk; ++i) {
 				int size = 1;
 				for (int n = 0; n != N; ++n) {
-					size *= tsizes[n][rlocblkidx[n][i]];
+					size *= tsizes[n][newlocblkidx[n][i]];
 				}
 				blksizes[i] = size;
 			}
 			
 			LOG.os<1>("Reserving.\n");
 						
-			for (auto& a : rlocblkidx) a.clear();
+			for (auto& a : newlocblkidx) a.clear();
 			
 			// now adjust the file view
 			nze = m_read_tensor->num_nze();

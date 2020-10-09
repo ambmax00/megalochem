@@ -3,6 +3,7 @@
 #include "ints/aofactory.h"
 #include "ints/integrals.h"
 #include "ints/screening.h"
+#include "utils/mpi_time.h"
 #include "utils/pool.h"
 
 #ifdef USE_LIBINT
@@ -27,6 +28,8 @@ class aofactory::impl {
 // =====================================================================
 
 private:
+
+	util::mpi_time TIME;
 
 	void reserve_3_partial(dbcsr::shared_tensor<3>& t_in, vec<vec<int>>& blkbounds,
 		shared_screener s_scr) {
@@ -224,8 +227,11 @@ public:
 	
 	impl(desc::smolecule mol, dbcsr::world w) :
 		m_world(w),
-		m_mol(mol)
+		m_mol(mol),
+		TIME(w.comm(), "IntFac")
 		{ init(); }
+		
+	~impl() { /*TIME.print_info();*/ }
 	
 	void init() {
 		
@@ -494,10 +500,17 @@ public:
 	
 	void compute_3_partial(dbcsr::shared_tensor<3>& t_in, vec<vec<int>>& blkbounds,
 		shared_screener s_scr) {
-			
-		reserve_3_partial(t_in, blkbounds, s_scr);
 		
+		//auto& t_res = TIME.sub("Res");
+		//auto& t_calc = TIME.sub("Calc");
+		
+		//t_res.start();
+		reserve_3_partial(t_in, blkbounds, s_scr);
+		//t_res.finish();
+		
+		//t_calc.start();
 		calc_ints(*t_in, m_eng_pool, m_basvec, s_scr.get()); 
+		//t_calc.finish();
 		
 	}
 	
