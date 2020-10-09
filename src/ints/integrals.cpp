@@ -636,7 +636,7 @@ void calc_ints_schwarz_x(dbcsr::mat_d& m_out, util::ShrPool<libint2::Engine>& en
 
 void calc_ints(dbcsr::mat_d& m_out, std::vector<std::vector<int>*> shell_offsets, 
 		std::vector<std::vector<int>*> nshells, CINTIntegralFunction& int_func,
-		FINT *atm, FINT natm, FINT* bas, FINT nbas, double* env) 
+		FINT *atm, FINT natm, FINT* bas, FINT nbas, double* env, int max_l) 
 {
 	
 	//std::cout << "NATOMS/NBAS: " << natm << " " << nbas << std::endl;
@@ -648,12 +648,17 @@ void calc_ints(dbcsr::mat_d& m_out, std::vector<std::vector<int>*> shell_offsets
 	auto& shell_offsets0 = *shell_offsets[0];
 	auto& shell_offsets1 = *shell_offsets[1]; 
 	
+	int max_buf_size = pow(2 * max_l + 1,2);
+	
 	#pragma omp parallel 
 	{	
 		
 		dbcsr::iterator iter(m_out);
 		
 		iter.start();
+		
+		double* buf = new double[max_buf_size];
+		int* shls = new int[2];
 		
 		while (iter.blocks_left()) {	
 			
@@ -680,9 +685,6 @@ void calc_ints(dbcsr::mat_d& m_out, std::vector<std::vector<int>*> shell_offsets
 			int nshell0 = nshells0[r];
 			int nshell1 = nshells1[c];
 			
-			double* buf;
-			int* shls = new int[2];
-			
 			//std::cout << "soffs: " << soff0 << " " << soff1 << std::endl;
 			//std::cout << "nshells: " << nshell0 << " " << nshell1 << std::endl;
 			
@@ -700,7 +702,6 @@ void calc_ints(dbcsr::mat_d& m_out, std::vector<std::vector<int>*> shell_offsets
 					
 					//std::cout << "PROCESSING SHELL: " << s0 << " " << s1 << std::endl;
 					
-					buf = new double[shellsize0*shellsize1];
 					int res = int_func(buf, shls, atm, natm, bas, nbas, env, nullptr);
 											
 					if (res != 0) {
@@ -720,14 +721,14 @@ void calc_ints(dbcsr::mat_d& m_out, std::vector<std::vector<int>*> shell_offsets
 				locblkoff1 = 0;
 				locblkoff0 += shellsize0;
 			}//endfor s1
-			
-			delete [] buf;
-			delete [] shls;
 						
 		}//end BLOCK LOOP
 		
 		iter.stop();
 		m_out.finalize();
+		
+		delete [] buf;
+		delete [] shls;
 		
 	}//end parallel omp	
 	
@@ -735,7 +736,7 @@ void calc_ints(dbcsr::mat_d& m_out, std::vector<std::vector<int>*> shell_offsets
 
 void calc_ints(dbcsr::tensor<3,double>& m_out, std::vector<std::vector<int>*> shell_offsets, 
 		std::vector<std::vector<int>*> nshells, CINTIntegralFunction& int_func,
-		FINT *atm, FINT natm, FINT* bas, FINT nbas, double* env)
+		FINT *atm, FINT natm, FINT* bas, FINT nbas, double* env, int max_l)
 {
 	
 	auto& nshells0 = *nshells[0];
@@ -745,12 +746,17 @@ void calc_ints(dbcsr::tensor<3,double>& m_out, std::vector<std::vector<int>*> sh
 	auto& shell_offsets1 = *shell_offsets[1];
 	auto& shell_offsets2 = *shell_offsets[2];
 	
+	int max_buf_size = pow(2*max_l+1,3);
+	
 	#pragma omp parallel 
 	{	
 		
 		dbcsr::iterator_t<3> iter(m_out);
 		
 		iter.start();
+		
+		double* buf = new double[max_buf_size];
+		int* shls = new int[4];
 		
 		while (iter.blocks_left()) {	
 			
@@ -783,8 +789,6 @@ void calc_ints(dbcsr::tensor<3,double>& m_out, std::vector<std::vector<int>*> sh
 			int& nshell1 = nshells1[idx[1]];
 			int& nshell2 = nshells2[idx[2]];
 			
-			double* buf;
-			int* shls = new int[4];
 			shls[1] = 0;
 			
 			//std::cout << "soffs: " << soff0 << " " << soff1 << std::endl;
@@ -814,7 +818,6 @@ void calc_ints(dbcsr::tensor<3,double>& m_out, std::vector<std::vector<int>*> sh
 						//std::cout << "EXPOS: " << bas(PTR_EXP,s0) << " " << bas(PTR_EXP,0) <<  " " << bas(PTR_EXP,s1) 
 						//	<<  " " << bas(PTR_EXP,s2) << std::endl;
 						
-						buf = new double[shellsize0*shellsize1*shellsize2];
 						int res = int_func(buf, shls, atm, natm, bas, nbas, env, nullptr);
 												
 						if (res != 0) {
@@ -844,12 +847,12 @@ void calc_ints(dbcsr::tensor<3,double>& m_out, std::vector<std::vector<int>*> sh
 				locblkoff0 += shellsize0;
 			}//endfor s0
 			
-			delete [] buf;
-			delete [] shls;
-			
 			m_out.put_block(idx, blk);
 						
 		}//end BLOCK LOOP
+		
+		delete [] buf;
+		delete [] shls;
 		
 		iter.stop();
 		m_out.finalize();
@@ -860,7 +863,7 @@ void calc_ints(dbcsr::tensor<3,double>& m_out, std::vector<std::vector<int>*> sh
 
 void calc_ints(dbcsr::tensor<4,double>& m_out, std::vector<std::vector<int>*> shell_offsets, 
 		std::vector<std::vector<int>*> nshells, CINTIntegralFunction& int_func,
-		FINT *atm, FINT natm, FINT* bas, FINT nbas, double* env)
+		FINT *atm, FINT natm, FINT* bas, FINT nbas, double* env, int max_l)
 {
 	const auto& nshells0 = *nshells[0];
 	const auto& nshells1 = *nshells[1];
@@ -871,12 +874,17 @@ void calc_ints(dbcsr::tensor<4,double>& m_out, std::vector<std::vector<int>*> sh
 	const auto& shell_offsets2 = *shell_offsets[2];
 	const auto& shell_offsets3 = *shell_offsets[3];
 	
+	int max_buf_size = pow(2*max_l+1,4);
+	
 	#pragma omp parallel 
 	{	
 		
 		dbcsr::iterator_t<4> iter(m_out);
 		
 		iter.start();
+		
+		double* buf = new double[max_buf_size];
+		int* shls = new int[4];
 		
 		while (iter.blocks_left()) {	
 			
@@ -912,9 +920,6 @@ void calc_ints(dbcsr::tensor<4,double>& m_out, std::vector<std::vector<int>*> sh
 			const int& nshell2 = nshells2[idx[2]];
 			const int& nshell3 = nshells3[idx[3]];
 			
-			double* buf;
-			int* shls = new int[4];
-			
 			dbcsr::block<4,double> blk(size);
 			
 			for (int s0 = soff0; s0 != soff0+nshell0; ++s0) {
@@ -941,7 +946,6 @@ void calc_ints(dbcsr::tensor<4,double>& m_out, std::vector<std::vector<int>*> sh
 							const int shellsize3 = CINTcgto_spheric(s3,bas);
 							shls[3] = s3;
 					
-							buf = new double[shellsize0*shellsize1*shellsize2*shellsize3];
 							int res = int_func(buf, shls, atm, natm, bas, nbas, env, nullptr);
 												
 							if (res != 0) {
@@ -978,12 +982,12 @@ void calc_ints(dbcsr::tensor<4,double>& m_out, std::vector<std::vector<int>*> sh
 				locblkoff0 += shellsize0;
 			}//endfor s0
 			
-			delete [] buf;
-			delete [] shls;
-			
 			m_out.put_block(idx, blk);
 						
 		}//end BLOCK LOOP
+		
+		delete [] buf;
+		delete [] shls;
 		
 		iter.stop();
 		m_out.finalize();
@@ -994,7 +998,7 @@ void calc_ints(dbcsr::tensor<4,double>& m_out, std::vector<std::vector<int>*> sh
 
 void calc_ints_xx(dbcsr::mat_d& m_out, std::vector<std::vector<int>*> shell_offsets, 
 		std::vector<std::vector<int>*> nshells, CINTIntegralFunction& int_func,
-		FINT *atm, FINT natm, FINT* bas, FINT nbas, double* env) 
+		FINT *atm, FINT natm, FINT* bas, FINT nbas, double* env,int max_l) 
 {
 		
 	auto my_world = m_out.get_world();
@@ -1004,12 +1008,17 @@ void calc_ints_xx(dbcsr::mat_d& m_out, std::vector<std::vector<int>*> shell_offs
 	auto& shell_offsets0 = *shell_offsets[0];
 	auto& shell_offsets1 = *shell_offsets[1]; 
 	
+	int max_buf_size = pow(2*max_l+1,2);
+	
 	#pragma omp parallel 
 	{	
 		
 		dbcsr::iterator iter(m_out);
 		
 		iter.start();
+		
+		double* buf = new double[max_buf_size];
+		int* shls = new int[4];
 		
 		while (iter.blocks_left()) {	
 			
@@ -1034,8 +1043,6 @@ void calc_ints_xx(dbcsr::mat_d& m_out, std::vector<std::vector<int>*> shell_offs
 			int nshell0 = nshells0[r];
 			int nshell1 = nshells1[c];
 			
-			double* buf;
-			int* shls = new int[4];
 			shls[1] = 0;
 			shls[3] = 0;
 			
@@ -1051,7 +1058,6 @@ void calc_ints_xx(dbcsr::mat_d& m_out, std::vector<std::vector<int>*> shell_offs
 					int shellsize1 = CINTcgto_spheric(s1,bas);
 					shls[2] = s1;
 										
-					buf = new double[shellsize0*shellsize1];
 					int res = int_func(buf, shls, atm, natm, bas, nbas, env, nullptr);
 											
 					if (res != 0) {
@@ -1072,10 +1078,10 @@ void calc_ints_xx(dbcsr::mat_d& m_out, std::vector<std::vector<int>*> shell_offs
 				locblkoff0 += shellsize0;
 			}//endfor s1
 			
-			delete [] buf;
-			delete [] shls;
-						
 		}//end BLOCK LOOP
+		
+		delete [] buf;
+		delete [] shls;			
 		
 		iter.stop();
 		m_out.finalize();
@@ -1086,7 +1092,7 @@ void calc_ints_xx(dbcsr::mat_d& m_out, std::vector<std::vector<int>*> shell_offs
 
 void calc_ints_schwarz_mn(dbcsr::mat_d& m_out, std::vector<std::vector<int>*> shell_offsets, 
 		std::vector<std::vector<int>*> nshells, CINTIntegralFunction& int_func,
-		FINT *atm, FINT natm, FINT* bas, FINT nbas, double* env) 
+		FINT *atm, FINT natm, FINT* bas, FINT nbas, double* env, int max_l) 
 {
 		
 	auto& nshells0 = *nshells[0];
@@ -1094,12 +1100,17 @@ void calc_ints_schwarz_mn(dbcsr::mat_d& m_out, std::vector<std::vector<int>*> sh
 	auto& shell_offsets0 = *shell_offsets[0];
 	auto& shell_offsets1 = *shell_offsets[1]; 
 	
+	int max_buf_size = pow(2*max_l+1,4);
+	
 	#pragma omp parallel 
 	{	
 		
 		dbcsr::iterator iter(m_out);
 		
 		iter.start();
+		
+		double* buf = new double[max_buf_size];
+		int* shls = new int[4];
 		
 		while (iter.blocks_left()) {	
 			
@@ -1126,9 +1137,6 @@ void calc_ints_schwarz_mn(dbcsr::mat_d& m_out, std::vector<std::vector<int>*> sh
 			int nshell0 = nshells0[r];
 			int nshell1 = nshells1[c];
 			
-			double* buf;
-			int* shls = new int[4];
-			
 			//std::cout << "nshells: " << nshell0 << " " << nshell1 << std::endl;
 			
 			int s0_idx = 0;
@@ -1149,7 +1157,6 @@ void calc_ints_schwarz_mn(dbcsr::mat_d& m_out, std::vector<std::vector<int>*> sh
 					
 					//std::cout << "PROCESSING SHELL: " << s0 << " " << s1 << std::endl;
 					
-					buf = new double[shellsize0*shellsize1*shellsize0*shellsize1];
 					int res = int_func(buf, shls, atm, natm, bas, nbas, env, nullptr);
 					
 					double n = 0.0;
@@ -1175,12 +1182,12 @@ void calc_ints_schwarz_mn(dbcsr::mat_d& m_out, std::vector<std::vector<int>*> sh
 				locblkoff0 += shellsize0;
 				++s0_idx;
 			}//endfor s1
-			
-			delete [] buf;
-			delete [] shls;
-						
+				
 		}//end BLOCK LOOP
 		
+		delete [] buf;
+		delete [] shls;
+
 		iter.stop();
 		m_out.finalize();
 		
@@ -1190,11 +1197,12 @@ void calc_ints_schwarz_mn(dbcsr::mat_d& m_out, std::vector<std::vector<int>*> sh
 
 void calc_ints_schwarz_x(dbcsr::mat_d& m_out, std::vector<std::vector<int>*> shell_offsets, 
 		std::vector<std::vector<int>*> nshells, CINTIntegralFunction& int_func,
-		FINT *atm, FINT natm, FINT* bas, FINT nbas, double* env) 
+		FINT *atm, FINT natm, FINT* bas, FINT nbas, double* env, int max_l) 
 {
 		
 	auto& nshells0 = *nshells[0];
 	auto& shell_offsets0 = *shell_offsets[0];
+	int max_buf_size = pow(2*max_l+1,2);
 	
 	#pragma omp parallel 
 	{	
@@ -1202,6 +1210,9 @@ void calc_ints_schwarz_x(dbcsr::mat_d& m_out, std::vector<std::vector<int>*> she
 		dbcsr::iterator iter(m_out);
 		
 		iter.start();
+		
+		double* buf = new double[max_buf_size];
+		int* shls = new int[4];
 		
 		while (iter.blocks_left()) {	
 			
@@ -1213,9 +1224,6 @@ void calc_ints_schwarz_x(dbcsr::mat_d& m_out, std::vector<std::vector<int>*> she
 			
 			int soff0 = shell_offsets0[r];
 			int nshell0 = nshells0[r];
-			
-			double* buf;
-			int* shls = new int[4];
 			
 			//std::cout << "soffs: " << soff0 << std::endl;
 			//std::cout << "nshells: " << nshell0 << std::endl;
@@ -1231,7 +1239,6 @@ void calc_ints_schwarz_x(dbcsr::mat_d& m_out, std::vector<std::vector<int>*> she
 					
 				//std::cout << "PROCESSING SHELL: " << s0 << std::endl;
 				
-				buf = new double[shellsize0*shellsize0];
 				int res = int_func(buf, shls, atm, natm, bas, nbas, env, nullptr);
 				
 				double n = 0.0;
@@ -1247,11 +1254,11 @@ void calc_ints_schwarz_x(dbcsr::mat_d& m_out, std::vector<std::vector<int>*> she
 				iter(idx++,0) = sqrt(n);
 					
 			}//endfor s1
-			
-			delete [] buf;
-			delete [] shls;
 						
 		}//end BLOCK LOOP
+		
+		delete [] buf;
+		delete [] shls;
 		
 		iter.stop();
 		m_out.finalize();

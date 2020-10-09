@@ -83,27 +83,27 @@ namespace ints {
 		
 void calc_ints(dbcsr::mat_d& m_out, std::vector<std::vector<int>*> shell_offsets, 
 		std::vector<std::vector<int>*> shell_sizes, CINTIntegralFunction& int_func,
-		FINT *atm, FINT natm, FINT* bas, FINT nbas, double* env);
+		FINT *atm, FINT natm, FINT* bas, FINT nbas, double* env, int max_l);
 		
 void calc_ints(dbcsr::tensor<3,double>& m_out, std::vector<std::vector<int>*> shell_offsets, 
 		std::vector<std::vector<int>*> shell_sizes, CINTIntegralFunction& int_func,
-		FINT *atm, FINT natm, FINT* bas, FINT nbas, double* env);
+		FINT *atm, FINT natm, FINT* bas, FINT nbas, double* env, int max_l);
 		
 void calc_ints(dbcsr::tensor<4,double>& m_out, std::vector<std::vector<int>*> shell_offsets, 
 		std::vector<std::vector<int>*> shell_sizes, CINTIntegralFunction& int_func,
-		FINT *atm, FINT natm, FINT* bas, FINT nbas, double* env);
+		FINT *atm, FINT natm, FINT* bas, FINT nbas, double* env, int max_l);
 		
 void calc_ints_xx(dbcsr::mat_d& m_out, std::vector<std::vector<int>*> shell_offsets, 
 		std::vector<std::vector<int>*> shell_sizes, CINTIntegralFunction& int_func,
-		FINT *atm, FINT natm, FINT* bas, FINT nbas, double* env);
+		FINT *atm, FINT natm, FINT* bas, FINT nbas, double* env, int max_l);
 
 void calc_ints_schwarz_mn(dbcsr::mat_d& m_out, std::vector<std::vector<int>*> shell_offsets, 
 		std::vector<std::vector<int>*> shell_sizes, CINTIntegralFunction& int_func,
-		FINT *atm, FINT natm, FINT* bas, FINT nbas, double* env);
+		FINT *atm, FINT natm, FINT* bas, FINT nbas, double* env, int max_l);
 		
 void calc_ints_schwarz_x(dbcsr::mat_d& m_out, std::vector<std::vector<int>*> shell_offsets, 
 		std::vector<std::vector<int>*> shell_sizes, CINTIntegralFunction& int_func,
-		FINT *atm, FINT natm, FINT* bas, FINT nbas, double* env);
+		FINT *atm, FINT natm, FINT* bas, FINT nbas, double* env, int max_l);
 
 } // end namespace
 

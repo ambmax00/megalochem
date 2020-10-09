@@ -1136,6 +1136,7 @@ public:
 		auto b = get_blk_bounds(idx, m_read_current_dims);
 		
 		m_generator(m_read_tensor, b);
+		m_read_tensor->filter(dbcsr::global::filter_eps);
 		
 		vec<vec<int>> copy_bounds = get_bounds(idx, m_wrview.dims);
 		
@@ -1439,6 +1440,8 @@ public:
 			MPI_File_close(&fh_data);
 			
 			LOG.os<1>("Done!!\n");
+			
+			MPI_Type_free(&MPI_HINDEXED);
 			
 			/*std::cout << "READTENSOR" << std::endl;
 			dbcsr::print(*read_tensor);

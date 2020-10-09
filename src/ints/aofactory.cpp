@@ -555,6 +555,7 @@ protected:
 	
 	std::string m_intname;
 	std::string m_braket;
+	int m_max_l;
 	
 	std::vector<int> m_b_offsets;
 	std::vector<int> m_b_nshells;
@@ -615,7 +616,9 @@ public:
 		m_mol(mol),
 		m_natoms(0),
 		m_nbas(0),
-		m_ndfbas(0)
+		m_ndfbas(0),
+		m_max_l(0),
+		TIME(w.comm(), "integrals")
 	{ init(); }
 	
 	void init() {
@@ -669,6 +672,8 @@ public:
 		{
 			for (auto& cluster : cbas) {
 				for (auto& shell : cluster) {
+					
+					m_max_l = std::max((size_t)m_max_l, shell.l);
 					
 					std::vector<int> bas_i(BAS_SLOTS);
 					bas_i[ATOM_OF] = atom_of(shell,atoms);
@@ -833,13 +838,13 @@ public:
 		
 			calc_ints(*m_ints, m_shell_offsets, m_nshells, m_intfunc,
 				m_atm.data(), m_natoms, m_bas.data(), m_nbas,
-				m_env.data());
+				m_env.data(), m_max_l);
 				
 		} else if (m_braket == "xs_xs") {
 			
 			calc_ints_xx(*m_ints, m_shell_offsets, m_nshells, m_intfunc,
 				m_atm.data(), m_natoms, m_bas.data(), m_nbas,
-				m_env.data());
+				m_env.data(), m_max_l);
 				
 		} else {
 			
@@ -858,7 +863,7 @@ public:
 		
 		calc_ints(*t_in, m_shell_offsets, m_nshells, m_intfunc,
 			m_atm.data(), m_natoms, m_bas.data(), m_nbas,
-			m_env.data());
+			m_env.data(), m_max_l);
 		
 	}	
 	
@@ -869,7 +874,7 @@ public:
 		
 		calc_ints(*t_in, m_shell_offsets, m_nshells, m_intfunc,
 			m_atm.data(), m_natoms, m_bas.data(), m_nbas,
-			m_env.data());
+			m_env.data(), m_max_l);
 		
 	}	
 	
@@ -880,7 +885,7 @@ public:
 		
 		calc_ints(*t_in, m_shell_offsets, m_nshells, m_intfunc,
 			m_atm.data(), m_natoms, m_bas.data(), m_nbas,
-			m_env.data());
+			m_env.data(), m_max_l);
 		
 	}
 	
@@ -924,11 +929,11 @@ public:
 		if (dim == "bbbb" && method == "schwarz") {
 			calc_ints_schwarz_mn(*m_ints, m_shell_offsets, m_nshells, m_intfunc,
 			m_atm.data(), m_natoms, m_bas.data(), m_nbas,
-			m_env.data());
+			m_env.data(), m_max_l);
 		} else if (dim == "xx" && method == "schwarz") {
 			calc_ints_schwarz_x(*m_ints, m_shell_offsets, m_nshells, m_intfunc,
 			m_atm.data(), m_natoms, m_bas.data(), m_nbas,
-			m_env.data());
+			m_env.data(), m_max_l);
 		} else {
 			throw std::runtime_error("Unknown screening method.");
 		}

@@ -623,6 +623,7 @@ void copy_matrix_to_3Dtensor_new(matrix<T>& m, tensor<3,T>& t, bool sym = false)
 	
 	if (sym) { 
 		m_ptr->release();
+		delete m_ptr;
 	}
 	
 	//dbcsr::print(*m_ptr);
