@@ -102,6 +102,14 @@ public:
         int* f_b2 = (c_bounds2) ? unfold_bounds<int>(*c_bounds2) : nullptr;
         int* f_b3 = (c_bounds3) ? unfold_bounds<int>(*c_bounds3) : nullptr;
         
+        if (
+			(c_bounds1 && c_bounds1->size() != c_con1->size()) ||
+			(c_bounds2 && c_bounds2->size() != c_ncon1->size()) ||
+			(c_bounds3 && c_bounds3->size() != c_ncon2->size()) 
+		){
+			throw std::runtime_error("Wrong bound dimensions.");
+		}
+        
         int rank = -1;
         MPI_Comm_rank(c_t1.comm(),&rank);
         

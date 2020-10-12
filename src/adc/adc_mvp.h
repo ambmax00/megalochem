@@ -7,6 +7,7 @@
 #include "desc/options.h"
 #include "fock/jkbuilder.h"
 #include "mp/z_builder.h"
+#include "ints/fitting.h"
 #include "adc/adc_defaults.h"
 
 namespace adc {
@@ -136,10 +137,11 @@ private:
 	stensor3 m_I;
 #endif
 
-	arrvec<int,2> bb;
-	arrvec<int,3> xbb;
+	arrvec<int,2> m_bb;
+	arrvec<int,3> m_xbb;
 	
 	std::shared_ptr<ints::dfitting> m_dfit;
+	std::shared_ptr<Eigen::MatrixXi> m_shellpair_info;
 	
 public:
 

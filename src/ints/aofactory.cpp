@@ -631,7 +631,7 @@ public:
 		int off = PTR_ENV_START;
 		
 		m_env.resize(off);
-		m_env[PTR_RANGE_OMEGA] = - global::omega;
+		m_env[PTR_RANGE_OMEGA] = 0;
 				
 		for (int i = 0; i != m_natoms; ++i) {
 			m_atm[i * ATM_SLOTS + CHARGE_OF] = atoms[i].atomic_number;
@@ -710,15 +710,17 @@ public:
 		add_basis(*cbas);
 		if (xbas) add_basis(*xbas);
 		
+		//std::cout << "MAX_L: " << m_max_l << std::endl;
+		
 		auto print = [](auto& v) {
 			for (auto e : v) {
 				std::cout << e << " ";
 			} std::cout << std::endl;
 		};
 		
-		/*print(m_atm);
-		print(m_bas);
-		print(m_env);*/
+		//print(m_atm);
+		//print(m_bas);
+		//print(m_env);
 		
 		// offsets
 		
@@ -755,7 +757,12 @@ public:
 			m_x_offsets = xs_off;
 		}
 		
+		//std::cout << "B/X" << std::endl;
+		//auto xsizes = m_mol->dims().x();
+		//auto bsizes = m_mol->dims().b();
 		
+		//print(xsizes);
+		//print(bsizes);
 			
 				
 	}
@@ -769,9 +776,11 @@ public:
 		} else if (op == "nuclear") {
 			m_intfunc = cint1e_nuc_sph;
 		} else if (op == "coulomb") {
+			m_env[PTR_RANGE_OMEGA] = 0.0;
 			m_intfunc = cint2e_sph;
 		} else if (op == "erfc_coulomb") {
-			m_intfunc = cint2e_coulerf_sph;
+			m_env[PTR_RANGE_OMEGA] = -global::omega;
+			m_intfunc = cint2e_sph;
 		} else {
 			throw std::runtime_error("Invalid operator.");
 		}

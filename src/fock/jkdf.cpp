@@ -323,7 +323,8 @@ void BATCHED_DFMO_K::compute_K() {
 			m_eri_batched->decompress_init({2}, vec<int>{0,2},vec<int>{1});
 			reo0.finish();
 			
-			m_c_bm->batched_contract_init();
+			//m_c_bm->batched_contract_init();
+			m_HT1_xmb_02_1->batched_contract_init();
 			
 			for (int inu = 0; inu != m_eri_batched->nbatches(2); ++inu) {
 				
@@ -350,8 +351,8 @@ void BATCHED_DFMO_K::compute_K() {
 			
 			nze_HTI += m_HT1_xmb_02_1->num_nze_total();
 			
-			m_c_bm->batched_contract_finalize();
-			
+			//m_c_bm->batched_contract_finalize();
+			m_HT1_xmb_02_1->batched_contract_finalize();
 			m_eri_batched->decompress_finalize();
 			
 			// end for M
@@ -388,6 +389,8 @@ void BATCHED_DFMO_K::compute_K() {
 			LOG.os<1>("Computing K_mn = HT_xim * HT_xin\n");
 			
 			m_K_01->batched_contract_init();
+			m_HT2_xmb_01_2->batched_contract_init();
+			HT2_xmb_01_2_copy->batched_contract_init();
 			
 			for (int ix = 0; ix != m_eri_batched->nbatches(0); ++ix) {
 			
@@ -406,6 +409,8 @@ void BATCHED_DFMO_K::compute_K() {
 			}
 			
 			m_K_01->batched_contract_finalize();
+			m_HT2_xmb_01_2->batched_contract_finalize();
+			HT2_xmb_01_2_copy->batched_contract_finalize();
 			
 			m_HT2_xmb_01_2->clear();
 			HT2_xmb_01_2_copy->clear();
@@ -513,7 +518,6 @@ void BATCHED_DFAO_K::compute_K() {
 		m_K_01->batched_contract_init();
 		m_cbar_xbb_01_2->batched_contract_init();
 		m_cbar_xbb_1_02->batched_contract_init();
-		//m_p_bb->batched_contract_init();
 		
 		int64_t nze_cbar = 0;
 		//auto full = eri_01_2->nfull_total();
@@ -530,6 +534,8 @@ void BATCHED_DFAO_K::compute_K() {
 			m_eri_batched->decompress({ix});
 			auto eri_01_2 = m_eri_batched->get_work_tensor();
 			fetch.finish();
+			
+			//m_p_bb->batched_contract_init();
 			
 			for (int inu = 0; inu != m_eri_batched->nbatches(2); ++inu) {
 				
@@ -593,6 +599,8 @@ void BATCHED_DFAO_K::compute_K() {
 				
 			}
 			
+			//m_p_bb->batched_contract_finalize();
+			
 		}
 		
 		m_eri_batched->decompress_finalize();
@@ -600,7 +608,6 @@ void BATCHED_DFAO_K::compute_K() {
 		
 		m_cbar_xbb_01_2->batched_contract_finalize();
 		m_cbar_xbb_1_02->batched_contract_finalize();
-		//m_p_bb->batched_contract_finalize();
 		
 		//double occ_cbar = (double) nze_cbar / (double) nze_cbar_tot;
 		//LOG.os<1>("Occupancy of cbar: ", occ_cbar, "%\n");

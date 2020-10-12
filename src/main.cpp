@@ -10,7 +10,7 @@
 #include "io/io.h"
 #include "hf/hfmod.h"
 #include "mp/mpmod.h"
-//#include "adc/adcmod.h"
+#include "adc/adcmod.h"
 #include "utils/mpi_time.h"
 
 #include "extern/scalapack.h"
@@ -177,7 +177,7 @@ int main(int argc, char** argv) {
 		mymp.compute_batch();
 		
 	}
-	/*
+
 	auto adcopt = opt.subtext("adc");
 	bool do_adc = opt.get<bool>("do_adc");
 	
@@ -185,7 +185,7 @@ int main(int argc, char** argv) {
 		
 		adc::adcmod myadc(myhfwfn,adcopt,wrd);
 		myadc.compute();
-	}*/
+	}
 	
 	scalapack::global_grid.free();
 

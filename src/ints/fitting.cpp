@@ -36,13 +36,19 @@ dbcsr::sbtensor<3,double> dfitting::compute(dbcsr::sbtensor<3,double> eri_batche
 	dbcsr::shared_tensor<2,double> inv, std::string cfit_btype) {
 	
 	auto spgrid3_xbb = eri_batched->spgrid();
-	
+		
 	auto b = m_mol->dims().b();
 	auto x = m_mol->dims().x();
 	
 	arrvec<int,3> xbb = {x,b,b};
 	
 	// ======== Compute inv_xx * i_xxb ==============
+	
+	auto print = [](auto v) {
+		for (auto e : v) {
+			std::cout << e << " ";
+		} std::cout << std::endl;
+	};
 	
 	auto c_xbb_0_12 = dbcsr::tensor_create<3>()
 		.name("c_xbb_0_12")
@@ -55,6 +61,7 @@ dbcsr::sbtensor<3,double> dfitting::compute(dbcsr::sbtensor<3,double> eri_batche
 		.name("c_xbb_1_02")
 		.map1({1}).map2({0,2})
 		.get();
+		
 			
 	auto mytype = dbcsr::get_btype(cfit_btype);
 	
@@ -83,6 +90,8 @@ dbcsr::sbtensor<3,double> dfitting::compute(dbcsr::sbtensor<3,double> eri_batche
 	
 	eri_batched->decompress_init({2},vec<int>{0},vec<int>{1,2});
 	c_xbb_batched->compress_init({2,0}, vec<int>{1}, vec<int>{0,2});
+	c_xbb_0_12->batched_contract_init();
+	c_xbb_1_02->batched_contract_init();
 	
 	for (int inu = 0; inu != c_xbb_batched->nbatches(2); ++inu) {
 		
@@ -90,6 +99,8 @@ dbcsr::sbtensor<3,double> dfitting::compute(dbcsr::sbtensor<3,double> eri_batche
 		eri_batched->decompress({inu});
 		auto eri_0_12 = eri_batched->get_work_tensor();
 		fetch.finish();
+		
+		//inv->batched_contract_init();
 			
 		for (int ix = 0; ix != c_xbb_batched->nbatches(0); ++ix) {
 			
@@ -114,17 +125,20 @@ dbcsr::sbtensor<3,double> dfitting::compute(dbcsr::sbtensor<3,double> eri_batche
 					.move_data(true)
 					.perform();
 				reo.finish();
-				
-				//dbcsr::print(*c_xbb_1_02);
-			
+					
 				c_xbb_batched->compress({inu,ix}, c_xbb_1_02);
 				
 		}
+		
+		//inv->batched_contract_finalize();
+		
 	}
 	
 	c_xbb_batched->compress_finalize();
 	eri_batched->decompress_finalize();
-	
+	c_xbb_0_12->batched_contract_finalize();
+	c_xbb_1_02->batched_contract_finalize();
+		
 	double c_occ = c_xbb_batched->occupation() * 100;
 	LOG.os<1>("Occupancy of c_xbb: ", c_occ, "%\n");
 
@@ -219,11 +233,15 @@ dbcsr::shared_tensor<3,double> dfitting::compute_pari(dbcsr::sbtensor<3,double> 
 	
 	auto spgrid3_xbb = eri_batched->spgrid();
 	
+	auto spgrid3_pair = dbcsr::create_pgrid<3>(m_world.comm())
+		.tensor_dims(xbbsizes)
+		.get();
+	
 	auto spgrid2_self = dbcsr::create_pgrid<2>(MPI_COMM_SELF).get();
 	
 	auto spgrid3_self = dbcsr::create_pgrid<3>(MPI_COMM_SELF).get();
 		
-	auto dims = spgrid3_xbb->dims();
+	auto dims = spgrid3_pair->dims();
 	
 	for (auto p : dims) {
 		LOG.os<1>(p, " ");
@@ -242,7 +260,7 @@ dbcsr::shared_tensor<3,double> dfitting::compute_pari(dbcsr::sbtensor<3,double> 
 	
 	arrvec<int,3> distsizes = {d0,d1,d2};
 	
-	dbcsr::dist_t<3> cdist(spgrid3_xbb, distsizes);
+	dbcsr::dist_t<3> cdist(spgrid3_pair, distsizes);
 	
 	// === END
 
@@ -260,6 +278,13 @@ dbcsr::shared_tensor<3,double> dfitting::compute_pari(dbcsr::sbtensor<3,double> 
 		.pgrid(spgrid3_xbb)
 		.blk_sizes(xbb)
 		.map1({0,1}).map2({2})
+		.get();
+		
+	auto c_xbb_self_mn = dbcsr::tensor_create<3,double>()
+		.name("c_xbb_self_mn")
+		.pgrid(spgrid3_self)
+		.map1({0}).map2({1,2})
+		.blk_sizes(xbb)
 		.get();
 		
 	auto c_xbb_self = dbcsr::tensor_create<3,double>()
@@ -330,7 +355,7 @@ dbcsr::shared_tensor<3,double> dfitting::compute_pari(dbcsr::sbtensor<3,double> 
 	int natom_pairs = atom_pairs.size();
 	
 	LOG(-1).os<>("NATOM PAIRS: ", natom_pairs, '\n');
-	
+		
 	int npairs_per_batch = std::ceil((double)natom_pairs / (double)nbatches);
 	
 	for (int ibatch = 0; ibatch != nbatches; ++ibatch) {
@@ -466,11 +491,12 @@ dbcsr::shared_tensor<3,double> dfitting::compute_pari(dbcsr::sbtensor<3,double> 
 
 #if 0	
 			std::cout << "Problem size: " << m << " x " << m << std::endl;
-			std::cout << "MY ALPHABETA: " << std::endl;
+			//std::cout << "MY ALPHABETA: " << std::endl;
 			
-			std::cout << alphaBeta << std::endl;
+			//std::cout << alphaBeta << std::endl;
 			
 			std::cout << "ALPHA TENSOR: " << std::endl;
+			met->filter(dbcsr::global::filter_eps);
 			dbcsr::print(*met);
 
 #endif
@@ -505,13 +531,13 @@ dbcsr::shared_tensor<3,double> dfitting::compute_pari(dbcsr::sbtensor<3,double> 
 			//	std::cout << Inv.data()[i] << std::endl;
 			//}
 
-#if 0		
+#if 0	
 			Eigen::MatrixXd E = Eigen::MatrixXd::Identity(m,m);
 			
 			E -= Inv * alphaBeta_c;
 			std::cout << "ERROR1: " << E.norm() << std::endl;
 			
-			std::cout << Inv << std::endl;
+			//std::cout << Inv << std::endl;
 #endif
 			U.resize(0,0);
 			Vt.resize(0,0);
@@ -558,22 +584,33 @@ dbcsr::shared_tensor<3,double> dfitting::compute_pari(dbcsr::sbtensor<3,double> 
 			iter_inv.stop();
 							 
 			inv_self->filter(dbcsr::global::filter_eps);
+			//std::cout << "INV" << std::endl;
 			//dbcsr::print(*inv_self);
-						
-			dbcsr::contract(*inv_self, *eri_self, *c_xbb_self)
-				.alpha(1.0).beta(1.0)
+			
+			//std::cout << "INTS" << std::endl;
+			//dbcsr::print(*eri_self);
+			
+			dbcsr::contract(*inv_self, *eri_self, *c_xbb_self_mn)
+				.alpha(1.0)
 				.filter(dbcsr::global::filter_eps)
 				.perform("XY, YMN -> XMN");
 		
 #if 0		
-			dbcsr::contract(*met, *c_xbb_self, *eri_self)
+			dbcsr::contract(*met, *c_xbb_self_mn, *eri_self)
 				.alpha(-1.0).beta(1.0)
 				.filter(dbcsr::global::filter_eps)
 				.perform("XY, YMN -> XMN");
 				
 			std::cout << "SUM" << std::endl;
 			dbcsr::print(*eri_self);
+			auto nblk = eri_self->num_blocks_total();
+			std::cout << nblk << std::endl;
 #endif
+		
+			dbcsr::copy(*c_xbb_self_mn, *c_xbb_self)
+				.move_data(true)
+				.sum(true)
+				.perform();
 		
 			eri_self->clear();
 			inv_self->clear();

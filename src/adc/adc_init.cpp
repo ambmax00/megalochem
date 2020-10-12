@@ -4,7 +4,6 @@
 #include "ints/gentran.h"
 #include "math/linalg/LLT.h"
 #include "math/solvers/hermitian_eigen_solver.h"
-#include <libint2/basis.h>
 #include <Eigen/Eigenvalues>
 
 namespace adc {
@@ -21,7 +20,7 @@ adcmod::adcmod(hf::shared_hf_wfn hfref, desc::options& opt, dbcsr::world& w) :
 	TIME(w.comm(), "ADC Module", LOG.global_plev()),
 	m_jmethod(m_opt.get<std::string>("build_J", ADC_BUILD_J)),
 	m_kmethod(m_opt.get<std::string>("build_K", ADC_BUILD_K)),
-	m_zmethod(m_opt.get<std::string>("build_Z", ADC_BUILD_Z)),
+	m_zmethod(m_opt.get<std::string>("build_Z", ADC_BUILD_Z))
 {
 	
 	LOG.banner("ADC MODULE",50,'*');
@@ -123,14 +122,14 @@ void adcmod::init_ao_tensors() {
 		
 		if (metric == "coulomb") {
 		
-			auto out = aofac->ao_3coverlap("coulomb");
+			auto out = aofac->ao_2c2e("coulomb");
 			out->filter(dbcsr::global::filter_eps);
 			ao3c2e_overlap = out;
 			
 		} else {
 			
-			auto coul_metric = aofac->ao_3coverlap("coulomb");
-			auto other_metric = aofac->ao_3coverlap(metric);
+			auto coul_metric = aofac->ao_2c2e("coulomb");
+			auto other_metric = aofac->ao_2c2e(metric);
 			
 			math::hermitian_eigen_solver solver(coul_metric, 'V');
 			solver.compute();
@@ -234,14 +233,18 @@ void adcmod::init_ao_tensors() {
 		
 		aofac->ao_3c2e_setup(metric);
 		
-		auto genfunc = aofac->get_generator(scr_s);
+		auto genfunc = aofac->get_generator(s_scr);
 		
 		dbcsr::btype mytype = dbcsr::get_btype(eris_mem);
 		
 		int nbatches_x = m_opt.get<int>("nbatches_x", ADC_NBATCHES_X);
 		int nbatches_b = m_opt.get<int>("nbatches_b", ADC_NBATCHES_B);
 		
+		auto x = m_hfwfn->mol()->dims().x();
+		auto b = m_hfwfn->mol()->dims().b();
+		
 		std::array<int,3> bdims = {nbatches_x,nbatches_b,nbatches_b};
+		arrvec<int,3> xbb = {x,b,b};
 		
 		eri_batched = dbcsr::btensor_create<3>()
 			.pgrid(m_spgrid3_xbb)
@@ -277,7 +280,7 @@ void adcmod::init_ao_tensors() {
 				eri_batched->compress({ix}, eri_hold);
 		}
 		
-		eribatch->compress_finalize();
+		eri_batched->compress_finalize();
 		
 		t_eri_batched.finish();
 				
@@ -294,6 +297,7 @@ void adcmod::init_ao_tensors() {
 		auto cfit = m_dfit->compute(eri_batched, ao3c2e_overlap_inv, intermeds);
 		m_reg.insert_btensor<3,double>("c_xbb_batched", cfit);
 	} else if (m_kmethod == "batchpari") {
+		throw std::runtime_error("PARI NYI for ADC.");
 		auto cfit = m_dfit->compute_pari(eri_batched, ao3c2e_overlap, s_scr);
 		m_reg.insert_tensor<3,double>("c_xbb_pari", cfit);
 	}
@@ -301,7 +305,7 @@ void adcmod::init_ao_tensors() {
 	if (eri_batched) m_reg.insert_btensor<3,double>("i_xbb_batched", eri_batched);
 	if (ao3c2e_overlap_inv) m_reg.insert_matrix<double>("s_xx_inv", ao3c2e_overlap_inv);
 	if (ao3c2e_overlap_invsqrt) 
-		m_reg.insert_matrix<double>("s_xx_invsqrt", ao3c2e_oberlap_invsqrt);
+		m_reg.insert_matrix<double>("s_xx_invsqrt", ao3c2e_overlap_invsqrt);
 	if (ao3c2e_overlap) m_reg.insert_matrix<double>("s_xx", ao3c2e_overlap);
 	if (s_scr) m_reg.insert_screener("screener", s_scr);
 	if (s_bb) m_reg.insert_matrix<double>("s_bb", s_bb);

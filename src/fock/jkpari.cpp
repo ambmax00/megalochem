@@ -93,7 +93,17 @@ void BATCHED_PARI_K::compute_K() {
 		
 	time_reo_int1.start();
 	m_eri_batched->decompress_init({0}, vec<int>{0,2},vec<int>{1});
-	time_reo_int1.finish();	
+	time_reo_int1.finish();
+	
+	K1->batched_contract_init();
+	K2->batched_contract_init();
+	
+	cfit_xbb_01_2->batched_contract_init();
+	cfit_xbb_0_12->batched_contract_init();
+	cbar_xbb_01_2->batched_contract_init();
+	cbar_xbb_02_1->batched_contract_init();
+	ctil_xbb_0_12->batched_contract_init();
+	ctil_xbb_02_1->batched_contract_init();
 	
 	dbcsr::copy_matrix_to_tensor(*m_p_A, *m_p_bb);
 	dbcsr::copy_matrix_to_tensor(*m_s_xx, *m_s_xx_01);
@@ -106,6 +116,9 @@ void BATCHED_PARI_K::compute_K() {
 		m_eri_batched->decompress({ix});
 		auto eri_02_1 = m_eri_batched->get_work_tensor();
 		time_fetch_ints.finish();
+		
+		//m_p_bb->batched_contract_init();
+		//m_s_xx_01->batched_contract_init();
 		
 		// Loop inu
 		for (int isig = 0; isig != m_eri_batched->nbatches(2); ++isig) {
@@ -207,7 +220,21 @@ void BATCHED_PARI_K::compute_K() {
 			LOG.os<1>("Done.\n");
 				
 		} // end loop sig
+		
+		//m_p_bb->batched_contract_finalize();
+		//m_s_xx_01->batched_contract_finalize();
+		
 	} // end loop x
+	
+	K1->batched_contract_finalize();
+	K2->batched_contract_finalize();
+	
+	cfit_xbb_01_2->batched_contract_finalize();
+	cfit_xbb_0_12->batched_contract_finalize();
+	cbar_xbb_01_2->batched_contract_finalize();
+	cbar_xbb_02_1->batched_contract_finalize();
+	ctil_xbb_0_12->batched_contract_finalize();
+	ctil_xbb_02_1->batched_contract_finalize();
 	
 	m_eri_batched->decompress_finalize();
 	m_s_xx_01->clear();
