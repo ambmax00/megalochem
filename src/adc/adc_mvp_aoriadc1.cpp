@@ -24,7 +24,7 @@ void MVP_ao_ri_adc1::init() {
 	
 	LOG.os<>("Setting up k builder for AO-ADC1.\n");
 	
-	if (kmethod == "batchdf") {
+	if (kmethod == "batchdfao") {
 		fock::K* kbuilder = new fock::BATCHED_DFAO_K(m_world,m_opt);
 		m_kbuilder.reset(kbuilder);
 	} else if (kmethod == "batchpari") {

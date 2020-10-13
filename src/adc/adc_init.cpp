@@ -3,6 +3,7 @@
 #include "ints/screening.h"
 #include "ints/gentran.h"
 #include "math/linalg/LLT.h"
+#include "math/linalg/piv_cd.h"
 #include "math/solvers/hermitian_eigen_solver.h"
 #include <Eigen/Eigenvalues>
 
@@ -83,7 +84,7 @@ void adcmod::init_ao_tensors() {
 	bool compute_3c2e(false), 
 		compute_metric_inv(false), 
 		compute_metric_invsqrt(false),
-		compute_s_bb(false);
+		compute_s_bb(true);
 		
 	switch(m_method) {
 		case method::ao_adc_1:

@@ -2,7 +2,7 @@
 #include "adc/adcmod.h"
 #include "adc/adc_mvp.h"
 #include "math/solvers/davidson.h"
-
+#include "math/linalg/piv_cd.h"
 #include <dbcsr_conversions.hpp>
 
 namespace adc {
@@ -69,17 +69,19 @@ void adcmod::compute() {
 			
 		}
 		
-		MVP* mvfacptr = new MVP_ao_ri_adc2(m_world, m_hfwfn->mol(), 
+		MVP* mvfacptr = new MVP_ao_ri_adc1(m_world, m_hfwfn->mol(), 
 			m_opt, m_reg, epso, epsv);
 		std::shared_ptr<MVP> mvfac(mvfacptr);
 		
 		mvfac->init();
-		auto out = mvfac->compute(dav_guess[0], 0.3); 
+		//auto out = mvfac->compute(dav_guess[0], 0.3); 
 		
-		double t = out->dot(*dav_guess[0]);
-		std::cout << "DOT: " << t << std::endl;
+		//double t = out->dot(*dav_guess[0]);
+		//std::cout << "DOT: " << t << std::endl;
 		
-		exit(0); 
+		//dbcsr::print(*dav_guess[0]);
+		
+		//exit(0); 
 		
 		math::davidson<MVP> dav(m_world.comm(), LOG.global_plev());
 		
@@ -98,16 +100,51 @@ void adcmod::compute() {
 		auto rvecs = dav.ritz_vectors();
 		auto vec_k = rvecs[m_nroots-1];
 		
+		
+		// LOCALIZATION ???
+		
+		auto po_bb = m_hfwfn->po_bb_A();
+		auto pv_bb = m_hfwfn->pv_bb_A();
+		auto c_bo = m_hfwfn->c_bo_A();
+		auto c_bv = m_hfwfn->c_bv_A();
+		auto s_bb = m_reg.get_matrix<double>("s_bb");
+		
+		math::pivinc_cd psolver_o(po_bb,0);
+		math::pivinc_cd psolver_v(pv_bb,0);
+		
+		psolver_o.compute();
+		psolver_v.compute();
+		
+		auto b = m_hfwfn->mol()->dims().b();
+		
+		auto Lo = psolver_o.L(b,o);
+		auto Lv = psolver_v.L(b,v);
+		
+		auto Lo_e = dbcsr::matrix_to_eigen(Lo);
+		auto Lv_e = dbcsr::matrix_to_eigen(Lv);
+		auto S_e = dbcsr::matrix_to_eigen(s_bb);
+		
+		auto c_bo_e = dbcsr::matrix_to_eigen(c_bo);
+		auto c_bv_e = dbcsr::matrix_to_eigen(c_bv);
+		
 		auto vec_k_e = dbcsr::matrix_to_eigen(vec_k);
-		double thresh = 1e-6;
+		double thresh = 1e-3;
+		
+		auto c_oo = Lo_e.transpose() * S_e * c_bo_e;
+		auto c_vv = Lv_e.transpose() * S_e * c_bv_e;
+		
+		vec_k_e = c_oo * vec_k_e * c_vv.transpose();
+		
+		std::cout << vec_k_e << std::endl;
+		std::cout << Lo_e << std::endl;
 		
 		std::vector<int> occs, virs;
-		
+				
 		LOG.os<>("State involves the orbital(s):\n");
 		for (int iocc = 0; iocc != vec_k_e.rows(); ++iocc) {
 			for (int ivir = 0; ivir != vec_k_e.cols(); ++ivir) {
 				if (fabs(vec_k_e(iocc,ivir)) >= thresh) {
-					LOG.os<>(iocc, " -> ", ivir, " : ", vec_k_e(iocc,ivir), '\n');
+					LOG.os<>(iocc, " -> ", nocc + ivir, " : ", vec_k_e(iocc,ivir), '\n');
 					occs.push_back(iocc);
 					virs.push_back(ivir);
 				}
@@ -123,12 +160,6 @@ void adcmod::compute() {
 		get_unique(occs);
 		get_unique(virs);
 		
-		auto c_bo = m_hfwfn->c_bo_A();
-		auto c_bv = m_hfwfn->c_bv_A();
-		
-		auto c_bo_e = dbcsr::matrix_to_eigen(c_bo);
-		auto c_bv_e = dbcsr::matrix_to_eigen(c_bv);
-		
 		// OCC
 		std::vector<int> aolist;
 		
@@ -136,21 +167,21 @@ void adcmod::compute() {
 			Eigen::MatrixXd& c_bm) {
 		
 			for (auto im : mlist) {
-				std::cout << "CHECKING " << im << std::endl;
+				//std::cout << "CHECKING " << im << std::endl;
 				for (int ibas = 0; ibas != c_bm.rows(); ++ibas) {
 					if (fabs(c_bm(ibas,im)) >= thresh) {
 						list.push_back(ibas);
-						std::cout << ibas << " ";
+						//std::cout << ibas << " ";
 					}
 				}
-				std::cout << std::endl;
+				//std::cout << std::endl;
 			}
 		};
 		
-		std::cout << "DO OCCS" << std::endl;
-		get_aos(aolist, occs, c_bo_e);
-		std::cout << "DO VIRS" << std::endl;
-		get_aos(aolist, virs, c_bv_e);
+		//std::cout << "DO OCCS" << std::endl;
+		get_aos(aolist, occs, Lo_e);
+		//std::cout << "DO VIRS" << std::endl;
+		get_aos(aolist, virs, Lv_e);
 		
 		get_unique(aolist);
 		
