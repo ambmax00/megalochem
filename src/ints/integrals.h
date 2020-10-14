@@ -59,6 +59,9 @@ int cint1e_nuc_sph(double *out, const FINT *shls,
 	const FINT *atm, FINT natm, const FINT *bas, FINT nbas, const double *env,
 	const CINTOpt *opt);
 
+int cint1e_r_sph(double *out, const FINT *shls,
+	const FINT *atm, FINT natm, const FINT *bas, FINT nbas, const double *env,
+	const CINTOpt *opt);
 
 int cint1e_kin_sph(double *out, const FINT *shls,
 	const FINT *atm, FINT natm, const FINT *bas, FINT nbas, const double *env,
@@ -82,6 +85,11 @@ typedef FINT (*CINTIntegralFunction)(double *out, const FINT *shls,
 namespace ints {
 		
 void calc_ints(dbcsr::mat_d& m_out, std::vector<std::vector<int>*> shell_offsets, 
+		std::vector<std::vector<int>*> shell_sizes, CINTIntegralFunction& int_func,
+		FINT *atm, FINT natm, FINT* bas, FINT nbas, double* env, int max_l);
+		
+void calc_ints(dbcsr::mat_d& m_x, dbcsr::mat_d& m_y, dbcsr::mat_d& m_z, 
+		std::vector<std::vector<int>*> shell_offsets, 
 		std::vector<std::vector<int>*> shell_sizes, CINTIntegralFunction& int_func,
 		FINT *atm, FINT natm, FINT* bas, FINT nbas, double* env, int max_l);
 		

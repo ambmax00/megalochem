@@ -3,7 +3,7 @@
 #include "ints/screening.h"
 #include "ints/gentran.h"
 #include "math/linalg/LLT.h"
-#include "math/linalg/piv_cd.h"
+#include "locorb/locorb.h"
 #include "math/solvers/hermitian_eigen_solver.h"
 #include <Eigen/Eigenvalues>
 
@@ -337,6 +337,34 @@ void adcmod::init_mo_tensors() {
 	
 	m_reg.insert_matrix<double>("c_bo", c_bo);
 	m_reg.insert_matrix<double>("c_bv", c_bv);
+	
+	locorb::mo_localizer loc(m_world, m_hfwfn->mol());
+	
+	auto L_bo = loc.compute_boys(c_bo);
+	auto L_bv = loc.compute_boys(c_bv);
+	
+	//dbcsr::print(*c_bo);
+	//dbcsr::print(*L_bo);
+	
+	auto c_e = dbcsr::matrix_to_eigen(c_bo);
+	auto l_e = dbcsr::matrix_to_eigen(L_bo);
+	
+	LOG.os<>(c_e, '\n');
+	LOG.os<>("NEW\n");
+	LOG.os<>(l_e, '\n');
+	
+	auto p = m_hfwfn->po_bb_A();
+	
+	dbcsr::multiply('N', 'T', *L_bo, *L_bo, *p)
+		.alpha(1.0)
+		.beta(-1.0)
+		.filter_eps(dbcsr::global::filter_eps)
+		.perform();
+	
+	auto nblk = p->num_blocks();
+	if (nblk != 0) throw std::runtime_error("Something went wrong.");
+	
+	exit(0);
 	
 }
 

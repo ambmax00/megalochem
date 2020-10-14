@@ -21,4 +21,5 @@ target_link_libraries(
 	chem_math_laplace
 	chem_mp
 	chem_fock
+	chem_locorb
 )

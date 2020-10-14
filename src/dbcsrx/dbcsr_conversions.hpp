@@ -76,21 +76,7 @@ shared_matrix<T> eigen_to_matrix(MatrixX<T>& mat, world& w, std::string name, ve
 	
 	if (out->has_symmetry()) {
 		//reserve upper diagonal blocks
-		int nrows, ncols;
-		nrows = out->nblkrows_total();
-		ncols = out->nblkcols_total();
-		vec<int> resrows, rescols;
-	
-		for (int i = 0; i != nrows; ++i) {
-			for (int j = 0; j != ncols; ++j) {
-				if (out->proc(i,j) == w.rank() && i <= j) {
-					resrows.push_back(i);
-					rescols.push_back(j);
-				}
-			}
-		}
-	
-		out->reserve_blocks(resrows,rescols);
+		out->reserve_sym();
 		
 	} else {
 		

@@ -12,6 +12,7 @@ add_subdirectory(fock)
 add_subdirectory(hf)
 add_subdirectory(mp)
 add_subdirectory(adc)
+add_subdirectory(locorb)
 
 add_executable(
         chem

@@ -559,11 +559,11 @@ public:
     }
     
     void batched_contract_init() {
-		c_dbcsr_t_batched_contract_init(m_tensor_ptr);
+		//c_dbcsr_t_batched_contract_init(m_tensor_ptr);
 	}
 	
 	void batched_contract_finalize() {
-		c_dbcsr_t_batched_contract_finalize(m_tensor_ptr,nullptr);
+		//c_dbcsr_t_batched_contract_finalize(m_tensor_ptr,nullptr);
 	}
 	
 	vec<int> idx_speed() {

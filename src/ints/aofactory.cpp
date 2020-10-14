@@ -781,6 +781,8 @@ public:
 		} else if (op == "erfc_coulomb") {
 			m_env[PTR_RANGE_OMEGA] = -global::omega;
 			m_intfunc = cint2e_sph;
+		} else if (op == "emult") {
+			m_intfunc = cint1e_r_sph;
 		} else {
 			throw std::runtime_error("Invalid operator.");
 		}
@@ -842,21 +844,7 @@ public:
 			.matrix_type(dbcsr::type::symmetric)
 			.get();
 			
-		// reserve symmtric blocks
-		int nblks = m_ints->nblkrows_total();
-		
-		vec<int> resrows, rescols;
-		
-		for (int i = 0; i != nblks; ++i) {
-			for (int j = 0; j != nblks; ++j) {
-				if (m_ints->proc(i,j) == m_world.rank() && i <= j) {
-					resrows.push_back(i);
-					rescols.push_back(j);
-				}
-			}
-		}
-		
-		m_ints->reserve_blocks(resrows,rescols);
+		m_ints->reserve_sym();
 		
 		if (m_braket == "x_x") {
 		
@@ -878,6 +866,45 @@ public:
 		
 		return m_ints;
 		
+	}
+	
+	std::array<dbcsr::shared_matrix<double>,3> compute_xyz(std::array<int,3> O) {
+		
+		auto ints_x = dbcsr::create<double>()
+			.name(m_intname + "_x")
+			.set_world(m_world)
+			.row_blk_sizes(m_tensor_sizes[0])
+			.col_blk_sizes(m_tensor_sizes[1])
+			.matrix_type(dbcsr::type::symmetric)
+			.get();
+			
+		auto ints_y = dbcsr::create_template<double>(ints_x)
+			.name(m_intname + "_y")
+			.get();
+			
+		auto ints_z = dbcsr::create_template<double>(ints_x)
+			.name(m_intname + "_z")
+			.get();
+			
+		ints_x->reserve_sym();
+		ints_y->reserve_sym();
+		ints_z->reserve_sym();
+		
+		m_env[PTR_COMMON_ORIG + 0] = O[0]; 
+		m_env[PTR_COMMON_ORIG + 1] = O[1];
+		m_env[PTR_COMMON_ORIG + 2] = O[2];
+		
+		calc_ints(*ints_x, *ints_y, *ints_z, m_shell_offsets, 
+				m_nshells, m_intfunc,
+				m_atm.data(), m_natoms, m_bas.data(), m_nbas,
+				m_env.data(), m_max_l);
+				
+		std::array<dbcsr::shared_matrix<double>,3> out = {
+			ints_x, ints_y, ints_z
+		};
+		
+		return out;
+			
 	}
 	
 	void compute_3_partial(dbcsr::shared_tensor<3>& t_in, vec<vec<int>>& blkbounds,
@@ -1030,6 +1057,18 @@ dbcsr::shared_matrix<double> aofactory::ao_auxoverlap() {
 	pimpl->set_operator("overlap");
 	pimpl->setup_calc();
 	return pimpl->compute();
+}
+
+std::array<dbcsr::shared_matrix<double>,3>
+	aofactory::ao_emultipole(std::array<int,3> O) {
+		
+	pimpl->set_name("emult");
+	pimpl->set_dim("bb");
+	pimpl->set_braket("x_x");
+	pimpl->set_operator("emult");
+	pimpl->setup_calc();
+	return pimpl->compute_xyz(O);
+	
 }
 
 void aofactory::ao_3c2e_setup(std::string metric) {

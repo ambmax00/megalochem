@@ -734,6 +734,124 @@ void calc_ints(dbcsr::mat_d& m_out, std::vector<std::vector<int>*> shell_offsets
 	
 }
 
+void calc_ints(dbcsr::mat_d& m_x, dbcsr::mat_d& m_y, dbcsr::mat_d& m_z, 
+		std::vector<std::vector<int>*> shell_offsets, 
+		std::vector<std::vector<int>*> shell_sizes, CINTIntegralFunction& int_func,
+		FINT *atm, FINT natm, FINT* bas, FINT nbas, double* env, int max_l) 
+{
+	
+	auto& nshells0 = *shell_sizes[0];
+	auto& nshells1 = *shell_sizes[1];
+	auto& shell_offsets0 = *shell_offsets[0];
+	auto& shell_offsets1 = *shell_offsets[1]; 
+	
+	int max_buf_size = pow(2 * max_l + 1,2);
+	
+	//#pragma omp parallel 
+	//{	
+	
+	auto w = m_x.get_world();
+	auto rank = w.rank();
+	
+	auto row_offsets = m_x.row_blk_offsets();
+	auto col_offsets = m_x.col_blk_offsets();
+	
+	double* buf = new double[max_buf_size * 3];
+	int* shls = new int[2];
+	
+	int rtot = m_x.nblkrows_total();
+	int ctot = m_x.nblkcols_total();
+		
+	for (int iblk0 = 0; iblk0 != rtot; ++iblk0) {
+		for (int iblk1 = 0; iblk1 != ctot; ++iblk1) {
+			
+			if (m_x.proc(iblk0,iblk1) != rank) continue;
+					
+			bool found = true;
+			
+			auto blkx = m_x.get_block_p(iblk0, iblk1, found);
+			if (!found) continue;
+			auto blky = m_y.get_block_p(iblk0, iblk1, found);
+			if (!found) continue;
+			auto blkz = m_z.get_block_p(iblk0, iblk1, found);
+			if (!found) continue;
+						
+			//block lower bounds
+			int lb0 = row_offsets[iblk0];
+			int lb1 = col_offsets[iblk1];
+			
+			// tensor offsets
+			int toff0 = lb0;
+			int toff1 = lb1;
+			// local Block offsets
+			int locblkoff0 = 0;
+			int locblkoff1 = 0;
+			
+			int soff0 = shell_offsets0[iblk0];
+			int soff1 = shell_offsets1[iblk1];
+			int nshell0 = nshells0[iblk0];
+			int nshell1 = nshells1[iblk1];
+			
+			//std::cout << "soffs: " << soff0 << " " << soff1 << std::endl;
+			//std::cout << "nshells: " << nshell0 << " " << nshell1 << std::endl;
+			
+			for (int s0 = soff0; s0 != soff0+nshell0; ++s0) {
+							
+				toff0 += locblkoff0;
+				int shellsize0 = CINTcgto_spheric(s0,bas);
+				shls[0] = s0;
+					
+				for (int s1 = soff1; s1 != soff1+nshell1; ++s1) {
+					
+					toff1 += locblkoff1;
+					int shellsize1 = CINTcgto_spheric(s1,bas);
+					shls[1] = s1;
+					
+					//std::cout << "PROCESSING SHELL: " << s0 << " " << s1 << std::endl;
+					
+					int res = int_func(buf, shls, atm, natm, bas, nbas, env, nullptr);
+											
+					if (res != 0) {
+						int idx = 0;
+					
+						for (int j = 0; j != shellsize1; ++j) {
+							for (int i = 0; i != shellsize0; ++i) {
+								//std::cout << buf[idx] << " ";
+								blkx(i + locblkoff0, j + locblkoff1) = buf[idx++];
+						}}
+						
+						for (int j = 0; j != shellsize1; ++j) {
+							for (int i = 0; i != shellsize0; ++i) {
+								//std::cout << buf[idx] << " ";
+								blky(i + locblkoff0, j + locblkoff1) = buf[idx++];
+						}}
+						
+						for (int j = 0; j != shellsize1; ++j) {
+							for (int i = 0; i != shellsize0; ++i) {
+								//std::cout << buf[idx] << " ";
+								blkz(i + locblkoff0, j + locblkoff1) = buf[idx++];
+						}}
+						
+					}
+					
+					locblkoff1 += shellsize1;						
+				}//endfor s2
+				
+				toff1 = lb1;
+				locblkoff1 = 0;
+				locblkoff0 += shellsize0;
+			}//endfor s1
+						
+		} // end for ic
+	} // end for ir
+	
+	delete [] buf;
+	delete [] shls;
+		
+	//}//end parallel omp	
+	
+}
+
 void calc_ints(dbcsr::tensor<3,double>& m_out, std::vector<std::vector<int>*> shell_offsets, 
 		std::vector<std::vector<int>*> nshells, CINTIntegralFunction& int_func,
 		FINT *atm, FINT natm, FINT* bas, FINT nbas, double* env, int max_l)
