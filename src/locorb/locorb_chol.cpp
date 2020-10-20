@@ -21,7 +21,7 @@ dbcsr::shared_matrix<double>
 		
 	dbcsr::multiply('N', 'T', *c_bm, *c_bm, *p_bb).perform();
 	
-	math::pivinc_cd piv(p_bb, LOG.global_plev());
+	math::pivinc_cd piv(p_bb, 9999);
 	
 	piv.compute();
 	
