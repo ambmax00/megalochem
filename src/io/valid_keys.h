@@ -87,6 +87,7 @@ static const json valid_keys =
 		{"build_J", "df"},
 		{"build_K", "df"},
 		{"build_Z", "LLMPFULL"},
+		{"eris", "core"},
 		{"intermeds", "core"},
 		{"doubles", "full"},
 		{"_required", {"nroots", "dfbasis", "method"}}

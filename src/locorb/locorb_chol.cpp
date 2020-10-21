@@ -3,8 +3,8 @@
 
 namespace locorb {
 
-dbcsr::shared_matrix<double> 
-		mo_localizer::compute_cholesky(dbcsr::shared_matrix<double> c_bm) {
+std::pair<smat_d,smat_d>  
+		mo_localizer::compute_cholesky(smat_d c_bm, smat_d s_bb) {
 			
 	auto b = c_bm->row_blk_sizes();
 	auto m = c_bm->col_blk_sizes();
@@ -21,7 +21,7 @@ dbcsr::shared_matrix<double>
 		
 	dbcsr::multiply('N', 'T', *c_bm, *c_bm, *p_bb).perform();
 	
-	math::pivinc_cd piv(p_bb, 9999);
+	math::pivinc_cd piv(p_bb, 0);
 	
 	piv.compute();
 	
@@ -30,7 +30,12 @@ dbcsr::shared_matrix<double>
 	}
 	
 	auto L_bm = piv.L(b,m);
-	return L_bm;
+	
+	auto u_mm = this->compute_conversion(c_bm, s_bb, L_bm);
+	
+	return std::make_pair<smat_d,smat_d>(
+		std::move(L_bm), std::move(u_mm)
+	);
 			
 }
 

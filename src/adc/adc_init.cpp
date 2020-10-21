@@ -337,17 +337,19 @@ void adcmod::init_mo_tensors() {
 	
 	m_reg.insert_matrix<double>("c_bo", c_bo);
 	m_reg.insert_matrix<double>("c_bv", c_bv);
-	
+	/*
 	locorb::mo_localizer loc(m_world, m_hfwfn->mol());
 	
-	auto L_bo = loc.compute_boys(c_bo);
-	auto L_bv = loc.compute_boys(c_bv);
+	auto s_bb = m_reg.get_matrix<double>("s_bb");
+	
+	auto boys_o = loc.compute_boys(c_bo, s_bb);
+	auto boys_v = loc.compute_boys(c_bv, s_bb);
 	
 	//dbcsr::print(*c_bo);
 	//dbcsr::print(*L_bo);
 	
 	auto c_e = dbcsr::matrix_to_eigen(c_bo);
-	auto l_e = dbcsr::matrix_to_eigen(L_bo);
+	auto l_e = dbcsr::matrix_to_eigen(boys_o.first);
 	
 	LOG.os<>(c_e, '\n');
 	LOG.os<>("NEW\n");
@@ -355,17 +357,15 @@ void adcmod::init_mo_tensors() {
 	
 	auto p = m_hfwfn->po_bb_A();
 	
-	dbcsr::multiply('N', 'T', *L_bo, *L_bo, *p)
+	dbcsr::multiply('N', 'T', *boys_o.first, *boys_o.first, *p)
 		.alpha(1.0)
 		.beta(-1.0)
 		.filter_eps(dbcsr::global::filter_eps)
 		.perform();
 	
 	auto nblk = p->num_blocks();
-	if (nblk != 0) throw std::runtime_error("Something went wrong.");
-	
-	exit(0);
-	
+	if (nblk != 0) throw std::runtime_error("Something went wrong.");*/
+		
 }
 
 

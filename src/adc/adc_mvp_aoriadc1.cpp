@@ -58,6 +58,8 @@ smat MVP_ao_ri_adc1::compute(smat u_ia, double omega) {
 	LOG.os<>("U transformed: \n");
 	dbcsr::print(*u_ao);
 	
+	u_ao->filter(dbcsr::global::filter_eps);
+	
 	m_jbuilder->set_density_alpha(u_ao);
 	m_kbuilder->set_density_alpha(u_ao);
 	

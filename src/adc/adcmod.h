@@ -65,6 +65,10 @@ private:
 	
 	std::shared_ptr<ints::dfitting> m_dfit;
 	
+	void analyze_sparsity(dbcsr::shared_matrix<double> u_ia, 
+		dbcsr::shared_matrix<double> c_loc_o, dbcsr::shared_matrix<double> u_loc_o,
+		dbcsr::shared_matrix<double> c_loc_v, dbcsr::shared_matrix<double> u_loc_v); 
+	
 	void init();
 	void init_ao_tensors();
 	void init_mo_tensors();

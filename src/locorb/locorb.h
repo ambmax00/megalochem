@@ -6,8 +6,11 @@
 #include "utils/mpi_log.h"
 #include "desc/molecule.h"
 #include "ints/aofactory.h"
+#include <utility>
 
 namespace locorb {
+	
+using smat_d = dbcsr::shared_matrix<double>;
 	
 class mo_localizer {
 private:	
@@ -28,11 +31,37 @@ public:
 		m_aofac(std::make_shared<ints::aofactory>(mol,w))
 	{}
 	
-	dbcsr::shared_matrix<double> 
-		compute_cholesky(dbcsr::shared_matrix<double> c_bm);
+	std::pair<smat_d,smat_d> compute_cholesky(smat_d c_bm, smat_d s_bb);
+		
+	std::pair<smat_d,smat_d> compute_boys(smat_d c_bm, smat_d s_bb);
+		
+	std::pair<smat_d,smat_d> compute_pao(smat_d c_bm, smat_d s_bb); 
 		
 	dbcsr::shared_matrix<double>
-		compute_boys(dbcsr::shared_matrix<double> c_bm);
+		compute_conversion(dbcsr::shared_matrix<double> c_bm,
+		dbcsr::shared_matrix<double> s_bb, dbcsr::shared_matrix<double> l_bm)
+	{
+		
+		auto temp = dbcsr::create_template<double>(c_bm)
+			.name("temp").get();
+		
+		auto w = c_bm->get_world();
+		auto m = c_bm->col_blk_sizes();
+		
+		auto u_mm = dbcsr::create<double>()
+			.name("u_mm")
+			.set_world(w)
+			.row_blk_sizes(m)
+			.col_blk_sizes(m)
+			.matrix_type(dbcsr::type::no_symmetry)
+			.get();
+		
+		dbcsr::multiply('N', 'N', *s_bb, *c_bm, *temp).perform();
+		dbcsr::multiply('T', 'N', *l_bm, *temp, *u_mm).perform();
+		
+		return u_mm;
+		
+	}	
 	
 };
 	
