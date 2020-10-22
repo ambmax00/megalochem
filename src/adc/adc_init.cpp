@@ -40,8 +40,9 @@ adcmod::adcmod(hf::shared_hf_wfn hfref, desc::options& opt, dbcsr::world& w) :
 	std::string splitmethod = m_hfwfn->mol()->c_basis()->split_method();
 	auto atoms = m_hfwfn->mol()->atoms();
 	
+	bool augmented = m_opt.get<bool>("df_augmentation", false);
 	auto dfbasis = std::make_shared<desc::cluster_basis>(
-		dfbasname, atoms, splitmethod, nsplit);
+		dfbasname, atoms, splitmethod, nsplit, augmented);
 	m_hfwfn->mol()->set_cluster_dfbasis(dfbasis);
 	
 	init();
@@ -337,34 +338,6 @@ void adcmod::init_mo_tensors() {
 	
 	m_reg.insert_matrix<double>("c_bo", c_bo);
 	m_reg.insert_matrix<double>("c_bv", c_bv);
-	/*
-	locorb::mo_localizer loc(m_world, m_hfwfn->mol());
-	
-	auto s_bb = m_reg.get_matrix<double>("s_bb");
-	
-	auto boys_o = loc.compute_boys(c_bo, s_bb);
-	auto boys_v = loc.compute_boys(c_bv, s_bb);
-	
-	//dbcsr::print(*c_bo);
-	//dbcsr::print(*L_bo);
-	
-	auto c_e = dbcsr::matrix_to_eigen(c_bo);
-	auto l_e = dbcsr::matrix_to_eigen(boys_o.first);
-	
-	LOG.os<>(c_e, '\n');
-	LOG.os<>("NEW\n");
-	LOG.os<>(l_e, '\n');
-	
-	auto p = m_hfwfn->po_bb_A();
-	
-	dbcsr::multiply('N', 'T', *boys_o.first, *boys_o.first, *p)
-		.alpha(1.0)
-		.beta(-1.0)
-		.filter_eps(dbcsr::global::filter_eps)
-		.perform();
-	
-	auto nblk = p->num_blocks();
-	if (nblk != 0) throw std::runtime_error("Something went wrong.");*/
 		
 }
 

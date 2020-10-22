@@ -98,13 +98,15 @@ hfmod::hfmod(desc::smolecule mol, desc::options opt, dbcsr::world& w)
 	if (m_opt.present("dfbasis")) {
 		 
 		std::string basname = m_opt.get<std::string>("dfbasis");
+		bool augmented = m_opt.get<bool>("df_augmentation", false);
+		
 		int nsplit = m_mol->c_basis()->nsplit();
 		auto smethod = m_mol->c_basis()->split_method();
 		auto atoms = m_mol->atoms();
 		
 		LOG.os<>("Setting df basis: ", basname, "\n\n");
 		auto dfbasis = std::make_shared<desc::cluster_basis>(
-			basname, atoms, smethod, nsplit);
+			basname, atoms, smethod, nsplit, augmented);
 	
 		m_mol->set_cluster_dfbasis(dfbasis);
 		

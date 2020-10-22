@@ -95,7 +95,13 @@ void adcmod::compute() {
 		
 		int nroots = m_opt.get<int>("nroots", ADC_NROOTS);
 		
+		auto& t_davidson = TIME.sub("Davidson diagonalization");
+		
+		t_davidson.start();
 		dav.compute(dav_guess, nroots);
+		t_davidson.finish();
+		
+		mvfac->print_info();
 		
 		LOG.os<>("Excitation energy of state nr. ", m_nroots, ": ", dav.eigval(), '\n');
 		
@@ -130,10 +136,10 @@ void adcmod::compute() {
 		
 		auto p = m_hfwfn->po_bb_A();
 		
-		v_bb->filter(1e-6);
-		//p->filter(1e-6);
+		v_bb->filter(1e-5);
+		p->filter(1e-5);
 		
-		dbcsr::print(*v_bb);
+		//dbcsr::print(*v_bb);
 		
 		LOG.os<>("Occupation: ", v_bb->occupation() * 100, "%\n");
 		LOG.os<>("Compared to ", p->occupation()*100, "% for density matrix.\n");
@@ -208,7 +214,7 @@ void adcmod::compute() {
 		
 		LOG.os<>("Basis blocks: ", nblk, " out of ", b.size(), '\n'); 
 		
-		exit(0);
+		TIME.print_info();
 		
 }
 

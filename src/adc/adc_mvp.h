@@ -53,6 +53,8 @@ public:
 	
 	virtual ~MVP() {}
 	
+	virtual void print_info() = 0;
+	
 };
 
 class MVP_ao_ri_adc1 : public MVP {
@@ -74,6 +76,13 @@ public:
 	void init() override;
 	
 	smat compute(smat u_ia, double omega) override;
+	
+	void print_info() override {
+		LOG.os<>("Timings for AO-ADC(1): \n");
+		TIME.print_info();
+		m_jbuilder->print_info();
+		m_kbuilder->print_info();
+	}
 	
 	~MVP_ao_ri_adc1() override {}
 	

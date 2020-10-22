@@ -26,8 +26,9 @@ mpmod::mpmod(hf::shared_hf_wfn& wfn_in, desc::options& opt_in, dbcsr::world& w_i
 	std::string splitmethod = m_hfwfn->mol()->c_basis()->split_method();
 	auto atoms = m_hfwfn->mol()->atoms(); 
 	
+	bool augmented = m_opt.get<bool>("df_augmentation", false);
 	auto dfbasis = std::make_shared<desc::cluster_basis>(
-		dfbasname, atoms, splitmethod, nsplit);
+		dfbasname, atoms, splitmethod, nsplit, augmented);
 	
 	m_hfwfn->mol()->set_cluster_dfbasis(dfbasis);
 	

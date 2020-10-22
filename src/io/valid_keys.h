@@ -21,6 +21,7 @@ static const json valid_keys =
 		{"reorder", true}, // whether to reorder atoms
 		{"unit", "string"}, // angstrom
 		{"basis", "string"}, // basisset name
+		{"augmentation", "string"}, // use augmented functions from aug-{basname}
 		//{"gen_basis", "basis"}, // custom basis set input
 		{"geometry", {0.0,0.0,0.0}}, // mol xyz
 		{"symbols", "string"}, // mol elements
@@ -55,6 +56,7 @@ static const json valid_keys =
 		{"SAD_diis", true},
 		{"SAD_spin_average", true},
 		{"dfbasis", "string"},
+		{"df_augmentation", true},
 		{"locc", false},
 		{"lvir", false},
 		{"_required", {"dfbasis"}}
@@ -65,6 +67,7 @@ static const json valid_keys =
 		{"nbatches_b", 3u},
 		{"nbatches_x", 3u},
 		{"dfbasis", "basis"},
+		{"df_augmentation", true},
 		{"c_os", 1.3},
 		{"eris", "core"},
 		{"intermeds", "core"},
@@ -77,6 +80,7 @@ static const json valid_keys =
 		{"c_os", 1.3},
 		{"c_os_coupling", 1.15},
 		{"dfbasis", "basis"},
+		{"df_augmentation", true},
 		{"nbatches_b", 3u},
 		{"nbatches_x", 3u},
 		{"nlap", 5u},

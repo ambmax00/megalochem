@@ -293,10 +293,13 @@ def qcschema_validate(filename):
 	
 	int ao_split = assign<int>(jmol, "ao_split", 10);
 	std::string basname = jmol["basis"];
+	std::optional<std::string> augbasname = std::nullopt;
 	
+	
+	bool augmented = assign<bool>(jmol, "augmentation", false);
 	desc::shared_cluster_basis cbas = 
 		std::make_shared<desc::cluster_basis>(
-			basname, atoms, ao_split_method, ao_split);
+			basname, atoms, ao_split_method, ao_split, augmented);
 	
 	int charge = jmol["charge"];
 	int mult = jmol["mult"];

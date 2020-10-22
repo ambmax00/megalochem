@@ -47,6 +47,13 @@ struct Shell {
 		alpha = std::vector<double>{0.0};
 		return out;
 	}
+	
+	bool operator ==(const Shell &b) const {
+		return (this->O == b.O) && (this->pure == b.pure)
+			&& (this->l == b.l) && (this->coeff == b.coeff)
+			&& (this->alpha == b.alpha);
+	}
+		
 
 };
 
@@ -115,9 +122,11 @@ public:
 
 	cluster_basis() {}
 	
-	cluster_basis(std::string basname, std::vector<desc::Atom>& atoms, std::string method, int nsplit);
+	cluster_basis(std::string basname, std::vector<desc::Atom>& atoms, 
+		std::string method, int nsplit, bool augmented = false);
 	
-	cluster_basis(vshell basis, std::string method, int nsplit);
+	cluster_basis(vshell basis, std::string method, int nsplit,
+		std::optional<vshell> augbasis = std::nullopt);
 	
 	cluster_basis(const cluster_basis& cbasis) : 
 		m_clusters(cbasis.m_clusters),

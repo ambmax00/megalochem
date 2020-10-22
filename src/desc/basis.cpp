@@ -134,8 +134,7 @@ vvshell split_multi_shell(vshell& basis, int nsplit, bool strict, bool sp) {
 	
 } 
 
-cluster_basis::cluster_basis(std::string basname, std::vector<desc::Atom>& atoms_in,
-	std::string method, int nsplit) {
+vshell make_basis(std::string basname, std::vector<desc::Atom>& atoms_in) {
 	
 	// check if file exists
 	std::string basis_root_dir(BASIS_ROOT);
@@ -236,11 +235,56 @@ cluster_basis::cluster_basis(std::string basname, std::vector<desc::Atom>& atoms
 		}
 	}
 	
-	*this = cluster_basis(basis, method, nsplit);
+	//std::cout << "BASIS" << std::endl;
+	//for (auto s : basis) {
+	//	std::cout << s << std::endl;
+	//}
+	
+	return basis;
+		
+}
+	
+
+cluster_basis::cluster_basis(std::string basname, std::vector<desc::Atom>& atoms_in,
+	std::string method, int nsplit, bool augmented) {
+	
+	auto basis = make_basis(basname, atoms_in);
+	std::optional<vshell> augbasis = (augmented) ? 
+		std::make_optional<vshell>(make_basis("aug-" + basname, atoms_in)) :
+		std::nullopt;
+	
+	*this = cluster_basis(basis, method, nsplit, augbasis);
 	
 }
 
-cluster_basis::cluster_basis(vshell basis, std::string method, int nsplit)
+vshell extract(vshell& basis, vshell& augbasis) {
+	
+	vshell aug_shells;
+	
+	for (auto& s : basis) {
+		if (std::find(augbasis.begin(), augbasis.end(), s) == augbasis.end())
+		{
+			throw std::runtime_error("Basis set is not a subset of augmented basis set!");
+		}
+	}
+	
+	for (auto& s : augbasis) {
+		auto iter = std::find(basis.begin(), basis.end(), s);
+		if (iter == basis.end()) {
+			//std::cout << s << std::endl;
+			aug_shells.push_back(s);
+		}
+	}
+	
+	//std::cout << "AUGSHELLS: " << aug_shells.size() << std::endl;
+	
+	augbasis.resize(0);
+	return aug_shells;	
+	
+}			
+
+cluster_basis::cluster_basis(vshell basis, std::string method, int nsplit,
+	std::optional<vshell> augbasis)
 	: m_nsplit(nsplit), m_split_method(method) {
 	
 	auto nbas = desc::nbf(basis);
@@ -249,33 +293,76 @@ cluster_basis::cluster_basis(vshell basis, std::string method, int nsplit)
 	//std::cout << "NBAS: " << nbas << std::endl;
 	//std::cout << "VSIZE: " << vsize << std::endl;
 	
-	if (method == "atomic") {
-		
-		m_clusters = split_atomic(basis);
-		
-	} else if (method == "shell") {
-		
-		m_clusters = split_shell(basis);
+	auto get_cluster = [&](vshell t_basis, int t_nsplit) {
 	
-	} else if (method == "multi_shell") {
+		if (method == "atomic") {
+			
+			return split_atomic(t_basis);
+			
+		} else if (method == "shell") {
+			
+			return split_shell(t_basis);
 		
-		m_clusters = split_multi_shell(basis,m_nsplit,false,false);
-		
-	} else if (method == "multi_shell_strict") {
-		
-		m_clusters = split_multi_shell(basis,m_nsplit,true,false);
+		} else if (method == "multi_shell") {
+			
+			return split_multi_shell(t_basis,t_nsplit,false,false);
+			
+		} else if (method == "multi_shell_strict") {
+			
+			return split_multi_shell(t_basis,t_nsplit,true,false);
 
-	} else if (method == "multi_shell_strict_sp") {
+		} else if (method == "multi_shell_strict_sp") {
+			
+			return split_multi_shell(t_basis,t_nsplit,true,true);
 		
-		m_clusters = split_multi_shell(basis,m_nsplit,true,true);
+		} else {
+			
+			throw std::runtime_error("Unknown splitting method: " + method);
+			
+		}
+		
+	};
 	
+	auto clusters = get_cluster(basis, nsplit);
+	if (augbasis) {
+		
+		//std::cout << "PREPPING" << std::endl;
+		auto aug_extract = extract(basis, *augbasis);
+		
+		auto aug_clusters = get_cluster(aug_extract, nsplit);
+		decltype(clusters) new_clusters;
+		
+		for (int i = 0; i != clusters.size(); ++i) {
+			
+			auto& this_shell = clusters[i].back();
+			auto& next_shell = (i == clusters.size() - 1) ? 
+				clusters[0].front() : clusters[i+1].front();
+			
+			new_clusters.push_back(clusters[i]);
+			
+			auto this_pos = this_shell.O;
+			auto next_pos = next_shell.O;
+			
+			if (this_pos == next_pos) continue;
+			
+			// search for all shells with same pos in augmented set
+			for (auto& c : aug_clusters) {
+				auto& s = c.front();
+				if (s.O == this_pos) {
+					new_clusters.push_back(c);
+				}
+			}
+			
+		}
+		
+		m_clusters = new_clusters;
+		
 	} else {
 		
-		throw std::runtime_error("Unknown splitting method: " + method);
+		m_clusters = clusters;
 		
 	}
-
-	
+					
 	for (auto c : m_clusters) {
 		m_cluster_sizes.push_back(desc::nbf(c));
 	}

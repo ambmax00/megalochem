@@ -104,13 +104,13 @@ public:
 			for (int i = prev_subspace; i != m_subspace; ++i) {
 				
 				//std::cout << "GUESS VECTOR: " << i << std::endl;
-				dbcsr::print(*m_vecs[i]);
+				//dbcsr::print(*m_vecs[i]);
 				
 				auto Av_i = (m_pseudo) ? m_fac->compute(m_vecs[i],*omega) : m_fac->compute(m_vecs[i]);
 				m_sigmas.push_back(Av_i);
 				
 				//std::cout << "SIGMA VECTOR: " << i << std::endl;
-				dbcsr::print(*Av_i); 
+				//dbcsr::print(*Av_i); 
 				
 			}
 			
@@ -125,8 +125,8 @@ public:
 				}
 			}
 			
-			LOG.os<1>("SUBSPACE MATRIX:\n");
-			LOG.os<1>(Asub, '\n');
+			LOG.os<2>("SUBSPACE MATRIX:\n");
+			LOG.os<2>(Asub, '\n');
 			
 			// diagonalize it
 			Eigen::SelfAdjointEigenSolver<Eigen::MatrixXd> es;
@@ -154,7 +154,7 @@ public:
 				} LOG.os<1>('\n');
 			}
 			
-			LOG.os<1>("EIGENVECTORS: \n", evecs, '\n');
+			LOG.os<2>("EIGENVECTORS: \n", evecs, '\n');
 			
 			// compute residual
 			// r_k = sum_i U_ik sigma_i - sum_i U_ik lambda_k b_i 
@@ -203,7 +203,7 @@ public:
 			// Normal davidson: RMS of residual is below certain threshold
 			// pseudo davidson: RMS of residual is higher than |omega - omega'| 
 			
-			if (m_pseudo) LOG.os<>("EVALS: ", *omega, " ", evals(m_nroots-1), '\n');
+			if (m_pseudo) LOG.os<1>("EVALS: ", *omega, " ", evals(m_nroots-1), '\n');
 			
 			m_converged = (m_pseudo) ? (rms < fabs(*omega - evals(m_nroots - 1))) : (rms < conv);
 			
@@ -277,7 +277,7 @@ public:
 			r_k->release();
 			D->release();
 			
-			dbcsr::print(*d_k);
+			//dbcsr::print(*d_k);
 			
 			// GRAM SCHMIDT
 			// b_new = d_k - sum_j proj_bi(d_k)
@@ -295,14 +295,14 @@ public:
 				//dbcsr::copy(*m_vecs[i], temp2).perform();
 				temp2->copy_in(*m_vecs[i]);
 				
-				dbcsr::print(*m_vecs[i]);
-				dbcsr::print(*temp2);
+				//dbcsr::print(*m_vecs[i]);
+				//dbcsr::print(*temp2);
 				
 				double proj = (d_k->dot(*m_vecs[i])) / (m_vecs[i]->dot(*m_vecs[i]));
 				
 				//dbcsr::dot(*m_vecs[i], d_k)/dbcsr::dot(*m_vecs[i],*m_vecs[i]);
 				
-				std::cout << proj << std::endl;
+				//std::cout << proj << std::endl;
 				
 				temp2->scale(-proj);
 				
@@ -310,7 +310,7 @@ public:
 				
 				//dbcsr::copy(temp2, bnew).sum(true).perform();
 				
-				dbcsr::print(*bnew);
+				//dbcsr::print(*bnew);
 				
 			}
 				

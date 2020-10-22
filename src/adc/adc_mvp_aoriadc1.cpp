@@ -44,19 +44,23 @@ void MVP_ao_ri_adc1::init() {
 
 smat MVP_ao_ri_adc1::compute(smat u_ia, double omega) {
 	
-	LOG.os<>("Computing ADC0.\n");
+	TIME.start();
+	
+	LOG.os<1>("Computing ADC0.\n");
 	// compute ADC0 part in MO basis
 	smat sig_0 = compute_sigma_0(u_ia);
 	
-	std::cout << "SIG0" << std::endl;
-	dbcsr::print(*sig_0);
+	//std::cout << "SIG0" << std::endl;
+	//dbcsr::print(*sig_0);
 	
 	
 	// transform u to ao coordinated
+	
+	LOG.os<1>("Computing ADC1.\n");
 	smat u_ao = u_transform(u_ia, 'N', m_c_bo, 'T', m_c_bv);
 	
-	LOG.os<>("U transformed: \n");
-	dbcsr::print(*u_ao);
+	//LOG.os<>("U transformed: \n");
+	//dbcsr::print(*u_ao);
 	
 	u_ao->filter(dbcsr::global::filter_eps);
 	
@@ -82,13 +86,15 @@ smat MVP_ao_ri_adc1::compute(smat u_ia, double omega) {
 	// transform back
 	smat sig_1 = u_transform(u_ao, 'T', m_c_bo, 'N', m_c_bv);
 	
-	LOG.os<>("Sigma adc1 mo:\n");
-	dbcsr::print(*sig_1);
+	//LOG.os<>("Sigma adc1 mo:\n");
+	//dbcsr::print(*sig_1);
 	
 	sig_0->add(1.0, 1.0, *sig_1);
 	
 	LOG.os<>("Sigma adc1 tot:\n");
-	dbcsr::print(*sig_0);
+	//dbcsr::print(*sig_0);
+	
+	TIME.finish();
 	
 	return sig_0;
 	
