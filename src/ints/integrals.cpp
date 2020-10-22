@@ -636,7 +636,7 @@ void calc_ints_schwarz_x(dbcsr::mat_d& m_out, util::ShrPool<libint2::Engine>& en
 
 void calc_ints(dbcsr::mat_d& m_out, std::vector<std::vector<int>*> shell_offsets, 
 		std::vector<std::vector<int>*> nshells, CINTIntegralFunction& int_func,
-		FINT *atm, FINT natm, FINT* bas, FINT nbas, double* env, int max_l) 
+		int *atm, int natm, int* bas, int nbas, double* env, int max_l) 
 {
 	
 	//std::cout << "NATOMS/NBAS: " << natm << " " << nbas << std::endl;
@@ -737,7 +737,7 @@ void calc_ints(dbcsr::mat_d& m_out, std::vector<std::vector<int>*> shell_offsets
 void calc_ints(dbcsr::mat_d& m_x, dbcsr::mat_d& m_y, dbcsr::mat_d& m_z, 
 		std::vector<std::vector<int>*> shell_offsets, 
 		std::vector<std::vector<int>*> shell_sizes, CINTIntegralFunction& int_func,
-		FINT *atm, FINT natm, FINT* bas, FINT nbas, double* env, int max_l) 
+		int *atm, int natm, int* bas, int nbas, double* env, int max_l) 
 {
 	
 	auto& nshells0 = *shell_sizes[0];
@@ -854,7 +854,7 @@ void calc_ints(dbcsr::mat_d& m_x, dbcsr::mat_d& m_y, dbcsr::mat_d& m_z,
 
 void calc_ints(dbcsr::tensor<3,double>& m_out, std::vector<std::vector<int>*> shell_offsets, 
 		std::vector<std::vector<int>*> nshells, CINTIntegralFunction& int_func,
-		FINT *atm, FINT natm, FINT* bas, FINT nbas, double* env, int max_l)
+		int *atm, int natm, int* bas, int nbas, double* env, int max_l)
 {
 	
 	auto& nshells0 = *nshells[0];
@@ -977,7 +977,7 @@ void calc_ints(dbcsr::tensor<3,double>& m_out, std::vector<std::vector<int>*> sh
 
 void calc_ints(dbcsr::tensor<4,double>& m_out, std::vector<std::vector<int>*> shell_offsets, 
 		std::vector<std::vector<int>*> nshells, CINTIntegralFunction& int_func,
-		FINT *atm, FINT natm, FINT* bas, FINT nbas, double* env, int max_l)
+		int *atm, int natm, int* bas, int nbas, double* env, int max_l)
 {
 	const auto& nshells0 = *nshells[0];
 	const auto& nshells1 = *nshells[1];
@@ -1112,7 +1112,7 @@ void calc_ints(dbcsr::tensor<4,double>& m_out, std::vector<std::vector<int>*> sh
 
 void calc_ints_xx(dbcsr::mat_d& m_out, std::vector<std::vector<int>*> shell_offsets, 
 		std::vector<std::vector<int>*> nshells, CINTIntegralFunction& int_func,
-		FINT *atm, FINT natm, FINT* bas, FINT nbas, double* env,int max_l) 
+		int *atm, int natm, int* bas, int nbas, double* env,int max_l) 
 {
 		
 	auto my_world = m_out.get_world();
@@ -1206,7 +1206,7 @@ void calc_ints_xx(dbcsr::mat_d& m_out, std::vector<std::vector<int>*> shell_offs
 
 void calc_ints_schwarz_mn(dbcsr::mat_d& m_out, std::vector<std::vector<int>*> shell_offsets, 
 		std::vector<std::vector<int>*> nshells, CINTIntegralFunction& int_func,
-		FINT *atm, FINT natm, FINT* bas, FINT nbas, double* env, int max_l) 
+		int *atm, int natm, int* bas, int nbas, double* env, int max_l) 
 {
 		
 	auto& nshells0 = *nshells[0];
@@ -1311,7 +1311,7 @@ void calc_ints_schwarz_mn(dbcsr::mat_d& m_out, std::vector<std::vector<int>*> sh
 
 void calc_ints_schwarz_x(dbcsr::mat_d& m_out, std::vector<std::vector<int>*> shell_offsets, 
 		std::vector<std::vector<int>*> nshells, CINTIntegralFunction& int_func,
-		FINT *atm, FINT natm, FINT* bas, FINT nbas, double* env, int max_l) 
+		int *atm, int natm, int* bas, int nbas, double* env, int max_l) 
 {
 		
 	auto& nshells0 = *nshells[0];
