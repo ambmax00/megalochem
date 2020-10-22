@@ -51,67 +51,67 @@ void calc_ints_schwarz_x(dbcsr::mat_d& m_out, util::ShrPool<libint2::Engine>& en
 extern "C" {
 #include <cint.h>
 
-int cint1e_ovlp_sph(double *out, const FINT *shls,
-	const FINT *atm, FINT natm, const FINT *bas, FINT nbas, const double *env,
+int cint1e_ovlp_sph(double *out, const int *shls,
+	const int *atm, int natm, const int *bas, int nbas, const double *env,
 	const CINTOpt *opt);
 
-int cint1e_nuc_sph(double *out, const FINT *shls,
-	const FINT *atm, FINT natm, const FINT *bas, FINT nbas, const double *env,
+int cint1e_nuc_sph(double *out, const int *shls,
+	const int *atm, int natm, const int *bas, int nbas, const double *env,
 	const CINTOpt *opt);
 
-int cint1e_r_sph(double *out, const FINT *shls,
-	const FINT *atm, FINT natm, const FINT *bas, FINT nbas, const double *env,
+int cint1e_r_sph(double *out, const int *shls,
+	const int *atm, int natm, const int *bas, int nbas, const double *env,
 	const CINTOpt *opt);
 
-int cint1e_kin_sph(double *out, const FINT *shls,
-	const FINT *atm, FINT natm, const FINT *bas, FINT nbas, const double *env,
+int cint1e_kin_sph(double *out, const int *shls,
+	const int *atm, int natm, const int *bas, int nbas, const double *env,
 	const CINTOpt *opt);
 	
-int cint3c2e_sph(double *out, const FINT *shls,
-	const FINT *atm, FINT natm, const FINT *bas, FINT nbas, const double *env,
+int cint3c2e_sph(double *out, const int *shls,
+	const int *atm, int natm, const int *bas, int nbas, const double *env,
 	const CINTOpt *opt);
 	
-int cint2e_coulerf_sph(double *out, const FINT *shls,
-	const FINT *atm, FINT natm, const FINT *bas, FINT nbas, const double *env,
+int cint2e_coulerf_sph(double *out, const int *shls,
+	const int *atm, int natm, const int *bas, int nbas, const double *env,
 	const CINTOpt *opt);
 
 
 }
 
-typedef FINT (*CINTIntegralFunction)(double *out, const FINT *shls,
-		const FINT *atm, FINT natm, const FINT *bas, FINT nbas, const double *env,
+typedef int (*CINTIntegralFunction)(double *out, const int *shls,
+		const int *atm, int natm, const int *bas, int nbas, const double *env,
 		const CINTOpt *opt);
 		
 namespace ints {
 		
 void calc_ints(dbcsr::mat_d& m_out, std::vector<std::vector<int>*> shell_offsets, 
 		std::vector<std::vector<int>*> shell_sizes, CINTIntegralFunction& int_func,
-		FINT *atm, FINT natm, FINT* bas, FINT nbas, double* env, int max_l);
+		int *atm, int natm, int* bas, int nbas, double* env, int max_l);
 		
 void calc_ints(dbcsr::mat_d& m_x, dbcsr::mat_d& m_y, dbcsr::mat_d& m_z, 
 		std::vector<std::vector<int>*> shell_offsets, 
 		std::vector<std::vector<int>*> shell_sizes, CINTIntegralFunction& int_func,
-		FINT *atm, FINT natm, FINT* bas, FINT nbas, double* env, int max_l);
+		int *atm, int natm, int* bas, int nbas, double* env, int max_l);
 		
 void calc_ints(dbcsr::tensor<3,double>& m_out, std::vector<std::vector<int>*> shell_offsets, 
 		std::vector<std::vector<int>*> shell_sizes, CINTIntegralFunction& int_func,
-		FINT *atm, FINT natm, FINT* bas, FINT nbas, double* env, int max_l);
+		int *atm, int natm, int* bas, int nbas, double* env, int max_l);
 		
 void calc_ints(dbcsr::tensor<4,double>& m_out, std::vector<std::vector<int>*> shell_offsets, 
 		std::vector<std::vector<int>*> shell_sizes, CINTIntegralFunction& int_func,
-		FINT *atm, FINT natm, FINT* bas, FINT nbas, double* env, int max_l);
+		int *atm, int natm, int* bas, int nbas, double* env, int max_l);
 		
 void calc_ints_xx(dbcsr::mat_d& m_out, std::vector<std::vector<int>*> shell_offsets, 
 		std::vector<std::vector<int>*> shell_sizes, CINTIntegralFunction& int_func,
-		FINT *atm, FINT natm, FINT* bas, FINT nbas, double* env, int max_l);
+		int *atm, int natm, int* bas, int nbas, double* env, int max_l);
 
 void calc_ints_schwarz_mn(dbcsr::mat_d& m_out, std::vector<std::vector<int>*> shell_offsets, 
 		std::vector<std::vector<int>*> shell_sizes, CINTIntegralFunction& int_func,
-		FINT *atm, FINT natm, FINT* bas, FINT nbas, double* env, int max_l);
+		int *atm, int natm, int* bas, int nbas, double* env, int max_l);
 		
 void calc_ints_schwarz_x(dbcsr::mat_d& m_out, std::vector<std::vector<int>*> shell_offsets, 
 		std::vector<std::vector<int>*> shell_sizes, CINTIntegralFunction& int_func,
-		FINT *atm, FINT natm, FINT* bas, FINT nbas, double* env, int max_l);
+		int *atm, int natm, int* bas, int nbas, double* env, int max_l);
 
 } // end namespace
 
