@@ -190,7 +190,7 @@ void adcmod::compute() {
 		}
 		
 		// Which blocks are absent?
-		std::vector<bool> blk_list(b.size());
+		std::vector<int> blk_list(b.size(),0);
 		
 		dbcsr::iterator<double> iter(*v_bb);
 		iter.start();
@@ -199,17 +199,21 @@ void adcmod::compute() {
 			
 			iter.next_block();
 			
-			blk_list[iter.row()] = true;
-			blk_list[iter.col()] = true;
+			blk_list[iter.row()] = 1;
+			blk_list[iter.col()] = 1;
 			
 		}
 		
 		iter.stop();
 			
 		int nblk = 0;
+		std::vector<int> blk_list_tot(blk_list.size());
 		
-		for (auto b : blk_list) {
-			if (b) nblk++;
+		MPI_Allreduce(blk_list.data(), blk_list_tot.data(), blk_list_tot.size(), 
+			MPI_INT, MPI_LOR, m_world.comm());
+		
+		for (auto b : blk_list_tot) {
+			if (b > 0) nblk++;
 		}
 		
 		LOG.os<>("Basis blocks: ", nblk, " out of ", b.size(), '\n'); 
