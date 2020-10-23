@@ -89,6 +89,24 @@ private:
 			
 		}
 		
+		auto x = m_mol->dims().x();
+		auto b = m_mol->dims().b();
+		
+		double mem = 0.0;
+		double mem_tot = 0.0;
+		
+		for (size_t i = 0; i != res[0].size(); ++i) {
+			mem += x[res[0][i]] * b[res[1][i]] * b[res[2][i]] * 8;
+		}
+		
+		for (int ip = 0; ip != m_world.size(); ++ip) {
+			if (ip == m_world.rank()) std::cout << "RANK: " << mem/1e+9 << " GB will be reserved." << std::endl;
+			MPI_Barrier(m_world.comm());
+		}
+		
+		MPI_Allreduce(&mem, &mem_tot, 1, MPI_DOUBLE, MPI_SUM, m_world.comm());
+		if (m_world.rank() == 0) std::cout << "TOTAL MEM: " << mem_tot << std::endl;
+   
 		t_in->reserve(res);
 		
 	}
