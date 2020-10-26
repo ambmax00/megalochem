@@ -32,9 +32,9 @@ public:
 	{}
 	
 	std::pair<smat_d,smat_d> compute_cholesky(smat_d c_bm, smat_d s_bb);
-		
+#if 0	
 	std::pair<smat_d,smat_d> compute_boys(smat_d c_bm, smat_d s_bb);
-		
+#endif	
 	std::pair<smat_d,smat_d> compute_pao(smat_d c_bm, smat_d s_bb); 
 		
 	dbcsr::shared_matrix<double>

@@ -30,8 +30,10 @@ protected:
 	
 	svector<double> m_epso;
 	svector<double> m_epsv;
-		
-	vec<int> m_o, m_v, m_b, m_x;
+			
+	smat m_s_bb;
+	smat m_c_bo, m_sc_bo;
+	smat m_c_bv, m_sc_bv;
 	
 	smat compute_sigma_0(smat& u_ia);
 	
@@ -41,11 +43,7 @@ public:
 
 	MVP(dbcsr::world& w, desc::smolecule smol, 
 		desc::options opt, util::registry& reg,
-		svector<double> epso, svector<double> epsv) :
-		m_world(w), m_mol(smol), m_opt(opt), 
-		LOG(w.comm(), m_opt.get<int>("print", ADC_PRINT_LEVEL)),
-		TIME(w.comm(), "MVP"),
-		m_reg(reg), m_epso(epso), m_epsv(epsv) {}
+		svector<double> epso, svector<double> epsv);
 		
 	virtual smat compute(smat u_ia, double omega = 0.0) = 0;
 	
@@ -62,9 +60,6 @@ private:
 	
 	std::shared_ptr<fock::J> m_jbuilder;
 	std::shared_ptr<fock::K> m_kbuilder;
-	
-	smat m_c_bo;
-	smat m_c_bv;
 
 public:
 
@@ -94,11 +89,8 @@ private:
 	std::array<int,3> m_nbatches;
 	dbcsr::btype m_bmethod;
 
-	smat m_c_bo;
-	smat m_c_bv;
 	smat m_po_bb;
 	smat m_pv_bb;
-	smat m_s_bb;
 	smat m_s_xx_inv;
 	
 	smat m_i_oo;

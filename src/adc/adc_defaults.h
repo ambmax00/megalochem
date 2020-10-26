@@ -11,6 +11,7 @@ static const int ADC_ORDER = 0;
 static const int ADC_NBATCHES_X = 5;
 static const int ADC_NBATCHES_B = 5;
 static const int ADC_NLAP = 5;
+static const int ADC_DIAG_ORDER = 0;
 
 static const double ADC_C_OS = 1.3;
 static const double ADC_C_OS_COUPLING = 1.17;

@@ -41,18 +41,27 @@ public:
 	dbcsr::shared_matrix<double> ao_kinetic();
 	dbcsr::shared_matrix<double> ao_nuclear();
 	
+	//dbcsr::shared_matrix<double> ao_diag_mnmn();
+	//dbcsr::shared_matrix<double> ao_diag_mmnn();
+	
 	dbcsr::shared_matrix<double> ao_2c2e(std::string metric);
 	dbcsr::shared_matrix<double> ao_auxoverlap();
 	
 	dbcsr::shared_matrix<double> ao_schwarz();
 	dbcsr::shared_matrix<double> ao_3cschwarz();
-	
+#if 0
 	std::array<dbcsr::shared_matrix<double>,3> 
 		ao_emultipole(std::array<int,3> O = {0,0,0});
-	
+#endif	
+
+	void ao_3c1e_setup(std::string metric);
+
 	void ao_3c2e_setup(std::string metric);
 
 	void ao_eri_setup(std::string metric);
+	
+	void ao_3c1e_fill_idx(dbcsr::shared_tensor<3,double>& t_in, arrvec<int,3>& idx, 
+		std::shared_ptr<screener> scr);
 	
 	void ao_3c2e_fill(dbcsr::shared_tensor<3,double>& t_in, vec<vec<int>>& blkbounds, 
 		std::shared_ptr<screener> scr);

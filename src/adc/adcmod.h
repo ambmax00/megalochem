@@ -72,7 +72,10 @@ private:
 	void init();
 	void init_ao_tensors();
 	void init_mo_tensors();
+	
 	void compute_diag();
+	dbcsr::shared_matrix<double> compute_diag_0();
+	dbcsr::shared_matrix<double> compute_diag_1();
 	
 public:	
 

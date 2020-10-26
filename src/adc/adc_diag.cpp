@@ -1,4 +1,6 @@
 #include "adc/adcmod.h"
+#include "ints/aofactory.h"
+#include <dbcsr_matrix_ops.hpp>
 
 namespace adc {
 
@@ -236,9 +238,7 @@ void adcmod::mo_compute_diag() {
 		
 }*/
 
-void adcmod::compute_diag() {
-	
-	// only zero order for now
+dbcsr::shared_matrix<double> adcmod::compute_diag_0() {
 	
 	LOG.os<>("Computing zeroth order diagonal.\n");
 	
@@ -248,17 +248,17 @@ void adcmod::compute_diag() {
 	auto o = m_hfwfn->mol()->dims().oa();
 	auto v = m_hfwfn->mol()->dims().va();
 	
-	m_d_ov = dbcsr::create<double>()
-		.name("diag_ov")
+	auto d_ov_0 = dbcsr::create<double>()
+		.name("diag_ov_0")
 		.set_world(m_world)
 		.row_blk_sizes(o)
 		.col_blk_sizes(v)
 		.matrix_type(dbcsr::type::no_symmetry)
 		.get();
 		
-	m_d_ov->reserve_all();
+	d_ov_0->reserve_all();
 	
-	dbcsr::iterator<double> iter(*m_d_ov);
+	dbcsr::iterator<double> iter(*d_ov_0);
 	
 	iter.start();
 	
@@ -283,9 +283,88 @@ void adcmod::compute_diag() {
 	
 	iter.stop();
 	
-	if (LOG.global_plev() >= 2) dbcsr::print(*m_d_ov);
+	if (LOG.global_plev() >= 2) dbcsr::print(*d_ov_0);
 	
 	LOG.os<>("Done with diagonal.\n");
+	
+	return d_ov_0;
+	
+}
+
+dbcsr::shared_matrix<double> adcmod::compute_diag_1() {
+	
+	/*std::shared_ptr<ints::aofactory> aofac = 
+		std::make_shared<ints::aofactory>(m_hfwfn->mol(), m_world);
+		
+	auto d_mnmn = aofac->ao_diag_mnmn();
+	auto d_mmnn = aofac->ao_diag_mmnn();
+	
+	d_mnmn->filter(dbcsr::global::filter_eps);
+	d_mmnn->filter(dbcsr::global::filter_eps);
+	
+	auto c_bo = m_hfwfn->c_bo_A();
+	auto c_bv = m_hfwfn->c_bv_A();
+	
+	auto o = m_hfwfn->mol()->dims().oa();
+	auto v = m_hfwfn->mol()->dims().va();
+	auto b = m_hfwfn->mol()->dims().b();
+	
+	auto d_mnmn_ob = dbcsr::create<double>()
+		.name("d_mnmn_ht")
+		.set_world(m_world)
+		.row_blk_sizes(o)
+		.col_blk_sizes(b)
+		.matrix_type(dbcsr::type::no_symmetry)
+		.get();
+		
+	auto d_mmnn_ob = dbcsr::create_template<double>(d_mnmn_ob)
+		.name("d_mmnn_ht")
+		.get();
+		
+	auto d_iaia = dbcsr::create<double>()
+		.name("d_iaia")
+		.set_world(m_world)
+		.row_blk_sizes(o)
+		.col_blk_sizes(v)
+		.matrix_type(dbcsr::type::no_symmetry)
+		.get();
+		
+	auto d_iiaa = dbcsr::create_template<double>(d_iaia)
+		.name("d_iiaa")
+		.get();
+		
+	dbcsr::multiply('T', 'N', *c_bo, *d_mnmn, *d_mnmn_ob).perform();
+	dbcsr::multiply('T', 'N', *c_bo, *d_mnmn, *d_mmnn_ob).perform();
+	dbcsr::multiply('N', 'N', *d_mnmn_ob, *c_bv, *d_iaia).perform();
+	dbcsr::multiply('N', 'N', *d_mnmn_ob, *c_bv, *d_iiaa).perform();
+	
+	// Form d_ia = - 2 * (ii|aa) - (ia|ia)
+	
+	d_iiaa->scale(-2.0);
+	d_iiaa->add(1.0, -1.0, *d_iaia);
+	
+	d_iiaa->setname("diag_ov_1");*/
+	
+	return nullptr;
+	
+}
+	
+void adcmod::compute_diag() {
+	
+	int diag_order = 0; //m_opt.get<int>("diag_order", ADC_DIAG_ORDER);
+	
+	auto d_ov_0 = compute_diag_0();
+	//dbcsr::print(*d_ov_0);
+	
+	if (diag_order > 0) {
+		auto d_ov_1 = compute_diag_1();
+		d_ov_0->add(1.0, 1.0, *d_ov_1);
+		m_d_ov = d_ov_0;
+		dbcsr::print(*d_ov_0);
+		m_d_ov->setname("diag_ov_1");
+	} else {
+		m_d_ov = d_ov_0;
+	}
 	
 }
 

@@ -6,9 +6,6 @@ void MVP_ao_ri_adc1::init() {
 	
 	LOG.os<>("Initializing AO-ADC(1)\n");
 	
-	m_c_bo = m_reg.get_matrix<double>("c_bo");
-	m_c_bv = m_reg.get_matrix<double>("c_bv");
-	
 	auto kmethod = m_opt.get<std::string>("k_method", "batchdfao");
 	
 	LOG.os<>("Setting up j builder for AO-ADC1.\n");
@@ -49,11 +46,7 @@ smat MVP_ao_ri_adc1::compute(smat u_ia, double omega) {
 	LOG.os<1>("Computing ADC0.\n");
 	// compute ADC0 part in MO basis
 	smat sig_0 = compute_sigma_0(u_ia);
-	
-	//std::cout << "SIG0" << std::endl;
-	//dbcsr::print(*sig_0);
-	
-	
+		
 	// transform u to ao coordinated
 	
 	LOG.os<1>("Computing ADC1.\n");
@@ -73,9 +66,6 @@ smat MVP_ao_ri_adc1::compute(smat u_ia, double omega) {
 	auto jmat = m_jbuilder->get_J();
 	auto kmat = m_kbuilder->get_K_A();
 	
-	auto j = u_transform(jmat, 'T', m_c_bo, 'N', m_c_bv);
-	auto k = u_transform(kmat, 'T', m_c_bo, 'N', m_c_bv);
-	
 	// recycle u_ao
 	u_ao->add(0.0, 1.0, *jmat);
 	u_ao->add(1.0, 1.0, *kmat);
@@ -91,7 +81,7 @@ smat MVP_ao_ri_adc1::compute(smat u_ia, double omega) {
 	
 	sig_0->add(1.0, 1.0, *sig_1);
 	
-	LOG.os<>("Sigma adc1 tot:\n");
+	//LOG.os<>("Sigma adc1 tot:\n");
 	//dbcsr::print(*sig_0);
 	
 	TIME.finish();

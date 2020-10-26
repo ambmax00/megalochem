@@ -2,6 +2,29 @@
 
 namespace adc {
 	
+MVP::MVP(dbcsr::world& w, desc::smolecule smol, 
+	desc::options opt, util::registry& reg,
+	svector<double> epso, svector<double> epsv) :
+	m_world(w), m_mol(smol), m_opt(opt), 
+	LOG(w.comm(), m_opt.get<int>("print", ADC_PRINT_LEVEL)),
+	TIME(w.comm(), "MVP"),
+	m_reg(reg), m_epso(epso), m_epsv(epsv) 
+{
+	m_s_bb = m_reg.get_matrix<double>("s_bb");
+	m_c_bo = m_reg.get_matrix<double>("c_bo");
+	m_c_bv = m_reg.get_matrix<double>("c_bv");
+	
+	m_sc_bo = dbcsr::create_template<double>(m_c_bo)
+		.name("sc_bo").get();
+		
+	m_sc_bv = dbcsr::create_template<double>(m_c_bv)
+		.name("sc_bv").get();
+		
+	dbcsr::multiply('N', 'N', *m_s_bb, *m_c_bo, *m_sc_bo).perform();
+	dbcsr::multiply('N', 'N', *m_s_bb, *m_c_bv, *m_sc_bv).perform();
+	
+}
+	
 smat MVP::compute_sigma_0(smat& u_ia) {
 	
 	// ADC0 : u_ia = - f_ij u_ja + f_ab u_ib

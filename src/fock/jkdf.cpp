@@ -76,6 +76,7 @@ void BATCHED_DF_J::compute_J() {
 		ptot->copy_in(*m_p_A);
 		ptot->scale(2.0);
 		bool sym = ptot->has_symmetry();
+		//if (!sym) std::cout << "HAS NO SYMMETRY" << std::endl;
 		dbcsr::copy_matrix_to_3Dtensor_new(*ptot,*m_ptot_bbd,sym);
 		//dbcsr::print(ptot);
 		ptot->clear();
@@ -553,7 +554,7 @@ void BATCHED_DFAO_K::compute_K() {
 					.bounds2(xm_bounds)
 					.bounds3(n_bounds)
 					.filter(dbcsr::global::filter_eps)
-					.perform("XML, LN -> XMN");
+					.perform("XMN, LN -> XML");
 				con_1_batch.finish();
 			
 				nze_cbar += m_cbar_xbb_01_2->num_nze_total();

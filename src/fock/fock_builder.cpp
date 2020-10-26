@@ -42,7 +42,6 @@ void fockmod::init() {
 	bool compute_eris_batched = false;
 	bool compute_3c2e_batched = false;
 	bool compute_s_xx = false;
-	bool s_xx_tensor = false;
 	bool compute_s_xx_inv = false;
 	bool compute_s_xx_invsqrt = false;
 	
@@ -104,8 +103,15 @@ void fockmod::init() {
 		compute_s_xx = true;
 		compute_s_xx_inv = true;
 		compute_3c2e_batched = true;
-		s_xx_tensor = true;
 		
+	} else if (k_method == "batchqr") {
+	
+		K* builder = new BATCHED_PARI_K(m_world,m_opt);
+		m_K_builder.reset(builder);
+		
+		compute_s_xx = true;
+		compute_3c2e_batched = true;
+	
 	} else {
 		
 		throw std::runtime_error("Unknown K method: " + k_method);
@@ -417,9 +423,32 @@ void fockmod::init() {
 		auto eri_batched = m_reg.get_btensor<3,double>("i_xbb_batched");
 		auto inv = m_reg.get_matrix<double>("s_xx_inv");
 		m_dfit = std::make_shared<ints::dfitting>(m_world, m_mol, LOG.global_plev());
+		
 		auto c_xbb_batched = m_dfit->compute(eri_batched, inv, 
 			m_opt.get<std::string>("intermeds", FOCK_INTERMEDS));
 		m_reg.insert_btensor<3,double>("c_xbb_batched", c_xbb_batched);
+	
+	}
+	
+	if (k_method == "batchqr") {
+		
+		LOG.os<1>("Computing fitting coefficients.\n");
+		
+		auto eri_batched = m_reg.get_btensor<3,double>("i_xbb_batched");
+		auto s_xx = m_reg.get_matrix<double>("s_xx");
+		m_dfit = std::make_shared<ints::dfitting>(m_world, m_mol, LOG.global_plev());
+		
+		auto o_xx = aofac->ao_auxoverlap();
+		
+		dbcsr::print(*o_xx);
+		
+		math::hermitian_eigen_solver solver(o_xx, 'V');
+		solver.compute();
+		auto o_xx_inv = solver.inverse();
+		
+		auto cfit = m_dfit->compute_qr(eri_batched, o_xx_inv, s_xx, scr_s, dbcsr::btype::core);
+		
+		exit(0);
 	
 	}
 	

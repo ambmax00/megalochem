@@ -2,8 +2,10 @@
 #include "ints/aofactory.h"
 #include "extern/lapack.h"
 #include "math/solvers/hermitian_eigen_solver.h"
+#include "utils/constants.h"
 #include <Eigen/Core>
 #include <Eigen/SVD>
+#include <Eigen/Dense>
 
 namespace ints {
 
@@ -682,47 +684,47 @@ dbcsr::shared_tensor<3,double> dfitting::compute_pari(dbcsr::sbtensor<3,double> 
 	return c_xbb_dist;
 	
 }
-/*
-void dfitting::compute_qr(dbcsr::sbtensor<3,double> eri_batched, dbcsr::shared_matrix<double> s_xx)
+
+struct exp_pos {
+	double exp;
+	std::array<double,3> pos;
+};
+
+dbcsr::sbtensor<3,double> dfitting::compute_qr(dbcsr::sbtensor<3,double> eri_batched,
+		dbcsr::shared_matrix<double> s_xx_inv, dbcsr::shared_matrix<double> m_xx,
+		shared_screener scr_s, dbcsr::btype mytype)
 {
 	
-	// invert overlap
-	math::hermitian_eigen_solver herm(s_xx, 'V', LOG.global_plev());
-	herm.compute();
+	auto aofac = std::make_shared<aofactory>(m_mol, m_world);
 	
-	auto s_xx_inv = herm.inverse();
-	
-	auto s_xx_inv_01 = dbcsr::tensor_create_matrix(s_xx_inv).get();
-	s_xx_inv->release();
+	double T = 1e-7;
+	double R = 40 * pow(BOHR_RADIUS,2);
 	
 	auto x = m_mol->dims().x();
 	auto b = m_mol->dims().b();
+	
+	auto xoff = m_xx->row_blk_offsets();
+	
 	arrvec<int,2> xx = {x,x};
 	arrvec<int,3> xbb = {x,b,b};
 	
-	// self tensors
-	auto spgrid3_self = dbcsr::create_pgrid<3>(MPI_COMM_SELF).get();
-	auto spgrid2_slef = dbcsr::create_pgrid<2>(MPI_COMM_SELF).get();
-	
-	auto C_xbb_self = dbcsr::tensor_create()
-		.name("C_xbb_self")
-		.pgrid(spgrid3_self)
-		.blk_sizes(xbb)
-		.map1({0}).map2({1,2})
-		.get();
-		
-	auto M_xx_self = dbcsr::tensor_create()
-		.name("M_xx_self")
-		.pgrid(spgrid2_self)
-		.blk_sizes(xx)
-		.map1({0}).map2({1})
-		.get();
-	
-	//create a distribution where each process possesses the full range of X
-	
+	// form pgrids
 	auto spgrid3_xbb = eri_batched->spgrid();
+	
+	int nbf = m_mol->c_basis()->nbf();
+	std::array<int,3> xbbsizes = {1,nbf,nbf};
+	
+	auto spgrid3_global_1bb = dbcsr::create_pgrid<3>(m_world.comm())
+		.tensor_dims(xbbsizes)
+		.get();
 		
-	auto dims = spgrid3_xbb->dims();
+	auto spgrid3_local_1bb = dbcsr::create_pgrid<3>(MPI_COMM_SELF)
+		.tensor_dims(xbbsizes)
+		.get();
+	
+	auto spgrid2_self = dbcsr::create_pgrid<2>(MPI_COMM_SELF).get();
+	
+	auto dims = spgrid3_global_1bb->dims();
 	
 	for (auto p : dims) {
 		LOG.os<1>(p, " ");
@@ -741,23 +743,395 @@ void dfitting::compute_qr(dbcsr::sbtensor<3,double> eri_batched, dbcsr::shared_m
 	
 	arrvec<int,3> distsizes = {d0,d1,d2};
 	
-	dbcsr::dist_t<3> dist_fullx(spgrid3_xbb, distsizes);
+	// a distribution where a process owns ALL (X) blocks for a certain (μν) pair
+	dbcsr::dist_t<3> dist3_global_1bb(spgrid3_global_1bb, distsizes);
 	
-	auto Q_xbb_fullx = dbcsr::tensor_create<3>()
-		.name("Q_xbb_fullx")
-		.ndist(cdist)
+	// form tensors
+	
+	auto c_xbb_global_1bb = dbcsr::tensor_create<3,double>()
+		.name("c_xbb_global_1bb")
+		.ndist(dist3_global_1bb)
 		.blk_sizes(xbb)
 		.map1({0}).map2({1,2})
 		.get();
 		
-	auto eri_fullx = dbcsr::tensor_create_template(Q_xbb_fullx)
-		.name("eri_fullx")
+	auto c_xbb_global_xbb = dbcsr::tensor_create<3,double>()
+		.name("c_xbb_global_xbb")
+		.pgrid(spgrid3_xbb)
+		.blk_sizes(xbb)
+		.map1({0}).map2({1,2})
 		.get();
 		
+	auto c_xbb_local_1bb = dbcsr::tensor_create<3,double>()
+		.name("c_xbb_local_xbb")
+		.pgrid(spgrid3_local_1bb)
+		.blk_sizes(xbb)
+		.map1({0}).map2({1,2})
+		.get();
+		
+	auto eri_local = dbcsr::tensor_create<3,double>()
+		.name("eri_local")
+		.pgrid(spgrid3_local_1bb)
+		.blk_sizes(xbb)
+		.map1({0}).map2({1,2})
+		.get();
+	
+	auto bdims_eri = eri_batched->batch_dims();
+	
+	auto c_xbb_batched = dbcsr::btensor_create<3,double>()
+		.name("cqr_xbb_batched")
+		.pgrid(spgrid3_xbb)
+		.blk_sizes(xbb)
+		.batch_dims(bdims_eri)
+		.btensor_type(mytype)
+		.print(1)
+		.get();
+		
+	auto s_xx_inv_local = dbcsr::tensor_create<2,double>()
+		.name("s_xx_inv_local")
+		.pgrid(spgrid2_self)
+		.blk_sizes(xx)
+		.map1({0}).map2({1})
+		.get();
+	
+	s_xx_inv_local->reserve_all();
+	
+	// copy s_xx_inv
+	auto s_xx_inv_eigen = dbcsr::matrix_to_eigen(s_xx_inv);
+	auto m_xx_eigen = dbcsr::matrix_to_eigen(m_xx);
+	
+	dbcsr::iterator_t<2,double> iter(*s_xx_inv_local);
+	
+	iter.start();
+	while (iter.blocks_left()) {
+		iter.next();
+		
+		auto& idx = iter.idx();
+		auto& off = iter.offset();
+		auto& size = iter.size();
+		
+		dbcsr::block<2,double> blk(size);
+		
+		for (int j = 0; j != size[1]; ++j) {
+			for (int i = 0; i != size[0]; ++i) {
+				blk(i,j) = s_xx_inv_eigen(i + off[0], j + off[1]);
+			}
+		}
+		
+		s_xx_inv_local->put_block(idx, blk);
+		
+	}
+	iter.stop();
+	s_xx_inv_eigen.resize(0,0);
+	
+	arrvec<int,3> blk_idx;
+	blk_idx[0].resize(x.size());
+	blk_idx[1].resize(1);
+	blk_idx[2].resize(1);
+	
+	auto x_basis = m_mol->c_dfbasis();
+	int nxblks = x.size();
+	
+	// get minimum exponent and position for each block
+	std::vector<exp_pos> min_exp_x(nxblks);
+	for (int i = 0; i != nxblks; ++i) {
+		exp_pos set;
+		
+		double min_exp = std::numeric_limits<double>::max();
+		auto& cluster = x_basis->at(i);
+		
+		for (auto& con_gauss : cluster) {
+			for (auto& exp : con_gauss.alpha) {
+				min_exp = std::min(min_exp, exp);
+			}
+		}
+		
+		set.exp = min_exp;
+		set.pos = cluster[0].O;
+		
+		min_exp_x[i] = set;
+		
+	}
+	
+	if (m_world.rank() == 0) {
+	std::cout << "X BASIS INFO: " << std::endl;
+	for (auto s : min_exp_x) {
+		std::cout << "EXP: " << s.exp << std::endl;
+		std::cout << "POS: " << s.pos[0] << " " << s.pos[1]
+			<< " " << s.pos[2] << std::endl;
+	}
+	}	
 		
 	
-	// Compute Q_mnP = S_PR^-1 (R|mn)
+	// ====== LOOP OVER NU BATCHES ==============
 	
-}*/
+	c_xbb_batched->compress_init({2}, vec<int>{0}, vec<int>{1,2});
+	
+	for (int ibatch_nu = 0; ibatch_nu != c_xbb_batched->nbatches(2); ++ibatch_nu) {
+		
+		LOG.os<>("BATCH: ", ibatch_nu, '\n');
+		
+		auto blk_nu = c_xbb_batched->blk_bounds(2,ibatch_nu);
+		
+		std::vector<std::pair<int,int>> mn_blk_list;
+	
+		for (int m = 0; m != b.size(); ++m) {
+			for (int n = blk_nu[0]; n != blk_nu[1]+1; ++n) {
+				
+				int rproc = m % dims[1];
+				int cproc = n % dims[2];
+							
+				if (rproc == m_world.myprow() && cproc == m_world.mypcol()) {
+					std::pair<int,int> p = {m,n};
+					mn_blk_list.push_back(p);
+				}
+				
+			}
+		}
+		
+		size_t npairs = mn_blk_list.size();
+	
+#if 1
+	for (int iproc = 0; iproc != m_world.size(); ++iproc) {
+	if (iproc == m_world.rank()) {
+#endif
+	
+	for (auto& mn_pair : mn_blk_list) {
+	
+		std::cout << "PROC: " << m_world.rank() << std::endl;
+		std::cout << "PAIR: " << mn_pair.first << " " << mn_pair.second << std::endl;
+	
+		int mu = mn_pair.first;
+		int nu = mn_pair.second;
+	
+		blk_idx[0] = vec<int>(x.size());
+		std::iota(blk_idx[0].begin(), blk_idx[0].end(), 0);
+		blk_idx[1][0] = mu;
+		blk_idx[2][0] = nu;
+	
+		aofac->ao_3c1e_setup("overlap");
+		aofac->ao_3c1e_fill_idx(eri_local, blk_idx, scr_s);
+		
+		auto c_idx = dbcsr::contract(*s_xx_inv_local, *eri_local,
+			*c_xbb_local_1bb)
+			.filter(dbcsr::global::filter_eps)
+			.get_index("XY, Ymn -> Xmn");
+		
+		std::vector<bool> blk_P_bool(x.size(),false);
+		for (auto i : c_idx[0]) {
+			blk_P_bool[i] = true;
+		}
+		
+		std::vector<int> blk_P;
+		for (int i = 0; i != x.size(); ++i) {
+			if (blk_P_bool[i]) blk_P.push_back(i);
+		}
+		
+		int npblks = blk_P.size();
+		
+		std::cout << "OVERLAP" << std::endl;
+		dbcsr::print(*eri_local);
+		eri_local->clear();
+		
+		if (npblks == 0) {
+			std::cout << "SKIPPING" << std::endl;
+			continue;
+		}
+
+#if 1
+		std::cout << "Primary fitting set" << std::endl;
+		for (auto p : blk_P) {
+			std::cout << p << " ";
+		} std::cout << std::endl;
+#endif
+		
+#if 1
+		std::cout << "Now generating another set..." << std::endl;
+#endif		
+		
+		std::vector<bool> blk_Q_bool(nxblks,false); // whether block x is involved 
+		
+		for (int ix = 0; ix != nxblks; ++ix) {
+			for (auto ip : blk_P) {
+				
+				auto& pos_x = min_exp_x[ix].pos;
+				auto& pos_p = min_exp_x[ip].pos;
+				double alpha_x = min_exp_x[ix].exp;
+				double alpha_p = min_exp_x[ip].exp;
+
+				double f = (alpha_x * alpha_p) / (alpha_x + alpha_p)
+					* (pow(pos_x[0] - pos_p[0],2)
+					+ pow(pos_x[1] - pos_p[1],2)
+					+ pow(pos_x[2] - pos_p[2],2));
+					
+				if (f < R) blk_Q_bool[ix] = true;
+#if 0			
+				std::cout << "F: " << f << std::endl;
+				if (blk_Q_bool[ix]) {
+					std::cout << "IX/IP: " << ix << " " << ip << std::endl;
+					std::cout << "POS: " << pos_x[0] << " " << pos_x[1] <<
+					" " << pos_x[2] << " " << pos_p[0] << " " << pos_p[1] <<
+					" " << pos_p[2] << std::endl;
+					std::cout << "ADDING" << std::endl;
+				}
+#endif				
+			}
+		}
+		
+		std::vector<int> blk_Q;
+		for (int ix = 0; ix != nxblks; ++ix) {
+			if (blk_Q_bool[ix]) blk_Q.push_back(ix);
+		}
+		
+#if 1
+		std::cout << "NEW SET: " << std::endl;
+		for (auto q : blk_Q) {
+			std::cout << q << " ";
+		} std::cout << std::endl;
+#endif			
+		
+		// generate integrals
+		aofac->ao_3c2e_setup("coulomb");
+		blk_idx[0] = blk_Q;
+		aofac->ao_3c2e_fill_idx(eri_local, blk_idx, scr_s);
+		
+		// how many x functions?
+		int nq = 0;
+		int np = 0;
+		
+		for (auto iq : blk_Q) {
+			nq += x[iq];
+		}
+		
+		for (auto ip : blk_P) {
+			np += x[ip];
+		}
+		
+		// how many b functions?
+		int nb = b[mu] * b[nu];
+		
+		// copy to eigen matrix
+		Eigen::MatrixXd eris_eigen = Eigen::MatrixXd::Zero(nq,nb);
+		Eigen::MatrixXd cxbb_eigen = Eigen::MatrixXd::Zero(np,nb);
+		Eigen::MatrixXd m_qp_eigen = Eigen::MatrixXd::Zero(nq,np);
+		
+		int poff = 0;
+		int qoff = 0;
+		int moff = b[mu]; 
+		
+		for (auto iq : blk_Q) {
+			
+			std::array<int,3> idx = {iq,mu,nu};
+			std::array<int,3> size = {x[iq],b[mu],b[nu]};
+			bool found = true;
+			auto blk = eri_local->get_block(idx,size,found);
+			
+			if (!found) continue;
+			
+			for (int qq = 0; qq != size[0]; ++qq) {
+				for (int mm = 0; mm != size[1]; ++mm) {
+					for (int nn = 0; nn != size[2]; ++nn) { 
+						eris_eigen(qq + qoff, mm + nn*moff)
+							= blk(qq,mm,nn);
+					}
+				}
+			}
+			
+			qoff += size[0];
+		}
+		
+		dbcsr::print(*eri_local);
+		
+		std::cout << "ERIS: " << std::endl;
+		std::cout << eris_eigen << std::endl;
+				
+		// copy metric to eigen
+		for (auto ip : blk_P) {
+			
+			int sizep = x[ip];
+			int poff_m = xoff[ip];
+			
+			qoff = 0;
+			
+			for (auto iq : blk_Q) {
+				
+				int sizeq = x[iq];
+				int qoff_m = xoff[iq];
+				
+				for (int qq = 0; qq != sizeq; ++qq) {
+					for (int pp = 0; pp != sizep; ++pp) {
+						m_qp_eigen(qq + qoff,pp + poff) = 
+							m_xx_eigen(qq + qoff_m, pp + poff_m);
+					}
+				}
+				
+				qoff += sizeq;
+			}
+			poff += sizep;
+		}
+		
+		std::cout << "FULL:" << std::endl;
+		std::cout << m_xx_eigen << std::endl;
+		
+		std::cout << "M" << std::endl;
+		std::cout << m_qp_eigen << std::endl;
+		
+		Eigen::MatrixXd c_eigen = m_qp_eigen.householderQr().solve(eris_eigen);
+		
+		std::cout << "C_EIGEN: " << std::endl;
+		std::cout << c_eigen << std::endl;
+
+#if 1
+		assert(eris_eigen.isApprox(m_qp_eigen*c_eigen));
+#endif
+		eri_local->clear();
+		
+		// transfer it to c_xbb
+		arrvec<int,3> cfit_idx;
+		cfit_idx[0] = blk_P;
+		cfit_idx[1] = vec<int>(blk_P.size(), mu);
+		cfit_idx[2] = vec<int>(blk_P.size(), nu);
+		
+		c_xbb_global_1bb->reserve(cfit_idx);
+		
+		poff = 0;
+		for (auto ip : blk_P) {
+			
+			std::array<int,3> idx = {ip, mu, nu};
+			std::array<int,3> size = {x[ip], b[mu], b[nu]};
+			
+			dbcsr::block<3,double> blk(size);
+			for (int pp = 0; pp != size[0]; ++pp) {
+				for (int mm = 0; mm != size[1]; ++mm) {
+					for (int nn = 0; nn != size[2]; ++nn) {
+						blk(pp,mm,nn) = c_eigen(pp + poff, mm + nn*moff);
+					}
+				}
+			}
+			
+			c_xbb_global_1bb->put_block(idx, blk);
+			poff += size[0];
+			
+		}
+		
+	}
+	
+	dbcsr::print(*c_xbb_global_1bb);
+
+#if 1
+	}
+	MPI_Barrier(m_world.comm());
+	}
+#endif	
+
+	c_xbb_batched->compress({ibatch_nu}, c_xbb_global_1bb);
+
+	}
+	
+	c_xbb_batched->compress_finalize();
+	
+	return c_xbb_batched;
+	
+}
 	
 } // end namespace

@@ -2,7 +2,7 @@
 #include "math/solvers/diis.h"
 
 namespace locorb {
-
+#if 0
 using smat = dbcsr::shared_matrix<double>;
 
 smat transform(smat c, smat dip) {
@@ -1002,5 +1002,5 @@ std::pair<smat_d,smat_d>
 	);
 			
 }	
-	
+#endif
 } // end namespace

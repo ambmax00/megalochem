@@ -152,7 +152,7 @@ public:
     arrvec<int,N3> get_index() {
 		
 		long long int nblkmax = c_dbcsr_t_max_nblks_local(c_t3.m_tensor_ptr);
-		int* indices = new int[nblkmax];
+		int* indices = new int[N3*nblkmax];
 		int nblkloc = 0;
 		
 		int* f_b1 = (c_bounds1) ? unfold_bounds<int>(*c_bounds1) : nullptr;
@@ -165,7 +165,7 @@ public:
         int out = (rank == 0) ? 6 : -1;
         int* unit_nr = (c_print) ? ((*c_print) ? &out : nullptr) : nullptr;  
         
-        c_dbcsr_t_contract_r_dp(
+        c_dbcsr_t_contract_index_r_dp(
             (c_alpha) ? *c_alpha : 1,
             c_t1.m_tensor_ptr, c_t2.m_tensor_ptr,
             (c_beta) ? *c_beta : 0,

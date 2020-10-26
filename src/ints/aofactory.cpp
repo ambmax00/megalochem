@@ -573,6 +573,7 @@ protected:
 	
 	std::string m_intname;
 	std::string m_braket;
+	std::string m_op;
 	int m_max_l;
 	
 	std::vector<int> m_b_offsets;
@@ -787,8 +788,12 @@ public:
 	
 	void set_operator(std::string op) {
 		
-		if (op == "overlap") {
+		m_op = op;
+		
+		if (op == "overlap" && m_nshells.size() < 3) {
 			m_intfunc = cint1e_ovlp_sph;
+		} else if (op == "overlap" && m_nshells.size() >= 3) {
+			m_intfunc = cint4c1e_sph;
 		} else if (op == "kinetic") {
 			m_intfunc = cint1e_kin_sph;
 		} else if (op == "nuclear") {
@@ -886,6 +891,36 @@ public:
 		
 	}
 	
+	dbcsr::shared_matrix<double> compute_diag(int i) {
+		
+		auto m_ints = dbcsr::create<double>()
+			.name(m_intname)
+			.set_world(m_world)
+			.row_blk_sizes(m_tensor_sizes[0])
+			.col_blk_sizes(m_tensor_sizes[1])
+			.matrix_type(dbcsr::type::symmetric)
+			.get();
+			
+		m_ints->reserve_sym();
+		
+		if (i == 0) {
+		
+			calc_ints_mnmn(*m_ints, m_shell_offsets, m_nshells, m_intfunc,
+				m_atm.data(), m_natoms, m_bas.data(), m_nbas,
+				m_env.data(), m_max_l);
+				
+		} else {
+			
+			calc_ints_mmnn(*m_ints, m_shell_offsets, m_nshells, m_intfunc,
+				m_atm.data(), m_natoms, m_bas.data(), m_nbas,
+				m_env.data(), m_max_l);
+				
+		}
+		
+		return m_ints;
+		
+	}
+	
 	std::array<dbcsr::shared_matrix<double>,3> compute_xyz(std::array<int,3> O) {
 		
 		auto ints_x = dbcsr::create<double>()
@@ -933,7 +968,7 @@ public:
 		calc_ints(*t_in, m_shell_offsets, m_nshells, m_intfunc,
 			m_atm.data(), m_natoms, m_bas.data(), m_nbas,
 			m_env.data(), m_max_l);
-		
+	
 	}	
 	
 	void compute_3_partial_idx(dbcsr::shared_tensor<3>& t_in, arrvec<int,3>& idx,
@@ -941,9 +976,15 @@ public:
 			
 		reserve_3_partial_idx(t_in, idx, s_scr);
 		
-		calc_ints(*t_in, m_shell_offsets, m_nshells, m_intfunc,
-			m_atm.data(), m_natoms, m_bas.data(), m_nbas,
-			m_env.data(), m_max_l);
+		//if (m_op != "overlap") {
+			calc_ints(*t_in, m_shell_offsets, m_nshells, m_intfunc,
+				m_atm.data(), m_natoms, m_bas.data(), m_nbas,
+				m_env.data(), m_max_l);
+		//} else {
+		//	calc_ints_3c(*t_in, m_shell_offsets, m_nshells, m_intfunc,
+		//		m_atm.data(), m_natoms, m_bas.data(), m_nbas,
+		//		m_env.data(), m_max_l);
+		//}
 		
 	}	
 	
@@ -1056,6 +1097,26 @@ dbcsr::shared_matrix<double> aofactory::ao_nuclear() {
 	pimpl->setup_calc();
 	return pimpl->compute();
 }
+/*
+dbcsr::shared_matrix<double> aofactory::ao_diag_mnmn() {
+		
+	pimpl->set_name("diag_mnmn_bb");
+	pimpl->set_dim("bbbb");
+	pimpl->set_braket("xx_xx");
+	pimpl->set_operator("coulomb");
+	pimpl->setup_calc();
+	return pimpl->compute_diag(0);
+}
+
+dbcsr::shared_matrix<double> aofactory::ao_diag_mmnn() {
+		
+	pimpl->set_name("diag_mmnn_bb");
+	pimpl->set_dim("bbbb");
+	pimpl->set_braket("xx_xx");
+	pimpl->set_operator("coulomb");
+	pimpl->setup_calc();
+	return pimpl->compute_diag(1);
+}*/
 
 dbcsr::shared_matrix<double> aofactory::ao_2c2e(std::string metric) {
 	
@@ -1076,7 +1137,7 @@ dbcsr::shared_matrix<double> aofactory::ao_auxoverlap() {
 	pimpl->setup_calc();
 	return pimpl->compute();
 }
-
+#if 0
 std::array<dbcsr::shared_matrix<double>,3>
 	aofactory::ao_emultipole(std::array<int,3> O) {
 		
@@ -1088,8 +1149,17 @@ std::array<dbcsr::shared_matrix<double>,3>
 	return pimpl->compute_xyz(O);
 	
 }
-
+#endif
 void aofactory::ao_3c2e_setup(std::string metric) {
+	
+	pimpl->set_braket("xs_xx");
+	pimpl->set_dim("xbb");
+	pimpl->set_operator(metric);
+	pimpl->setup_calc();
+	
+}
+
+void aofactory::ao_3c1e_setup(std::string metric) {
 	
 	pimpl->set_braket("xs_xx");
 	pimpl->set_dim("xbb");
@@ -1115,6 +1185,13 @@ void aofactory::ao_3c2e_fill(dbcsr::shared_tensor<3,double>& t_in,
 }
 
 void aofactory::ao_3c2e_fill_idx(dbcsr::shared_tensor<3,double>& t_in, 
+	arrvec<int,3>& blkbounds, shared_screener scr) {
+	
+	pimpl->compute_3_partial_idx(t_in,blkbounds,scr);
+	
+}
+
+void aofactory::ao_3c1e_fill_idx(dbcsr::shared_tensor<3,double>& t_in, 
 	arrvec<int,3>& blkbounds, shared_screener scr) {
 	
 	pimpl->compute_3_partial_idx(t_in,blkbounds,scr);
