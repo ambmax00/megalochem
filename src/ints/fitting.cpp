@@ -70,6 +70,8 @@ dbcsr::sbtensor<3,double> dfitting::compute(dbcsr::sbtensor<3,double> eri_batche
 	int nbatches_x = eri_batched->nbatches(0);
 	int nbatches_b = eri_batched->nbatches(2);
 
+	std::cout << "NBATCHES: " << nbatches_x << " " << nbatches_b << std::endl;
+
 	std::array<int,3> bdims = {nbatches_x,nbatches_b,nbatches_b};
 	
 	auto c_xbb_batched = dbcsr::btensor_create<3>()
@@ -92,8 +94,11 @@ dbcsr::sbtensor<3,double> dfitting::compute(dbcsr::sbtensor<3,double> eri_batche
 	
 	eri_batched->decompress_init({2},vec<int>{0},vec<int>{1,2});
 	c_xbb_batched->compress_init({2,0}, vec<int>{1}, vec<int>{0,2});
-	c_xbb_0_12->batched_contract_init();
-	c_xbb_1_02->batched_contract_init();
+	//c_xbb_0_12->batched_contract_init();
+	//c_xbb_1_02->batched_contract_init();
+	
+	//auto e = eri_batched->get_work_tensor();
+	//std::cout << "ERI OCC: " << e->occupation() * 100 << std::endl;
 	
 	for (int inu = 0; inu != c_xbb_batched->nbatches(2); ++inu) {
 		
@@ -138,11 +143,16 @@ dbcsr::sbtensor<3,double> dfitting::compute(dbcsr::sbtensor<3,double> eri_batche
 	
 	c_xbb_batched->compress_finalize();
 	eri_batched->decompress_finalize();
-	c_xbb_0_12->batched_contract_finalize();
-	c_xbb_1_02->batched_contract_finalize();
-		
-	double c_occ = c_xbb_batched->occupation() * 100;
-	LOG.os<1>("Occupancy of c_xbb: ", c_occ, "%\n");
+	//c_xbb_0_12->batched_contract_finalize();
+	//c_xbb_1_02->batched_contract_finalize();
+	
+	//auto cw = c_xbb_batched->get_work_tensor();
+	//dbcsr::print(*cw);
+	
+	double cfit_occupation = c_xbb_batched->occupation() * 100;
+	LOG.os<1>("Occupancy of c_xbb: ", cfit_occupation, "%\n");
+	
+	assert(cfit_occupation <= 100);
 
 	TIME.finish();
 	

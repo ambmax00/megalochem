@@ -110,6 +110,80 @@ public:
 		
 };
 
+template <typename T> 
+struct is_shared_ptr : std::false_type {};
+
+template <typename T>
+struct is_shared_ptr<std::shared_ptr<T>> : std::true_type {};
+
+template <class KEY>
+class key_registry {
+private:
+
+	std::array<std::any,static_cast<const int>(KEY::NUM_KEYS)> m_array;
+	
+	template <class KEY2>
+	friend class key_registry;
+	
+public:
+
+	key_registry() {}
+		
+	template <class M>
+	typename std::enable_if<is_shared_ptr<M>::value == true, void>::type
+	insert(KEY name, M& m) {
+		int pos = static_cast<int>(name);
+		std::any in = std::any(m);
+		if (this->present(name)) {
+			throw std::runtime_error("Key " + std::to_string(pos) + " already present!");
+		} else {
+			m_array[pos] = in;
+		}
+	}
+	
+	template <class M>
+	typename std::enable_if<is_shared_ptr<M>::value == true, M>::type
+	get(KEY name) const {
+		M out;
+		int pos = static_cast<int>(name);
+		if (this->present(name)) {
+			if (typeid(out).name() != m_array[pos].type().name()) {
+				auto badtype = std::string(typeid(out).name());
+				auto goodtype = std::string(m_array[pos].type().name());
+				throw std::runtime_error("Registry: Bad cast from " + badtype + " to " + goodtype);
+			}
+			out = std::any_cast<M>(m_array[pos]);
+		} else {
+			throw std::runtime_error("Could not find key in registry!");
+		}
+		return out;
+	}
+	
+	void clear() {
+		for (auto& a : m_array) a = nullptr;
+	}
+	
+	void erase(KEY key) {
+		int pos = static_cast<int>(key);
+		m_array[pos].reset();
+	}
+	
+	bool present(KEY key) const {
+		int pos = static_cast<int>(key);
+		return (m_array[pos].has_value()) ? true : false;
+	}
+	
+	template <class REG, class KEY2>
+	void add(REG registry_in, KEY2 old_key, KEY new_key) {
+		int pos_old = static_cast<int>(old_key);
+		int pos_new = static_cast<int>(new_key);
+		m_array[pos_new] = registry_in.m_array[pos_old];
+	}
+	
+	~key_registry() {}
+		
+};
+
 } // end namespace
 
 #endif

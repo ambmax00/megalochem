@@ -9,8 +9,8 @@
 #include "io/reader.h"
 #include "io/io.h"
 #include "hf/hfmod.h"
-#include "mp/mpmod.h"
-#include "adc/adcmod.h"
+//#include "mp/mpmod.h"
+//#include "adc/adcmod.h"
 #include "utils/mpi_time.h"
 
 #include "extern/scalapack.h"
@@ -166,7 +166,7 @@ int main(int argc, char** argv) {
 	}
 	
 	MPI_Barrier(MPI_COMM_WORLD);
-	
+	/*
 	auto mpopt = opt.subtext("mp");
 	
 	bool do_mp = opt.get<bool>("do_mp");
@@ -185,7 +185,7 @@ int main(int argc, char** argv) {
 		
 		adc::adcmod myadc(myhfwfn,adcopt,wrd);
 		myadc.compute();
-	}
+	}*/
 	
 	scalapack::global_grid.free();
 

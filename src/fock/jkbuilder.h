@@ -10,6 +10,31 @@
 #include <dbcsr_matrix.hpp>
 
 namespace fock {
+
+enum class Jkey {
+	pgrid2 = 0,
+	pgrid3,
+	pgrid4,
+	eri_bbbb,
+	eri_xbb,
+	v_inv_xx,
+	NUM_KEYS = 6
+};
+
+enum class Kkey {
+	pgrid2 = 0,
+	pgrid3,
+	pgrid4,
+	eri_bbbb,
+	eri_xbb,
+	v_xx,
+	v_inv_xx,
+	v_inv_xx_sqrt,
+	dfit_xbb,
+	dfit_pari_xbb,
+	dfit_qr_xbb,
+	NUM_KEYS = 10	
+};
 	
 class JK_common {
 protected:
@@ -17,9 +42,7 @@ protected:
 	desc::smolecule m_mol;
 	desc::options m_opt;
 	dbcsr::world m_world;
-	
-	util::registry m_reg;
-	
+		
 	util::mpi_log LOG;
 	util::mpi_time TIME;
 	
@@ -48,9 +71,6 @@ public:
 		m_SAD_iter = SAD; 
 		m_SAD_rank = rank;
 	}
-	void set_reg(util::registry& reg) {
-		m_reg = reg;
-	}
 	
 	virtual ~JK_common() {}
 	
@@ -66,6 +86,8 @@ protected:
 	
 	void init_base();
 	
+	util::key_registry<Jkey> m_reg; 
+	
 public:
 	
 	J(dbcsr::world& w, desc::options& opt, std::string name) : JK_common(w,opt,name) {}
@@ -73,6 +95,10 @@ public:
 	virtual void compute_J() = 0;
 	
 	virtual void init() = 0;
+	
+	void set_reg(util::key_registry<Jkey>& reg) {
+		m_reg = reg;
+	}
 	
 	dbcsr::shared_matrix<double> get_J() { return m_J; }	
 		
@@ -86,6 +112,8 @@ protected:
 	
 	void init_base();
 	
+	util::key_registry<Kkey> m_reg;
+	
 public:
 	
 	K(dbcsr::world& w, desc::options& opt, std::string name) : JK_common(w,opt,name) {}
@@ -93,6 +121,10 @@ public:
 	virtual void compute_K() = 0;
 	
 	virtual void init() = 0;
+	
+	void set_reg(util::key_registry<Kkey>& reg) {
+		m_reg = reg;
+	}
 	
 	dbcsr::shared_matrix<double> get_K_A() { return m_K_A; }
 	dbcsr::shared_matrix<double> get_K_B() { return m_K_B; }
@@ -143,8 +175,8 @@ private:
 	dbcsr::shared_tensor<3,double> m_ptot_bbd;
 	dbcsr::shared_tensor<2,double> m_gp_xd;
 	dbcsr::shared_tensor<2,double> m_gq_xd;
-	dbcsr::shared_tensor<2,double> m_inv;
-	dbcsr::shared_matrix<double> m_inv_mat;
+	dbcsr::shared_tensor<2,double> m_v_inv;
+	dbcsr::shared_matrix<double> m_v_inv_mat;
 	
 	dbcsr::shared_pgrid<3> m_spgrid_bbd;
 	dbcsr::shared_pgrid<2> m_spgrid_xd, m_spgrid2;
@@ -172,7 +204,7 @@ private:
 	
 	dbcsr::shared_tensor<2,double> m_c_bm;
 	dbcsr::shared_tensor<2,double> m_K_01;
-	dbcsr::shared_tensor<2,double> m_invsqrt;
+	dbcsr::shared_tensor<2,double> m_v_inv_sqrt;
 	
 	dbcsr::shared_pgrid<2> m_spgrid2;
 	
@@ -220,7 +252,7 @@ private:
 	dbcsr::shared_tensor<2,double> m_K_01;
 	dbcsr::shared_tensor<2,double> m_p_bb;
 	dbcsr::shared_tensor<2,double> m_s_xx_01;
-	dbcsr::shared_matrix<double> m_s_xx;
+	dbcsr::shared_matrix<double> m_v_xx;
 	
 	dbcsr::shared_pgrid<2> m_spgrid2;
 	dbcsr::shared_pgrid<3> m_spgrid3_xbb;

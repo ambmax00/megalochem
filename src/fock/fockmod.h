@@ -6,7 +6,7 @@
 #include "utils/mpi_time.h"
 #include "fock/jkbuilder.h"
 #include "ints/fitting.h"
-
+#include "ints/aoloader.h"
 #include <dbcsr_matrix.hpp>
 
 namespace fock {
@@ -31,7 +31,8 @@ private:
 	
 	std::shared_ptr<J> m_J_builder;
 	std::shared_ptr<K> m_K_builder;
-	std::shared_ptr<ints::dfitting> m_dfit;
+	ints::aoloader m_ao;
+	
 	
 	dbcsr::shared_pgrid<2> spgrid2;
 	dbcsr::shared_pgrid<3> spgrid3_xbb;
@@ -61,8 +62,8 @@ public:
 	
 	void print_info() { 
 		TIME.print_info();
+		m_ao.print_info();
 		if (m_J_builder) m_J_builder->print_info();
-		if (m_dfit) m_dfit->print_info();
 		if (m_K_builder) m_K_builder->print_info();
 	}
 	

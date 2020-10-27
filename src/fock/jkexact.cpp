@@ -26,7 +26,7 @@ void EXACT_J::init() {
 	
 	m_ptot_bbd = dbcsr::tensor_create_template<3>(m_J_bbd).name("p dummy").get();
 	
-	m_eri_batched = m_reg.get_btensor<4,double>("i_bbbb_batched");
+	m_eri_batched = m_reg.get<dbcsr::sbtensor<4,double>>(Jkey::eri_bbbb);
 	
 }
 
@@ -48,7 +48,7 @@ void EXACT_K::init() {
 	
 	m_p_bbd = dbcsr::tensor_create_template<3>(m_K_bbd).name("p dummy").get();
 	
-	m_eri_batched = m_reg.get_btensor<4,double>("i_bbbb_batched");
+	m_eri_batched = m_reg.get<dbcsr::sbtensor<4,double>>(Kkey::eri_bbbb);
 	
 }	
 

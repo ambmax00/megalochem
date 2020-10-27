@@ -9,6 +9,8 @@ set(SOURCES
 	screening.cpp
 	fitting.h
 	fitting.cpp
+	aoloader.h
+	aoloader.cpp
 )
 
 add_library(chem_ints ${SOURCES})

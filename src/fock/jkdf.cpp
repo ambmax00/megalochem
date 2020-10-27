@@ -45,15 +45,15 @@ void BATCHED_DF_J::init() {
 	
 	m_ptot_bbd = dbcsr::tensor_create_template<3>(m_J_bbd).name("ptot_bbd").get();
 	
-	m_inv_mat = m_reg.get_matrix<double>("s_xx_inv");
-	m_inv = dbcsr::tensor_create<2,double>()
+	m_v_inv_mat = m_reg.get<dbcsr::shared_matrix<double>>(Jkey::v_inv_xx);
+	m_v_inv = dbcsr::tensor_create<2,double>()
 		.name("inv")
 		.pgrid(m_spgrid2)
 		.blk_sizes(xx)
 		.map1({0}).map2({1})
 		.get();
 	
-	m_eri_batched = m_reg.get_btensor<3,double>("i_xbb_batched");
+	m_eri_batched = m_reg.get<dbcsr::sbtensor<3,double>>(Jkey::eri_xbb);
 	
 }
 
@@ -126,17 +126,15 @@ void BATCHED_DF_J::compute_J() {
 	
 	m_gp_xd->batched_contract_finalize();
 	m_ptot_bbd->batched_contract_finalize();
-		
-	//dbcsr::print(*m_gp_xd);
-	
+			
 	LOG.os<1>("X_, XY -> Y_\n");
 	
-	dbcsr::copy_matrix_to_tensor(*m_inv_mat, *m_inv);
+	dbcsr::copy_matrix_to_tensor(*m_v_inv_mat, *m_v_inv);
 	
-	dbcsr::contract(*m_gp_xd, *m_inv, *m_gq_xd)
+	dbcsr::contract(*m_gp_xd, *m_v_inv, *m_gq_xd)
 		.filter(dbcsr::global::filter_eps).perform("X_, XY -> Y_");
 	
-	m_inv->clear();
+	m_v_inv->clear();
 	//dbcsr::print(*m_gq_xd);
 	
 	//dbcsr::print(*m_inv);
@@ -207,12 +205,13 @@ void BATCHED_DFMO_K::init() {
 	m_K_01 = dbcsr::tensor_create<2>().pgrid(m_spgrid2).name("K_01")
 		.map1({0}).map2({1}).blk_sizes(bb).get();
 	
-	auto invsqrt_mat = m_reg.get_matrix<double>("s_xx_invsqrt");
-	m_invsqrt = dbcsr::tensor_create<2>().pgrid(m_spgrid2).name("s_xx_invsqrt")
-		.map1({0}).map2({1}).blk_sizes(xx).get();
-	dbcsr::copy_matrix_to_tensor(*invsqrt_mat, *m_invsqrt);
+	auto invsqrt_mat = m_reg.get<dbcsr::shared_matrix<double>>(Kkey::v_inv_xx_sqrt);
 	
-	m_eri_batched = m_reg.get_btensor<3,double>("i_xbb_batched");
+	m_v_inv_sqrt = dbcsr::tensor_create<2>().pgrid(m_spgrid2).name("s_xx_invsqrt")
+		.map1({0}).map2({1}).blk_sizes(xx).get();
+	dbcsr::copy_matrix_to_tensor(*invsqrt_mat, *m_v_inv_sqrt);
+	
+	m_eri_batched = m_reg.get<dbcsr::sbtensor<3,double>>(Kkey::eri_xbb);
 		
 }
 
@@ -367,7 +366,7 @@ void BATCHED_DFMO_K::compute_K() {
 			};
 			
 			con2.start();
-			dbcsr::contract(*m_HT1_xmb_0_12,*m_invsqrt,*m_HT2_xmb_0_12)
+			dbcsr::contract(*m_HT1_xmb_0_12,*m_v_inv_sqrt,*m_HT2_xmb_0_12)
 				.bounds2(nu_o_bounds)
 				.filter(dbcsr::global::filter_eps)
 				.perform("XiN, XY -> YiN");
@@ -455,8 +454,8 @@ void BATCHED_DFAO_K::init() {
 	
 	init_base();
 		
-	m_eri_batched = m_reg.get_btensor<3,double>("i_xbb_batched");
-	m_c_xbb_batched = m_reg.get_btensor<3,double>("c_xbb_batched");
+	m_eri_batched = m_reg.get<dbcsr::sbtensor<3,double>>(Kkey::eri_xbb);
+	m_c_xbb_batched = m_reg.get<dbcsr::sbtensor<3,double>>(Kkey::dfit_xbb);
 	
 	auto b = m_mol->dims().b();
 	auto x = m_mol->dims().x();

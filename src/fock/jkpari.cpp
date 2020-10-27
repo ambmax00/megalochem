@@ -20,9 +20,9 @@ void BATCHED_PARI_K::init() {
 	arrvec<int,2> bb = {b,b};
 	arrvec<int,2> xx = {x,x};
 	
-	m_eri_batched = m_reg.get_btensor<3,double>("i_xbb_batched");
+	m_eri_batched = m_reg.get<dbcsr::sbtensor<3,double>>(Kkey::eri_xbb);
 	
-	m_cfit_xbb = m_reg.get_tensor<3,double>("c_xbb_pari");
+	m_cfit_xbb = m_reg.get<dbcsr::shared_tensor<3,double>>(Kkey::dfit_pari_xbb);
 	
 	m_spgrid2 = dbcsr::create_pgrid<2>(m_world.comm()).get();
 	
@@ -32,7 +32,7 @@ void BATCHED_PARI_K::init() {
 	m_p_bb = dbcsr::tensor_create_template<2,double>(m_K_01)
 			.name("p_bb_0_1").map1({0}).map2({1}).get();
 	
-	m_s_xx = m_reg.get_matrix<double>("s_xx");
+	m_v_xx = m_reg.get<dbcsr::shared_matrix<double>>(Kkey::v_xx);
 	m_s_xx_01 = dbcsr::tensor_create<2>()
 		.name("s_xx_01")
 		.pgrid(m_spgrid2)
@@ -106,7 +106,7 @@ void BATCHED_PARI_K::compute_K() {
 	ctil_xbb_02_1->batched_contract_init();
 	
 	dbcsr::copy_matrix_to_tensor(*m_p_A, *m_p_bb);
-	dbcsr::copy_matrix_to_tensor(*m_s_xx, *m_s_xx_01);
+	dbcsr::copy_matrix_to_tensor(*m_v_xx, *m_s_xx_01);
 	
 	// Loop ix
 	for (int ix = 0; ix != m_eri_batched->nbatches(0); ++ix) {
