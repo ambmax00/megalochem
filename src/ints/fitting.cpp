@@ -1092,8 +1092,9 @@ dbcsr::sbtensor<3,double> dfitting::compute_qr(dbcsr::sbtensor<3,double> eri_bat
 		std::cout << c_eigen << std::endl;
 
 #if 1
-		assert(eris_eigen.isApprox(m_qp_eigen*c_eigen));
+		//assert(eris_eigen.isApprox(m_qp_eigen*c_eigen,1e-8));
 #endif
+		eris_eigen.resize(0,0);
 		eri_local->clear();
 		
 		// transfer it to c_xbb

@@ -65,7 +65,20 @@ void fockmod::init() {
 			m_ao.request(ints::key::erfc_xx_inv);
 			m_ao.request(ints::key::erfc_xbb);
 		}
+	
+	} else if (j_method == "batchqr") {
 		
+		J* builder = new BATCHED_DF_J(m_world,m_opt);
+		m_J_builder.reset(builder);
+		
+		m_ao.request(ints::key::scr_xbb);
+		
+		m_ao.request(ints::key::coul_xx);
+		m_ao.request(ints::key::ovlp_xx);
+		m_ao.request(ints::key::ovlp_xx_inv);
+		m_ao.request(ints::key::coul_xbb);
+		m_ao.request(ints::key::dfit_qr_xbb);
+	
 	} else {
 		
 		throw std::runtime_error("Unknown J method: " + j_method);
@@ -129,12 +142,14 @@ void fockmod::init() {
 		
 	} else if (k_method == "batchqr") {
 	
-		K* builder = new BATCHED_PARI_K(m_world,m_opt);
+		K* builder = new BATCHED_QRDF_K(m_world,m_opt);
 		m_K_builder.reset(builder);
 		
 		m_ao.request(ints::key::scr_xbb);
 		
 		m_ao.request(ints::key::coul_xx);
+		m_ao.request(ints::key::ovlp_xx);
+		m_ao.request(ints::key::ovlp_xx_inv);
 		m_ao.request(ints::key::coul_xbb);
 		m_ao.request(ints::key::dfit_qr_xbb);
 	
@@ -178,6 +193,9 @@ void fockmod::init() {
 			jreg.add(aoreg, ints::key::erfc_xbb, Jkey::eri_xbb);
 			jreg.add(aoreg, ints::key::erfc_xx_inv, Jkey::v_inv_xx);
 		}
+	} else if (j_method == "batchqr") {
+		jreg.add(aoreg, ints::key::dfit_qr_xbb, Jkey::eri_xbb);
+		jreg.add(aoreg, ints::key::coul_xx, Jkey::v_inv_xx);
 	}
 	
 	// set K

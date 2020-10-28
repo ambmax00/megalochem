@@ -12,28 +12,28 @@
 namespace fock {
 
 enum class Jkey {
-	pgrid2 = 0,
-	pgrid3,
-	pgrid4,
-	eri_bbbb,
-	eri_xbb,
-	v_inv_xx,
-	NUM_KEYS = 6
+	pgrid2 		= 0,
+	pgrid3 		= 1,
+	pgrid4 		= 2,
+	eri_bbbb	= 3,
+	eri_xbb 	= 4,
+	v_inv_xx 	= 5,
+	NUM_KEYS 	= 6
 };
 
 enum class Kkey {
-	pgrid2 = 0,
-	pgrid3,
-	pgrid4,
-	eri_bbbb,
-	eri_xbb,
-	v_xx,
-	v_inv_xx,
-	v_inv_xx_sqrt,
-	dfit_xbb,
-	dfit_pari_xbb,
-	dfit_qr_xbb,
-	NUM_KEYS = 10	
+	pgrid2 			= 0,
+	pgrid3 			= 1,
+	pgrid4 			= 2,
+	eri_bbbb 		= 3,
+	eri_xbb 		= 4,
+	v_xx 			= 5,
+	v_inv_xx 		= 6,
+	v_inv_xx_sqrt 	= 7,
+	dfit_xbb 		= 8,
+	dfit_pari_xbb 	= 9,
+	dfit_qr_xbb 	= 10,
+	NUM_KEYS 		= 11	
 };
 	
 class JK_common {
@@ -267,6 +267,35 @@ public:
 	
 };
 
+class BATCHED_QRDF_K : public K {
+private:
+
+	dbcsr::sbtensor<3,double> m_c_xbb_batched;
+	
+	dbcsr::shared_tensor<2,double> m_K_01;
+	dbcsr::shared_tensor<2,double> m_p_bb;
+	dbcsr::shared_tensor<2,double> m_v_xx_01;
+	dbcsr::shared_matrix<double> m_v_xx;
+	
+	dbcsr::shared_tensor<3,double> m_cbar_xbb_01_2;
+	dbcsr::shared_tensor<3,double> m_cbar_xbb_1_02;
+	
+	dbcsr::shared_tensor<3,double> m_cpq_xbb_0_12;
+	dbcsr::shared_tensor<3,double> m_cpq_xbb_01_2;
+	
+	dbcsr::shared_pgrid<2> m_spgrid2;
+	dbcsr::shared_pgrid<3> m_spgrid3_xbb;
+	
+public:
+
+	BATCHED_QRDF_K(dbcsr::world& w, desc::options& opt);
+	void compute_K() override;
+	void init() override;
+	
+	~BATCHED_QRDF_K() {}
+	
+};
+
 inline std::shared_ptr<J> get_J(
 	std::string name, dbcsr::world& w, desc::options opt) {
 	
@@ -302,6 +331,8 @@ inline std::shared_ptr<K> get_K(
 		ptr = new BATCHED_DFMO_K(w,opt);
 	} else if (name == "batchpari") {
 		ptr = new BATCHED_PARI_K(w,opt);
+	} else if (name == "batchqrdf") {
+		ptr = new BATCHED_QRDF_K(w,opt);
 	}
 	
 	if (!ptr) {

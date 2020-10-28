@@ -116,6 +116,17 @@ void aoloader::compute() {
 		time.finish();
 	}
 	
+	if (comp(key::ovlp_xx_inv)) {
+		LOG.os<>("Computing auxiliary overlap inverse\n");
+		auto& time = TIME.sub("Inverting auxiliary overlap matrix");
+		time.start();
+		auto s = m_reg.get<smatd>(key::ovlp_xx);
+		auto p = invert(s);
+		auto s_inv = p.first;
+		m_reg.insert(key::ovlp_xx_inv,s_inv);
+		time.finish();
+	}
+	
 	if (comp(key::coul_xx)) {
 		LOG.os<>("Computing coulomb metric\n");
 		auto& time = TIME.sub("Coulomb metric");
@@ -414,9 +425,7 @@ void aoloader::compute() {
 		
 		auto& time = TIME.sub("Density fitting coefficients (PARI)");
 		time.start();
-		
-		//LOG.os<1>("Computing fitting coefficients.\n");
-		
+				
 		auto eri_batched = m_reg.get<sbt3>(key::coul_xbb);
 		auto m_xx = m_reg.get<smatd>(key::coul_xx);
 		auto scr = m_reg.get<ints::shared_screener>(key::scr_xbb);
@@ -428,57 +437,28 @@ void aoloader::compute() {
 	
 	}
 	
+	if (comp(key::dfit_qr_xbb)) {
+		
+		LOG.os<>("Computing fitting coefficients (QR)\n");
+		
+		auto& time = TIME.sub("Density fitting coefficients (QR)");
+		time.start();
+				
+		auto eri_batched = m_reg.get<sbt3>(key::coul_xbb);
+		auto m_xx = m_reg.get<smatd>(key::coul_xx);
+		auto s_xx_inv = m_reg.get<smatd>(key::ovlp_xx_inv);
+		auto scr = m_reg.get<ints::shared_screener>(key::scr_xbb);
+		
+		auto c_xbb_qr = dfit.compute_qr(eri_batched, s_xx_inv, m_xx, scr, dbcsr::btype::core);
+		m_reg.insert(key::dfit_qr_xbb, c_xbb_qr);
+	
+		time.finish();
+	
+	}
+	
 	TIME.finish();
 	LOG.os<>("Finished loading AO quantities.\n");
 	
 }
-
-/*
- * if (k_method == "batchqr") {
-		
-		LOG.os<1>("Computing fitting coefficients.\n");
-		
-		auto eri_batched = m_reg.get_btensor<3,double>("i_xbb_batched");
-		auto s_xx = m_reg.get_matrix<double>("s_xx");
-		m_dfit = std::make_shared<ints::dfitting>(m_world, m_mol, LOG.global_plev());
-		
-		auto o_xx = aofac->ao_auxoverlap();
-		arrvec<int,2> xx = {m_mol->dims().x(), m_mol->dims().x()};
-		
-		dbcsr::print(*o_xx);
-		
-		math::hermitian_eigen_solver solver(o_xx, 'V');
-		solver.compute();
-		auto o_xx_inv = solver.inverse();
-		
-		auto cfit_batched = m_dfit->compute_qr(eri_batched, o_xx_inv, s_xx, scr_s, dbcsr::btype::core);
-		
-		auto s_xx_01 = dbcsr::tensor_create<2,double>()
-			.name("s_xx_01")
-			.pgrid(spgrid2)
-			.blk_sizes(xx)
-			.map1({0}).map2({1})
-			.get();
-			
-		auto cfit = cfit_batched->get_work_tensor();
-		auto eri4_batched = m_reg.get_btensor<4,double>("i_bbbb_batched");
-		auto eri4 = eri4_batched->get_work_tensor();
-		
-		dbcsr::copy_matrix_to_tensor(*s_xx, *s_xx_01);
-		auto cfitm = dbcsr::tensor_create_template<3,double>(cfit)
-			.name("sd").get();
-			
-		dbcsr::contract(*s_xx_01, *cfit, *cfitm)
-			.perform("XY, Ymn -> Xmn");
-			
-		dbcsr::contract(*cfit, *cfitm, *eri4)
-			.alpha(1.0)
-			.perform("Xmn, Xkl -> mnkl");
-		
-		dbcsr::print(*eri4);
-		exit(0);
-
-	
-	}*/
 	
 } // end namespace

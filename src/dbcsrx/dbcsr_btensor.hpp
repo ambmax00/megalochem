@@ -131,7 +131,9 @@ protected:
 	using generator_type = 
 	std::function<void(dbcsr::stensor<N,T>&,vec<vec<int>>&)>;
 	
-	generator_type m_generator;		
+	generator_type m_generator;	
+	
+	btensor(MPI_Comm comm, int print) : LOG(comm,print) {}	
 	
 public:
 
@@ -233,8 +235,8 @@ public:
 		
 	}
 	
-	btensor(const btensor& in) = default;
-	
+	btensor(const btensor& in) = delete;
+		
 	void set_generator(generator_type& func) {
 		m_generator = func;
 	}
@@ -1536,7 +1538,52 @@ public:
 		return out;
 	}
 			
+	std::shared_ptr<btensor<N,T>> get_access_duplicate() {
 		
+		auto out = std::make_shared<btensor<N,T>>(m_comm, LOG.global_plev());
+	
+		out->m_mpirank = m_mpirank;
+		out->m_mpisize = m_mpisize;
+		
+		out->m_read_tensor = dbcsr::create_template<3>(m_read_tensor)
+			.name(m_read_tensor->name()).get();
+			
+		out->m_work_tensor = m_work_tensor; // for now
+		
+		out->m_name = m_name;
+		out->m_spgrid_N = m_spgrid_N;
+		out->m_blk_sizes = m_blk_sizes;
+		out->m_filename = m_filename;
+		out->m_path = m_path;
+		out->m_type = m_type;
+		
+		out->m_nblkloc = m_nblkloc;
+		out->m_nblkloc_global = m_nblkloc_global;
+		out->m_nzeloc = m_nzeloc;
+		out->m_nblktot_global = m_nblktot_global;
+		out->m_nblktot = m_nblktot;
+		out->m_nzetot = m_nzetot;
+		
+		out->m_write_current_batch = m_write_current_batch;
+		out->m_read_current_batch = m_read_current_batch;
+		out->m_read_current_dims = m_read_current_dims;
+		out->m_read_current_is_contiguous = m_read_current_is_contiguous;
+		
+		out->m_blk_bounds = m_blk_bounds;
+		out->m_bounds = m_bounds;
+		out->m_full_blk_bounds = m_full_blk_bounds;
+		out->m_full_bounds = m_full_bounds;
+	
+		out->m_nbatches_dim = m_nbatches_dim;
+		
+		out->m_wrview = m_wrview;
+		out->m_rdviewmap = m_rdviewmap;
+	
+		out->m_generator = m_generator;
+	
+		return out;
+		
+	}
 	
 }; //end class btensor
 

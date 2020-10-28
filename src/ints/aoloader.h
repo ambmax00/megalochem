@@ -13,29 +13,29 @@ namespace ints {
 
 enum class key {
 	pgrid2 = 0,
-	pgrid3,
-	pgrid4, // processor grids
-	ovlp_bb, // overlap matrix
-	ovlp_xx, // overlap matrix for aux basis
-	pot_bb, // nuc. potential ints
-	kin_bb, // kin. ints
-	ovlp_bb_inv, 
-	ovlp_xx_inv,
-	coul_xbb, // 3c2e integrals
-	erfc_xbb, // 3c2e integrals in coulomb metric
-	coul_xx, // 2c2e ints in coulomb metric
-	erfc_xx, // 2c2e integrals in erfc metric 
-	coul_bbbb, // 4c2e integrals
-	coul_xx_inv,
-	erfc_xx_inv,
-	coul_xx_invsqrt,
-	erfc_xx_invsqrt,
-	dfit_coul_xbb, // fitting coefficients
-	dfit_erfc_xbb,
-	dfit_pari_xbb,
-	dfit_qr_xbb,
-	scr_xbb,
-	NUM_KEYS
+	pgrid3 = 1,
+	pgrid4 = 2, // processor grids
+	ovlp_bb = 3, // overlap matrix
+	ovlp_xx = 4, // overlap matrix for aux basis
+	pot_bb = 5, // nuc. potential ints
+	kin_bb = 6, // kin. ints
+	ovlp_bb_inv = 7, 
+	ovlp_xx_inv = 8,
+	coul_xbb = 9, // 3c2e integrals
+	erfc_xbb = 10, // 3c2e integrals in coulomb metric
+	coul_xx = 11, // 2c2e ints in coulomb metric
+	erfc_xx = 12, // 2c2e integrals in erfc metric 
+	coul_bbbb = 13, // 4c2e integrals
+	coul_xx_inv = 14,
+	erfc_xx_inv = 15,
+	coul_xx_invsqrt = 16,
+	erfc_xx_invsqrt = 17,
+	dfit_coul_xbb = 18, // fitting coefficients
+	dfit_erfc_xbb = 19,
+	dfit_pari_xbb = 20,
+	dfit_qr_xbb = 21,
+	scr_xbb = 22,
+	NUM_KEYS = 23
 };
 	
 class aoloader {

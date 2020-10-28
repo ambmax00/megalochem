@@ -135,7 +135,9 @@ public:
 		int pos = static_cast<int>(name);
 		std::any in = std::any(m);
 		if (this->present(name)) {
-			throw std::runtime_error("Key " + std::to_string(pos) + " already present!");
+			std::string msg = "Key nr. " + std::to_string(pos) 
+				+ " of type " + typeid(name).name() + " already present!";
+			throw std::runtime_error(msg);
 		} else {
 			m_array[pos] = in;
 		}
@@ -154,7 +156,9 @@ public:
 			}
 			out = std::any_cast<M>(m_array[pos]);
 		} else {
-			throw std::runtime_error("Could not find key in registry!");
+			std::string msg = "Key nr. " + std::to_string(pos) 
+				+ " of type " + typeid(name).name() + " not found!";
+			throw std::runtime_error(msg);
 		}
 		return out;
 	}
