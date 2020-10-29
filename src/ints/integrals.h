@@ -11,39 +11,6 @@
 #include <mpi.h>
 
 // =====================================================================
-//                          LIBINT2
-// =====================================================================
-
-#ifdef USE_LIBINT
-#include <libint2.hpp>
-
-namespace ints {
-
-using cluster_vec = std::vector<const std::vector<std::vector<libint2::Shell>>*>;
-
-void calc_ints(dbcsr::mat_d& m_out, util::ShrPool<libint2::Engine>& engine,
-	cluster_vec& basvec);
-
-void calc_ints(dbcsr::tensor<2>& t_out, util::ShrPool<libint2::Engine>& eng,
-	cluster_vec& basvec);
-	
-void calc_ints(dbcsr::tensor<3>& t_out, util::ShrPool<libint2::Engine>& eng,
-	cluster_vec& basvec, screener* scr = nullptr);
-	
-void calc_ints(dbcsr::tensor<4>& t_out, util::ShrPool<libint2::Engine>& eng,
-	cluster_vec& basvec);
-	
-void calc_ints_schwarz_mn(dbcsr::mat_d& m_out, util::ShrPool<libint2::Engine>& engine,
-	cluster_vec& basvec);
-	
-void calc_ints_schwarz_x(dbcsr::mat_d& m_out, util::ShrPool<libint2::Engine>& engine,
-	cluster_vec& basvec);
-
-} // end namespace
-
-#endif // USE_LIBINT
-
-// =====================================================================
 //                       LIBCINT
 // =====================================================================
 
@@ -64,6 +31,10 @@ int cint1e_r_sph(double *out, const int *shls,
 	const CINTOpt *opt);
 
 int cint1e_kin_sph(double *out, const int *shls,
+	const int *atm, int natm, const int *bas, int nbas, const double *env,
+	const CINTOpt *opt);
+	
+int cint2c2e_sph(double *out, const int *shls,
 	const int *atm, int natm, const int *bas, int nbas, const double *env,
 	const CINTOpt *opt);
 	
@@ -95,14 +66,6 @@ void calc_ints(dbcsr::mat_d& m_out, std::vector<std::vector<int>*> shell_offsets
 		std::vector<std::vector<int>*> shell_sizes, CINTIntegralFunction& int_func,
 		int *atm, int natm, int* bas, int nbas, double* env, int max_l);
 		
-void calc_ints_mnmn(dbcsr::mat_d& m_out, std::vector<std::vector<int>*> shell_offsets, 
-		std::vector<std::vector<int>*> shell_sizes, CINTIntegralFunction& int_func,
-		int *atm, int natm, int* bas, int nbas, double* env, int max_l);
-		
-void calc_ints_mmnn(dbcsr::mat_d& m_out, std::vector<std::vector<int>*> shell_offsets, 
-		std::vector<std::vector<int>*> shell_sizes, CINTIntegralFunction& int_func,
-		int *atm, int natm, int* bas, int nbas, double* env, int max_l);
-		
 void calc_ints(dbcsr::mat_d& m_x, dbcsr::mat_d& m_y, dbcsr::mat_d& m_z, 
 		std::vector<std::vector<int>*> shell_offsets, 
 		std::vector<std::vector<int>*> shell_sizes, CINTIntegralFunction& int_func,
@@ -112,15 +75,7 @@ void calc_ints(dbcsr::tensor<3,double>& m_out, std::vector<std::vector<int>*> sh
 		std::vector<std::vector<int>*> shell_sizes, CINTIntegralFunction& int_func,
 		int *atm, int natm, int* bas, int nbas, double* env, int max_l);
 		
-void calc_ints_3c(dbcsr::tensor<3,double>& m_out, std::vector<std::vector<int>*> shell_offsets, 
-		std::vector<std::vector<int>*> shell_sizes, CINTIntegralFunction& int_func,
-		int *atm, int natm, int* bas, int nbas, double* env, int max_l);
-		
 void calc_ints(dbcsr::tensor<4,double>& m_out, std::vector<std::vector<int>*> shell_offsets, 
-		std::vector<std::vector<int>*> shell_sizes, CINTIntegralFunction& int_func,
-		int *atm, int natm, int* bas, int nbas, double* env, int max_l);
-		
-void calc_ints_xx(dbcsr::mat_d& m_out, std::vector<std::vector<int>*> shell_offsets, 
 		std::vector<std::vector<int>*> shell_sizes, CINTIntegralFunction& int_func,
 		int *atm, int natm, int* bas, int nbas, double* env, int max_l);
 

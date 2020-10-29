@@ -270,15 +270,17 @@ public:
 class BATCHED_QRDF_K : public K {
 private:
 
-	dbcsr::sbtensor<3,double> m_c_xbb_batched;
+	dbcsr::sbtensor<3,double> m_c_xbb_batched_a;
+	dbcsr::sbtensor<3,double> m_c_xbb_batched_b;
 	
 	dbcsr::shared_tensor<2,double> m_K_01;
 	dbcsr::shared_tensor<2,double> m_p_bb;
 	dbcsr::shared_tensor<2,double> m_v_xx_01;
 	dbcsr::shared_matrix<double> m_v_xx;
 	
+	dbcsr::shared_tensor<3,double> m_c_xbb_02_1;
 	dbcsr::shared_tensor<3,double> m_cbar_xbb_01_2;
-	dbcsr::shared_tensor<3,double> m_cbar_xbb_1_02;
+	dbcsr::shared_tensor<3,double> m_cbar_xbb_02_1;
 	
 	dbcsr::shared_tensor<3,double> m_cpq_xbb_0_12;
 	dbcsr::shared_tensor<3,double> m_cpq_xbb_01_2;

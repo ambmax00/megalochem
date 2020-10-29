@@ -23,6 +23,12 @@ struct global {
 	static inline double precision = std::numeric_limits<double>::epsilon();
 	static inline double omega = 0.1;
 };
+
+enum class metric {
+	invalid,
+	coulomb,
+	erfc_coulomb
+};
 	
 class screener;
 
@@ -44,7 +50,7 @@ public:
 	//dbcsr::shared_matrix<double> ao_diag_mnmn();
 	//dbcsr::shared_matrix<double> ao_diag_mmnn();
 	
-	dbcsr::shared_matrix<double> ao_2c2e(std::string metric);
+	dbcsr::shared_matrix<double> ao_2c2e(metric m);
 	dbcsr::shared_matrix<double> ao_auxoverlap();
 	
 	dbcsr::shared_matrix<double> ao_schwarz();
@@ -54,22 +60,19 @@ public:
 		ao_emultipole(std::array<int,3> O = {0,0,0});
 #endif	
 
-	void ao_3c1e_setup(std::string metric);
+	void ao_3c1e_ovlp_setup();
 
-	void ao_3c2e_setup(std::string metric);
+	void ao_3c2e_setup(metric m);
 
-	void ao_eri_setup(std::string metric);
+	void ao_eri_setup(metric m);
 	
-	void ao_3c1e_fill_idx(dbcsr::shared_tensor<3,double>& t_in, arrvec<int,3>& idx, 
+	void ao_3c_fill(dbcsr::shared_tensor<3,double>& t_in, vec<vec<int>>& blkbounds, 
 		std::shared_ptr<screener> scr);
 	
-	void ao_3c2e_fill(dbcsr::shared_tensor<3,double>& t_in, vec<vec<int>>& blkbounds, 
-		std::shared_ptr<screener> scr);
-	
-	void ao_3c2e_fill_idx(dbcsr::shared_tensor<3,double>& t_in, arrvec<int,3>& idx, 
+	void ao_3c_fill_idx(dbcsr::shared_tensor<3,double>& t_in, arrvec<int,3>& idx, 
 		std::shared_ptr<screener> scr);
 		
-	void ao_eri_fill(dbcsr::shared_tensor<4,double>& t_in, vec<vec<int>>& blkbounds, 
+	void ao_4c_fill(dbcsr::shared_tensor<4,double>& t_in, vec<vec<int>>& blkbounds, 
 		std::shared_ptr<screener> scr);
 		
 	std::function<void(dbcsr::shared_tensor<3,double>&,vec<vec<int>>&)>

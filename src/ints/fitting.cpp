@@ -168,7 +168,7 @@ dbcsr::shared_tensor<3,double> dfitting::compute_pari(dbcsr::sbtensor<3,double> 
 	dbcsr::shared_matrix<double> s_xx, shared_screener scr_s) {
 	
 	auto aofac = std::make_shared<aofactory>(m_mol, m_world);
-	aofac->ao_3c2e_setup("coulomb");
+	aofac->ao_3c2e_setup(metric::coulomb);
 	
 	auto& time_setup = TIME.sub("Setting up preliminary data");
 	auto& time_form_cfit = TIME.sub("Forming cfit");
@@ -436,7 +436,7 @@ dbcsr::shared_tensor<3,double> dfitting::compute_pari(dbcsr::sbtensor<3,double> 
 			
 			arrvec<int,3> blks = {xab_idx, ma_idx, nb_idx};
 			
-			aofac->ao_3c2e_fill_idx(eri_self, blks, scr_s);	
+			aofac->ao_3c_fill_idx(eri_self, blks, scr_s);	
 			
 			eri_self->filter(dbcsr::global::filter_eps);
 			
@@ -700,9 +700,9 @@ struct exp_pos {
 	std::array<double,3> pos;
 };
 
-dbcsr::sbtensor<3,double> dfitting::compute_qr(dbcsr::sbtensor<3,double> eri_batched,
-		dbcsr::shared_matrix<double> s_xx_inv, dbcsr::shared_matrix<double> m_xx,
-		shared_screener scr_s, dbcsr::btype mytype)
+dbcsr::sbtensor<3,double> dfitting::compute_qr(dbcsr::shared_matrix<double> s_xx_inv, 
+		dbcsr::shared_matrix<double> m_xx, dbcsr::shared_pgrid<3> spgrid3_xbb,
+		shared_screener scr_s, std::array<int,3> bdims, dbcsr::btype mytype)
 {
 	
 	auto aofac = std::make_shared<aofactory>(m_mol, m_world);
@@ -717,9 +717,6 @@ dbcsr::sbtensor<3,double> dfitting::compute_qr(dbcsr::sbtensor<3,double> eri_bat
 	
 	arrvec<int,2> xx = {x,x};
 	arrvec<int,3> xbb = {x,b,b};
-	
-	// form pgrids
-	auto spgrid3_xbb = eri_batched->spgrid();
 	
 	int nbf = m_mol->c_basis()->nbf();
 	std::array<int,3> xbbsizes = {1,nbf,nbf};
@@ -785,16 +782,14 @@ dbcsr::sbtensor<3,double> dfitting::compute_qr(dbcsr::sbtensor<3,double> eri_bat
 		.blk_sizes(xbb)
 		.map1({0}).map2({1,2})
 		.get();
-	
-	auto bdims_eri = eri_batched->batch_dims();
-	
+		
 	auto c_xbb_batched = dbcsr::btensor_create<3,double>()
 		.name("cqr_xbb_batched")
 		.pgrid(spgrid3_xbb)
 		.blk_sizes(xbb)
-		.batch_dims(bdims_eri)
+		.batch_dims(bdims)
 		.btensor_type(mytype)
-		.print(1)
+		.print(0)
 		.get();
 		
 	auto s_xx_inv_local = dbcsr::tensor_create<2,double>()
@@ -831,6 +826,9 @@ dbcsr::sbtensor<3,double> dfitting::compute_qr(dbcsr::sbtensor<3,double> eri_bat
 		s_xx_inv_local->put_block(idx, blk);
 		
 	}
+	
+	s_xx_inv_local->filter(dbcsr::global::filter_eps);
+	
 	iter.stop();
 	s_xx_inv_eigen.resize(0,0);
 	
@@ -862,7 +860,8 @@ dbcsr::sbtensor<3,double> dfitting::compute_qr(dbcsr::sbtensor<3,double> eri_bat
 		min_exp_x[i] = set;
 		
 	}
-	
+
+#if 0
 	if (m_world.rank() == 0) {
 	std::cout << "X BASIS INFO: " << std::endl;
 	for (auto s : min_exp_x) {
@@ -870,9 +869,9 @@ dbcsr::sbtensor<3,double> dfitting::compute_qr(dbcsr::sbtensor<3,double> eri_bat
 		std::cout << "POS: " << s.pos[0] << " " << s.pos[1]
 			<< " " << s.pos[2] << std::endl;
 	}
-	}	
+	}
+#endif	
 		
-	
 	// ====== LOOP OVER NU BATCHES ==============
 	
 	c_xbb_batched->compress_init({2}, vec<int>{0}, vec<int>{1,2});
@@ -899,17 +898,29 @@ dbcsr::sbtensor<3,double> dfitting::compute_qr(dbcsr::sbtensor<3,double> eri_bat
 			}
 		}
 		
+		LOG(-1).os<>("Number of pairs on rank ", m_world.rank(), ": ", 
+			mn_blk_list.size(), '\n');
+		
 		size_t npairs = mn_blk_list.size();
+		
+	auto& time1 = TIME.sub("1");
+	auto& time2 = TIME.sub("2");
+	auto& time3 = TIME.sub("3");
+	auto& time4 = TIME.sub("4");
+	auto& time5 = TIME.sub("5");
+	auto& time6 = TIME.sub("6");
 	
-#if 1
+#if 0
 	for (int iproc = 0; iproc != m_world.size(); ++iproc) {
 	if (iproc == m_world.rank()) {
 #endif
 	
 	for (auto& mn_pair : mn_blk_list) {
 	
-		std::cout << "PROC: " << m_world.rank() << std::endl;
+		//std::cout << "PROC: " << m_world.rank() << std::endl;
 		std::cout << "PAIR: " << mn_pair.first << " " << mn_pair.second << std::endl;
+	
+		time1.start();
 	
 		int mu = mn_pair.first;
 		int nu = mn_pair.second;
@@ -919,12 +930,12 @@ dbcsr::sbtensor<3,double> dfitting::compute_qr(dbcsr::sbtensor<3,double> eri_bat
 		blk_idx[1][0] = mu;
 		blk_idx[2][0] = nu;
 	
-		aofac->ao_3c1e_setup("overlap");
-		aofac->ao_3c1e_fill_idx(eri_local, blk_idx, scr_s);
+		aofac->ao_3c1e_ovlp_setup();
+		aofac->ao_3c_fill_idx(eri_local, blk_idx, scr_s);
 		
 		auto c_idx = dbcsr::contract(*s_xx_inv_local, *eri_local,
 			*c_xbb_local_1bb)
-			.filter(dbcsr::global::filter_eps)
+			.filter(T)
 			.get_index("XY, Ymn -> Xmn");
 		
 		std::vector<bool> blk_P_bool(x.size(),false);
@@ -939,25 +950,28 @@ dbcsr::sbtensor<3,double> dfitting::compute_qr(dbcsr::sbtensor<3,double> eri_bat
 		
 		int npblks = blk_P.size();
 		
-		std::cout << "OVERLAP" << std::endl;
-		dbcsr::print(*eri_local);
+		//std::cout << "OVERLAP" << std::endl;
+		//dbcsr::print(*eri_local);
 		eri_local->clear();
 		
+		time1.finish();
+
 		if (npblks == 0) {
 			std::cout << "SKIPPING" << std::endl;
 			continue;
 		}
-
-#if 1
+#if 0
 		std::cout << "Primary fitting set" << std::endl;
 		for (auto p : blk_P) {
 			std::cout << p << " ";
 		} std::cout << std::endl;
 #endif
 		
-#if 1
+#if 0
 		std::cout << "Now generating another set..." << std::endl;
 #endif		
+		
+		time2.start();
 		
 		std::vector<bool> blk_Q_bool(nxblks,false); // whether block x is involved 
 		
@@ -993,17 +1007,22 @@ dbcsr::sbtensor<3,double> dfitting::compute_qr(dbcsr::sbtensor<3,double> eri_bat
 			if (blk_Q_bool[ix]) blk_Q.push_back(ix);
 		}
 		
-#if 1
+#if 0
 		std::cout << "NEW SET: " << std::endl;
 		for (auto q : blk_Q) {
 			std::cout << q << " ";
 		} std::cout << std::endl;
-#endif			
+#endif		
 		
+		time2.finish();
+	
+		
+		time3.start();
 		// generate integrals
-		aofac->ao_3c2e_setup("coulomb");
+		aofac->ao_3c2e_setup(metric::coulomb);
 		blk_idx[0] = blk_Q;
-		aofac->ao_3c2e_fill_idx(eri_local, blk_idx, scr_s);
+		aofac->ao_3c_fill_idx(eri_local, blk_idx, scr_s);
+		time3.finish();
 		
 		// how many x functions?
 		int nq = 0;
@@ -1016,6 +1035,8 @@ dbcsr::sbtensor<3,double> dfitting::compute_qr(dbcsr::sbtensor<3,double> eri_bat
 		for (auto ip : blk_P) {
 			np += x[ip];
 		}
+		
+		time4.start();
 		
 		// how many b functions?
 		int nb = b[mu] * b[nu];
@@ -1050,10 +1071,10 @@ dbcsr::sbtensor<3,double> dfitting::compute_qr(dbcsr::sbtensor<3,double> eri_bat
 			qoff += size[0];
 		}
 		
-		dbcsr::print(*eri_local);
+		//dbcsr::print(*eri_local);
 		
-		std::cout << "ERIS: " << std::endl;
-		std::cout << eris_eigen << std::endl;
+		//std::cout << "ERIS: " << std::endl;
+		//std::cout << eris_eigen << std::endl;
 				
 		// copy metric to eigen
 		for (auto ip : blk_P) {
@@ -1080,23 +1101,32 @@ dbcsr::sbtensor<3,double> dfitting::compute_qr(dbcsr::sbtensor<3,double> eri_bat
 			poff += sizep;
 		}
 		
-		std::cout << "FULL:" << std::endl;
-		std::cout << m_xx_eigen << std::endl;
+		time4.finish();
 		
-		std::cout << "M" << std::endl;
-		std::cout << m_qp_eigen << std::endl;
+		//std::cout << "FULL:" << std::endl;
+		//std::cout << m_xx_eigen << std::endl;
 		
+		//std::cout << "M" << std::endl;
+		//std::cout << m_qp_eigen << std::endl;
+		
+		time5.start();
 		Eigen::MatrixXd c_eigen = m_qp_eigen.householderQr().solve(eris_eigen);
+		time5.finish();
 		
-		std::cout << "C_EIGEN: " << std::endl;
-		std::cout << c_eigen << std::endl;
+		std::cout << "X: " << mu << " " << nu << " " 
+			<< blk_P.size() << "/" << x.size() << " "
+			<< blk_Q.size() << "/" << x.size() << std::endl;
+		
+		//std::cout << "C_EIGEN: " << std::endl;
+		//std::cout << c_eigen << std::endl;
 
-#if 1
-		//assert(eris_eigen.isApprox(m_qp_eigen*c_eigen,1e-8));
+#if 0
+		assert(eris_eigen.isApprox(m_qp_eigen*c_eigen,1e-8));
 #endif
 		eris_eigen.resize(0,0);
 		eri_local->clear();
 		
+		time6.start();
 		// transfer it to c_xbb
 		arrvec<int,3> cfit_idx;
 		cfit_idx[0] = blk_P;
@@ -1124,12 +1154,13 @@ dbcsr::sbtensor<3,double> dfitting::compute_qr(dbcsr::sbtensor<3,double> eri_bat
 			poff += size[0];
 			
 		}
+		time6.finish();
 		
 	}
 	
-	dbcsr::print(*c_xbb_global_1bb);
+	//dbcsr::print(*c_xbb_global_1bb);
 
-#if 1
+#if 0
 	}
 	MPI_Barrier(m_world.comm());
 	}
@@ -1140,6 +1171,14 @@ dbcsr::sbtensor<3,double> dfitting::compute_qr(dbcsr::sbtensor<3,double> eri_bat
 	}
 	
 	c_xbb_batched->compress_finalize();
+	
+	double occupation = c_xbb_batched->occupation() * 100;
+	LOG.os<>("Occupation of QR fitting coefficients: ", occupation, "%\n");
+	
+	assert(occupation <= 100.0);
+	
+	TIME.print_info();
+	//exit(0);
 	
 	return c_xbb_batched;
 	

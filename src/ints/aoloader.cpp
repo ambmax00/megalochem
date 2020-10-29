@@ -131,7 +131,7 @@ void aoloader::compute() {
 		LOG.os<>("Computing coulomb metric\n");
 		auto& time = TIME.sub("Coulomb metric");
 		time.start();
-		auto c = m_aofac->ao_2c2e("coulomb");
+		auto c = m_aofac->ao_2c2e(ints::metric::coulomb);
 		m_reg.insert(key::coul_xx,c);
 		time.finish();
 	}
@@ -143,8 +143,8 @@ void aoloader::compute() {
 		auto& time = TIME.sub("Erfc-attenuated coulomb metric");
 		time.start();
 		
-		auto c = m_aofac->ao_2c2e("coulomb");
-		auto e = m_aofac->ao_2c2e("erfc_coulomb");
+		auto c = m_aofac->ao_2c2e(metric::coulomb);
+		auto e = m_aofac->ao_2c2e(metric::erfc_coulomb);
 		auto p = invert(c);
 		auto cinv = p.first;
 		
@@ -213,7 +213,7 @@ void aoloader::compute() {
 		
 		t_ints.start();
 		
-		m_aofac->ao_eri_setup("coulomb");
+		m_aofac->ao_eri_setup(metric::coulomb);
 		
 		auto b = m_mol->dims().b();
 		arrvec<int,4> bbbb = {b,b,b,b};
@@ -251,7 +251,7 @@ void aoloader::compute() {
 				bounds[2] = eri_batched->blk_bounds(2, imu);
 				bounds[3] = eri_batched->blk_bounds(3, inu);
 				
-				m_aofac->ao_eri_fill(eris_gen, bounds, nullptr);
+				m_aofac->ao_4c_fill(eris_gen, bounds, nullptr);
 				
 				eris_gen->filter(dbcsr::global::filter_eps);
 				
@@ -277,9 +277,9 @@ void aoloader::compute() {
 		time.start();
 		
 		std::shared_ptr<ints::screener> scr;
-		if (comp(key::coul_xbb)) scr.reset(new ints::schwarz_screener(m_aofac,"coulomb"));
-		if (comp(key::erfc_xbb)) scr.reset(new ints::schwarz_screener(m_aofac,"erfc_coulomb"));
-				
+		//if (comp(key::coul_xbb)) 
+		//if (comp(key::erfc_xbb)) scr.reset(new ints::schwarz_screener(m_aofac,"erfc_coulomb"));
+		scr.reset(new ints::schwarz_screener(m_aofac,"coulomb"));		
 		scr->compute();
 				
 		m_reg.insert(key::scr_xbb,scr);
@@ -306,11 +306,11 @@ void aoloader::compute() {
 		t_eri_batched.start();
 		t_setup.start();
 		
-		std::string metric;
-		if (comp(key::coul_xbb)) metric = "coulomb";
-		if (comp(key::erfc_xbb)) metric = "erfc_coulomb";
+		ints::metric m;
+		if (comp(key::coul_xbb)) m = ints::metric::coulomb;
+		if (comp(key::erfc_xbb)) m = ints::metric::erfc_coulomb;
 				
-		m_aofac->ao_3c2e_setup(metric);
+		m_aofac->ao_3c2e_setup(m);
 		auto genfunc = m_aofac->get_generator(scr);
 		
 		std::string eris_mem = m_opt.get<std::string>("eris", "core");
@@ -358,9 +358,9 @@ void aoloader::compute() {
 				bounds[2] = eri_batched->full_blk_bounds(2);
 				
 				t_calc.start();
-				if (mytype != dbcsr::btype::direct) m_aofac->ao_3c2e_fill(eris_gen,bounds,scr);
+				if (mytype != dbcsr::btype::direct) m_aofac->ao_3c_fill(eris_gen,bounds,scr);
 				t_calc.finish();
-				//dbcsr::print(*eri);
+				dbcsr::print(*eris_gen);
 				eris_gen->filter(dbcsr::global::filter_eps);
 				t_compress.start();
 				eri_batched->compress({ix}, eris_gen);
@@ -443,13 +443,19 @@ void aoloader::compute() {
 		
 		auto& time = TIME.sub("Density fitting coefficients (QR)");
 		time.start();
-				
-		auto eri_batched = m_reg.get<sbt3>(key::coul_xbb);
+		
+		int nbatches_x = m_opt.get<int>("nbatches_x", 5);
+		int nbatches_b = m_opt.get<int>("nbatches_b", 5);
+		
+		std::array<int,3> bdims = {nbatches_x, nbatches_b, nbatches_b};
+		
+		//auto eri_batched = m_reg.get<sbt3>(key::coul_xbb);
 		auto m_xx = m_reg.get<smatd>(key::coul_xx);
 		auto s_xx_inv = m_reg.get<smatd>(key::ovlp_xx_inv);
 		auto scr = m_reg.get<ints::shared_screener>(key::scr_xbb);
 		
-		auto c_xbb_qr = dfit.compute_qr(eri_batched, s_xx_inv, m_xx, scr, dbcsr::btype::core);
+		auto c_xbb_qr = dfit.compute_qr(s_xx_inv, m_xx, spgrid3, scr, 
+			bdims, dbcsr::btype::core);
 		m_reg.insert(key::dfit_qr_xbb, c_xbb_qr);
 	
 		time.finish();

@@ -6,27 +6,46 @@
 #include "utils/mpi_time.h"
 #include "utils/pool.h"
 
-#ifdef USE_LIBINT
-#include <libint2.hpp>
-#endif
-
-#ifdef USE_LIBCINT
 extern "C" {
-	#include <cint.h>
+#include <cint.h>
 }
-#endif
 
 #include <iostream>
 #include <limits>
 	
 namespace ints {
 
+enum class op {
+	invalid 		= 0,
+	overlap 		= 1,
+	coulomb 		= 2,
+	kinetic 		= 3,
+	nuclear 		= 4,
+	emultipole 		= 5,
+	erfc_coulomb 	= 6,
+	_END 			= 7
+};
+
+enum class ctr {
+	invalid = 0,
+	c_2c1e 	= 1,
+	c_2c2e	= 2,
+	c_3c1e	= 3,
+	c_3c2e	= 4,
+	c_4c2e	= 5,
+	c_4c1e	= 6,
+	_END = 7
+};
+
+constexpr int combine(op e1, ctr e2) {
+	const int pos1 = static_cast<const int>(e1);
+	const int pos2 = static_cast<const int>(e2);
+	const int size1 = static_cast<const int>(op::_END);
+	return pos1 + pos2*size1;
+}
+
 class aofactory::impl {
 	
-// =====================================================================
-//                       LIBINT2
-// =====================================================================
-
 private:
 
 	util::mpi_time TIME;
@@ -218,345 +237,6 @@ public:
 	}
 	
 	desc::smolecule mol() { return m_mol; }
-		
-	
-#ifdef USE_LIBINT
-
-	using vshell_l = std::vector<libint2::Shell>;
-	using vvshell_l = std::vector<std::vector<libint2::Shell>>;
-	using shared_vvshell_l = std::shared_ptr<
-		std::vector<std::vector<libint2::Shell>>>;
-
-	dbcsr::world m_world;
-	
-	desc::smolecule m_mol;
-	shared_vvshell_l m_cbas;
-	shared_vvshell_l m_xbas;
-	
-	libint2::Operator m_Op = libint2::Operator::invalid;
-	libint2::BraKet m_BraKet = libint2::BraKet::invalid;
-	
-	vec<const vvshell_l*> m_basvec;
-	util::ShrPool<libint2::Engine> m_eng_pool;
-	
-	std::string m_intname = "";
-
-public:
-	
-	impl(desc::smolecule mol, dbcsr::world w) :
-		m_world(w),
-		m_mol(mol),
-		TIME(w.comm(), "IntFac")
-		{ init(); }
-		
-	~impl() { /*TIME.print_info();*/ }
-	
-	void init() {
-		
-		libint2::initialize();
-		
-		// convert to libint format
-		auto cbas = m_mol->c_basis();
-		auto xbas = m_mol->c_dfbasis();
-		
-		auto convert_vec = [](std::vector<double> vec) {
-			libint2::svector<double> out;
-			for (auto e : vec) {
-				out.push_back(e);
-			} 
-			return out;
-		};
-		
-		auto convert_bas = [&convert_vec](auto& mega_bas) {
-			shared_vvshell_l libint_bas = 
-				std::make_shared<vvshell_l>(0);
-			
-			for (auto& cluster : mega_bas) {
-				vshell_l vs_l;
-				for (auto& s : cluster) {
-					
-					auto alpha = convert_vec(s.alpha);
-					
-					libint2::svector<libint2::Shell::Contraction> c_l(1);
-					
-					c_l[0].l = s.l;
-					c_l[0].pure = s.pure;
-					
-					auto coeff = convert_vec(s.coeff);
-									
-					c_l[0].coeff = coeff;
-					
-					libint2::Shell s_l(alpha, c_l, s.O);
-					
-					vs_l.push_back(s_l);
-			
-				}
-				libint_bas->push_back(vs_l);
-			}
-			
-			return libint_bas;
-			
-		};
-		
-		if (cbas) m_cbas = convert_bas(*cbas);
-		if (xbas) m_xbas = convert_bas(*xbas);
-		
-		/*std::cout << "LIBINT2 BASIS:" << std::endl;
-		for (auto c : *m_cbas) {
-			std::cout << "CLUSTER: " << std::endl;
-			for (auto s : c) {
-				std::cout << s << std::endl;
-			}
-		}
-		
-		if (xbas) {
-			std::cout << "LIBINT2 X BASIS:" << std::endl;
-			for (auto c : *m_xbas) {
-				std::cout << "CLUSTER: " << std::endl;
-				for (auto s : c) {
-					std::cout << s << std::endl;
-				}
-			}
-		}*/
-		
-	}
-	
-	void set_dim(std::string dim) {
-		
-		if (dim == "bb") { 
-			m_basvec = {m_cbas.get(),m_cbas.get()};
-		} else if (dim == "xx") {
-			m_basvec = {m_xbas.get(),m_xbas.get()};
-		} else if (dim == "xbb") {
-			m_basvec = {m_xbas.get(), m_cbas.get(),m_cbas.get()};
-		} else if (dim == "bbbb") {
-			m_basvec = {m_cbas.get(),m_cbas.get(),m_cbas.get(),m_cbas.get()};
-		} else {
-			throw std::runtime_error("Unsupported basis set specifications: "+ dim);
-		}
-		
-	}
-	
-	void set_operator(std::string op) {
-		
-		if (op == "coulomb") {
-			m_Op = libint2::Operator::coulomb;
-		} else if (op == "overlap") {
-			m_Op = libint2::Operator::overlap;
-		} else if (op == "kinetic") {
-			m_Op = libint2::Operator::kinetic;
-		} else if (op == "nuclear") {
-			m_Op = libint2::Operator::nuclear;
-		} else if (op == "erfc_coulomb") {
-			//std::cout << "ERROR" << std::endl;
-			m_Op = libint2::Operator::erfc_coulomb;
-		} else { 
-			throw std::runtime_error("Invalid operator: "+ op);
-		}
-	}
-	
-	void set_braket(std::string dim) {
-		
-		if (dim == "x_x") { 
-			m_BraKet = libint2::BraKet::x_x;
-		} else if (dim == "xs_xs") {
-			m_BraKet = libint2::BraKet::xs_xs;
-		} else if (dim == "xs_xx") {
-			m_BraKet = libint2::BraKet::xs_xx;
-		} else if (dim == "xx_xx") {
-			m_BraKet = libint2::BraKet::xx_xx;
-		} else {
-			throw std::runtime_error("Unsupported basis set specifications: "+ dim);
-		}
-		
-	}
-	
-	void set_name(std::string istr) {
-		m_intname = istr;
-	}
-	
-	void setup_calc(bool screen = false) {
-		
-		size_t max_nprim = 0;
-		int max_l = 0;
-		
-		for (auto& c : m_basvec) {
-			for (auto& vs : *c) {
-				max_nprim = std::max(max_nprim, libint2::max_nprim(vs));
-				max_l = std::max(max_l, libint2::max_l(vs));
-			}
-		}
-		
-		libint2::Engine eng(m_Op, max_nprim, max_l, 0, std::numeric_limits<double>::epsilon());
-			
-		if (m_Op == libint2::Operator::nuclear) {
-			std::vector<libint2::Atom> latoms;
-			for (auto a : m_mol->atoms()) {
-				libint2::Atom a_out;
-				a_out.x = a.x;
-				a_out.y = a.y;
-				a_out.z = a.z;
-				a_out.atomic_number = a.atomic_number;
-				latoms.push_back(a_out);
-			}
-			eng.set_params(make_point_charges(latoms)); 
-		} else if (m_Op == libint2::Operator::erfc_coulomb) {
-			eng.set_params(global::omega);
-		}
-		
-		eng.set(m_BraKet);
-		
-		if (screen) {
-			eng.set_precision(pow(global::precision,2));
-		} else {
-			eng.set_precision(global::precision);
-		}
-			
-		m_eng_pool = util::make_pool<libint2::Engine>(eng);
-				
-	}
-	
-	void finalize() {
-		libint2::finalize();
-	}
-	
-	std::vector<int> cluster_sizes(const vvshell_l& vvs) {
-		std::vector<int> out;
-		for (auto& c : vvs) {
-			int size = 0;
-			for (auto& s : c) {
-				size += (int)s.size();
-			}
-			out.push_back(size);
-		}
-	
-		return out;
-	}
-	
-	dbcsr::shared_matrix<double> compute() {
-		
-		auto rowsizes = cluster_sizes(*m_basvec[0]);
-		auto colsizes = cluster_sizes(*m_basvec[1]);
-		
-		auto m_ints = dbcsr::create<double>()
-			.name(m_intname)
-			.set_world(m_world)
-			.row_blk_sizes(rowsizes).col_blk_sizes(colsizes)
-			.matrix_type(dbcsr::type::symmetric)
-			.get();
-			
-		// reserve symmtric blocks
-		int nblks = m_ints->nblkrows_total();
-		
-		vec<int> resrows, rescols;
-		
-		for (int i = 0; i != nblks; ++i) {
-			for (int j = 0; j != nblks; ++j) {
-				if (m_ints->proc(i,j) == m_world.rank() && i <= j) {
-					resrows.push_back(i);
-					rescols.push_back(j);
-				}
-			}
-		}
-		
-		m_ints->reserve_blocks(resrows,rescols);
-
-		calc_ints(*m_ints, m_eng_pool, m_basvec);
-		
-		return m_ints;
-		
-	}
-	
-	dbcsr::shared_matrix<double> compute_screen(std::string method, std::string dim) {
-		
-		auto rowsizes = (dim == "bbbb") ? m_mol->dims().s() : m_mol->dims().xs();
-		auto colsizes = (dim == "bbbb") ? m_mol->dims().s() : vec<int>{1};
-		
-		auto sym = (dim == "bbbb") ? dbcsr::type::symmetric : dbcsr::type::no_symmetry;
-		
-		auto m_ints = dbcsr::create<double>()
-			.name(m_intname)
-			.set_world(m_world)
-			.row_blk_sizes(rowsizes).col_blk_sizes(colsizes)
-			.matrix_type(sym).get();
-			
-		// reserve symmtric blocks
-		int nblks = m_ints->nblkrows_total();
-		
-		if (sym == dbcsr::type::symmetric) {
-		
-			vec<int> resrows, rescols;
-			
-			for (int i = 0; i != nblks; ++i) {
-				for (int j = 0; j != nblks; ++j) {
-					if (m_ints->proc(i,j) == m_world.rank() && i <= j) {
-						resrows.push_back(i);
-						rescols.push_back(j);
-					}
-				}
-			}
-			
-			m_ints->reserve_blocks(resrows,rescols);
-			
-		} else {
-			
-			m_ints->reserve_all();
-			
-		}
-		
-		if (dim == "bbbb" && method == "schwarz") {
-			calc_ints_schwarz_mn(*m_ints, m_eng_pool, m_basvec);
-		} else if (dim == "xx" && method == "schwarz") {
-			calc_ints_schwarz_x(*m_ints, m_eng_pool, m_basvec);
-		} else {
-			throw std::runtime_error("Unknown screening method.");
-		}
-		
-		return m_ints;
-		
-	}
-	
-	void compute_3_partial(dbcsr::shared_tensor<3>& t_in, vec<vec<int>>& blkbounds,
-		shared_screener s_scr) {
-		
-		//auto& t_res = TIME.sub("Res");
-		//auto& t_calc = TIME.sub("Calc");
-		
-		//t_res.start();
-		reserve_3_partial(t_in, blkbounds, s_scr);
-		//t_res.finish();
-		
-		//t_calc.start();
-		calc_ints(*t_in, m_eng_pool, m_basvec, s_scr.get()); 
-		//t_calc.finish();
-		
-	}
-	
-	void compute_3_partial_idx(dbcsr::shared_tensor<3>& t_in, arrvec<int,3>& idx,
-		shared_screener s_scr) {
-			
-		reserve_3_partial_idx(t_in, idx, s_scr);
-		
-		calc_ints(*t_in, m_eng_pool, m_basvec, s_scr.get()); 
-		
-	}
-	
-	void compute_4_partial(dbcsr::shared_tensor<4>& t_in, vec<vec<int>>& blkbounds,
-		shared_screener s_scr) {
-		
-		reserve_4_partial(t_in, blkbounds, s_scr);
-		
-		calc_ints(*t_in, m_eng_pool, m_basvec); 
-		
-	}
-
-#endif // use_libint
-
-#ifdef USE_LIBCINT 
-
-// =====================================================================
-//                       LIBCINT
-// =====================================================================
 
 protected:
 
@@ -572,8 +252,8 @@ protected:
 	CINTIntegralFunction m_intfunc;
 	
 	std::string m_intname;
-	std::string m_braket;
-	std::string m_op;
+	ctr m_ctr = ctr::invalid;
+	op m_op = op::invalid;
 	int m_max_l;
 	
 	std::vector<int> m_b_offsets;
@@ -786,30 +466,12 @@ public:
 				
 	}
 	
-	void set_operator(std::string op) {
-		
-		m_op = op;
-		
-		if (op == "overlap" && m_nshells.size() < 3) {
-			m_intfunc = cint1e_ovlp_sph;
-		} else if (op == "overlap" && m_nshells.size() >= 3) {
-			m_intfunc = cint4c1e_sph;
-		} else if (op == "kinetic") {
-			m_intfunc = cint1e_kin_sph;
-		} else if (op == "nuclear") {
-			m_intfunc = cint1e_nuc_sph;
-		} else if (op == "coulomb") {
-			m_env[PTR_RANGE_OMEGA] = 0.0;
-			m_intfunc = cint2e_sph;
-		} else if (op == "erfc_coulomb") {
-			m_env[PTR_RANGE_OMEGA] = -global::omega;
-			m_intfunc = cint2e_sph;
-		} else if (op == "emult") {
-			m_intfunc = cint1e_r_sph;
-		} else {
-			throw std::runtime_error("Invalid operator.");
-		}
-		
+	void set_operator(op i_op) {
+		m_op = i_op;
+	}
+	
+	void set_center(ctr i_ctr) {
+		m_ctr = i_ctr;
 	}
 	
 	void set_dim(std::string dim) {
@@ -836,19 +498,71 @@ public:
 		
 	}
 	
-	void set_braket(std::string dim) {
-		
-		m_braket = dim;
-		
-	}
-	
 	void set_name(std::string istr) {
 		m_intname = istr;
 	}
 	
-	void setup_calc(bool screen = false) {
+	void setup_calc(bool dummy = false) {
 		
-		// PRECISION !!!!
+		m_env[PTR_RANGE_OMEGA] = 0.0;
+		
+		switch (combine(m_op, m_ctr)) {
+			
+			case combine(op::overlap, ctr::c_2c1e):
+				m_intfunc = cint1e_ovlp_sph;
+				break;
+				
+			case combine(op::kinetic, ctr::c_2c1e):
+				m_intfunc = cint1e_kin_sph;
+				break;
+				
+			case combine(op::nuclear, ctr::c_2c1e):
+				m_intfunc = cint1e_nuc_sph;
+				break;
+				
+			case combine(op::overlap, ctr::c_3c1e):
+				m_intfunc = cint3c1e_sph;
+				break;
+				
+			case combine(op::overlap, ctr::c_4c1e):
+				m_intfunc = cint4c1e_sph;
+				break;
+				
+			case combine(op::coulomb, ctr::c_2c2e):
+				m_intfunc = cint2c2e_sph;
+				break;
+				
+			case combine(op::coulomb, ctr::c_3c2e):
+				m_intfunc = cint3c2e_sph;
+				break;
+				
+			case combine(op::coulomb, ctr::c_4c2e):
+				m_intfunc = cint2e_sph;
+				break;
+				
+			case combine(op::erfc_coulomb, ctr::c_2c2e):
+				m_env[PTR_RANGE_OMEGA] = - global::omega;
+				m_intfunc = cint2c2e_sph;
+				break;
+				
+			case combine(op::erfc_coulomb, ctr::c_3c2e):
+				m_env[PTR_RANGE_OMEGA] = - global::omega;
+				m_intfunc = cint3c2e_sph;
+				break;
+				
+			case combine(op::erfc_coulomb, ctr::c_4c2e):
+				m_env[PTR_RANGE_OMEGA] = - global::omega;
+				m_intfunc = cint2e_sph;
+				break;
+				
+			case combine(op::emultipole, ctr::c_2c1e):
+				m_intfunc = cint1e_r_sph;
+				break;
+				
+			default:
+				throw std::runtime_error("Operator/Centre combination not valid!");
+				
+		}
 				
 	}
 	
@@ -869,54 +583,10 @@ public:
 			
 		m_ints->reserve_sym();
 		
-		if (m_braket == "x_x") {
-		
-			calc_ints(*m_ints, m_shell_offsets, m_nshells, m_intfunc,
-				m_atm.data(), m_natoms, m_bas.data(), m_nbas,
-				m_env.data(), m_max_l);
+		calc_ints(*m_ints, m_shell_offsets, m_nshells, m_intfunc,
+			m_atm.data(), m_natoms, m_bas.data(), m_nbas,
+			m_env.data(), m_max_l);
 				
-		} else if (m_braket == "xs_xs") {
-			
-			calc_ints_xx(*m_ints, m_shell_offsets, m_nshells, m_intfunc,
-				m_atm.data(), m_natoms, m_bas.data(), m_nbas,
-				m_env.data(), m_max_l);
-				
-		} else {
-			
-			throw std::runtime_error("Invalid Braket.");
-			
-		}
-		
-		return m_ints;
-		
-	}
-	
-	dbcsr::shared_matrix<double> compute_diag(int i) {
-		
-		auto m_ints = dbcsr::create<double>()
-			.name(m_intname)
-			.set_world(m_world)
-			.row_blk_sizes(m_tensor_sizes[0])
-			.col_blk_sizes(m_tensor_sizes[1])
-			.matrix_type(dbcsr::type::symmetric)
-			.get();
-			
-		m_ints->reserve_sym();
-		
-		if (i == 0) {
-		
-			calc_ints_mnmn(*m_ints, m_shell_offsets, m_nshells, m_intfunc,
-				m_atm.data(), m_natoms, m_bas.data(), m_nbas,
-				m_env.data(), m_max_l);
-				
-		} else {
-			
-			calc_ints_mmnn(*m_ints, m_shell_offsets, m_nshells, m_intfunc,
-				m_atm.data(), m_natoms, m_bas.data(), m_nbas,
-				m_env.data(), m_max_l);
-				
-		}
-		
 		return m_ints;
 		
 	}
@@ -976,15 +646,9 @@ public:
 			
 		reserve_3_partial_idx(t_in, idx, s_scr);
 		
-		//if (m_op != "overlap") {
-			calc_ints(*t_in, m_shell_offsets, m_nshells, m_intfunc,
-				m_atm.data(), m_natoms, m_bas.data(), m_nbas,
-				m_env.data(), m_max_l);
-		//} else {
-		//	calc_ints_3c(*t_in, m_shell_offsets, m_nshells, m_intfunc,
-		//		m_atm.data(), m_natoms, m_bas.data(), m_nbas,
-		//		m_env.data(), m_max_l);
-		//}
+		calc_ints(*t_in, m_shell_offsets, m_nshells, m_intfunc,
+			m_atm.data(), m_natoms, m_bas.data(), m_nbas,
+			m_env.data(), m_max_l);
 		
 	}	
 	
@@ -1048,11 +712,11 @@ public:
 			throw std::runtime_error("Unknown screening method.");
 		}
 		
+		dbcsr::print(*m_ints);
+		
 		return m_ints;
 		
 	}
-
-#endif // use libcint
 
 };
 
@@ -1064,66 +728,44 @@ aofactory::~aofactory() { delete pimpl; }
 
 dbcsr::shared_matrix<double> aofactory::ao_overlap() {
 	
-	std::string intname = "s_bb";
-	
 	pimpl->set_name("s_bb");
 	pimpl->set_dim("bb");
-	pimpl->set_braket("x_x");
-	pimpl->set_operator("overlap");
+	pimpl->set_center(ctr::c_2c1e);
+	pimpl->set_operator(op::overlap);
 	pimpl->setup_calc();
 	return pimpl->compute();
 }
 
 dbcsr::shared_matrix<double> aofactory::ao_kinetic() {
 	
-	std::string intname = "k_bb";
-	
 	pimpl->set_name("t_bb");
 	pimpl->set_dim("bb");
-	pimpl->set_braket("x_x");
-	pimpl->set_operator("kinetic");
+	pimpl->set_center(ctr::c_2c1e);
+	pimpl->set_operator(op::kinetic);
 	pimpl->setup_calc();
 	return pimpl->compute();
 }
 
 dbcsr::shared_matrix<double> aofactory::ao_nuclear() {
 	
-	std::string intname = "v_bb";
-	
 	pimpl->set_name("v_bb");
 	pimpl->set_dim("bb");
-	pimpl->set_braket("x_x");
-	pimpl->set_operator("nuclear");
+	pimpl->set_center(ctr::c_2c1e);
+	pimpl->set_operator(op::nuclear);
 	pimpl->setup_calc();
 	return pimpl->compute();
 }
-/*
-dbcsr::shared_matrix<double> aofactory::ao_diag_mnmn() {
-		
-	pimpl->set_name("diag_mnmn_bb");
-	pimpl->set_dim("bbbb");
-	pimpl->set_braket("xx_xx");
-	pimpl->set_operator("coulomb");
-	pimpl->setup_calc();
-	return pimpl->compute_diag(0);
-}
 
-dbcsr::shared_matrix<double> aofactory::ao_diag_mmnn() {
-		
-	pimpl->set_name("diag_mmnn_bb");
-	pimpl->set_dim("bbbb");
-	pimpl->set_braket("xx_xx");
-	pimpl->set_operator("coulomb");
-	pimpl->setup_calc();
-	return pimpl->compute_diag(1);
-}*/
-
-dbcsr::shared_matrix<double> aofactory::ao_2c2e(std::string metric) {
+dbcsr::shared_matrix<double> aofactory::ao_2c2e(metric m) {
 	
-	pimpl->set_name("i_xx_"+metric);
+	op iop = op::invalid;
+	if (m == metric::coulomb) iop = op::coulomb;
+	if (m == metric::erfc_coulomb) iop = op::erfc_coulomb;
+	
+	pimpl->set_name("i_xx");
 	pimpl->set_dim("xx");
-	pimpl->set_braket("xs_xs");
-	pimpl->set_operator(metric);
+	pimpl->set_center(ctr::c_2c2e);
+	pimpl->set_operator(iop);
 	pimpl->setup_calc();
 	return pimpl->compute();
 }
@@ -1132,8 +774,8 @@ dbcsr::shared_matrix<double> aofactory::ao_auxoverlap() {
 	
 	pimpl->set_name("s_xx");
 	pimpl->set_dim("xx");
-	pimpl->set_braket("x_x");
-	pimpl->set_operator("overlap");
+	pimpl->set_center(ctr::c_2c1e);
+	pimpl->set_operator(op::overlap);
 	pimpl->setup_calc();
 	return pimpl->compute();
 }
@@ -1143,62 +785,63 @@ std::array<dbcsr::shared_matrix<double>,3>
 		
 	pimpl->set_name("emult");
 	pimpl->set_dim("bb");
-	pimpl->set_braket("x_x");
-	pimpl->set_operator("emult");
+	pimpl->set_center(ctr::c_2c1e);
+	pimpl->set_operator(op::emultipole);
 	pimpl->setup_calc();
 	return pimpl->compute_xyz(O);
 	
 }
 #endif
-void aofactory::ao_3c2e_setup(std::string metric) {
+void aofactory::ao_3c2e_setup(metric m) {
 	
-	pimpl->set_braket("xs_xx");
+	op iop = op::invalid;
+	if (m == metric::coulomb) iop = op::coulomb;
+	if (m == metric::erfc_coulomb) iop = op::erfc_coulomb;
+	
+	pimpl->set_center(ctr::c_3c2e);
 	pimpl->set_dim("xbb");
-	pimpl->set_operator(metric);
+	pimpl->set_operator(iop);
 	pimpl->setup_calc();
 	
 }
 
-void aofactory::ao_3c1e_setup(std::string metric) {
+void aofactory::ao_3c1e_ovlp_setup() {
 	
-	pimpl->set_braket("xs_xx");
+	pimpl->set_center(ctr::c_3c1e);
 	pimpl->set_dim("xbb");
-	pimpl->set_operator(metric);
+	pimpl->set_operator(op::overlap);
 	pimpl->setup_calc();
 	
 }
 
-void aofactory::ao_eri_setup(std::string metric) {
+void aofactory::ao_eri_setup(metric m) {
 	
-	pimpl->set_braket("xx_xx");
+	op iop = op::invalid;
+	if (m == metric::coulomb) iop = op::coulomb;
+	if (m == metric::erfc_coulomb) iop = op::erfc_coulomb;
+	
+	pimpl->set_center(ctr::c_4c2e);
 	pimpl->set_dim("bbbb");
-	pimpl->set_operator(metric);
+	pimpl->set_operator(iop);
 	pimpl->setup_calc();
 	
 }
 
-void aofactory::ao_3c2e_fill(dbcsr::shared_tensor<3,double>& t_in, 
+void aofactory::ao_3c_fill(dbcsr::shared_tensor<3,double>& t_in, 
 	vec<vec<int>>& blkbounds, shared_screener scr) {
 	
 	pimpl->compute_3_partial(t_in,blkbounds,scr);
 	
 }
 
-void aofactory::ao_3c2e_fill_idx(dbcsr::shared_tensor<3,double>& t_in, 
-	arrvec<int,3>& blkbounds, shared_screener scr) {
-	
-	pimpl->compute_3_partial_idx(t_in,blkbounds,scr);
-	
-}
-
-void aofactory::ao_3c1e_fill_idx(dbcsr::shared_tensor<3,double>& t_in, 
+void aofactory::ao_3c_fill_idx(dbcsr::shared_tensor<3,double>& t_in, 
 	arrvec<int,3>& blkbounds, shared_screener scr) {
 	
 	pimpl->compute_3_partial_idx(t_in,blkbounds,scr);
 	
 }
 				
-void aofactory::ao_eri_fill(dbcsr::shared_tensor<4,double>& t_in, 
+void aofactory::ao_4c_fill(dbcsr::shared_tensor<4,double>& t_in, 
 	vec<vec<int>>& blkbounds, shared_screener scr) {
 	
 	pimpl->compute_4_partial(t_in,blkbounds,scr);
@@ -1208,8 +851,8 @@ void aofactory::ao_eri_fill(dbcsr::shared_tensor<4,double>& t_in,
 dbcsr::shared_matrix<double> aofactory::ao_schwarz() {
 	pimpl->set_name("Z_mn");
 	pimpl->set_dim("bb");
-	pimpl->set_braket("xx_xx");
-	pimpl->set_operator("coulomb");
+	pimpl->set_center(ctr::c_4c2e);
+	pimpl->set_operator(op::coulomb);
 	pimpl->setup_calc(true);
 	return pimpl->compute_screen("schwarz", "bbbb");
 }
@@ -1217,8 +860,8 @@ dbcsr::shared_matrix<double> aofactory::ao_schwarz() {
 dbcsr::shared_matrix<double> aofactory::ao_3cschwarz() {
 	pimpl->set_name("Z_x");
 	pimpl->set_dim("xx");
-	pimpl->set_braket("xs_xs");
-	pimpl->set_operator("coulomb");
+	pimpl->set_center(ctr::c_2c2e);
+	pimpl->set_operator(op::coulomb);
 	pimpl->setup_calc(true);
 	return pimpl->compute_screen("schwarz", "xx");
 }

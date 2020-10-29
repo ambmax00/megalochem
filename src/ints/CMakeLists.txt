@@ -3,8 +3,6 @@ set(SOURCES
 	aofactory.cpp
 	integrals.h
 	integrals.cpp
-	gentran.h
-	gentran.cpp
 	screening.h
 	screening.cpp
 	fitting.h

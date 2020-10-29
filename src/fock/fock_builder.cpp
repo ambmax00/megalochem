@@ -76,7 +76,6 @@ void fockmod::init() {
 		m_ao.request(ints::key::coul_xx);
 		m_ao.request(ints::key::ovlp_xx);
 		m_ao.request(ints::key::ovlp_xx_inv);
-		m_ao.request(ints::key::coul_xbb);
 		m_ao.request(ints::key::dfit_qr_xbb);
 	
 	} else {
@@ -150,7 +149,6 @@ void fockmod::init() {
 		m_ao.request(ints::key::coul_xx);
 		m_ao.request(ints::key::ovlp_xx);
 		m_ao.request(ints::key::ovlp_xx_inv);
-		m_ao.request(ints::key::coul_xbb);
 		m_ao.request(ints::key::dfit_qr_xbb);
 	
 	} else {

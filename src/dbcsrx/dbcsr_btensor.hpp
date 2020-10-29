@@ -133,9 +133,9 @@ protected:
 	
 	generator_type m_generator;	
 	
-	btensor(MPI_Comm comm, int print) : LOG(comm,print) {}	
-	
 public:
+
+	btensor(MPI_Comm comm, int print) : LOG(comm,print) {}	
 
 	/* batchsize: given in MB */
 	btensor(std::string name, shared_pgrid<N> spgrid, arrvec<int,N> blksizes, 
@@ -1545,10 +1545,14 @@ public:
 		out->m_mpirank = m_mpirank;
 		out->m_mpisize = m_mpisize;
 		
-		out->m_read_tensor = dbcsr::create_template<3>(m_read_tensor)
-			.name(m_read_tensor->name()).get();
-			
-		out->m_work_tensor = m_work_tensor; // for now
+		if (m_read_tensor) {
+			out->m_read_tensor = dbcsr::tensor_create_template<3,double>(m_read_tensor)
+				.name(m_read_tensor->name()).get();
+		}
+		
+		if (m_work_tensor) {
+			out->m_work_tensor = m_work_tensor; // for now
+		}
 		
 		out->m_name = m_name;
 		out->m_spgrid_N = m_spgrid_N;
