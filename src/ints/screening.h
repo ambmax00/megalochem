@@ -70,6 +70,31 @@ public:
 	
 };
 
+class ovlp_screener : public screener {
+protected:
+
+	Eigen::MatrixXd m_blk_norms_mn;
+	
+public:
+
+	ovlp_screener(std::shared_ptr<aofactory> ifac) : 
+		screener(ifac, "ovlp") {}
+		
+	void compute() override;
+	
+	bool skip_block(int i, int j, int k) override;
+	bool skip(int i, int j, int k) override;
+	
+	double val_x(int i) override { return 0; }
+	double val_bb(int i, int j) override  { return 0; }
+	
+	double blknorm_x(int i) override { return 1; }
+	double blknorm_bb(int i, int j) override  { return m_blk_norms_mn(i,j); }
+	
+	~ovlp_screener() {}
+	
+};
+
 using shared_screener = std::shared_ptr<screener>;
 
 } // end namespace

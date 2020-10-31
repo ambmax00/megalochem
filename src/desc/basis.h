@@ -114,11 +114,20 @@ private:
 
 	std::vector<vshell> m_clusters;
 	std::vector<int> m_cluster_sizes;
+	std::vector<bool> m_cluster_diff; // false: not diffuse | true : diffuse
+	std::vector<std::string> m_cluster_types; // s, p, d, ... sp, spdf, ...
+	std::vector<double> m_cluster_radii;
 	std::vector<int> m_shell_offsets;
 	int m_nsplit;
 	std::string m_split_method;
 	
 public:
+
+	struct global {
+		static inline double cutoff = 1e-8;
+		static inline double step = 0.5;
+		static inline int maxiter = 5000;
+	};
 
 	cluster_basis() {}
 	
@@ -133,7 +142,10 @@ public:
 		m_cluster_sizes(cbasis.m_cluster_sizes),
 		m_shell_offsets(cbasis.m_shell_offsets),
 		m_nsplit(cbasis.m_nsplit),
-		m_split_method(cbasis.m_split_method) {}
+		m_split_method(cbasis.m_split_method),
+		m_cluster_diff(cbasis.m_cluster_diff),
+		m_cluster_types(cbasis.m_cluster_types),
+		m_cluster_radii(cbasis.m_cluster_radii) {}
 		
 	cluster_basis& operator =(const cluster_basis& cbasis) {
 		if (this != &cbasis) {
@@ -142,6 +154,9 @@ public:
 			m_shell_offsets = cbasis.m_shell_offsets;
 			m_nsplit = cbasis.m_nsplit;
 			m_split_method = cbasis.m_split_method;
+			m_cluster_diff = cbasis.m_cluster_diff;
+			m_cluster_types = cbasis.m_cluster_types;
+			m_cluster_radii = cbasis.m_cluster_radii;
 		}
 		
 		return *this;
@@ -167,6 +182,25 @@ public:
 		return m_clusters[i];
 	}
 	
+	std::vector<int> cluster_sizes() const;
+	
+	int shell_offset(int i) const {
+		return m_shell_offsets[i];
+	}
+	
+	std::vector<int> block_to_atom(std::vector<desc::Atom>& atoms) const;
+	
+	int nsplit() { return m_nsplit; }
+	std::string split_method() { return m_split_method; }
+	
+	std::vector<double> min_alpha() const;
+	
+	std::vector<double> radii() const;
+	
+	std::vector<bool> diffuse() const;
+	
+	std::vector<std::string> types() const;
+	
 	size_t max_nprim() const;
 
 	size_t nbf() const;
@@ -185,16 +219,7 @@ public:
 		return n;
 	}
 	
-	std::vector<int> cluster_sizes() const;
-	
-	int shell_offset(int i) const {
-		return m_shell_offsets[i];
-	}
-	
-	std::vector<int> block_to_atom(std::vector<desc::Atom>& atoms) const;
-	
-	int nsplit() { return m_nsplit; }
-	std::string split_method() { return m_split_method; }
+	void print_info() const;
 
 };
 

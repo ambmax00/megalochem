@@ -292,32 +292,28 @@ void calc_ints(dbcsr::tensor<3,double>& m_out, std::vector<std::vector<int>*> sh
 							
 				toff0 += locblkoff0;
 				int shellsize0 = CINTcgto_spheric(s0,bas);
-				shls[0] = s0;
+				shls[2] = s0;
 					
 				for (int s1 = soff1; s1 != soff1+nshell1; ++s1) {
 					
 					toff1 += locblkoff1;
 					int shellsize1 = CINTcgto_spheric(s1,bas);
-					shls[1] = s1;
+					shls[0] = s1;
 					
 					for (int s2 = soff2; s2 != soff2+nshell2; ++s2) {
 						
 						toff2 += locblkoff2;
 						int shellsize2 = CINTcgto_spheric(s2,bas);
-						shls[2] = s2;
-					
-						std::cout << "PROCESSING SHELL: " << s0 << " " << s1 << " " << s2 << std::endl;
-						std::cout << "EXPOS: " << bas(PTR_EXP,s0) << " " << bas(PTR_EXP,s1) 
-							<<  " " << bas(PTR_EXP,s2) << std::endl;
+						shls[1] = s2;
 						
 						int res = int_func(buf, shls, atm, natm, bas, nbas, env, nullptr);
 												
 						if (res != 0) {
 							int iidx = 0;
-						
-							for (int k = 0; k != shellsize2; ++k) {
-								for (int j = 0; j != shellsize1; ++j) {
-									for (int i = 0; i != shellsize0; ++i) {
+							
+							for (int i = 0; i != shellsize0; ++i) {
+								for (int k = 0; k != shellsize2; ++k) {
+									for (int j = 0; j != shellsize1; ++j) {
 											blk(i + locblkoff0, j + locblkoff1, k + locblkoff2) = buf[iidx++];
 								
 								}}}// std::cout << std::endl;

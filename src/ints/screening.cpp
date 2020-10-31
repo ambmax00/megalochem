@@ -59,4 +59,27 @@ bool schwarz_screener::skip(int i, int j, int k) {
 	
 }
 
+void ovlp_screener::compute() {
+	
+	auto s_bb = p_fac->ao_overlap();
+	
+	m_blk_norms_mn = dbcsr::block_norms(*s_bb);
+	
+}
+
+bool ovlp_screener::skip_block(int i, int j, int k) {
+	
+	float f = m_blk_norms_mn(j,k);
+	
+	if (f > m_blk_threshold) return false;
+	return true;
+	
+}
+
+bool ovlp_screener::skip(int i, int j, int k) {
+	
+	return false;
+	
+}
+
 } // end namespace

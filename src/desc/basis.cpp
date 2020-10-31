@@ -8,7 +8,13 @@
 
 #cmakedefine BASIS_ROOT "@BASIS_ROOT@"
 
-namespace desc { 
+namespace desc {
+
+const int MAX_L = 6;
+
+const std::vector<std::string> ANGMOMS = {
+	"s", "p", "d", "f", "g", "h", "i"
+}; 
 	
 vvshell split_atomic(vshell& basis) {
 	
@@ -244,6 +250,34 @@ vshell make_basis(std::string basname, std::vector<desc::Atom>& atoms_in) {
 		
 }
 	
+double exp_radius(int l, double alpha, double threshold, double prefactor) {
+	
+	// g(r) = prefactor * r^l * exp(-alpha*r**2) - threshold = 0
+	double step = cluster_basis::global::step;
+	int maxiter = cluster_basis::global::maxiter;
+	
+	double radius = 0.5;
+	double g = 0.0;
+	
+	for (int i = 0; i != maxiter; ++i) {
+		g = fabs(prefactor) * exp(-alpha * radius * radius) * pow(radius,l);
+		if (g < fabs(threshold)) break;
+		radius = radius + step;
+	}
+		
+	return radius;
+	
+}
+
+double cluster_min_alpha(const vshell& shells) {
+	double min = std::numeric_limits<double>::max();
+	for (auto& s : shells) {
+		for (auto& e : s.alpha) {
+			min = std::min(min,e);
+		}
+	}
+	return min;
+}
 
 cluster_basis::cluster_basis(std::string basname, std::vector<desc::Atom>& atoms_in,
 	std::string method, int nsplit, bool augmented) {
@@ -339,6 +373,7 @@ cluster_basis::cluster_basis(vshell basis, std::string method, int nsplit,
 				clusters[0].front() : clusters[i+1].front();
 			
 			new_clusters.push_back(clusters[i]);
+			m_cluster_diff.push_back(false);
 			
 			auto this_pos = this_shell.O;
 			auto next_pos = next_shell.O;
@@ -350,6 +385,7 @@ cluster_basis::cluster_basis(vshell basis, std::string method, int nsplit,
 				auto& s = c.front();
 				if (s.O == this_pos) {
 					new_clusters.push_back(c);
+					m_cluster_diff.push_back(true);
 				}
 			}
 			
@@ -360,6 +396,7 @@ cluster_basis::cluster_basis(vshell basis, std::string method, int nsplit,
 	} else {
 		
 		m_clusters = clusters;
+		m_cluster_diff = std::vector<bool>(m_clusters.size(),false);
 		
 	}
 					
@@ -375,10 +412,31 @@ cluster_basis::cluster_basis(vshell basis, std::string method, int nsplit,
 		off += m_clusters[i].size();
 	}
 	
-	/*std::cout << "OFFS: " << std::endl;
-	for (auto s : m_shell_offsets) {
-		std::cout << s << " ";
-	} std::cout << std::endl;*/
+	// radii
+	for (auto& cluster : m_clusters) {
+		double max_radius = 0.0;
+		for (auto& shell : cluster) {
+			for (int i = 0; i != shell.nprim(); ++i) {
+				max_radius = std::max(max_radius,
+					exp_radius(shell.l, shell.alpha[i], 
+					cluster_basis::global::cutoff, shell.coeff[i]));
+			}
+		}
+		m_cluster_radii.push_back(max_radius);
+	}
+	
+	// shelltypes
+	for (auto& cluster : m_clusters) {
+		std::vector<bool> stypes(MAX_L + 1);
+		for (auto& shell : cluster) {
+			stypes[shell.l] = true;
+		}
+		std::string id = "";
+		for (int i = 0; i != MAX_L+1; ++i) {
+			if (stypes[i]) id += ANGMOMS[i];
+		}
+		m_cluster_types.push_back(id);
+	}
 	
 }
 
@@ -434,6 +492,40 @@ std::vector<int> cluster_basis::block_to_atom(std::vector<desc::Atom>& atoms) co
 	}
 	
 	return blk_to_atom;
+	
+}
+
+std::vector<double> cluster_basis::min_alpha() const {
+	std::vector<double> out;
+	for (auto& cluster : m_clusters) {
+		out.push_back(cluster_min_alpha(cluster));
+	}
+	return out;
+}
+	
+std::vector<double> cluster_basis::radii() const {
+	return m_cluster_radii;
+}
+
+std::vector<bool> cluster_basis::diffuse() const {
+	return m_cluster_diff;
+}
+	
+std::vector<std::string> cluster_basis::types() const {
+	return m_cluster_types;
+}
+
+void cluster_basis::print_info() const {
+	
+	for (int icluster = 0; icluster != m_clusters.size(); ++icluster) {
+		std::cout << "Cluster: " << icluster << '\n'
+				<< "{" << '\n'
+				<< '\t' << "size: " << m_cluster_sizes[icluster] << '\n'
+				<< '\t' << "radius: " << m_cluster_radii[icluster] << '\n'
+				<< '\t' << "diffuse: " << m_cluster_diff[icluster] << '\n'
+				<< '\t' << "type: " << m_cluster_types[icluster] << '\n'
+				<< "}" << std::endl;
+	}
 	
 }
 

@@ -142,7 +142,7 @@ private:
 			for (auto m : idx[1]) {
 				for (auto n : idx[2]) {
 					
-					if (scr->skip_block(x,m,n)) continue;
+					if (scr && scr->skip_block(x,m,n)) continue;
 					
 					newblks[0].push_back(x);
 					newblks[1].push_back(m);
@@ -641,6 +641,14 @@ public:
 	
 	}	
 	
+	void compute_3_all(dbcsr::shared_tensor<3>& t_in) {
+				
+		calc_ints(*t_in, m_shell_offsets, m_nshells, m_intfunc,
+			m_atm.data(), m_natoms, m_bas.data(), m_nbas,
+			m_env.data(), m_max_l);
+	
+	}	
+	
 	void compute_3_partial_idx(dbcsr::shared_tensor<3>& t_in, arrvec<int,3>& idx,
 		shared_screener s_scr) {
 			
@@ -824,6 +832,12 @@ void aofactory::ao_eri_setup(metric m) {
 	pimpl->set_dim("bbbb");
 	pimpl->set_operator(iop);
 	pimpl->setup_calc();
+	
+}
+
+void aofactory::ao_3c_fill(dbcsr::shared_tensor<3,double>& t_in) {
+	
+	pimpl->compute_3_all(t_in);
 	
 }
 

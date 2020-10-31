@@ -66,6 +66,8 @@ public:
 
 	void ao_eri_setup(metric m);
 	
+	void ao_3c_fill(dbcsr::shared_tensor<3,double>& t_in);
+	
 	void ao_3c_fill(dbcsr::shared_tensor<3,double>& t_in, vec<vec<int>>& blkbounds, 
 		std::shared_ptr<screener> scr);
 	

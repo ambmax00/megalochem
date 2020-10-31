@@ -120,7 +120,7 @@ void aoloader::compute() {
 		LOG.os<>("Computing auxiliary overlap inverse\n");
 		auto& time = TIME.sub("Inverting auxiliary overlap matrix");
 		time.start();
-		auto s = m_reg.get<smatd>(key::ovlp_xx);
+		auto s = m_reg.get<smatd>(key::ovlp_xx);		
 		auto p = invert(s);
 		auto s_inv = p.first;
 		m_reg.insert(key::ovlp_xx_inv,s_inv);
@@ -360,7 +360,6 @@ void aoloader::compute() {
 				t_calc.start();
 				if (mytype != dbcsr::btype::direct) m_aofac->ao_3c_fill(eris_gen,bounds,scr);
 				t_calc.finish();
-				dbcsr::print(*eris_gen);
 				eris_gen->filter(dbcsr::global::filter_eps);
 				t_compress.start();
 				eri_batched->compress({ix}, eris_gen);
