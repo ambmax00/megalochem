@@ -44,7 +44,8 @@ public:
 		dbcsr::shared_pgrid<3> spgrid3_xbb,
 		shared_screener scr_s, 
 		std::array<int,3> bdims,
-		dbcsr::btype mytype);
+		dbcsr::btype mytype,
+		bool atomic = false);
 		
 	//void compute_qr(dbcsr::sbtensor<3,double> eris, dbcsr::shared_matrix<double> s_xx);
 	

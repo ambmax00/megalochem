@@ -27,7 +27,8 @@ inline btype get_btype(std::string str) {
 	return btype::invalid;
 };
 
-inline vec<vec<int>> make_blk_bounds(std::vector<int> blksizes, int nbatches) {
+inline vec<vec<int>> make_blk_bounds(std::vector<int> blksizes, 
+	int nbatches, std::optional<std::vector<int>> blkmap = std::nullopt) {
 		
 	int nblks = blksizes.size();
 	int nele = std::accumulate(blksizes.begin(),blksizes.end(),0);
@@ -36,23 +37,41 @@ inline vec<vec<int>> make_blk_bounds(std::vector<int> blksizes, int nbatches) {
 			
 	double nele_per_batch = (double) nele / (double) nbatches;
 	
+	if (blkmap && blksizes.size() != blkmap->size()) 
+		throw std::runtime_error(
+			"Block sizes and block map do not have the same dimension");
+	
 	vec<vec<int>> out;
 	int current_sum = 0;
+	int prev_centre = -1;
+	int current_centre = -1;
 	int ibatch = 1;
 	int first_blk = 0;
 	int last_blk = 0;
 	
 	for (int i = 0; i != nblks; ++i) {
 		current_sum += blksizes[i];
+		current_centre = (blkmap) ? blkmap->at(i) : i;
 		
-		if (current_sum >= ibatch * nele_per_batch) {
+		if (current_sum >= ibatch * nele_per_batch 
+			&& (prev_centre != current_centre || i == nblks-1)) {
 			last_blk = i;
 			vec<int> b = {first_blk,last_blk};
 			out.push_back(b);
 			first_blk = i+1;
 			++ibatch;
 		}
+		
+		prev_centre = current_centre;
+		
 	}
+	
+	/*std::cout << "BOUNDS: " << out.size() << std::endl;
+	for (auto p : out) {
+		std::cout << p[0] << " " << p[1] << std::endl;
+	}*/
+	
+	if (out.size() == 0) throw std::runtime_error("Block bounds are zero.");
 	
 	return out;
 		
@@ -139,7 +158,8 @@ public:
 
 	/* batchsize: given in MB */
 	btensor(std::string name, shared_pgrid<N> spgrid, arrvec<int,N> blksizes, 
-		std::array<int,N> nbatches, btype mytype, int print = -1) : 
+		std::array<int,N> nbatches, arrvec<int,N> blkmap, btype mytype, 
+		int print = -1) : 
 		m_comm(spgrid->comm()),
 		m_name(name),
 		m_spgrid_N(spgrid),
@@ -179,7 +199,7 @@ public:
 			}
 			
 			// batch bounds
-			m_blk_bounds[i] = make_blk_bounds(blksizes[i],nbatches[i]);
+			m_blk_bounds[i] = make_blk_bounds(blksizes[i],nbatches[i],blkmap[i]);
 	
 			m_bounds[i] = m_blk_bounds[i];
 			auto& ibds = m_bounds[i];
@@ -1601,6 +1621,7 @@ private:
 	shared_pgrid<N> c_pgrid;
 	arrvec<int,N> c_blk_sizes;
 	std::array<int,N> c_bdims;
+	arrvec<int,N> c_blkmap;
 	std::string c_name;
 	dbcsr::btype c_btype;
 	int c_print;
@@ -1625,6 +1646,10 @@ public:
 		c_bdims = t_bdims; return *this;
 	}
 	
+	btensor_create_base& blk_map(arrvec<int,N> t_blkmap) {
+		c_blkmap = t_blkmap; return *this;
+	}
+	
 	btensor_create_base& btensor_type(btype t_btype) {
 		c_btype = t_btype; return *this;
 	}
@@ -1634,7 +1659,8 @@ public:
 	}
 	
 	sbtensor<N,T> get() {
-		auto out = std::make_shared<btensor<N,T>>(c_name,c_pgrid,c_blk_sizes,c_bdims,c_btype,c_print);
+		auto out = std::make_shared<btensor<N,T>>(c_name,c_pgrid,c_blk_sizes,
+			c_bdims,c_blkmap,c_btype,c_print);
 		return out;
 	}
 

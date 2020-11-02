@@ -73,12 +73,18 @@ dbcsr::sbtensor<3,double> dfitting::compute(dbcsr::sbtensor<3,double> eri_batche
 	std::cout << "NBATCHES: " << nbatches_x << " " << nbatches_b << std::endl;
 
 	std::array<int,3> bdims = {nbatches_x,nbatches_b,nbatches_b};
+
+	auto blkmap_b = m_mol->c_basis()->block_to_atom(m_mol->atoms());
+	auto blkmap_x = m_mol->c_dfbasis()->block_to_atom(m_mol->atoms());
+		
+	arrvec<int,3> blkmaps = {blkmap_x, blkmap_b, blkmap_b};
 	
 	auto c_xbb_batched = dbcsr::btensor_create<3>()
 		.name(m_mol->name() + "_c_xbb_batched")
 		.pgrid(spgrid3_xbb)
 		.blk_sizes(xbb)
 		.batch_dims(bdims)
+		.blk_map(blkmaps)
 		.btensor_type(mytype)
 		.print(LOG.global_plev())
 		.get();
@@ -152,7 +158,8 @@ dbcsr::sbtensor<3,double> dfitting::compute(dbcsr::sbtensor<3,double> eri_batche
 	double cfit_occupation = c_xbb_batched->occupation() * 100;
 	LOG.os<1>("Occupancy of c_xbb: ", cfit_occupation, "%\n");
 	
-	assert(cfit_occupation <= 100);
+	if (cfit_occupation > 100) throw std::runtime_error(
+		"Fitting coefficients occupation more than 100%");
 
 	TIME.finish();
 	
@@ -719,14 +726,15 @@ std::vector<block_info> get_block_info(desc::cluster_basis& cbas) {
 
 dbcsr::sbtensor<3,double> dfitting::compute_qr(dbcsr::shared_matrix<double> s_xx_inv, 
 		dbcsr::shared_matrix<double> m_xx, dbcsr::shared_pgrid<3> spgrid3_xbb,
-		shared_screener scr_s, std::array<int,3> bdims, dbcsr::btype mytype)
+		shared_screener scr_s, std::array<int,3> bdims, dbcsr::btype mytype, 
+		bool atomic)
 {
 	
 	TIME.start();
 	
 	auto aofac = std::make_shared<aofactory>(m_mol, m_world);
 	
-	double T = 1e-6;
+	double T = 1e-5;
 	double R2 = 40;
 	
 	auto x = m_mol->dims().x();
@@ -765,18 +773,76 @@ dbcsr::sbtensor<3,double> dfitting::compute_qr(dbcsr::shared_matrix<double> s_xx
 	
 	LOG.os<>("Grid size: ", m_world.nprow(), " ", m_world.npcol(), '\n');
 		
-	vec<int> d0(x.size(),0.0);
+	vec<int> d0(x.size(),0);
 	vec<int> d1(b.size());
 	vec<int> d2(b.size());
 	
+	std::vector<int> blkmap_b;
+	std::vector<int> blkmap_x;
+	
+	if (atomic) {
+		blkmap_b = m_mol->c_basis()->block_to_atom(m_mol->atoms());
+		blkmap_x = m_mol->c_dfbasis()->block_to_atom(m_mol->atoms());
+	} else {
+		blkmap_b.resize(b.size());
+		blkmap_x.resize(x.size());
+		std::iota(blkmap_b.begin(), blkmap_b.end(), 0);
+		std::iota(blkmap_x.begin(), blkmap_x.end(), 0);
+	}
+	
+	auto is_diff = m_mol->c_basis()->diffuse();
+	
+	const int natoms = m_mol->atoms().size();
+	// make sure that each process has one atom block, but diffuse
+	// and tight blocks are separated
+	int offset = 0;
+	auto dist = blkmap_b;
+	for (int i = 0; i != blkmap_b.size(); ++i) {
+		dist[i] = (!is_diff[i]) ? dist[i] : dist[i] + natoms;
+	}
+	
 	for (int i = 0; i != d1.size(); ++i) {
-		d1[i] = i % dims[1];
-		d2[i] = i % dims[2];
+		d1[i] = dist[i] % dims[1];
+		d2[i] = dist[i] % dims[2];
+	}
+	
+	int atom_nblks = *(std::max_element(dist.begin(), dist.end())) + 1;
+	
+	std::vector<std::vector<int>> atom_blocks;
+	std::vector<int> sub_block;
+	int prev_centre = 0;
+	
+	for (int i = 0; i != b.size(); ++i) {
+		int current_centre = dist[i];
+		if (current_centre != prev_centre) {
+			atom_blocks.push_back(sub_block);
+			sub_block.clear();
+		}
+		sub_block.push_back(i);
+		if (i == b.size() - 1) {
+			atom_blocks.push_back(sub_block);
+		}
+		prev_centre = current_centre;
+	}
+	
+	if (m_world.rank() == 0) {
+		std::cout << "ATOM BLOCKS: " << std::endl;
+		for (auto p : atom_blocks) {
+			for (auto i : p) {
+				std::cout << i << " ";
+			} std::cout << std::endl;
+		}
+
+		std::cout << "DISTS: " << std::endl;
+		for (auto i : d1) std::cout << i << " ";
+		std::cout << std::endl;
+		for (auto i : d2) std::cout << i << " ";
+		std::cout << std::endl;
 	}
 	
 	arrvec<int,3> distsizes = {d0,d1,d2};
 	
-	// a distribution where a process owns ALL (X) blocks for a certain (μν) pair
+	// a distribution where a process owns ALL (X) blocks for a certain (μν) atomic pair
 	dbcsr::dist_t<3> dist3_global_1bb(spgrid3_global_1bb, distsizes);
 	
 	// form tensors
@@ -816,10 +882,13 @@ dbcsr::sbtensor<3,double> dfitting::compute_qr(dbcsr::shared_matrix<double> s_xx
 		.map1({0}).map2({1,2})
 		.get();
 		
+	arrvec<int,3> blkmaps = {blkmap_x, blkmap_b, blkmap_b};
+		
 	auto c_xbb_batched = dbcsr::btensor_create<3,double>()
 		.name("cqr_xbb_batched")
 		.pgrid(spgrid3_xbb)
 		.blk_sizes(xbb)
+		.blk_map(blkmaps)
 		.batch_dims(bdims)
 		.btensor_type(mytype)
 		.print(0)
@@ -833,11 +902,6 @@ dbcsr::sbtensor<3,double> dfitting::compute_qr(dbcsr::shared_matrix<double> s_xx
 		.get();
 	
 	dbcsr::copy_matrix_to_tensor(*s_xx_inv, *s_xx_inv_global);
-	
-	arrvec<int,3> blk_idx;
-	blk_idx[0].resize(x.size());
-	blk_idx[1].resize(1);
-	blk_idx[2].resize(1);
 	
 	auto b_basis = m_mol->c_basis();
 	auto x_basis = m_mol->c_dfbasis();
@@ -876,27 +940,55 @@ dbcsr::sbtensor<3,double> dfitting::compute_qr(dbcsr::shared_matrix<double> s_xx
 		
 		auto blk_nu = c_xbb_batched->blk_bounds(2,ibatch_nu);
 		
-		std::vector<std::pair<int,int>> mn_blk_list;
+		std::vector<arrvec<int,2>> atom_blk_list;
+		int npairs = 0;
 	
-		for (int m = 0; m != b.size(); ++m) {
-			for (int n = blk_nu[0]; n != blk_nu[1]+1; ++n) {
+		for (auto iblock : atom_blocks) {
+			for (auto jblock : atom_blocks) {
 				
-				int rproc = m % dims[1];
-				int cproc = n % dims[2];
-							
-				if (rproc == m_world.myprow() && cproc == m_world.mypcol()) {
-					std::pair<int,int> p = {m,n};
-					mn_blk_list.push_back(p);
+				// find out processes for atom blocks
+				// due to the dsitribution we created, we are guarenteed
+				// that each process has a whole block
+				int rproc = d1[iblock[0]];
+				int cproc = d2[jblock[0]];
+				
+				if (m_world.myprow() == rproc && m_world.mypcol() == cproc) 
+				{
+					arrvec<int,2> sublist;
+					
+					for (auto m : iblock) {
+						sublist[0].push_back(m);
+					}
+					
+					for (auto n : jblock) {
+						if (n < blk_nu[0] || n > blk_nu[1]) continue;
+						sublist[1].push_back(n);
+					}
+					
+					npairs += sublist[1].size() * sublist[0].size();
+					if (!sublist[1].empty()) atom_blk_list.push_back(sublist);
 				}
-				
 			}
 		}
-		
+				
 		LOG(-1).os<>("Number of pairs on rank ", m_world.rank(), ": ", 
-			mn_blk_list.size(), '\n');
-		
-		size_t npairs = mn_blk_list.size();
-		
+			npairs, '\n');
+			
+		for (int iproc = 0; iproc != m_world.size(); ++iproc) {
+			if (iproc == m_world.rank()) {
+				std::cout << "PROC " << iproc << std::endl;
+				for (auto& subset : atom_blk_list) {
+					for (auto& p : subset[0]) {
+						std::cout << p << " ";
+					} std::cout << std::endl;
+					for (auto& p : subset[1]) {
+						std::cout << p << " ";
+					} std::cout << std::endl;
+				}
+			}
+			MPI_Barrier(m_world.comm());
+		}
+				
 		auto& time1 = TIME.sub("1");
 		auto& time2 = TIME.sub("2");
 		auto& time3 = TIME.sub("3");
@@ -995,46 +1087,68 @@ dbcsr::sbtensor<3,double> dfitting::compute_qr(dbcsr::shared_matrix<double> s_xx
 	if (iproc == m_world.rank()) {
 #endif
 	
+		int nsubset = 0;
+	
 		// now loop over munu block pairs
-		for (auto& mn_pair : mn_blk_list) {
+		for (auto& subset : atom_blk_list) {
 			
-			std::cout << "PROC: " << m_world.rank() << std::endl;
-			std::cout << "PAIR: " << mn_pair.first << " " << mn_pair.second << std::endl; 
+			std::cout << "Subset " << nsubset++ << std::endl;
 			
-			int mu = mn_pair.first;
-			int nu = mn_pair.second;
+			std::vector<int> mu_blks = subset[0];
+			std::vector<int> nu_blks = subset[1];
+			
+			for (auto& p : subset[0]) {
+				std::cout << p << " ";
+			} std::cout << std::endl;
+			for (auto& p : subset[1]) {
+				std::cout << p << " ";
+			} std::cout << std::endl;
+			
+			std::cout << "DIMS: " << mu_blks.size() << " x " << nu_blks.size() << std::endl;
+			
 			
 			vec<bool> blk_P_bool(x.size(),false);
 			
-			std::array<int,3> idx = {0,mu,nu};
-			std::array<int,3> size = {0,b[mu],b[nu]};
-			
-			bool keep = false;
-			
-			for (int ix = 0; ix != x.size(); ++ix) {
-				bool found = false;
-				idx[0] = ix;
-				size[0] = x[ix];
-				auto blk = prs_xbb_global_1bb->get_block(idx, size, found);
-				if (!found) continue;
+			std::array<int,3> idx = {0,0,0};
+			std::array<int,3> size = {0,0,0};
+						
+			// get all relevant P functions
+			for (auto imu : mu_blks) {
+				for (auto inu : nu_blks) {
 				
-				auto max_iter = std::max_element(blk.data(), blk.data() + blk.ntot(),
-					[](double a, double b) {
-						return fabs(a) < fabs(b);
+					idx[1] = imu;
+					idx[2] = inu;
+					
+					size[1] = b[imu];
+					size[2] = b[inu];
+				
+					bool keep = false;
+					
+					for (int ix = 0; ix != x.size(); ++ix) {
+						bool found = false;
+						idx[0] = ix;
+						size[0] = x[ix];
+						auto blk = prs_xbb_global_1bb->get_block(idx, size, found);
+						if (!found) continue;
+						
+						auto max_iter = std::max_element(blk.data(), blk.data() + blk.ntot(),
+							[](double a, double b) {
+								return fabs(a) < fabs(b);
+							}
+						);
+						
+						if (fabs(*max_iter) > T) blk_P_bool[ix] = true;
+						
+						/*double tot = 0.0;
+						for (int i = 0; i != blk.ntot(); ++i) {
+							tot += fabs(blk.data()[i]);
+						}
+						
+						tot /= blk.ntot();
+						if (tot > T) blk_P_bool[ix] = true;*/
+										
 					}
-				);
-				
-				if (fabs(*max_iter) > T) blk_P_bool[ix] = true;
-				
-				/*double tot = 0.0;
-				for (int i = 0; i != blk.ntot(); ++i) {
-					tot += fabs(blk.data()[i]);
-				}
-				
-				tot /= blk.ntot();
-				if (tot > T) blk_P_bool[ix] = true;*/
-								
-			}
+			}}
 			
 			vec<int> blk_P;
 			blk_P.reserve(x.size());
@@ -1079,11 +1193,28 @@ dbcsr::sbtensor<3,double> dfitting::compute_qr(dbcsr::shared_matrix<double> s_xx
 			time2.finish();
 			
 			time3.start();
+			
+			arrvec<int,3> blk_idx;
+			blk_idx[0] = blk_Q;
+			blk_idx[1] = mu_blks;
+			blk_idx[2] = nu_blks;
+			
+			int nb = 0; // number of total nb functions
+			int mstride = 0;
+			int nstride = 0;
+					
+			for (auto imu : mu_blks) {
+				mstride += b[imu];
+			}
+			
+			for (auto inu : nu_blks) {
+				nstride += b[inu];
+			}
+			
+			nb = nstride * mstride;
+			
 			// generate integrals
 			aofac->ao_3c2e_setup(metric::coulomb);
-			blk_idx[0] = blk_Q;
-			blk_idx[1][0] = mu;
-			blk_idx[2][0] = nu;
 			aofac->ao_3c_fill_idx(eri_local, blk_idx, nullptr);
 			time3.finish();
 			
@@ -1101,10 +1232,9 @@ dbcsr::sbtensor<3,double> dfitting::compute_qr(dbcsr::shared_matrix<double> s_xx
 				np += x[ip];
 			}
 			
-			time4.start();
+			std::cout << "NP,NQ,NB: " << np << "/" << nq << "/" << nb << std::endl;
 			
-			// how many b functions?
-			int nb = b[mu] * b[nu];
+			time4.start();
 			
 			// copy to eigen matrix
 			Eigen::MatrixXd eris_eigen = Eigen::MatrixXd::Zero(nq,nb);
@@ -1112,27 +1242,32 @@ dbcsr::sbtensor<3,double> dfitting::compute_qr(dbcsr::shared_matrix<double> s_xx
 			
 			int poff = 0;
 			int qoff = 0;
-			int moff = b[mu]; 
+			int moff = 0;
+			int noff = 0;
 			
 			for (auto iq : blk_Q) {
+				for (auto imu : mu_blks) {
+					for (auto inu : nu_blks) {
 				
-				std::array<int,3> idx = {iq,mu,nu};
-				std::array<int,3> size = {x[iq],b[mu],b[nu]};
-				bool found = true;
-				auto blk = eri_local->get_block(idx,size,found);
-				
-				if (!found) continue;
-				
-				for (int qq = 0; qq != size[0]; ++qq) {
-					for (int mm = 0; mm != size[1]; ++mm) {
-						for (int nn = 0; nn != size[2]; ++nn) { 
-							eris_eigen(qq + qoff, mm + nn*moff)
-								= blk(qq,mm,nn);
-						}
+						std::array<int,3> idx = {iq,imu,inu};
+						std::array<int,3> size = {x[iq],b[imu],b[inu]};
+						bool found = true;
+						auto blk = eri_local->get_block(idx,size,found);
+						if (!found) continue;
+						
+						for (int qq = 0; qq != size[0]; ++qq) {
+							for (int mm = 0; mm != size[1]; ++mm) {
+								for (int nn = 0; nn != size[2]; ++nn) {
+									eris_eigen(qq + qoff, mm + moff + (nn+noff)*mstride)
+										= blk(qq,mm,nn);
+						}}}
+						noff += b[inu];
 					}
+					noff = 0;
+					moff += b[imu];
 				}
-				
-				qoff += size[0];
+				moff = 0;
+				qoff += x[iq];
 			}
 					
 			// copy metric to eigen
@@ -1185,35 +1320,49 @@ dbcsr::sbtensor<3,double> dfitting::compute_qr(dbcsr::shared_matrix<double> s_xx
 			time6.start();
 			// transfer it to c_xbb
 			arrvec<int,3> cfit_idx;
-			cfit_idx[0] = blk_P;
-			cfit_idx[1] = vec<int>(blk_P.size(), mu);
-			cfit_idx[2] = vec<int>(blk_P.size(), nu);
+			
+			for (auto ip : blk_P) {
+				for (auto imu : mu_blks) {
+					for (auto inu : nu_blks) {
+						cfit_idx[0].push_back(ip);
+						cfit_idx[1].push_back(imu);
+						cfit_idx[2].push_back(inu);
+					}
+				}
+			}
 			
 			c_xbb_global_1bb->reserve(cfit_idx);
 			
 			poff = 0;
+			moff = 0;
+			noff = 0;
+			
 			for (auto ip : blk_P) {
+				for (auto imu : mu_blks) {
+					for (auto inu : nu_blks) {
 				
-				std::array<int,3> idx = {ip, mu, nu};
-				std::array<int,3> size = {x[ip], b[mu], b[nu]};
-				
-				dbcsr::block<3,double> blk(size);
-				for (int pp = 0; pp != size[0]; ++pp) {
-					for (int mm = 0; mm != size[1]; ++mm) {
-						for (int nn = 0; nn != size[2]; ++nn) {
-							blk(pp,mm,nn) = c_eigen(pp + poff, mm + nn*moff);
-						}
+						std::array<int,3> idx = {ip, imu, inu};
+						std::array<int,3> size = {x[ip], b[imu], b[inu]};
+						
+						dbcsr::block<3,double> blk(size);
+						for (int pp = 0; pp != size[0]; ++pp) {
+							for (int mm = 0; mm != size[1]; ++mm) {
+								for (int nn = 0; nn != size[2]; ++nn) {
+									blk(pp,mm,nn) = c_eigen(pp + poff, 
+										mm + moff + (nn+noff)*mstride);
+						}}}
+						c_xbb_global_1bb->put_block(idx, blk);
+						noff += b[inu];
 					}
-				}
-				
-				c_xbb_global_1bb->put_block(idx, blk);
-				poff += size[0];
-				
+					noff = 0;
+					moff += b[imu];
+				}			
+				moff = 0;	
+				poff += x[ip];
 			}
 			time6.finish();
 			
-		} // end loop over mu|nu pairs
-		
+		} // end loop over atom block pairs
 #if 0	
 		}
 		MPI_Barrier(m_world.comm());
@@ -1233,7 +1382,8 @@ dbcsr::sbtensor<3,double> dfitting::compute_qr(dbcsr::shared_matrix<double> s_xx
 	double occupation = c_xbb_batched->occupation() * 100;
 	LOG.os<>("Occupation of QR fitting coefficients: ", occupation, "%\n");
 	
-	assert(occupation <= 100.0);
+	if (occupation > 100) throw std::runtime_error(
+		"Fitting coefficients occupation more than 100%");
 	
 	TIME.finish();
 	

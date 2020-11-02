@@ -471,7 +471,7 @@ std::vector<int> cluster_basis::cluster_sizes() const {
 	return m_cluster_sizes;
 }
 
-std::vector<int> cluster_basis::block_to_atom(std::vector<desc::Atom>& atoms) const {
+std::vector<int> cluster_basis::block_to_atom(std::vector<desc::Atom> atoms) const {
 	
 	std::vector<int> blk_to_atom(m_cluster_sizes.size());
 	

@@ -221,10 +221,14 @@ void aoloader::compute() {
 		int nbatches_b = m_opt.get<int>("nbatches_x", 5);
 		std::array<int,4> bdims = {nbatches_b,nbatches_b,nbatches_b,nbatches_b};
 		
+		auto blkmap_b = m_mol->c_basis()->block_to_atom(m_mol->atoms());
+		arrvec<int,4> blkmaps = {blkmap_b, blkmap_b, blkmap_b, blkmap_b};
+		
 		auto eri_batched = dbcsr::btensor_create<4>()
 			.name(m_mol->name() + "_eri_batched")
 			.pgrid(spgrid4)
 			.blk_sizes(bbbb)
+			.blk_map(blkmaps)
 			.batch_dims(bdims)
 			.btensor_type(dbcsr::btype::core)
 			.print(LOG.global_plev())
@@ -325,12 +329,18 @@ void aoloader::compute() {
 		
 		std::array<int,3> bdims = {nbatches_x,nbatches_b,nbatches_b};
 		
+		auto blkmap_b = m_mol->c_basis()->block_to_atom(m_mol->atoms());
+		auto blkmap_x = m_mol->c_dfbasis()->block_to_atom(m_mol->atoms());
+		
+		arrvec<int,3> blkmaps = {blkmap_x, blkmap_b, blkmap_b};
+		
 		auto eri_batched = dbcsr::btensor_create<3>()
 			.name(m_mol->name() + "_eri_batched")
 			.pgrid(spgrid3)
 			.blk_sizes(xbb)
 			.batch_dims(bdims)
 			.btensor_type(mytype)
+			.blk_map(blkmaps)
 			.print(LOG.global_plev())
 			.get();
 			
@@ -381,7 +391,8 @@ void aoloader::compute() {
 		LOG.os<1>("Occupation of 3c2e integrals: ", eri_occupation, "%\n");
 		LOG.os<>("Done computing 3c2e integrals.\n\n");
 		
-		assert(eri_occupation <= 100);
+		if (eri_occupation > 100) throw std::runtime_error(
+			"3c2e integrals occupation more than 100%");
 		
 	}
 	

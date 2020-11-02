@@ -188,7 +188,7 @@ public:
 		return m_shell_offsets[i];
 	}
 	
-	std::vector<int> block_to_atom(std::vector<desc::Atom>& atoms) const;
+	std::vector<int> block_to_atom(std::vector<desc::Atom> atoms) const;
 	
 	int nsplit() { return m_nsplit; }
 	std::string split_method() { return m_split_method; }

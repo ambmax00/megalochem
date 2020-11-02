@@ -720,7 +720,7 @@ public:
 			throw std::runtime_error("Unknown screening method.");
 		}
 		
-		dbcsr::print(*m_ints);
+		//dbcsr::print(*m_ints);
 		
 		return m_ints;
 		
