@@ -393,6 +393,8 @@ void aoloader::compute() {
 		
 		if (eri_occupation > 100) throw std::runtime_error(
 			"3c2e integrals occupation more than 100%");
+	
+		auto mat = dfit.compute_idx(eri_batched);
 		
 	}
 	
@@ -421,6 +423,8 @@ void aoloader::compute() {
 		
 		auto c_xbb_batched = dfit.compute(eri_batched, inv, 
 			m_opt.get<std::string>("intermeds", "core"));
+			
+		auto mat = dfit.compute_idx(c_xbb_batched);
 			
 		if (comp(key::dfit_coul_xbb)) m_reg.insert(key::dfit_coul_xbb, c_xbb_batched);
 		if (comp(key::dfit_erfc_xbb)) m_reg.insert(key::dfit_erfc_xbb, c_xbb_batched);
@@ -465,8 +469,10 @@ void aoloader::compute() {
 		auto scr = m_reg.get<ints::shared_screener>(key::scr_xbb);
 		
 		auto c_xbb_qr = dfit.compute_qr(s_xx_inv, m_xx, spgrid3, scr, 
-			bdims, dbcsr::btype::core);
+			bdims, dbcsr::btype::core, true);
 		m_reg.insert(key::dfit_qr_xbb, c_xbb_qr);
+		
+		auto mat = dfit.compute_idx(c_xbb_qr);
 	
 		time.finish();
 	

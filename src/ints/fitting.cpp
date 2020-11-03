@@ -1393,5 +1393,60 @@ dbcsr::sbtensor<3,double> dfitting::compute_qr(dbcsr::shared_matrix<double> s_xx
 	return c_xbb_batched;
 	
 }
+
+// for C_Xμν computes sparsity between X and ν 
+std::shared_ptr<Eigen::MatrixXi> dfitting::compute_idx(
+	dbcsr::sbtensor<3,double> cfit_xbb)
+{
+	auto x = m_mol->dims().x();
+	auto b = m_mol->dims().b();
+	
+	Eigen::MatrixXi idx_local = Eigen::MatrixXi::Zero(x.size(),b.size());
+	Eigen::MatrixXi idx_global = Eigen::MatrixXi::Zero(x.size(),b.size());
+	
+	cfit_xbb->decompress_init({2}, vec<int>{0}, vec<int>{1,2});
+	int nbatches = (cfit_xbb->get_type() == dbcsr::btype::core) ?
+		1 : cfit_xbb->nbatches(2);
+		
+	for (int inu = 0; inu != nbatches; ++inu) {
+		cfit_xbb->decompress({inu});
+		auto cfit = cfit_xbb->get_work_tensor();
+		
+		dbcsr::iterator_t<3> iter(*cfit);
+		iter.start();
+		
+		while (iter.blocks_left()) {
+			iter.next();
+			auto& idx = iter.idx();
+			
+			int ix = idx[0];
+			int inu = idx[2];
+			
+			idx_local(ix,inu) = 1;
+		}
+		
+		iter.stop();
+		
+	}
+	
+	cfit_xbb->decompress_finalize();
+	
+	MPI_Allreduce(idx_local.data(), idx_global.data(), x.size() * b.size(),
+		MPI_INT, MPI_LOR, m_world.comm());
+		
+	int nblks = 0;
+		
+	for (int ix = 0; ix != x.size(); ++ix) {
+		for (int inu = 0; inu != b.size(); ++inu) {
+			if (idx_global(ix,inu)) ++nblks;
+		}
+	}
+	
+	LOG.os<>("BLOCKS: ", nblks, "/", x.size()*b.size(), '\n');
+	
+	auto out_ptr = std::make_shared<Eigen::MatrixXi>(std::move(idx_global));
+	return out_ptr;
+
+}
 	
 } // end namespace

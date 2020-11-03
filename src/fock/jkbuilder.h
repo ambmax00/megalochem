@@ -267,7 +267,7 @@ public:
 	
 };
 
-class BATCHED_QRDF_K : public K {
+class BATCHED_DFMEM_K : public K {
 private:
 
 	dbcsr::sbtensor<3,double> m_c_xbb_batched;
@@ -279,7 +279,39 @@ private:
 	
 	dbcsr::shared_tensor<3,double> m_c_xbb_02_1;
 	dbcsr::shared_tensor<3,double> m_cbar_xbb_01_2;
+	dbcsr::shared_tensor<3,double> m_cbar_xbb_02_1;
+	
+	dbcsr::shared_tensor<3,double> m_cpq_xbb_0_12;
+	dbcsr::shared_tensor<3,double> m_cpq_xbb_01_2;
+	
+	dbcsr::shared_pgrid<2> m_spgrid2;
+	dbcsr::shared_pgrid<3> m_spgrid3_xbb;
+	
+	Eigen::MatrixXi m_idx_list;
+	
+public:
+
+	BATCHED_DFMEM_K(dbcsr::world& w, desc::options& opt);
+	void compute_K() override;
+	void init() override;
+	
+	~BATCHED_DFMEM_K() {}
+	
+};
+
+class BATCHED_DFSPARSE_K : public K {
+private:
+
+	dbcsr::sbtensor<3,double> m_c_xbb_batched;
+	
+	dbcsr::shared_tensor<2,double> m_K_01;
+	dbcsr::shared_tensor<2,double> m_p_bb;
+	dbcsr::shared_tensor<2,double> m_v_xx_01;
+	dbcsr::shared_matrix<double> m_v_xx;
+	
+	dbcsr::shared_tensor<3,double> m_c_xbb_02_1;
 	dbcsr::shared_tensor<3,double> m_cbar_xbb_0_12;
+	dbcsr::shared_tensor<3,double> m_cbar_xbb_01_2;
 	
 	dbcsr::shared_tensor<3,double> m_cbarpq_xbb_0_12;
 	dbcsr::shared_tensor<3,double> m_cbarpq_xbb_02_1;
@@ -291,11 +323,11 @@ private:
 	
 public:
 
-	BATCHED_QRDF_K(dbcsr::world& w, desc::options& opt);
+	BATCHED_DFSPARSE_K(dbcsr::world& w, desc::options& opt);
 	void compute_K() override;
 	void init() override;
 	
-	~BATCHED_QRDF_K() {}
+	~BATCHED_DFSPARSE_K() {}
 	
 };
 
@@ -334,8 +366,8 @@ inline std::shared_ptr<K> get_K(
 		ptr = new BATCHED_DFMO_K(w,opt);
 	} else if (name == "batchpari") {
 		ptr = new BATCHED_PARI_K(w,opt);
-	} else if (name == "batchqrdf") {
-		ptr = new BATCHED_QRDF_K(w,opt);
+	} else if (name == "batchdfmem") {
+		ptr = new BATCHED_DFMEM_K(w,opt);
 	}
 	
 	if (!ptr) {

@@ -2,13 +2,13 @@
 
 namespace fock {
 	
-BATCHED_QRDF_K::BATCHED_QRDF_K(dbcsr::world& w, desc::options& opt) 
-	: K(w,opt,"BATCHED_QRDF_K") {}
-void BATCHED_QRDF_K::init() {
+BATCHED_DFSPARSE_K::BATCHED_DFSPARSE_K(dbcsr::world& w, desc::options& opt) 
+	: K(w,opt,"BATCHED_DFSPARSE_K") {}
+void BATCHED_DFSPARSE_K::init() {
 	
 	init_base();
 		
-	m_c_xbb_batched = m_reg.get<dbcsr::sbtensor<3,double>>(Kkey::dfit_qr_xbb);
+	m_c_xbb_batched = m_reg.get<dbcsr::sbtensor<3,double>>(Kkey::dfit_xbb);
 	
 	m_v_xx = m_reg.get<dbcsr::shared_matrix<double>>(Kkey::v_xx);
 	
@@ -23,7 +23,7 @@ void BATCHED_QRDF_K::init() {
 	m_spgrid2 = dbcsr::create_pgrid<2>(m_world.comm()).get();
 	
 	m_cbar_xbb_01_2 = dbcsr::tensor_create<3,double>()
-		.name("Cbar_xbb_01_2")
+		.name("cbar_xbb_01_2")
 		.pgrid(m_spgrid3_xbb)
 		.blk_sizes(xbb)
 		.map1({0,1}).map2({2})
@@ -31,7 +31,7 @@ void BATCHED_QRDF_K::init() {
 		
 	m_cbar_xbb_0_12 = 
 		dbcsr::tensor_create_template<3>(m_cbar_xbb_01_2)
-		.name("Cbar_xbb_0_12")
+		.name("cbar_xbb_0_12")
 		.map1({0}).map2({1,2})
 		.get();
 		
@@ -107,7 +107,7 @@ void BATCHED_QRDF_K::init() {
 		
 }
 
-void BATCHED_QRDF_K::compute_K() {
+void BATCHED_DFSPARSE_K::compute_K() {
 	
 	TIME.start();
 	
@@ -161,6 +161,7 @@ void BATCHED_QRDF_K::compute_K() {
 				con_1.start();
 				dbcsr::contract(*c_xbb_01_2, *m_p_bb, *m_cbar_xbb_01_2)
 					.bounds2(ymbds)
+					.filter(dbcsr::global::filter_eps)
 					.perform("Ymr, rs -> Yms");
 				con_1.finish();
 				
@@ -189,6 +190,7 @@ void BATCHED_QRDF_K::compute_K() {
 				dbcsr::contract(*m_v_xx_01, *m_cbar_xbb_0_12, *m_cbarpq_xbb_0_12)
 					.bounds1(ybds)
 					.bounds2(xbds)
+					.filter(dbcsr::global::filter_eps)
 					.perform("XY, Yms -> Xms");
 				con_2.finish();
 			
@@ -235,6 +237,7 @@ void BATCHED_QRDF_K::compute_K() {
 				con_3.start();
 				dbcsr::contract(*m_c_xbb_02_1, *m_cbarpq_xbb_02_1, *m_K_01)
 					.bounds1(xsbds)
+					.filter(dbcsr::global::filter_eps/nxbatches)
 					.beta(1.0)
 					.perform("Xns, Xms -> mn");
 				con_3.finish();
@@ -274,7 +277,5 @@ void BATCHED_QRDF_K::compute_K() {
 	TIME.finish();
 			
 }
-	
-	
 	
 } // end namespace

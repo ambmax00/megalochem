@@ -45,7 +45,9 @@ public:
 		shared_screener scr_s, 
 		std::array<int,3> bdims,
 		dbcsr::btype mytype,
-		bool atomic = false);
+		bool atomic);
+		
+	std::shared_ptr<Eigen::MatrixXi> compute_idx(dbcsr::sbtensor<3,double> cfit_xbb);
 		
 	//void compute_qr(dbcsr::sbtensor<3,double> eris, dbcsr::shared_matrix<double> s_xx);
 	

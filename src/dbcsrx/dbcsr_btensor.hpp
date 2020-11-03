@@ -43,8 +43,8 @@ inline vec<vec<int>> make_blk_bounds(std::vector<int> blksizes,
 	
 	vec<vec<int>> out;
 	int current_sum = 0;
-	int prev_centre = -1;
 	int current_centre = -1;
+	int next_centre = -1;
 	int ibatch = 1;
 	int first_blk = 0;
 	int last_blk = 0;
@@ -53,8 +53,19 @@ inline vec<vec<int>> make_blk_bounds(std::vector<int> blksizes,
 		current_sum += blksizes[i];
 		current_centre = (blkmap) ? blkmap->at(i) : i;
 		
+		if (i != nblks-1 && blkmap) {
+			next_centre = blkmap->at(i+1);
+		} else if (i != nblks-1 && !blkmap) {
+			next_centre = i+1;
+		} else if (i == nblks-1 && blkmap) {
+			next_centre = -1;
+		} else {
+			next_centre = i+1;
+		}
+		
 		if (current_sum >= ibatch * nele_per_batch 
-			&& (prev_centre != current_centre || i == nblks-1)) {
+			&& (next_centre != current_centre)) 
+		{
 			last_blk = i;
 			vec<int> b = {first_blk,last_blk};
 			out.push_back(b);
@@ -62,14 +73,12 @@ inline vec<vec<int>> make_blk_bounds(std::vector<int> blksizes,
 			++ibatch;
 		}
 		
-		prev_centre = current_centre;
-		
 	}
 	
-	/*std::cout << "BOUNDS: " << out.size() << std::endl;
+	std::cout << "BOUNDS: " << out.size() << std::endl;
 	for (auto p : out) {
 		std::cout << p[0] << " " << p[1] << std::endl;
-	}*/
+	}
 	
 	if (out.size() == 0) throw std::runtime_error("Block bounds are zero.");
 	

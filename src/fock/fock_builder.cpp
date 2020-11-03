@@ -141,7 +141,7 @@ void fockmod::init() {
 		
 	} else if (k_method == "batchqr") {
 	
-		K* builder = new BATCHED_QRDF_K(m_world,m_opt);
+		K* builder = new BATCHED_DFMEM_K(m_world,m_opt);
 		m_K_builder.reset(builder);
 		
 		m_ao.request(ints::key::scr_xbb);
@@ -225,7 +225,7 @@ void fockmod::init() {
 	} else if (k_method == "batchqr") {
 	
 		kreg.add(aoreg, ints::key::coul_xx, Kkey::v_xx);
-		kreg.add(aoreg, ints::key::dfit_qr_xbb, Kkey::dfit_qr_xbb);
+		kreg.add(aoreg, ints::key::dfit_qr_xbb, Kkey::dfit_xbb);
 	
 	}
 	
