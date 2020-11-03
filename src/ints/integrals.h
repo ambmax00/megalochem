@@ -50,10 +50,6 @@ int cint3c1e_sph(double *out, const int *shls,
 	const int *atm, int natm, const int *bas, int nbas, const double *env,
 	const CINTOpt *opt);
 	
-int cint4c1e_sph(double *out, const int *shls,
-	const int *atm, int natm, const int *bas, int nbas, const double *env,
-	const CINTOpt *opt);
-	
 void cint3c1e_sph_optimizer(CINTOpt **opt, const int *atm, const int natm,
     const int *bas, const int nbas, const double *env);
 	

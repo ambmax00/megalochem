@@ -796,51 +796,82 @@ dbcsr::sbtensor<3,double> dfitting::compute_qr(dbcsr::shared_matrix<double> s_xx
 	// make sure that each process has one atom block, but diffuse
 	// and tight blocks are separated
 	int offset = 0;
-	auto dist = blkmap_b;
-	for (int i = 0; i != blkmap_b.size(); ++i) {
-		dist[i] = (!is_diff[i]) ? dist[i] : dist[i] + natoms;
+	auto blkmap_atom = blkmap_b;
+	for (int i = 0; i != blkmap_b.size(); ++i) { 
+		blkmap_atom[i] = (!is_diff[i]) ? blkmap_atom[i] 
+			: blkmap_atom[i] + natoms;
 	}
 	
-	for (int i = 0; i != d1.size(); ++i) {
-		d1[i] = dist[i] % dims[1];
-		d2[i] = dist[i] % dims[2];
-	}
-	
-	int atom_nblks = *(std::max_element(dist.begin(), dist.end())) + 1;
+	int atom_nblks = *(std::max_element(blkmap_atom.begin(), blkmap_atom.end())) + 1;
 	
 	std::vector<std::vector<int>> atom_blocks;
+	std::vector<int> atom_blk_sizes;
+	
 	std::vector<int> sub_block;
+	int sub_size = 0;
 	int prev_centre = 0;
 	
 	for (int i = 0; i != b.size(); ++i) {
-		int current_centre = dist[i];
+		
+		int current_centre = blkmap_atom[i];
 		if (current_centre != prev_centre) {
 			atom_blocks.push_back(sub_block);
+			atom_blk_sizes.push_back(sub_size);
 			sub_block.clear();
+			sub_size = 0;
 		}
+		
 		sub_block.push_back(i);
+		sub_size += b[i];
+		
 		if (i == b.size() - 1) {
 			atom_blocks.push_back(sub_block);
+			atom_blk_sizes.push_back(sub_size);
 		}
+		
 		prev_centre = current_centre;
 	}
 	
+	std::vector<int> d1_atom = dbcsr::default_dist(atom_blk_sizes.size(), dims[1], atom_blk_sizes);
+	std::vector<int> d2_atom = dbcsr::default_dist(atom_blk_sizes.size(), dims[2], atom_blk_sizes);
+	
+	auto make_dist = [&atom_blocks](std::vector<int> d_atom)
+	{
+		std::vector<int> d_blk;
+		for (int iblk = 0; iblk != atom_blocks.size(); ++iblk) {
+			for (auto i : atom_blocks[iblk]) {
+				d_blk.push_back(d_atom[iblk]);
+			}
+		}
+		return d_blk;
+	};
+	
+	auto d1_blk = make_dist(d1_atom);
+	auto d2_blk = make_dist(d2_atom);
+	
 	if (m_world.rank() == 0) {
+		
 		std::cout << "ATOM BLOCKS: " << std::endl;
 		for (auto p : atom_blocks) {
 			for (auto i : p) {
 				std::cout << i << " ";
 			} std::cout << std::endl;
 		}
+		
+		std::cout << "ATOM SIZES: " << std::endl;
+		for (auto i : atom_blk_sizes) {
+			std::cout << i << " ";
+		} std::cout << std::endl;
+		
 
 		std::cout << "DISTS: " << std::endl;
-		for (auto i : d1) std::cout << i << " ";
+		for (auto i : d1_blk) std::cout << i << " ";
 		std::cout << std::endl;
-		for (auto i : d2) std::cout << i << " ";
+		for (auto i : d2_blk) std::cout << i << " ";
 		std::cout << std::endl;
 	}
 	
-	arrvec<int,3> distsizes = {d0,d1,d2};
+	arrvec<int,3> distsizes = {d0,d1_blk,d2_blk};
 	
 	// a distribution where a process owns ALL (X) blocks for a certain (μν) atomic pair
 	dbcsr::dist_t<3> dist3_global_1bb(spgrid3_global_1bb, distsizes);
@@ -949,8 +980,8 @@ dbcsr::sbtensor<3,double> dfitting::compute_qr(dbcsr::shared_matrix<double> s_xx
 				// find out processes for atom blocks
 				// due to the dsitribution we created, we are guarenteed
 				// that each process has a whole block
-				int rproc = d1[iblock[0]];
-				int cproc = d2[jblock[0]];
+				int rproc = d1_blk[iblock[0]];
+				int cproc = d2_blk[jblock[0]];
 				
 				if (m_world.myprow() == rproc && m_world.mypcol() == cproc) 
 				{
@@ -1092,7 +1123,7 @@ dbcsr::sbtensor<3,double> dfitting::compute_qr(dbcsr::shared_matrix<double> s_xx
 		// now loop over munu block pairs
 		for (auto& subset : atom_blk_list) {
 			
-			std::cout << "Subset " << nsubset++ << std::endl;
+			std::cout << "Subset/Proc " << nsubset++ << "/" << m_world.rank() << std::endl;
 			
 			std::vector<int> mu_blks = subset[0];
 			std::vector<int> nu_blks = subset[1];

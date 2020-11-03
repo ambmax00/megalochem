@@ -33,8 +33,7 @@ enum class ctr {
 	c_3c1e	= 3,
 	c_3c2e	= 4,
 	c_4c2e	= 5,
-	c_4c1e	= 6,
-	_END = 7
+	_END = 6
 };
 
 constexpr int combine(op e1, ctr e2) {
@@ -522,10 +521,6 @@ public:
 				
 			case combine(op::overlap, ctr::c_3c1e):
 				m_intfunc = cint3c1e_sph;
-				break;
-				
-			case combine(op::overlap, ctr::c_4c1e):
-				m_intfunc = cint4c1e_sph;
 				break;
 				
 			case combine(op::coulomb, ctr::c_2c2e):
