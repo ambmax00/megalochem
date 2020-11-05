@@ -94,8 +94,9 @@ public:
 	
 	template <typename D, attribute0 A0, attribute1 A1> 
 	friend class attribute_wrapper;
-
+	
 	// delete for required, such that default initilization is disbaled
+	// currently disabled because not working in C++20
 	//template <attribute0 A0 = a0, 
 	//	typename std::enable_if<A0 == required_, int>::type = 0>
 	//attribute_wrapper() = delete;
