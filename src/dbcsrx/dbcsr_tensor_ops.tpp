@@ -1065,50 +1065,6 @@ void ewmult(tensor<N,T>& t1, tensor<N,T>& t2, tensor<N,T>& tout) {
 	
 }
 
-/*
-template <int N>
-void ewmult(tensor<N,double>& t1, tensor<N,double>& t2, tensor<N,double>& t3) {
-	
-	// dot product only for N = 2 at the moment
-	//assert(N == 2);
-
-	double sum = 0.0;
-	
-	dbcsr::iterator_t<N> it(t1);
-	
-	while (it.blocks_left()) {
-			
-			it.next();
-			
-			bool found = false;
-			auto b1 = t1.get_block({.idx = it.idx(), .blk_size = it.sizes(), .found = found});
-			auto b2 = t2.get_block({.idx = it.idx(), .blk_size = it.sizes(), .found = found});
-			
-			if (!found) continue;
-			
-			//std::cout  << std::inner_product(b1.data(), b1.data() + b1.ntot(), b2.data(), T()) << std::endl;
-			
-			//std::cout << "ELE: " << std::endl;
-			//for (int i = 0; i != b1.ntot(); ++i) { std::cout << b1(i) << " " << b2(i) << std::endl; }
-			
-			
-			sum += std::inner_product(b1.data(), b1.data() + b1.ntot(), b2.data(), 0.0);
-			
-			//std::cout << "SUM: " << std::inner_product(b1.data(), b1.data() + b1.ntot(), b2.data(), T()) << std::endl;
-			
-	}
-		
-	
-	
-	double MPIsum = 0.0;
-	
-	MPI_Allreduce(&sum,&MPIsum,1,MPI_DOUBLE,MPI_SUM,t1.comm());
-	
-	return MPIsum;
-		
-}*/ /*
-
-*/
 template <int N, typename T>
 T RMS(tensor<N,T>& t_in) {
 	
@@ -1126,79 +1082,179 @@ T RMS(tensor<N,T>& t_in) {
 	
 }
 
-
-/*
-template <typename T>
-vec<T> diag(tensor<2,T>& t) {
+template <int N, typename T>
+void copy_local_to_global(tensor<N,T>& t_loc, tensor<N,T>& t_glob) {
 	
-	int myrank = -1;
-	int commsize = 0;
+	MPI_Comm comm_glob = t_glob.comm();
 	
-	MPI_Comm_rank(t.comm(), &myrank); 
-	MPI_Comm_size(t.comm(), &commsize);
+	int mpirank = -1;
+	int mpisize = -1;
 	
-	auto nfull = t.nfull_tot();
+	MPI_Comm_rank(comm_glob, &mpirank);
+	MPI_Comm_size(comm_glob, &mpisize);
 	
-	int n = nfull[0];
-	int m = nfull[1];
+	auto blksizes_glob = t_glob.blk_sizes();
+	auto blksizes_loc = t_loc.blk_sizes();
 	
-	if (n != m) throw std::runtime_error("Cannot take diagonal of non-square matrix.");
-	
-	vec<T> dvec(n, T());
-	
-	auto blksize = t.blk_size();
-	auto blkoff = t.blk_offset();
-	
-	// loop over diagonal blocks
-	for (int D = 0; D != blksize[0].size(); ++D) {
-		
-		int proc = -1;
-		idx2 idx = {D,D};
-		
-		//std::cout << "BLOCK: " << D << " " << D << std::endl;
-		
-		t.get_stored_coordinates({.idx = idx, .proc = proc});
-		
-		//std::cout << "RANK: " << proc << std::endl;
-		
-		block<2,T> blk;
-		int size = blksize[0][D];
-		
-		int off = blkoff[0][D];
-		
-		if (proc == myrank) {
-			
-			bool found = false;
-			blk = t.get_block({.idx = idx, .blk_size = {size,size}, .found = found});	
-			
-			if (found) {
-				//std::cout << "FOUND" << std::endl;
-			
-				for (int d = 0; d != size; ++d) {
-					dvec[off + d] = blk(d,d);
-				}
-				
-			}
-			
+	for (int in = 0; in != N; ++in) {
+		if (blksizes_glob[in] != blksizes_loc[in]) {
+			throw std::runtime_error("Tensor copy: icompatible block sizes.");
 		}
-			
-		MPI_Bcast(&dvec[off],size,MPI_DOUBLE,proc,t.comm());
+	}
+	
+	vec<int> send_nblk_p(mpisize,0);
+	vec<int> send_nze_p(mpisize,0);
+	
+	vec<arrvec<int,N>> send_idx_p(mpisize);
+	
+	dbcsr::iterator_t<N> iter(t_loc);
+	
+	iter.start();
+	
+	while (iter.blocks_left()) {
+		
+		iter.next();
+		auto& idx = iter.idx();
+		auto& size = iter.size();
+		
+		int nze = std::accumulate(&size[0], &size[0] + N, 1,
+			std::multiplies<int>());
+	
+		int dest_p = t_glob.proc(idx);
+		
+		send_nblk_p[dest_p] += 1;
+		send_nze_p[dest_p] += nze;
+		
+		for (int i = 0; i != N; ++i) { 
+			send_idx_p[dest_p][i].push_back(idx[i]);
+		}
 		
 	}
 	
-	//print(t);
+	iter.stop();
 	
-	//if (myrank == 0) {
-	//	for (auto x : dvec) {
-	//		std::cout << x << " ";
-	//	} std::cout << std::endl;
-	//}
+	vec<int> recv_nblk_p(mpisize);
+	vec<int> recv_nze_p(mpisize);
 	
-	return dvec;
+	// send info around
 	
+	for (int ip = 0; ip != mpisize; ++ip) {
+		
+		MPI_Gather(&send_nblk_p[ip],1,MPI_INT,recv_nblk_p.data(),1,
+			MPI_INT,ip,comm_glob);
+			
+		MPI_Gather(&send_nze_p[ip],1,MPI_INT,recv_nze_p.data(),1,
+			MPI_INT,ip,comm_glob);
+			
+	}
+	
+	// allocate space on sender
+	
+	vec<vec<double>> send_blk_data(mpisize);
+	vec<int> send_blk_offset(mpisize,0);
+	
+	for (int ip = 0; ip != mpisize; ++ip) {
+		send_blk_data[ip].resize(send_nze_p[ip]);
+	}
+	
+	// copy blocks
+	
+	iter.start();
+	
+	while (iter.blocks_left()) {
+		
+		iter.next();
+		
+		auto& idx = iter.idx();
+		auto& size = iter.size();
+		
+		int dest_p = t_glob.proc(idx);
+		
+		bool found = true;
+		auto blk = t_loc.get_block(idx, size, found);
+		
+		std::copy(blk.data(), blk.data()+blk.ntot(),
+			send_blk_data[dest_p].begin() + send_blk_offset[dest_p]);
+			
+		send_blk_offset[dest_p] += blk.ntot();
+		
+	}
+	
+	iter.stop();
+		
+	// allocate space on receiver 
+	
+	int recv_blktot = std::accumulate(recv_nblk_p.begin(),recv_nblk_p.end(),0);
+	int recv_nzetot = std::accumulate(recv_nze_p.begin(),recv_nze_p.end(),0);
+	
+	vec<int> recv_blk_offset(mpisize);
+	vec<int> recv_nze_offset(mpisize);
+	
+	int blkoffset = 0;
+	int nzeoffset = 0;
+	
+	for (int ip = 0; ip != mpisize; ++ip) {
+		recv_blk_offset[ip] = blkoffset;
+		recv_nze_offset[ip] = nzeoffset;
+		
+		blkoffset += recv_nblk_p[ip];
+		nzeoffset += recv_nze_p[ip];
+	}
+	
+	arrvec<int,N> recv_blkidx;
+	vec<double> recv_blk_data(recv_nzetot);
+	
+	for (auto& v : recv_blkidx) {
+		v.resize(recv_blktot);
+	}
+	
+	// send over block indices
+	
+	for (int ip = 0; ip != mpisize; ++ip) {
+		for (int in = 0; in != N; ++in) {
+			
+			MPI_Gatherv(send_idx_p[ip][in].data(),send_nblk_p[ip],MPI_INT,
+				recv_blkidx[in].data(),recv_nblk_p.data(),recv_blk_offset.data(),
+				MPI_INT,ip,comm_glob);
+		}
+	}	
+	
+	// send over block data
+	
+	for (int ip = 0; ip != mpisize; ++ip) {
+		
+		MPI_Gatherv(send_blk_data[ip].data(),send_nze_p[ip],MPI_DOUBLE,
+			recv_blk_data.data(),recv_nze_p.data(),recv_nze_offset.data(),
+			MPI_DOUBLE,ip,comm_glob);
+			
+	}
+	
+	// allocate blocks
+	
+	t_glob.reserve(recv_blkidx);
+	
+	nzeoffset = 0;
+	
+	std::array<int,N> idxt, sizet;
+	
+	for (int iblk = 0; iblk != recv_blkidx[0].size(); ++iblk) {
+		
+		for (int in = 0; in != N; ++in) {
+			idxt[in] = recv_blkidx[in][iblk];
+			sizet[in] = blksizes_glob[in][idxt[in]];
+		}
+		
+		T* ptr = recv_blk_data.data() + nzeoffset;
+		
+		dbcsr::block<N,T> blk(sizet, ptr);
+		
+		t_glob.put_block(idxt, blk);
+		
+		nzeoffset += blk.ntot();
+		
+	}
+		
 }
-                      
-*/
 
 } // end namespace dbcsr
 

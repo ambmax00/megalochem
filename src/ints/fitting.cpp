@@ -3,12 +3,10 @@
 #include "extern/lapack.h"
 #include "math/solvers/hermitian_eigen_solver.h"
 #include "utils/constants.h"
+#include "utils/scheduler.h"
 #include <Eigen/Core>
 #include <Eigen/SVD>
 #include <Eigen/Dense>
-#include <deque>
-#include <cstdlib>
-#include <unistd.h>
 
 namespace ints {
 
@@ -1428,252 +1426,6 @@ dbcsr::sbtensor<3,double> dfitting::compute_qr(dbcsr::shared_matrix<double> s_xx
 	
 }
 
-class scheduler {
-private:
-
-	const int64_t NO_RESP = -1;
-	const int64_t NO_TASK = -2;
-	const int NO_REQU = -1;
-	const int NO_WORK = 0;
-	const int HAS_WORK = 1;
-
-	MPI_Comm m_comm;
-	int m_mpisize;
-	int m_mpirank;
-	int64_t m_ntasks;
-	
-	std::vector<int64_t> m_transfer;
-	std::vector<int> m_request;
-	std::vector<int> m_status;
-	
-	MPI_Win m_transfer_win = MPI_WIN_NULL;
-	MPI_Win m_request_win = MPI_WIN_NULL;
-	MPI_Win m_status_win = MPI_WIN_NULL;
-	
-	std::deque<int64_t> m_local_tasks; 
-	std::function<void(int64_t)>& m_executer;
-	
-	void init_deque() {
-		for (int64_t i = 0; i != m_ntasks; ++i) {
-			int proc = i % m_mpisize;
-			if (0 == m_mpirank) m_local_tasks.push_back(i);
-		}
-	}
-	
-	void update_status() {
-		//std::cout << m_mpirank << " : " << "UPDATE STATUS" << std::endl;
-		m_status[m_mpirank] = (m_local_tasks.empty()) ? 
-			NO_WORK : HAS_WORK;
-	}
-	
-	void add_task(int64_t t) {
-		//std::cout << m_mpirank << " : " << "ADD TASK" << std::endl;
-		m_local_tasks.push_front(t);
-		update_status();
-	}
-	
-	void acquire() {
-		//std::cout << m_mpirank << " : " << "ACQUIRE" << std::endl;
-		while (true) {
-			
-			m_transfer[m_mpirank] = NO_RESP;
-			
-			int victim = rand() % m_mpisize;
-			int v_work = NO_WORK;
-			
-			//std::cout << m_mpirank << " : " << "STEALING FROM " << victim << std::endl;
-			
-			// get status of victim
-			MPI_Get(&v_work, 1, MPI_INT, victim, victim, 1, 
-				MPI_INT, m_status_win);
-				
-			//std::cout << ((v_work == NO_WORK) ? "NO_WORK" : "HAS_WORK") << std::endl;
-			
-			// continue if victim has no work
-			if (v_work == NO_WORK) {
-				communicate();
-				//usleep(1000000);
-				return;
-			}
-			
-			// make victim aware that task can be stolen
-			//std::cout << "PROC: " << m_mpirank << " WRITING" << std::endl;
-			int result = NO_REQU;
-			int r = MPI_Compare_and_swap(&m_mpirank, &NO_REQU, &result, MPI_INT,
-				victim, victim, m_request_win);
-			
-			// continue if not succeeded 
-			if (result != NO_REQU) {
-				//std::cout << m_mpirank << " : " << "CAS FAILED" << std::endl;
-				communicate();
-				//usleep(1000000);
-				return;
-			}
-			
-			//std::cout << m_mpirank << " : " << "CAS SUCCEEDED, NOW WAITING" << std::endl;
-			
-			// loop and check if request accepted
-			while (m_transfer[m_mpirank] == NO_RESP) {
-				communicate();
-				//usleep(1000000);
-
-			}
-			
-			//std::cout << m_mpirank << " : " << "GOT RESPONSE FROM VICTIM: " 
-			//	<< m_transfer[m_mpirank] << std::endl;
-			
-			if (m_transfer[m_mpirank] != NO_TASK) {
-				//std::cout << m_mpirank << " : " << "ADDING TASK " << 
-				//	m_transfer[m_mpirank] << " FROM VICTIM" << std::endl;
-				add_task(m_transfer[m_mpirank]);
-				m_request[m_mpirank] = NO_REQU;
-				//usleep(1000000);
-				return;
-			}
-			
-			communicate();
-			
-		}
-	}
-	
-	void communicate() {
-		
-		// check if there is a processor request
-		int thief = m_request[m_mpirank];
-		
-		if (thief != NO_REQU) {
-			//std::cout << m_mpirank << " : " 
-			//	<< " GOT REQUEST FROM THIEF " << thief << std::endl;
-		} else {
-			//std::cout << m_mpirank << " : " << "NO REQUEST" << std::endl;
-		}
-		
-		//usleep(500000);
-		
-		if (thief == NO_REQU) return;
-		
-		int64_t t = NO_TASK;
-		
-		if (!m_local_tasks.empty()) {
-			t = m_local_tasks[0];
-			m_local_tasks.pop_front();
-		}
-		
-		//std::cout << m_mpirank << " : " << "PUTTING task " << t << " on THIEF " 
-		//	<< thief << std::endl;
-		MPI_Put(&t, 1, MPI_LONG_LONG, thief, thief, 1, MPI_LONG_LONG,
-			m_transfer_win);
-		
-		//usleep(500000);
-		
-		m_request[m_mpirank] = NO_REQU;
-		
-	}
-	
-	void execute(int64_t task) {
-		//std::cout << m_mpirank << " : " << "EXECUTE" << std::endl;
-		m_executer(task);
-	}
-			
-	
-public:
-
-	scheduler(MPI_Comm comm, int64_t ntasks, std::function<void(int64_t)>& executer) 
-		: m_comm(comm), m_executer(executer), m_ntasks(ntasks)
-	{
-		
-		std::cout << "NTASKS: " << m_ntasks << std::endl;
-		
-		MPI_Comm_size(comm, &m_mpisize);
-		MPI_Comm_rank(comm, &m_mpirank);
-		init_deque();
-		
-		m_transfer.resize(m_mpisize, NO_RESP);
-		m_request.resize(m_mpisize, NO_REQU);
-		m_status.resize(m_mpisize, NO_WORK);
-		
-		std::cout << "MY QUEUE: " << std::endl;
-		for (auto q : m_local_tasks) {
-			std::cout << q << " ";
-		} std::cout << '\n';
-		
-		MPI_Win_create(m_transfer.data(), m_mpisize * sizeof(int64_t),
-			sizeof(int64_t), MPI_INFO_NULL, m_comm, &m_transfer_win);
-			
-		MPI_Win_create(m_request.data(), m_mpisize * sizeof(int),
-			sizeof(int), MPI_INFO_NULL, m_comm, &m_request_win);
-			
-		MPI_Win_create(m_status.data(), m_mpisize * sizeof(int),
-			sizeof(int), MPI_INFO_NULL, m_comm, &m_status_win);		
-			
-		MPI_Win_fence(0, m_transfer_win); 
-		MPI_Win_fence(0, m_request_win); 
-		MPI_Win_fence(0, m_status_win); 
-		
-	}
-	
-	void run() {
-		
-		const int nmax_run = 100;
-		int nrun = 0;
-		
-		while (true) {
-			if (m_local_tasks.empty()) {
-				acquire();
-			} else {
-				//std::cout << "WORKER ON PROC " << m_mpirank << std::endl;
-				int64_t task = m_local_tasks.back();
-				m_local_tasks.pop_back();
-				update_status();
-				communicate();
-				execute(task);
-			}
-			
-			
-			// check every namx_run iterations wether all procs are empty
-			if (nrun++ > nmax_run) {
-				
-				MPI_Request barrier_request;
-				int flag = 0;
-				
-				//std::cout << "FLAGGING" << std::endl;
-				MPI_Ibarrier(m_comm,&barrier_request);
-				
-				while (!flag) {
-					MPI_Test(&barrier_request, &flag, MPI_STATUS_IGNORE);
-					communicate();
-				}
-				
-				//std::cout << m_mpirank << " : " << "REDUCE" << std::endl;
-				
-				int empty = m_local_tasks.empty() ? 1 : 0;
-				int all_empty = 0;
-				//if (empty) std::cout << m_mpirank << " : " << "IS EMPTY" << std::endl;
-				MPI_Allreduce(&empty, &all_empty, 1, MPI_INT, MPI_LAND, m_comm);
-				
-				//std::cout << m_mpirank << " : " << "CONTINUEING" << std::endl;
-				
-				// ==== EXIT ====
-				if (all_empty) return;
-				nrun = 0;
-			}
-		}
-		
-	}
-	
-	~scheduler() {
-		
-		MPI_Win_fence(0, m_transfer_win); 
-		MPI_Win_fence(0, m_request_win); 
-		MPI_Win_fence(0, m_status_win); 
-		
-		MPI_Win_free(&m_transfer_win);
-		MPI_Win_free(&m_request_win);
-		MPI_Win_free(&m_status_win);
-	}
-	
-};
-
 dbcsr::sbtensor<3,double> dfitting::compute_qr_new(dbcsr::shared_matrix<double> s_xx_inv, 
 		dbcsr::shared_matrix<double> m_xx, dbcsr::shared_pgrid<3> spgrid3_xbb,
 		shared_screener scr_s, std::array<int,3> bdims, dbcsr::btype mytype, 
@@ -1764,9 +1516,11 @@ dbcsr::sbtensor<3,double> dfitting::compute_qr_new(dbcsr::shared_matrix<double> 
 		.btensor_type(mytype)
 		.print(0)
 		.get();
-		
+	
+	dbcsr::world single_world(MPI_COMM_SELF);
+	
 	auto s_xx_inv_eigen = dbcsr::matrix_to_eigen(s_xx_inv);
-	auto s_xx_local_mat = dbcsr::eigen_to_matrix(s_xx_inv_eigen, m_world, 
+	auto s_xx_local_mat = dbcsr::eigen_to_matrix(s_xx_inv_eigen, single_world, 
 		"temp", x, x, dbcsr::type::symmetric);
 	dbcsr::copy_matrix_to_tensor(*s_xx_local_mat, *s_xx_inv_local);
 	
@@ -1868,8 +1622,6 @@ dbcsr::sbtensor<3,double> dfitting::compute_qr_new(dbcsr::shared_matrix<double> 
 	}
 #endif	
 
-	
-
 
 	// ===================== OTHER STUFF ==============================
 	
@@ -1946,213 +1698,96 @@ dbcsr::sbtensor<3,double> dfitting::compute_qr_new(dbcsr::shared_matrix<double> 
 			}
 		}
 		
-		std::function<void(int64_t)> func = [&global_tasks,this](int64_t i) 
+		/* =============================================================
+		 *            TASK FUNCTION FOR SCHEDULER 
+		 * ============================================================*/
+		std::function<void(int64_t)> task_func = [&](int64_t itask) 
 		{
-			std::cout << "PROC: " << m_world.rank() << " -> TASK ID: " << i << std::endl;
-		};
-		
-		scheduler test(m_world.comm(), global_tasks.size(), func);
-		test.run();
-		
-		exit(0);
-		
-		
-	}
-		
-		
-	/*
-		
-		
-		
-		
-		
-		
-		
-		
-		
-		
-		
-		
-		
-		
-		
-		
-		
-		
-		LOG.os<>("BATCH: ", ibatch_nu, '\n');
-		
-		auto blk_nu = c_xbb_batched->blk_bounds(2,ibatch_nu);
-		
-		std::vector<arrvec<int,2>> atom_blk_list;
-		int npairs = 0;
-	
-		for (auto iblock : atom_blocks) {
-			for (auto jblock : atom_blocks) {
-				
-				// find out processes for atom blocks
-				// due to the dsitribution we created, we are guarenteed
-				// that each process has a whole block
-				int rproc = d1_blk[iblock[0]];
-				int cproc = d2_blk[jblock[0]];
-				
-				if (m_world.myprow() == rproc && m_world.mypcol() == cproc) 
-				{
-					arrvec<int,2> sublist;
-					
-					for (auto m : iblock) {
-						sublist[0].push_back(m);
-					}
-					
-					for (auto n : jblock) {
-						if (n < blk_nu[0] || n > blk_nu[1]) continue;
-						sublist[1].push_back(n);
-					}
-					
-					npairs += sublist[1].size() * sublist[0].size();
-					if (!sublist[1].empty()) atom_blk_list.push_back(sublist);
-				}
-			}
-		}
-				
-		LOG(-1).os<>("Number of pairs on rank ", m_world.rank(), ": ", 
-			npairs, '\n');
+			std::cout << "PROC: " << m_world.rank() << " -> TASK ID: " << itask << std::endl;
 			
-		for (int iproc = 0; iproc != m_world.size(); ++iproc) {
-			if (iproc == m_world.rank()) {
-				std::cout << "PROC " << iproc << std::endl;
-				for (auto& subset : atom_blk_list) {
-					for (auto& p : subset[0]) {
-						std::cout << p << " ";
-					} std::cout << std::endl;
-					for (auto& p : subset[1]) {
-						std::cout << p << " ";
-					} std::cout << std::endl;
-				}
-			}
-			MPI_Barrier(m_world.comm());
-		}
+			// === COMPUTE 3c1e overlap integrals
+			// 1. allocate blocks
+			
+			arrvec<int,3> blkidx;
+			int64_t ovlp_nblks = 0;
+			
+			for (auto chunk : global_tasks[itask]) {
+				int ifrag = chunk.first;
+				int jfrag = chunk.second;
 				
-		auto& time1 = TIME.sub("1");
-		auto& time2 = TIME.sub("2");
-		auto& time3 = TIME.sub("3");
-		auto& time4 = TIME.sub("4");
-		auto& time5 = TIME.sub("5");
-		auto& time6 = TIME.sub("6");
-		
-		// compute overlap
-		
-		auto xblks = c_xbb_batched->full_blk_bounds(0);
-		auto mblks = c_xbb_batched->full_blk_bounds(1);
-		auto nblks = c_xbb_batched->blk_bounds(2, ibatch_nu);
-		
-		arrvec<int,3> ovlp_blkidx;
-				
-		
-		// reserve blocks 
-		
-		int nu_blks = nblks[1] - nblks[0] + 1;
-		
-		long long int nblktot = x.size() * b.size() * nu_blks;
-		long long int nblkloc = 0;
-		long long int nblk = 0;
-		
-		for (auto ix : ovlp_blklocidx[0]) {
-			for (auto imu : ovlp_blklocidx[1]) {
-				
-				auto& pos_x = blkinfo_x[ix].pos;
-				auto& pos_m = blkinfo_b[imu].pos;
-				double r_x = blkinfo_x[ix].radius;
-				double r_mu = blkinfo_b[imu].radius;
-				
-				double ab_xm = dist(pos_x, pos_m);
-				if (ab_xm > r_x + r_mu) continue; 
-				
-				for (auto inu : ovlp_blklocidx[2]) {
-					
-					if (inu < nblks[0] || inu > nblks[1]) continue;
-					
-					auto& pos_n = blkinfo_b[inu].pos;
-					double r_nu = blkinfo_b[inu].radius;
-					
-					double ab_xn = dist(pos_x, pos_n);
-					if (ab_xn > r_x + r_mu) continue;
-					
-					ovlp_blkidx[0].push_back(ix);
-					ovlp_blkidx[1].push_back(imu);
-					ovlp_blkidx[2].push_back(inu);
-					
-					++nblkloc;
-					
-				}
-			}
-		}
-		
-		MPI_Allreduce(&nblkloc, &nblk, 1, MPI_LONG_LONG_INT, MPI_SUM, m_world.comm());
-		LOG.os<>("FILTERED BLOCKS: ", nblk, "/", nblktot, '\n');
-				
-		ovlp_xbb_global->reserve(ovlp_blkidx);
-		
-		aofac->ao_3c1e_ovlp_setup();
-		aofac->ao_3c_fill(ovlp_xbb_global);
-		
-		//ovlp_xbb_global->filter(dbcsr::global::filter_eps);
-		
-		//dbcsr::print(*ovlp_xbb_global);
-		
-		// compute c_xbb = s^1/2 Xmn
-		vec<vec<int>> mn_bounds = {
-			c_xbb_batched->full_bounds(1),
-			c_xbb_batched->bounds(2,ibatch_nu)
-		};
-		
-		dbcsr::contract(*s_xx_inv_global, *ovlp_xbb_global, *prs_xbb_global_xbb)
-			.filter(T)
-			.bounds3(mn_bounds)
-			.perform("XY, Ymn -> Xmn");
-			
-		ovlp_xbb_global->clear();
-		
-		//dbcsr::print(*prs_xbb_global_xbb);
-		
-		dbcsr::copy(*prs_xbb_global_xbb, *prs_xbb_global_1bb)
-			.move_data(true)
-			.perform();
-	
-		//dbcsr::print(*prs_xbb_global_1bb);
-	
-#if 0
-	for (int iproc = 0; iproc != m_world.size(); ++iproc) {
-	if (iproc == m_world.rank()) {
-#endif
-	
-		int nsubset = 0;
-	
-		// now loop over munu block pairs
-		for (auto& subset : atom_blk_list) {
-			
-			std::cout << "Subset/Proc " << nsubset++ << "/" << m_world.rank() << std::endl;
-			
-			std::vector<int> mu_blks = subset[0];
-			std::vector<int> nu_blks = subset[1];
-			
-			for (auto& p : subset[0]) {
-				std::cout << p << " ";
-			} std::cout << std::endl;
-			for (auto& p : subset[1]) {
-				std::cout << p << " ";
-			} std::cout << std::endl;
-			
-			std::cout << "DIMS: " << mu_blks.size() << " x " << nu_blks.size() << std::endl;
-			
-			
-			vec<bool> blk_P_bool(x.size(),false);
-			
-			std::array<int,3> idx = {0,0,0};
-			std::array<int,3> size = {0,0,0};
+				for (auto imu : frag_blocks[ifrag]) {
+					for (auto inu : frag_blocks[jfrag]) {
 						
-			// get all relevant P functions
-			for (auto imu : mu_blks) {
-				for (auto inu : nu_blks) {
+						double ri = blkinfo_b[inu].radius;
+						double rj = blkinfo_b[imu].radius;
+						auto posi = blkinfo_b[inu].pos;
+						auto posj = blkinfo_b[imu].pos;
+						
+						if (dist(posi,posj) > ri + rj) continue;
+						
+						for (int ix = 0; ix != x.size(); ++ix) {
+							double rx = blkinfo_x[ix].radius;
+							auto posx = blkinfo_x[ix].pos;
+							
+							if (dist(posx,posi) > ri + rx) continue;
+							
+							blkidx[0].push_back(ix);
+							blkidx[1].push_back(imu);
+							blkidx[2].push_back(inu);
+							
+							ovlp_nblks++;
+							
+						}
+					}
+				}
+			}
+			
+			std::cout << "NBLOCKS: " << ovlp_nblks << std::endl;
+			
+			// 2. Compute 
+			
+			ovlp_xbb_local->reserve(blkidx);
+			aofac->ao_3c1e_ovlp_setup();
+			aofac->ao_3c_fill(ovlp_xbb_local);
+		
+			vec<vec<int>> mn_bounds = {
+				c_xbb_batched->full_bounds(1),
+				c_xbb_batched->bounds(2,ibatch_nu)
+			};
+			
+			// 3. Contract
+						
+			dbcsr::contract(*s_xx_inv_local, *ovlp_xbb_local, *prs_xbb_local)
+				.filter(T)
+				.bounds3(mn_bounds)
+				.perform("XY, Ymn -> Xmn");
+						
+			ovlp_xbb_local->clear();
+			
+			// === LOOP OVER CHUNKS OF FRAGMENTS 
+			
+			for (auto chunk : global_tasks[itask]) {
+				
+				int ifrag = chunk.first;
+				int jfrag = chunk.second;
+				
+				std::cout << "CHUNK: " << ifrag << " " << jfrag << std::endl;
+				
+				auto blk_mu = frag_blocks[ifrag];
+				auto blk_nu = frag_blocks[jfrag];
+				
+				std::cout << "SIZE: " << blk_mu.size() << " " << blk_nu.size() 
+					<< std::endl;
+				
+				vec<bool> blk_P_bool(x.size(),false);
+			
+				std::array<int,3> idx = {0,0,0};
+				std::array<int,3> size = {0,0,0};
+				
+						
+				// === get all relevant P functions ==
+				for (auto imu : blk_mu) {
+					for (auto inu : blk_nu) {
 				
 					idx[1] = imu;
 					idx[2] = inu;
@@ -2166,7 +1801,7 @@ dbcsr::sbtensor<3,double> dfitting::compute_qr_new(dbcsr::shared_matrix<double> 
 						bool found = false;
 						idx[0] = ix;
 						size[0] = x[ix];
-						auto blk = prs_xbb_global_1bb->get_block(idx, size, found);
+						auto blk = prs_xbb_local->get_block(idx, size, found);
 						if (!found) continue;
 						
 						auto max_iter = std::max_element(blk.data(), blk.data() + blk.ntot(),
@@ -2176,243 +1811,244 @@ dbcsr::sbtensor<3,double> dfitting::compute_qr_new(dbcsr::shared_matrix<double> 
 						);
 						
 						if (fabs(*max_iter) > T) blk_P_bool[ix] = true;
-						
-						/*double tot = 0.0;
-						for (int i = 0; i != blk.ntot(); ++i) {
-							tot += fabs(blk.data()[i]);
-						}
-						
-						tot /= blk.ntot();
-						if (tot > T) blk_P_bool[ix] = true;
 										
 					}
-			}}
+				}}
 			
-			vec<int> blk_P;
-			blk_P.reserve(x.size());
-			for (int ix = 0; ix != x.size(); ++ix) {
-				if (blk_P_bool[ix]) blk_P.push_back(ix);
-			}
+				vec<int> blk_P;
+				blk_P.reserve(x.size());
+				for (int ix = 0; ix != x.size(); ++ix) {
+					if (blk_P_bool[ix]) blk_P.push_back(ix);
+				}
 			
-			int nblkp = blk_P.size();
-			std::cout << "FUNCS: " << nblkp << "/" << x.size() << std::endl;
+				int nblkp = blk_P.size();
+				std::cout << "FUNCS: " << nblkp << "/" << x.size() << std::endl;
 			
-			if (nblkp == 0) continue;
+				if (nblkp == 0) continue;
+					
+					
+				// ==== Get all Q functions ====	
+				std::vector<bool> blk_Q_bool(x.size(),false); // whether block x is involved 
+				
+				for (int ix = 0; ix != nxblks; ++ix) {
+					for (auto ip : blk_P) {
+						
+						auto& pos_x = blkinfo_x[ix].pos;
+						auto& pos_p = blkinfo_x[ip].pos;
+						double alpha_x = blkinfo_x[ix].alpha;
+						double alpha_p = blkinfo_x[ip].alpha;
+						
+						double f = (alpha_x * alpha_p) / (alpha_x + alpha_p)
+							* dist(pos_x, pos_p);
+							
+						if (f < R2) blk_Q_bool[ix] = true;
+		
+					}
+				}
+				
+				std::vector<int> blk_Q;
+				blk_Q.reserve(x.size());
+				for (int ix = 0; ix != x.size(); ++ix) {
+					if (blk_Q_bool[ix]) blk_Q.push_back(ix);
+				}
+				
+				int nblkq = blk_Q.size();
+				std::cout << "NEW SET: " << nblkq << "/" << x.size() << std::endl;
+				
+				
+				// === Compute coulomb integrals
+				arrvec<int,3> coul_blk_idx;
+				coul_blk_idx[0] = blk_Q;
+				coul_blk_idx[1] = blk_mu;
+				coul_blk_idx[2] = blk_nu;
 			
-			time2.start();
+				int nb = 0; // number of total nb functions
+				int mstride = 0;
+				int nstride = 0;
+					
+				for (auto imu : blk_mu) {
+					mstride += b[imu];
+				}
 			
-			std::vector<bool> blk_Q_bool(x.size(),false); // whether block x is involved 
+				for (auto inu : blk_nu) {
+					nstride += b[inu];
+				}
+				
+				nb = nstride * mstride;
 			
-			for (int ix = 0; ix != nxblks; ++ix) {
+				// generate integrals
+				aofac->ao_3c2e_setup(metric::coulomb);
+				aofac->ao_3c_fill_idx(eri_local, coul_blk_idx, nullptr);
+			
+				//dbcsr::print(*eri_local);
+			
+				// how many x functions?
+				int nq = 0;
+				int np = 0;
+			
+				for (auto iq : blk_Q) {
+					nq += x[iq];
+				}
+			
+				for (auto ip : blk_P) {
+					np += x[ip];
+				}
+			
+				std::cout << "NP,NQ,NB: " << np << "/" << nq << "/" << nb << std::endl;
+			
+			
+				// ==== Prepare matrices for QR decomposition ====
+				
+				Eigen::MatrixXd eris_eigen = Eigen::MatrixXd::Zero(nq,nb);
+				Eigen::MatrixXd m_qp_eigen = Eigen::MatrixXd::Zero(nq,np);
+			
+				int poff = 0;
+				int qoff = 0;
+				int moff = 0;
+				int noff = 0;
+			
+				// Copy integrals to matrix
+				for (auto iq : blk_Q) {
+					for (auto imu : blk_mu) {
+						for (auto inu : blk_nu) {
+				
+							std::array<int,3> idx = {iq,imu,inu};
+							std::array<int,3> size = {x[iq],b[imu],b[inu]};
+							bool found = true;
+							auto blk = eri_local->get_block(idx,size,found);
+							if (!found) continue;
+							
+							for (int qq = 0; qq != size[0]; ++qq) {
+								for (int mm = 0; mm != size[1]; ++mm) {
+									for (int nn = 0; nn != size[2]; ++nn) {
+										eris_eigen(qq + qoff, mm + moff + (nn+noff)*mstride)
+											= blk(qq,mm,nn);
+							}}}
+							noff += b[inu];
+						}
+						noff = 0;
+						moff += b[imu];
+					}
+					moff = 0;
+					qoff += x[iq];
+				}
+					
+				// copy metric to eigen
 				for (auto ip : blk_P) {
 					
-					auto& pos_x = blkinfo_x[ix].pos;
-					auto& pos_p = blkinfo_x[ip].pos;
-					double alpha_x = blkinfo_x[ix].alpha;
-					double alpha_p = blkinfo_x[ip].alpha;
+					int sizep = x[ip];
+					int poff_m = xoff[ip];
 					
-					double f = (alpha_x * alpha_p) / (alpha_x + alpha_p)
-						* dist(pos_x, pos_p);
-						
-					if (f < R2) blk_Q_bool[ix] = true;
-	
-				}
-			}
-			
-			std::vector<int> blk_Q;
-			blk_Q.reserve(x.size());
-			for (int ix = 0; ix != x.size(); ++ix) {
-				if (blk_Q_bool[ix]) blk_Q.push_back(ix);
-			}
-			
-			int nblkq = blk_Q.size();
-			std::cout << "NEW SET: " << nblkq << "/" << x.size() << std::endl;
-
-			time2.finish();
-			
-			time3.start();
-			
-			arrvec<int,3> blk_idx;
-			blk_idx[0] = blk_Q;
-			blk_idx[1] = mu_blks;
-			blk_idx[2] = nu_blks;
-			
-			int nb = 0; // number of total nb functions
-			int mstride = 0;
-			int nstride = 0;
+					qoff = 0;
 					
-			for (auto imu : mu_blks) {
-				mstride += b[imu];
-			}
-			
-			for (auto inu : nu_blks) {
-				nstride += b[inu];
-			}
-			
-			nb = nstride * mstride;
-			
-			// generate integrals
-			aofac->ao_3c2e_setup(metric::coulomb);
-			aofac->ao_3c_fill_idx(eri_local, blk_idx, nullptr);
-			time3.finish();
-			
-			//dbcsr::print(*eri_local);
-			
-			// how many x functions?
-			int nq = 0;
-			int np = 0;
-			
-			for (auto iq : blk_Q) {
-				nq += x[iq];
-			}
-			
-			for (auto ip : blk_P) {
-				np += x[ip];
-			}
-			
-			std::cout << "NP,NQ,NB: " << np << "/" << nq << "/" << nb << std::endl;
-			
-			time4.start();
-			
-			// copy to eigen matrix
-			Eigen::MatrixXd eris_eigen = Eigen::MatrixXd::Zero(nq,nb);
-			Eigen::MatrixXd m_qp_eigen = Eigen::MatrixXd::Zero(nq,np);
-			
-			int poff = 0;
-			int qoff = 0;
-			int moff = 0;
-			int noff = 0;
-			
-			for (auto iq : blk_Q) {
-				for (auto imu : mu_blks) {
-					for (auto inu : nu_blks) {
-				
-						std::array<int,3> idx = {iq,imu,inu};
-						std::array<int,3> size = {x[iq],b[imu],b[inu]};
-						bool found = true;
-						auto blk = eri_local->get_block(idx,size,found);
-						if (!found) continue;
+					for (auto iq : blk_Q) {
 						
-						for (int qq = 0; qq != size[0]; ++qq) {
-							for (int mm = 0; mm != size[1]; ++mm) {
-								for (int nn = 0; nn != size[2]; ++nn) {
-									eris_eigen(qq + qoff, mm + moff + (nn+noff)*mstride)
-										= blk(qq,mm,nn);
-						}}}
-						noff += b[inu];
+						int sizeq = x[iq];
+						int qoff_m = xoff[iq];
+						
+						for (int qq = 0; qq != sizeq; ++qq) {
+							for (int pp = 0; pp != sizep; ++pp) {
+								m_qp_eigen(qq + qoff,pp + poff) = 
+									m_xx_eigen(qq + qoff_m, pp + poff_m);
+							}
+						}
+						
+						qoff += sizeq;
 					}
-					noff = 0;
-					moff += b[imu];
+					poff += sizep;
 				}
-				moff = 0;
-				qoff += x[iq];
-			}
-					
-			// copy metric to eigen
-			for (auto ip : blk_P) {
+						
+				eri_local->clear();	
 				
-				int sizep = x[ip];
-				int poff_m = xoff[ip];
 				
-				qoff = 0;
+				// ===== Compute QR decomposition ==== 
+			
+				Eigen::MatrixXd c_eigen;
 				
-				for (auto iq : blk_Q) {
-					
-					int sizeq = x[iq];
-					int qoff_m = xoff[iq];
-					
-					for (int qq = 0; qq != sizeq; ++qq) {
-						for (int pp = 0; pp != sizep; ++pp) {
-							m_qp_eigen(qq + qoff,pp + poff) = 
-								m_xx_eigen(qq + qoff_m, pp + poff_m);
+				if (nblkq == x.size() && nblkp == x.size() && !full_is_computed) {
+					full_qr.compute(m_qp_eigen);
+					full_is_computed = true;
+					c_eigen = full_qr.solve(eris_eigen);
+				} else if (nblkq == x.size() && nblkp == x.size() && full_is_computed) {
+					c_eigen = full_qr.solve(eris_eigen);
+				} else if (nq != x.size() || np != x.size()) {
+					blk_qr.compute(m_qp_eigen);
+					c_eigen = blk_qr.solve(eris_eigen);
+				}
+						
+				eris_eigen.resize(0,0);
+			
+				
+				// ==== Transfer fitting coefficients to tensor
+				
+				// transfer it to c_xbb
+				arrvec<int,3> cfit_idx;
+			
+				for (auto ip : blk_P) {
+					for (auto imu : blk_mu) {
+						for (auto inu : blk_nu) {
+							cfit_idx[0].push_back(ip);
+							cfit_idx[1].push_back(imu);
+							cfit_idx[2].push_back(inu);
 						}
 					}
-					
-					qoff += sizeq;
 				}
-				poff += sizep;
-			}
 			
-			time4.finish();
-			
-			eri_local->clear();	
-			
-			time5.start();
-			Eigen::MatrixXd c_eigen;
-			
-			if (nblkq == x.size() && nblkp == x.size() && !full_is_computed) {
-				full_qr.compute(m_qp_eigen);
-				full_is_computed = true;
-				c_eigen = full_qr.solve(eris_eigen);
-			} else if (nblkq == x.size() && nblkp == x.size() && full_is_computed) {
-				c_eigen = full_qr.solve(eris_eigen);
-			} else if (nq != x.size() || np != x.size()) {
-				blk_qr.compute(m_qp_eigen);
-				c_eigen = blk_qr.solve(eris_eigen);
-			}
-			
-			time5.finish();
-			
-			eris_eigen.resize(0,0);
-			
-			time6.start();
-			// transfer it to c_xbb
-			arrvec<int,3> cfit_idx;
-			
-			for (auto ip : blk_P) {
-				for (auto imu : mu_blks) {
-					for (auto inu : nu_blks) {
-						cfit_idx[0].push_back(ip);
-						cfit_idx[1].push_back(imu);
-						cfit_idx[2].push_back(inu);
-					}
-				}
-			}
-			
-			c_xbb_global_1bb->reserve(cfit_idx);
-			
-			poff = 0;
-			moff = 0;
-			noff = 0;
-			
-			for (auto ip : blk_P) {
-				for (auto imu : mu_blks) {
-					for (auto inu : nu_blks) {
+				c_xbb_local->reserve(cfit_idx);
 				
-						std::array<int,3> idx = {ip, imu, inu};
-						std::array<int,3> size = {x[ip], b[imu], b[inu]};
-						
-						dbcsr::block<3,double> blk(size);
-						for (int pp = 0; pp != size[0]; ++pp) {
-							for (int mm = 0; mm != size[1]; ++mm) {
-								for (int nn = 0; nn != size[2]; ++nn) {
-									blk(pp,mm,nn) = c_eigen(pp + poff, 
-										mm + moff + (nn+noff)*mstride);
-						}}}
-						c_xbb_global_1bb->put_block(idx, blk);
-						noff += b[inu];
-					}
-					noff = 0;
-					moff += b[imu];
-				}			
-				moff = 0;	
-				poff += x[ip];
-			}
-			time6.finish();
+				poff = 0;
+				moff = 0;
+				noff = 0;
 			
-		} // end loop over atom block pairs
-#if 0	
-		}
-		MPI_Barrier(m_world.comm());
-		}
-#endif
+				for (auto ip : blk_P) {
+					for (auto imu : blk_mu) {
+						for (auto inu : blk_nu) {
+					
+							std::array<int,3> idx = {ip, imu, inu};
+							std::array<int,3> size = {x[ip], b[imu], b[inu]};
+							
+							dbcsr::block<3,double> blk(size);
+							for (int pp = 0; pp != size[0]; ++pp) {
+								for (int mm = 0; mm != size[1]; ++mm) {
+									for (int nn = 0; nn != size[2]; ++nn) {
+										blk(pp,mm,nn) = c_eigen(pp + poff, 
+											mm + moff + (nn+noff)*mstride);
+							}}}
+							c_xbb_local->put_block(idx, blk);
+							noff += b[inu];
+						}
+						noff = 0;
+						moff += b[imu];
+					}			
+					moff = 0;	
+					poff += x[ip];
+				}
+			
+			} // end loop over chunks
+			
+			prs_xbb_local->clear();
+				
+		}; // end task function
+			
 		
-		c_xbb_global_1bb->filter(dbcsr::global::filter_eps);
+		// ============== RUN SCHEDULER ================================
 		
-		c_xbb_batched->compress({ibatch_nu}, c_xbb_global_1bb);
-		prs_xbb_global_1bb->clear();
-		c_xbb_global_1bb->clear();
-
+		util::scheduler tasks(m_world.comm(), global_tasks.size(), task_func);
+		tasks.run();
+		
+		
+		// =============== REDISTRIBUTE BLOCKS AND COMPRESS ============ 
+		
+		
+		//dbcsr::print(*c_xbb_local);
+		
+		dbcsr::copy_local_to_global(*c_xbb_local, *c_xbb_global);
+		
+		c_xbb_local->clear();
+		//dbcsr::print(*c_xbb_global);
+		
+		c_xbb_batched->compress({ibatch_nu}, c_xbb_global);		
+		
 	} // end loop over batches
 	
 	c_xbb_batched->compress_finalize();
@@ -2422,12 +2058,7 @@ dbcsr::sbtensor<3,double> dfitting::compute_qr_new(dbcsr::shared_matrix<double> 
 	
 	if (occupation > 100) throw std::runtime_error(
 		"Fitting coefficients occupation more than 100%");
-	
-	TIME.finish();
-	
-	TIME.print_info();
-	//exit(0);*/
-	
+		
 	return c_xbb_batched;
 	
 }
