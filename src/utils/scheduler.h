@@ -151,7 +151,7 @@ private:
 	}
 	
 	void execute(int64_t task) {
-		//std::cout << m_mpirank << " : " << "EXECUTE" << std::endl;
+		std::cout << m_mpirank << " : " << "EXECUTE" << std::endl;
 		m_executer(task);
 	}
 			
@@ -194,7 +194,7 @@ public:
 	
 	void run() {
 		
-		const int nmax_run = 100;
+		const int nmax_run = 10;
 		int nrun = 0;
 		
 		while (true) {

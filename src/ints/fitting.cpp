@@ -1655,7 +1655,7 @@ dbcsr::sbtensor<3,double> dfitting::compute_qr_new(dbcsr::shared_matrix<double> 
 
 		task_list global_tasks;
 		
-		const int chunksize = 8;
+		const int chunksize = 1;
 		
 		std::vector<std::pair<int,int>> chunk;
 		
@@ -1894,7 +1894,7 @@ dbcsr::sbtensor<3,double> dfitting::compute_qr_new(dbcsr::shared_matrix<double> 
 					np += x[ip];
 				}
 			
-				std::cout << "NP,NQ,NB: " << np << "/" << nq << "/" << nb << std::endl;
+				std::cout << "RANK: " << m_world.rank() << " NP,NQ,NB: " << np << "/" << nq << "/" << nb << std::endl;
 			
 			
 				// ==== Prepare matrices for QR decomposition ====

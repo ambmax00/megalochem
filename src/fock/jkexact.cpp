@@ -119,7 +119,8 @@ void EXACT_K::compute_K() {
 	auto compute_K_single = [&](dbcsr::smat_d& p, dbcsr::smat_d& k, std::string x) {
 		
 		dbcsr::copy_matrix_to_3Dtensor_new<double>(*p,*m_p_bbd,true);
-		
+		m_p_bbd->filter(dbcsr::global::filter_eps);		
+	
 		LOG.os<1>("Computing exchange term (", x, ") ... \n");
 		
 		//m_K_bbd->batched_contract_init();

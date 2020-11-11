@@ -490,7 +490,7 @@ void BATCHED_DFAO_K::compute_K() {
 		LOG.os<1>("Computing exchange part (", x, ")\n");
 		
 		dbcsr::copy_matrix_to_tensor(*p_bb, *m_p_bb);
-				
+		m_p_bb->filter(dbcsr::global::filter_eps);			
 		//dbcsr::print(*c_bm);
 		//dbcsr::print(*m_c_bm);	
 		
@@ -708,7 +708,7 @@ void BATCHED_DFMEM_K::compute_K() {
 		LOG.os<1>("Computing exchange part (", x, ")\n");
 		
 		dbcsr::copy_matrix_to_tensor(*p_bb, *m_p_bb);
-				
+		m_p_bb->filter(dbcsr::global::filter_eps);				
 		//dbcsr::print(*c_bm);
 		//dbcsr::print(*m_c_bm);	
 				
