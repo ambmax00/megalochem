@@ -9,8 +9,8 @@
 #include "io/reader.h"
 #include "io/io.h"
 #include "hf/hfmod.h"
-//#include "mp/mpmod.h"
-//#include "adc/adcmod.h"
+#include "mp/mpmod.h"
+#include "adc/adcmod.h"
 #include "utils/mpi_time.h"
 
 #include "extern/scalapack.h"
@@ -144,7 +144,7 @@ int main(int argc, char** argv) {
 	auto hfopt = opt.subtext("hf");
 	
 	hf::shared_hf_wfn myhfwfn = std::make_shared<hf::hf_wfn>();
-	hf::hfmod myhf(mol,hfopt,wrd);
+	hf::hfmod myhf(wrd,mol,hfopt);
 
 	bool skip_hf = hfopt.get<bool>("skip", false);
 	bool do_hf = opt.get<bool>("do_hf", true);
@@ -166,15 +166,15 @@ int main(int argc, char** argv) {
 	}
 	
 	MPI_Barrier(MPI_COMM_WORLD);
-	/*
+	
 	auto mpopt = opt.subtext("mp");
 	
 	bool do_mp = opt.get<bool>("do_mp");
 	
 	if (do_mp) {
 	
-		mp::mpmod mymp(myhfwfn,mpopt,wrd);
-		mymp.compute_batch();
+		mp::mpmod mymp(wrd,myhfwfn,mpopt);
+		mymp.compute();
 		
 	}
 
@@ -183,9 +183,9 @@ int main(int argc, char** argv) {
 	
 	if (do_adc) {
 		
-		adc::adcmod myadc(myhfwfn,adcopt,wrd);
+		adc::adcmod myadc(wrd,myhfwfn,adcopt);
 		myadc.compute();
-	}*/
+	}
 	
 	scalapack::global_grid.free();
 

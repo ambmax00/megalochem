@@ -71,7 +71,7 @@ private:
 
 public:
 
-	hfmod(desc::smolecule mol, desc::options opt, dbcsr::world& wrd);
+	hfmod(dbcsr::world wrd, desc::smolecule mol, desc::options opt);
 	
 	hfmod() = delete;
 	hfmod(hfmod& hfmod_in) = delete;

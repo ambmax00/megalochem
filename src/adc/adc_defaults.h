@@ -19,9 +19,9 @@ static const double ADC_C_OS_COUPLING = 1.17;
 static const std::string ADC_METHOD = "ri_adc_1";
 static const std::string ADC_ERIS = "core";
 static const std::string ADC_METRIC = "coulomb";
-static const std::string ADC_BUILD_Z = "LLMPFULL";
-static const std::string ADC_BUILD_J = "batchdf";
-static const std::string ADC_BUILD_K = "batchdfao";
+static const std::string ADC_BUILD_Z = "llmp_full";
+static const std::string ADC_BUILD_J = "dfao";
+static const std::string ADC_BUILD_K = "dfao";
 static const std::string ADC_INTERMEDS = "core";
 static const std::string ADC_DOUBLES = "full";
 	

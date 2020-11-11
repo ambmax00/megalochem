@@ -86,6 +86,8 @@ public:
 		Eigen::MatrixXd Asub;
 		Eigen::VectorXd evals;
 		Eigen::MatrixXd evecs;
+		Eigen::VectorXd prev_evals(0);
+		Eigen::MatrixXd prev_evecs(0,0);
 		
 		m_sigmas.clear();
 		
@@ -155,6 +157,45 @@ public:
 			}
 			
 			LOG.os<2>("EIGENVECTORS: \n", evecs, '\n');
+			
+			/* reorder 
+			if (prev_evals.size() != 0) {
+				
+				// order the eigenvals/eigenvecs such that they correspond best to previous ones
+				
+				std::vector<int> associated(evals.size(), -1);
+				for (int iprev = 0; iprev != prev_evals.size(); ++iprev) {
+					
+					int min_diff_idx = -1;
+					double min_diff = std::numeric_limits<double>::max();
+					
+					// find minimum vec
+					for (int icurrent = 0; icurrent != evals.size(); ++icurrent) {
+						// compute error norm
+						if (associated[icurrent] != -1) continue;
+						
+						auto err = prev_evecs.col(iprev) - evecs.col(icurrent);
+						double diff = err.norm();
+						
+						if (diff < min_diff) {
+							min_diff = diff;
+							min_diff_idx = icurrent;
+						}
+					}
+					
+					associated[min_diff_idx] = iprev;
+					
+				}
+				
+				std::cout << "ASSOC: " << std::endl;
+				for (auto e : associated) {
+					std::cout << e << " ";
+				} std::cout << std::endl;
+				
+			}*/
+			
+			prev_evals = evals;
+			prev_evecs = evecs;	 
 			
 			// compute residual
 			// r_k = sum_i U_ik sigma_i - sum_i U_ik lambda_k b_i 

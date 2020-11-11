@@ -36,124 +36,110 @@ fockmod::fockmod (dbcsr::world iworld, desc::smolecule imol, desc::options iopt)
 
 void fockmod::init() {
 	
-	std::string j_method = m_opt.get<std::string>("build_J", FOCK_BUILD_J);
-	std::string k_method = m_opt.get<std::string>("build_K", FOCK_BUILD_K);
-	std::string metric = m_opt.get<std::string>("df_metric", FOCK_METRIC);
+	std::string j_method_str = m_opt.get<std::string>("build_J", FOCK_BUILD_J);
+	std::string k_method_str = m_opt.get<std::string>("build_K", FOCK_BUILD_K);
+	std::string metric_str = m_opt.get<std::string>("df_metric", FOCK_METRIC);
 	std::string eris_mem = m_opt.get<std::string>("eris", FOCK_ERIS);
-			
+		
+	jmethod jmet = str_to_jmethod(j_method_str);
+	kmethod kmet = str_to_kmethod(k_method_str);	
+	ints::metric metr = ints::str_to_metric(metric_str);
+		
 	// set J
-	if (j_method == "exact") {
+	if (jmet == jmethod::exact) {
 		
-		J* builder = new EXACT_J(m_world, m_opt);
-		m_J_builder.reset(builder);
+		m_ao.request(ints::key::coul_bbbb, true);
 		
-		m_ao.request(ints::key::coul_bbbb);
+	} else if (jmet == jmethod::dfao) {
 		
-	} else if (j_method == "batchdf") {
+		m_ao.request(ints::key::scr_xbb,true);
 		
-		J* builder = new BATCHED_DF_J(m_world,m_opt);
-		m_J_builder.reset(builder);
-		
-		m_ao.request(ints::key::scr_xbb);
-		
-		if (metric == "coulomb") {
-			m_ao.request(ints::key::coul_xx);
-			m_ao.request(ints::key::coul_xx_inv);
-			m_ao.request(ints::key::coul_xbb);
-		} else if (metric == "erfc_coulomb") {
-			m_ao.request(ints::key::erfc_xx);
-			m_ao.request(ints::key::erfc_xx_inv);
-			m_ao.request(ints::key::erfc_xbb);
+		if (metr == ints::metric::coulomb) {
+			m_ao.request(ints::key::coul_xx, false);
+			m_ao.request(ints::key::coul_xx_inv, true);
+			m_ao.request(ints::key::coul_xbb, true);
+		} else if (metr == ints::metric::erfc_coulomb) {
+			m_ao.request(ints::key::erfc_xx, false);
+			m_ao.request(ints::key::erfc_xx_inv, true);
+			m_ao.request(ints::key::erfc_xbb, true);
+		} else if (metr == ints::metric::qr_fit) {
+			m_ao.request(ints::key::coul_xx, true);
+			m_ao.request(ints::key::ovlp_xx, false);
+			m_ao.request(ints::key::ovlp_xx_inv, false);
+			m_ao.request(ints::key::qr_xbb, true);
 		}
-	
-	} else if (j_method == "batchqr") {
 		
-		J* builder = new BATCHED_DF_J(m_world,m_opt);
-		m_J_builder.reset(builder);
-		
-		m_ao.request(ints::key::scr_xbb);
-		
-		m_ao.request(ints::key::coul_xx);
-		m_ao.request(ints::key::ovlp_xx);
-		m_ao.request(ints::key::ovlp_xx_inv);
-		m_ao.request(ints::key::dfit_qr_xbb);
-	
 	} else {
 		
-		throw std::runtime_error("Unknown J method: " + j_method);
+		throw std::runtime_error("Unknown J method: " + j_method_str);
 		
 	}
 		
 	
 	// set K
-	if (k_method == "exact") {
+	if (kmet == kmethod::exact) {
 		
-		K* builder = new EXACT_K(m_world, m_opt);
-		m_K_builder.reset(builder);
+		m_ao.request(ints::key::coul_bbbb,true);
 		
-		m_ao.request(ints::key::coul_bbbb);
+	} else if (kmet == kmethod::dfao) {
 		
-	} else if (k_method == "batchdfao") {
+		m_ao.request(ints::key::scr_xbb,true);
 		
-		K* builder = new BATCHED_DFAO_K(m_world,m_opt);
-		m_K_builder.reset(builder);
-		
-		m_ao.request(ints::key::scr_xbb);
-		
-		if (metric == "coulomb") {
-			m_ao.request(ints::key::coul_xx);
-			m_ao.request(ints::key::coul_xx_inv);
-			m_ao.request(ints::key::coul_xbb);
-			m_ao.request(ints::key::dfit_coul_xbb);
-		} else if (metric == "erfc_coulomb") {
-			m_ao.request(ints::key::erfc_xx);
-			m_ao.request(ints::key::erfc_xx_inv);
-			m_ao.request(ints::key::erfc_xbb);
-			m_ao.request(ints::key::dfit_erfc_xbb);
+		if (metr == ints::metric::coulomb) {
+			m_ao.request(ints::key::coul_xx,false);
+			m_ao.request(ints::key::coul_xx_inv,false);
+			m_ao.request(ints::key::coul_xbb,true);
+			m_ao.request(ints::key::dfit_coul_xbb,true);
+		} else if (metr == ints::metric::erfc_coulomb) {
+			m_ao.request(ints::key::erfc_xx,false);
+			m_ao.request(ints::key::erfc_xx_inv,false);
+			m_ao.request(ints::key::erfc_xbb,true);
+			m_ao.request(ints::key::dfit_erfc_xbb,true);
+		} else if (metr == ints::metric::qr_fit) {
+			m_ao.request(ints::key::coul_xx, true);
+			m_ao.request(ints::key::ovlp_xx, false);
+			m_ao.request(ints::key::ovlp_xx_inv, false);
+			m_ao.request(ints::key::qr_xbb, true);
+			m_ao.request(ints::key::dfit_qr_xbb, true);
 		}
 		
-	} else if (k_method == "batchdfmo") {
+	} else if (kmet == kmethod::dfmo) {
 		
-		K* builder = new BATCHED_DFMO_K(m_world,m_opt);
-		m_K_builder.reset(builder);
+		m_ao.request(ints::key::scr_xbb,true);
 		
-		m_ao.request(ints::key::scr_xbb);
-		
-		if (metric == "coulomb") {
-			m_ao.request(ints::key::coul_xx);
-			m_ao.request(ints::key::coul_xx_invsqrt);
-			m_ao.request(ints::key::coul_xbb);
-		} else if (metric == "erfc_coulomb") {
-			throw std::runtime_error("DFMO with erfc disabled.");
+		if (metr == ints::metric::coulomb) {
+			m_ao.request(ints::key::coul_xx,false);
+			m_ao.request(ints::key::coul_xx_invsqrt,true);
+			m_ao.request(ints::key::coul_xbb,true);
+		} else {
+			throw std::runtime_error("DFMO with non coulomb metric disabled.");
 		}
 		
-	} else if (k_method == "batchpari") {
+	} else if (kmet == kmethod::dfmem) {
 		
-		K* builder = new BATCHED_PARI_K(m_world,m_opt);
-		m_K_builder.reset(builder);
+		m_ao.request(ints::key::scr_xbb,true);
 		
-		m_ao.request(ints::key::scr_xbb);
+		if (metr == ints::metric::coulomb) {
+			m_ao.request(ints::key::coul_xx,false);
+			m_ao.request(ints::key::coul_xx_inv,false);
+			m_ao.request(ints::key::coul_xbb,true);
+			m_ao.request(ints::key::dfit_coul_xbb,true);
+		} else if (metr == ints::metric::erfc_coulomb) {
+			m_ao.request(ints::key::erfc_xx,false);
+			m_ao.request(ints::key::erfc_xx_inv,false);
+			m_ao.request(ints::key::erfc_xbb,true);
+			m_ao.request(ints::key::dfit_erfc_xbb,true);
+		} else if (metr == ints::metric::qr_fit) {
+			m_ao.request(ints::key::coul_xx, false);
+			m_ao.request(ints::key::ovlp_xx, false);
+			m_ao.request(ints::key::ovlp_xx_inv, false);
+			m_ao.request(ints::key::qr_xbb, false);
+			m_ao.request(ints::key::dfit_qr_xbb, true);
+		}
 		
-		m_ao.request(ints::key::coul_xx);
-		m_ao.request(ints::key::coul_xx_inv);
-		m_ao.request(ints::key::coul_xbb);
-		m_ao.request(ints::key::dfit_pari_xbb);
-		
-	} else if (k_method == "batchqr") {
-	
-		K* builder = new BATCHED_DFMEM_K(m_world,m_opt);
-		m_K_builder.reset(builder);
-		
-		m_ao.request(ints::key::scr_xbb);
-		
-		m_ao.request(ints::key::coul_xx);
-		m_ao.request(ints::key::ovlp_xx);
-		m_ao.request(ints::key::ovlp_xx_inv);
-		m_ao.request(ints::key::dfit_qr_xbb);
-	
 	} else {
 		
-		throw std::runtime_error("Unknown K method: " + k_method);
+		throw std::runtime_error("Unknown K method: " + k_method_str);
 		
 	}
 	
@@ -161,82 +147,135 @@ void fockmod::init() {
 	auto aoreg = m_ao.get_registry();
 	
 	LOG.os<>("Setting up JK builder.\n");
-	LOG.os<>("J method: ", j_method, '\n');
-	LOG.os<>("K method: ", k_method, '\n');
+	LOG.os<>("J method: ", j_method_str, '\n');
+	LOG.os<>("K method: ", k_method_str, '\n');
 	
-	m_J_builder->set_density_alpha(m_p_A);
-	m_J_builder->set_density_beta(m_p_B);
-	m_J_builder->set_coeff_alpha(m_c_A);
-	m_J_builder->set_coeff_beta(m_c_B);
-	m_J_builder->set_mol(m_mol);
+	std::shared_ptr<J> jbuilder;
+	std::shared_ptr<K> kbuilder;
 	
-	m_K_builder->set_density_alpha(m_p_A);
-	m_K_builder->set_density_beta(m_p_B);
-	m_K_builder->set_coeff_alpha(m_c_A);
-	m_K_builder->set_coeff_beta(m_c_B);
-	m_K_builder->set_mol(m_mol);
+	int nprint = LOG.global_plev();
 	
-	// registries
-	
-	util::key_registry<Jkey> jreg;
-	util::key_registry<Kkey> kreg;
-	
-	if (j_method == "exact") {
-		jreg.add(aoreg, ints::key::coul_bbbb, Jkey::eri_bbbb);
-	} else if (j_method == "batchdf") {
-		if (metric == "coulomb") {
-			jreg.add(aoreg, ints::key::coul_xbb, Jkey::eri_xbb);
-			jreg.add(aoreg, ints::key::coul_xx_inv, Jkey::v_inv_xx);
-		} else {
-			jreg.add(aoreg, ints::key::erfc_xbb, Jkey::eri_xbb);
-			jreg.add(aoreg, ints::key::erfc_xx_inv, Jkey::v_inv_xx);
+	if (jmet == jmethod::exact) {
+		
+		auto eris = aoreg.get<dbcsr::sbtensor<4,double>>(ints::key::coul_bbbb);
+		
+		jbuilder = create_EXACT_J(m_world, m_mol, nprint)
+			.eri4c2e_batched(eris)
+			.get();
+		
+	} else if (jmet == jmethod::dfao) {
+		
+		dbcsr::sbtensor<3,double> eris;
+		dbcsr::shared_matrix<double> v_inv;
+		
+		if (metr == ints::metric::coulomb) {
+			
+			eris = aoreg.get<decltype(eris)>(ints::key::coul_xbb);
+			v_inv = aoreg.get<decltype(v_inv)>(ints::key::coul_xx_inv);
+			
+		} else if (metr == ints::metric::erfc_coulomb) {
+			
+			eris = aoreg.get<decltype(eris)>(ints::key::erfc_xbb);
+			v_inv = aoreg.get<decltype(v_inv)>(ints::key::erfc_xx_inv);
+			
+		} else if (metr == ints::metric::qr_fit) {
+			
+			eris = aoreg.get<decltype(eris)>(ints::key::qr_xbb);
+			v_inv = aoreg.get<decltype(v_inv)>(ints::key::coul_xx);
+			
 		}
-	} else if (j_method == "batchqr") {
-		jreg.add(aoreg, ints::key::dfit_qr_xbb, Jkey::eri_xbb);
-		jreg.add(aoreg, ints::key::coul_xx, Jkey::v_inv_xx);
+		
+		jbuilder = create_BATCHED_DF_J(m_world, m_mol, nprint)
+			.eri3c2e_batched(eris)
+			.v_inv(v_inv)
+			.get();
+		
 	}
 	
 	// set K
-	if (k_method == "exact") {
+	if (kmet == kmethod::exact) {
 		
-		kreg.add(aoreg, ints::key::coul_bbbb, Kkey::eri_bbbb);
+		auto eris = aoreg.get<dbcsr::sbtensor<4,double>>(ints::key::coul_bbbb);
 		
-	} else if (k_method == "batchdfao") {
+		kbuilder = create_EXACT_K(m_world, m_mol, nprint)
+			.eri4c2e_batched(eris)
+			.get();
 		
-		if (metric == "coulomb") {
-			kreg.add(aoreg, ints::key::coul_xbb, Kkey::eri_xbb);
-			kreg.add(aoreg, ints::key::dfit_coul_xbb, Kkey::dfit_xbb);
-		} else if (metric == "erfc_coulomb") {
-			kreg.add(aoreg, ints::key::erfc_xbb, Kkey::eri_xbb);
-			kreg.add(aoreg, ints::key::dfit_erfc_xbb, Kkey::dfit_xbb);
+	} else if (kmet == kmethod::dfao) {
+		
+		dbcsr::sbtensor<3,double> eris;
+		dbcsr::sbtensor<3,double> cfit;
+		
+		switch (metr) {
+			case ints::metric::coulomb:
+				eris = aoreg.get<decltype(eris)>(ints::key::coul_xbb);
+				cfit = aoreg.get<decltype(eris)>(ints::key::dfit_coul_xbb);
+				break;
+			case ints::metric::erfc_coulomb:
+				eris = aoreg.get<decltype(eris)>(ints::key::erfc_xbb);
+				cfit = aoreg.get<decltype(eris)>(ints::key::dfit_erfc_xbb);
+				break;
+			case ints::metric::qr_fit:
+				eris = aoreg.get<decltype(eris)>(ints::key::qr_xbb);
+				cfit = aoreg.get<decltype(eris)>(ints::key::dfit_qr_xbb);
+				break;
 		}
 		
-	} else if (k_method == "batchdfmo") {
+		kbuilder = create_BATCHED_DFAO_K(m_world, m_mol, nprint)
+			.eri3c2e_batched(eris)
+			.fitting_batched(cfit)
+			.get();
 		
-		kreg.add(aoreg, ints::key::coul_xbb, Kkey::eri_xbb);
-		kreg.add(aoreg, ints::key::coul_xx_invsqrt, Kkey::v_inv_xx_sqrt);
+	} else if (kmet == kmethod::dfmo) {
 		
-	} else if (k_method == "batchpari") {
+		auto eris = aoreg.get<dbcsr::sbtensor<3,double>>(ints::key::coul_xbb);
+		auto invsqrt = aoreg.get<dbcsr::shared_matrix<double>>(ints::key::coul_xx_invsqrt);
+		int nbatches = m_opt.get<int>("occ_nbatches");
 		
-		kreg.add(aoreg, ints::key::coul_xx, Kkey::v_xx);
-		kreg.add(aoreg, ints::key::coul_xbb, Kkey::eri_xbb);
-		kreg.add(aoreg, ints::key::dfit_pari_xbb, Kkey::dfit_pari_xbb);
+		kbuilder = create_BATCHED_DFMO_K(m_world, m_mol, nprint)
+			.eri3c2e_batched(eris)
+			.v_invsqrt(invsqrt)
+			.occ_nbatches(nbatches)
+			.get();
 		
-	} else if (k_method == "batchqr") {
-	
-		kreg.add(aoreg, ints::key::coul_xx, Kkey::v_xx);
-		kreg.add(aoreg, ints::key::dfit_qr_xbb, Kkey::dfit_xbb);
-	
+	} else if (kmet == kmethod::dfmem) {
+		
+		dbcsr::sbtensor<3,double> eris;
+		dbcsr::shared_matrix<double> v_xx;
+		
+		switch (metr) {
+			case ints::metric::coulomb:
+				eris = aoreg.get<decltype(eris)>(ints::key::coul_xbb);
+				v_xx = aoreg.get<decltype(v_xx)>(ints::key::coul_xx_inv);
+				break;
+			case ints::metric::erfc_coulomb:
+				eris = aoreg.get<decltype(eris)>(ints::key::erfc_xbb);
+				v_xx = aoreg.get<decltype(v_xx)>(ints::key::erfc_xx_inv);
+				break;
+			case ints::metric::qr_fit:
+				eris = aoreg.get<decltype(eris)>(ints::key::qr_xbb);
+				v_xx = aoreg.get<decltype(v_xx)>(ints::key::coul_xx);
+				break;
+		}
+		
+		kbuilder = create_BATCHED_DFMEM_K(m_world, m_mol, nprint)
+			.eri3c2e_batched(eris)
+			.v_xx(v_xx)
+			.get();
+			
 	}
 	
-	m_J_builder->set_reg(jreg);
-	m_K_builder->set_reg(kreg);
+	m_J_builder = jbuilder;
+	m_K_builder = kbuilder;
+	
+	m_J_builder->set_sym(true);
+	m_K_builder->set_sym(true);
 	
 	LOG.os<>("Initializing J...\n");
 	m_J_builder->init();
 	LOG.os<>("Initializing K... \n");
 	m_K_builder->init();
-		
+	
 	LOG.os<>("Finished setting up JK builder \n \n");
 	
 }
@@ -250,6 +289,16 @@ void fockmod::compute(bool SAD_iter, int rank) {
 	
 	auto& t_j = TIME.sub("J builder");
 	auto& t_k = TIME.sub("K builder");
+	
+	m_J_builder->set_coeff_alpha(m_c_A);
+	m_J_builder->set_coeff_beta(m_c_B);
+	m_J_builder->set_density_alpha(m_p_A);
+	m_J_builder->set_density_beta(m_p_B);
+	
+	m_K_builder->set_coeff_alpha(m_c_A);
+	m_K_builder->set_coeff_beta(m_c_B);
+	m_K_builder->set_density_alpha(m_p_A);
+	m_K_builder->set_density_beta(m_p_B);
 	
 	LOG.os<1>("Computing coulomb matrix.\n");
 	t_j.start();

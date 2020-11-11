@@ -63,6 +63,7 @@ static const json valid_keys =
 	}},
 	{"mp", {
 		{"print", 0u},
+		{"df_metric", "string"},
 		{"nlap", 5u}, // number of laplace points
 		{"nbatches_b", 3u},
 		{"nbatches_x", 3u},
@@ -81,6 +82,7 @@ static const json valid_keys =
 		{"c_os_coupling", 1.15},
 		{"dfbasis", "basis"},
 		{"df_augmentation", true},
+		{"df_metric", "string"},
 		{"nbatches_b", 3u},
 		{"nbatches_x", 3u},
 		{"nlap", 5u},

@@ -53,7 +53,7 @@ private:
 	}
 	
 	void acquire() {
-		std::cout << m_mpirank << " : " << "ACQUIRE" << std::endl;
+		//std::cout << m_mpirank << " : " << "ACQUIRE" << std::endl;
 		while (true) {
 			
 			m_transfer[m_mpirank] = NO_RESP;
@@ -99,8 +99,8 @@ private:
 
 			}
 			
-			std::cout << m_mpirank << " : " << "GOT RESPONSE FROM VICTIM: " 
-				<< m_transfer[m_mpirank] << std::endl;
+			//std::cout << m_mpirank << " : " << "GOT RESPONSE FROM VICTIM: " 
+			//	<< m_transfer[m_mpirank] << std::endl;
 			
 			if (m_transfer[m_mpirank] != NO_TASK) {
 				//std::cout << m_mpirank << " : " << "ADDING TASK " << 
@@ -162,7 +162,7 @@ public:
 		: m_comm(comm), m_executer(executer), m_ntasks(ntasks)
 	{
 		
-		std::cout << "NTASKS: " << m_ntasks << std::endl;
+		//std::cout << "NTASKS: " << m_ntasks << std::endl;
 		
 		MPI_Comm_size(comm, &m_mpisize);
 		MPI_Comm_rank(comm, &m_mpirank);
@@ -172,10 +172,10 @@ public:
 		m_request.resize(m_mpisize, NO_REQU);
 		m_status.resize(m_mpisize, NO_WORK);
 		
-		std::cout << "MY QUEUE: " << std::endl;
+		/*std::cout << "MY QUEUE: " << std::endl;
 		for (auto q : m_local_tasks) {
 			std::cout << q << " ";
-		} std::cout << '\n';
+		} std::cout << '\n';*/
 		
 		MPI_Win_create(m_transfer.data(), m_mpisize * sizeof(int64_t),
 			sizeof(int64_t), MPI_INFO_NULL, m_comm, &m_transfer_win);

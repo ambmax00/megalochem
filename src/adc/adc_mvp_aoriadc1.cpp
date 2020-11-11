@@ -2,50 +2,72 @@
 
 namespace adc {
 
-void MVP_ao_ri_adc1::init() {
+void MVPAOADC1::init() {
 	
 	LOG.os<>("Initializing AO-ADC(1)\n");
 	
-	auto kmethod = m_opt.get<std::string>("k_method", "batchdfao");
-	
 	LOG.os<>("Setting up j builder for AO-ADC1.\n");
 	
-	fock::J* jbuilder = new fock::BATCHED_DF_J(m_world,m_opt);
-	m_jbuilder.reset(jbuilder);
+	switch (m_jmethod) {
+		case fock::jmethod::dfao:
+		
+			m_jbuilder = fock::create_BATCHED_DF_J(
+				m_world, m_mol, LOG.global_plev())
+				.eri3c2e_batched(m_eri3c2e_batched)
+				.v_inv(m_v_xx)
+				.get();
+			break;
+		
+		default:
+		
+			throw std::runtime_error("AOADC1 does not support this J builder.\n");
+			
+	}
 	
 	m_jbuilder->set_sym(false);
-	m_jbuilder->set_reg(m_reg);
-	m_jbuilder->set_mol(m_mol);
-	
 	m_jbuilder->init();
 	
 	LOG.os<>("Setting up k builder for AO-ADC1.\n");
 	
-	if (kmethod == "batchdfao") {
-		fock::K* kbuilder = new fock::BATCHED_DFAO_K(m_world,m_opt);
-		m_kbuilder.reset(kbuilder);
-	} else if (kmethod == "batchpari") {
-		fock::K* kbuilder = new fock::BATCHED_PARI_K(m_world,m_opt);
-		m_kbuilder.reset(kbuilder);
+	switch (m_kmethod) {
+		case fock::kmethod::dfao:
+			
+			m_kbuilder = fock::create_BATCHED_DFAO_K(
+				m_world, m_mol, LOG.global_plev())
+				.eri3c2e_batched(m_eri3c2e_batched)
+				.fitting_batched(m_fitting_batched)
+				.get();
+			break;
+			
+		case fock::kmethod::dfmem:
+		
+			m_kbuilder = fock::create_BATCHED_DFMEM_K(
+				m_world, m_mol, LOG.global_plev())
+				.eri3c2e_batched(m_eri3c2e_batched)
+				.v_xx(m_v_xx)
+				.get();
+			break;	
+		
+		default:
+		
+			throw std::runtime_error("AOADC1 does not support this K builder.\n");
+			
 	}
 	
-	m_kbuilder->set_sym(false);
-	m_kbuilder->set_reg(m_reg);
-	m_kbuilder->set_mol(m_mol);
-	
+	m_kbuilder->set_sym(false);	
 	m_kbuilder->init();
 	
 	LOG.os<>("Done with setting up.\n");
 	
 }
 
-smat MVP_ao_ri_adc1::compute(smat u_ia, double omega) {
+smat MVPAOADC1::compute(smat u_ia, double omega) {
 	
 	TIME.start();
 	
 	LOG.os<1>("Computing ADC0.\n");
 	// compute ADC0 part in MO basis
-	smat sig_0 = compute_sigma_0(u_ia);
+	smat sig_0 = compute_sigma_0(u_ia, *m_eps_occ, *m_eps_vir);
 		
 	// transform u to ao coordinated
 	

@@ -5,10 +5,10 @@
 
 namespace fock {
 	
-JK_common::JK_common(dbcsr::world& w, desc::options opt, std::string name) :
-	m_world(w), m_opt(opt),
-	LOG(m_world.comm(),m_opt.get<int>("print", FOCK_PRINT_LEVEL)),
-	TIME(m_world.comm(), name, LOG.global_plev()) {}
+JK_common::JK_common(dbcsr::world w, desc::smolecule mol, int print, std::string name) :
+	m_world(w), m_mol(mol),
+	LOG(m_world.comm(),print),
+	TIME(m_world.comm(), name, print) {}
 	
 void J::init_base() {
 	

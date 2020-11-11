@@ -8,8 +8,8 @@
 
 namespace fock {
 
-BATCHED_PARI_K::BATCHED_PARI_K(dbcsr::world& w, desc::options& opt) 
-	: K(w,opt,"PARI-K") {}
+BATCHED_PARI_K::BATCHED_PARI_K(dbcsr::world w, desc::smolecule mol, int print) 
+	: K(w,mol,print,"PARI-K") {}
 
 void BATCHED_PARI_K::init() {
 	
@@ -19,11 +19,7 @@ void BATCHED_PARI_K::init() {
 	auto x = m_mol->dims().x();
 	arrvec<int,2> bb = {b,b};
 	arrvec<int,2> xx = {x,x};
-	
-	m_eri_batched = m_reg.get<dbcsr::sbtensor<3,double>>(Kkey::eri_xbb);
-	
-	m_cfit_xbb = m_reg.get<dbcsr::shared_tensor<3,double>>(Kkey::dfit_pari_xbb);
-	
+		
 	m_spgrid2 = dbcsr::create_pgrid<2>(m_world.comm()).get();
 	
 	m_K_01 = dbcsr::tensor_create<2,double>().pgrid(m_spgrid2).name("K_01")
@@ -32,7 +28,6 @@ void BATCHED_PARI_K::init() {
 	m_p_bb = dbcsr::tensor_create_template<2,double>(m_K_01)
 			.name("p_bb_0_1").map1({0}).map2({1}).get();
 	
-	m_v_xx = m_reg.get<dbcsr::shared_matrix<double>>(Kkey::v_xx);
 	m_s_xx_01 = dbcsr::tensor_create<2>()
 		.name("s_xx_01")
 		.pgrid(m_spgrid2)
@@ -58,29 +53,29 @@ void BATCHED_PARI_K::compute_K() {
 	
 	// allocate tensors
 	
-	auto cfit_xbb_01_2 = m_cfit_xbb;
+	auto cfit_xbb_01_2 = m_fitting;
 	
-	auto cfit_xbb_0_12 = dbcsr::tensor_create_template(m_cfit_xbb)
+	auto cfit_xbb_0_12 = dbcsr::tensor_create_template(m_fitting)
 		.name("cfit_xbb_0_12")
 		.map1({0}).map2({1,2})
 		.get();
 	
-	auto cbar_xbb_01_2 = dbcsr::tensor_create_template(m_cfit_xbb)
+	auto cbar_xbb_01_2 = dbcsr::tensor_create_template(m_fitting)
 		.name("cbar_xbb_01_2")
 		.map1({0,1}).map2({2})
 		.get();
 		
-	auto cbar_xbb_02_1 = dbcsr::tensor_create_template(m_cfit_xbb)
+	auto cbar_xbb_02_1 = dbcsr::tensor_create_template(m_fitting)
 		.name("cbar_xbb_02_1")
 		.map1({0,2}).map2({1})
 		.get();
 	
-	auto ctil_xbb_0_12 = dbcsr::tensor_create_template(m_cfit_xbb)
+	auto ctil_xbb_0_12 = dbcsr::tensor_create_template(m_fitting)
 		.name("ctil_xbb_0_12")
 		.map1({0}).map2({1,2})
 		.get();
 		
-	auto ctil_xbb_02_1 = dbcsr::tensor_create_template(m_cfit_xbb)
+	auto ctil_xbb_02_1 = dbcsr::tensor_create_template(m_fitting)
 		.name("ctil_xbb_02_1")
 		.map1({0,2}).map2({1})
 		.get();
@@ -92,7 +87,7 @@ void BATCHED_PARI_K::compute_K() {
 		.name("K2").get();
 		
 	time_reo_int1.start();
-	m_eri_batched->decompress_init({0}, vec<int>{0,2},vec<int>{1});
+	m_eri3c2e_batched->decompress_init({0}, vec<int>{0,2},vec<int>{1});
 	time_reo_int1.finish();
 	
 	K1->batched_contract_init();
@@ -109,29 +104,29 @@ void BATCHED_PARI_K::compute_K() {
 	dbcsr::copy_matrix_to_tensor(*m_v_xx, *m_s_xx_01);
 	
 	// Loop ix
-	for (int ix = 0; ix != m_eri_batched->nbatches(0); ++ix) {
+	for (int ix = 0; ix != m_eri3c2e_batched->nbatches(0); ++ix) {
 		
 		LOG.os<1>("Fetching integrals.\n");
 		time_fetch_ints.start();
-		m_eri_batched->decompress({ix});
-		auto eri_02_1 = m_eri_batched->get_work_tensor();
+		m_eri3c2e_batched->decompress({ix});
+		auto eri_02_1 = m_eri3c2e_batched->get_work_tensor();
 		time_fetch_ints.finish();
 		
 		//m_p_bb->batched_contract_init();
 		//m_s_xx_01->batched_contract_init();
 		
 		// Loop inu
-		for (int isig = 0; isig != m_eri_batched->nbatches(2); ++isig) {
+		for (int isig = 0; isig != m_eri3c2e_batched->nbatches(2); ++isig) {
 			
 			LOG.os<1>("Loop PARI K, batch nr ", ix, " ", isig, '\n');
 			
 			vec<vec<int>> xm_bounds = {
-				m_eri_batched->bounds(0,ix),
-				m_eri_batched->full_bounds(1)
+				m_eri3c2e_batched->bounds(0,ix),
+				m_eri3c2e_batched->full_bounds(1)
 			};
 			
 			vec<vec<int>> s_bounds = {
-				m_eri_batched->bounds(2,isig)
+				m_eri3c2e_batched->bounds(2,isig)
 			};
 			
 			LOG.os<1>("Forming cbar.\n");
@@ -147,9 +142,9 @@ void BATCHED_PARI_K::compute_K() {
 			time_form_cbar.finish();	
 				
 			vec<vec<int>> rns_bounds = {
-				m_eri_batched->full_bounds(0),
-				m_eri_batched->full_bounds(1),
-				m_eri_batched->bounds(2,isig)
+				m_eri3c2e_batched->full_bounds(0),
+				m_eri3c2e_batched->full_bounds(1),
+				m_eri3c2e_batched->bounds(2,isig)
 			};
 			 
 			LOG.os<1>("Copying...\n");
@@ -160,12 +155,12 @@ void BATCHED_PARI_K::compute_K() {
 			time_copy_cfit.finish();
 		
 			vec<vec<int>> ns_bounds = {
-				m_eri_batched->full_bounds(1),
-				m_eri_batched->bounds(2,isig)
+				m_eri3c2e_batched->full_bounds(1),
+				m_eri3c2e_batched->bounds(2,isig)
 			};
 			
 			vec<vec<int>> x_bounds = {
-				m_eri_batched->bounds(0,ix)
+				m_eri3c2e_batched->bounds(0,ix)
 			};
 			
 			LOG.os<1>("Forming ctil.\n");
@@ -190,8 +185,8 @@ void BATCHED_PARI_K::compute_K() {
 			time_reo_cbar.finish();
 			
 			vec<vec<int>> xs_bounds = {
-				m_eri_batched->bounds(0,ix),
-				m_eri_batched->bounds(2,isig)
+				m_eri3c2e_batched->bounds(0,ix),
+				m_eri3c2e_batched->bounds(2,isig)
 			};
 			
 			LOG.os<1>("Forming K (1).\n");
@@ -199,7 +194,7 @@ void BATCHED_PARI_K::compute_K() {
 			time_form_K1.start();
 			dbcsr::contract(*cbar_xbb_02_1, *eri_02_1, *K1)
 				.bounds1(xs_bounds)
-				.filter(dbcsr::global::filter_eps/m_eri_batched->nbatches(0))
+				.filter(dbcsr::global::filter_eps/m_eri3c2e_batched->nbatches(0))
 				.beta(1.0)
 				.perform("Qms, Qns -> mn");
 			time_form_K1.finish();
@@ -209,7 +204,7 @@ void BATCHED_PARI_K::compute_K() {
 			time_form_K2.start();
 			dbcsr::contract(*ctil_xbb_02_1, *cbar_xbb_02_1, *K2)
 				.bounds1(xs_bounds)
-				.filter(dbcsr::global::filter_eps/m_eri_batched->nbatches(0))
+				.filter(dbcsr::global::filter_eps/m_eri3c2e_batched->nbatches(0))
 				.beta(1.0)
 				.perform("Qns, Qms -> mn");	
 			time_form_K2.finish();
@@ -236,7 +231,7 @@ void BATCHED_PARI_K::compute_K() {
 	ctil_xbb_0_12->batched_contract_finalize();
 	ctil_xbb_02_1->batched_contract_finalize();
 	
-	m_eri_batched->decompress_finalize();
+	m_eri3c2e_batched->decompress_finalize();
 	m_s_xx_01->clear();
 	
 	K2->scale(-0.5);	

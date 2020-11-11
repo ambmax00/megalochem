@@ -943,7 +943,7 @@ dbcsr::sbtensor<3,double> dfitting::compute_qr(dbcsr::shared_matrix<double> s_xx
 	auto blkinfo_x = get_block_info(*x_basis);
 	auto blkinfo_b = get_block_info(*b_basis);
 
-#if 1
+#if 0
 	if (m_world.rank() == 0) {
 	std::cout << "X BASIS INFO: " << std::endl;
 	for (auto s : blkinfo_x) {
@@ -1595,7 +1595,7 @@ dbcsr::sbtensor<3,double> dfitting::compute_qr_new(dbcsr::shared_matrix<double> 
 		
 	}
 	
-	LOG.os<>("FRAG BLOCK BOUNDS: \n");
+	LOG.os<1>("FRAG BLOCK BOUNDS: \n");
 	for (auto bds : frag_bounds) {
 		std::cout << bds[0] << " " << bds[1] << std::endl;
 	}
@@ -1610,7 +1610,7 @@ dbcsr::sbtensor<3,double> dfitting::compute_qr_new(dbcsr::shared_matrix<double> 
 	auto blkinfo_x = get_block_info(*x_basis);
 	auto blkinfo_b = get_block_info(*b_basis);
 
-#if 1
+#if 0
 	if (m_world.rank() == 0) {
 	std::cout << "X BASIS INFO: " << std::endl;
 	for (auto s : blkinfo_x) {
@@ -1690,20 +1690,20 @@ dbcsr::sbtensor<3,double> dfitting::compute_qr_new(dbcsr::shared_matrix<double> 
 		
 		if (chunk.size() != 0) global_tasks.push_back(chunk);
 		
-		LOG.os<>("GLOBAL TASKS: \n");
+		/*LOG.os<>("GLOBAL TASKS: \n");
 		for (int itask = 0; itask != global_tasks.size(); ++itask) {
 			LOG.os<>("TASK: ", itask, '\n');
 			for (auto c : global_tasks[itask]) {
 				LOG.os<>(c.first, " ", c.second, '\n');
 			}
-		}
+		}*/
 		
 		/* =============================================================
 		 *            TASK FUNCTION FOR SCHEDULER 
 		 * ============================================================*/
 		std::function<void(int64_t)> task_func = [&](int64_t itask) 
 		{
-			std::cout << "PROC: " << m_world.rank() << " -> TASK ID: " << itask << std::endl;
+			//std::cout << "PROC: " << m_world.rank() << " -> TASK ID: " << itask << std::endl;
 			
 			// === COMPUTE 3c1e overlap integrals
 			// 1. allocate blocks
@@ -1742,7 +1742,7 @@ dbcsr::sbtensor<3,double> dfitting::compute_qr_new(dbcsr::shared_matrix<double> 
 				}
 			}
 			
-			std::cout << "NBLOCKS: " << ovlp_nblks << std::endl;
+			//std::cout << "NBLOCKS: " << ovlp_nblks << std::endl;
 			
 			// 2. Compute 
 			
@@ -1771,13 +1771,13 @@ dbcsr::sbtensor<3,double> dfitting::compute_qr_new(dbcsr::shared_matrix<double> 
 				int ifrag = chunk.first;
 				int jfrag = chunk.second;
 				
-				std::cout << "CHUNK: " << ifrag << " " << jfrag << std::endl;
+				//std::cout << "CHUNK: " << ifrag << " " << jfrag << std::endl;
 				
 				auto blk_mu = frag_blocks[ifrag];
 				auto blk_nu = frag_blocks[jfrag];
 				
-				std::cout << "SIZE: " << blk_mu.size() << " " << blk_nu.size() 
-					<< std::endl;
+				//std::cout << "SIZE: " << blk_mu.size() << " " << blk_nu.size() 
+				//	<< std::endl;
 				
 				vec<bool> blk_P_bool(x.size(),false);
 			
@@ -1822,7 +1822,7 @@ dbcsr::sbtensor<3,double> dfitting::compute_qr_new(dbcsr::shared_matrix<double> 
 				}
 			
 				int nblkp = blk_P.size();
-				std::cout << "FUNCS: " << nblkp << "/" << x.size() << std::endl;
+				//std::cout << "FUNCS: " << nblkp << "/" << x.size() << std::endl;
 			
 				if (nblkp == 0) continue;
 					
@@ -1853,7 +1853,7 @@ dbcsr::sbtensor<3,double> dfitting::compute_qr_new(dbcsr::shared_matrix<double> 
 				}
 				
 				int nblkq = blk_Q.size();
-				std::cout << "NEW SET: " << nblkq << "/" << x.size() << std::endl;
+				//std::cout << "NEW SET: " << nblkq << "/" << x.size() << std::endl;
 				
 				
 				// === Compute coulomb integrals
@@ -2058,7 +2058,9 @@ dbcsr::sbtensor<3,double> dfitting::compute_qr_new(dbcsr::shared_matrix<double> 
 	
 	if (occupation > 100) throw std::runtime_error(
 		"Fitting coefficients occupation more than 100%");
-		
+	
+	TIME.finish();
+	
 	return c_xbb_batched;
 	
 }
@@ -2077,6 +2079,8 @@ std::shared_ptr<Eigen::MatrixXi> dfitting::compute_idx(
 	int nbatches = (cfit_xbb->get_type() == dbcsr::btype::core) ?
 		1 : cfit_xbb->nbatches(2);
 		
+	double tresh = 1e-6;
+		
 	for (int inu = 0; inu != nbatches; ++inu) {
 		cfit_xbb->decompress({inu});
 		auto cfit = cfit_xbb->get_work_tensor();
@@ -2087,11 +2091,20 @@ std::shared_ptr<Eigen::MatrixXi> dfitting::compute_idx(
 		while (iter.blocks_left()) {
 			iter.next();
 			auto& idx = iter.idx();
+			auto& size = iter.size();
 			
 			int ix = idx[0];
 			int inu = idx[2];
+		
+			bool found = true;
+			auto blk = cfit->get_block(idx, size, found);
+			double maxele = 0.0;
 			
-			idx_local(ix,inu) = 1;
+			for (int i = 0; i != blk.ntot(); ++i) {
+				maxele = std::max(maxele, fabs(blk.data()[i]));
+			}
+			
+			idx_local(ix,inu) = (maxele > tresh) ? 1 : idx_local(ix,inu);
 		}
 		
 		iter.stop();

@@ -2,18 +2,15 @@
 
 namespace mp {
 
-void LLMP_FULL_Z::init_tensors() {
+void LLMP_FULL_Z::init() {
 	
 	LOG.os<>("Setting up tensors in LLMP_FULL.\n");
 	
-	m_eri_batched = m_reg.get_btensor<3,double>("i_xbb_batched");
-	
-	auto xbb = m_eri_batched->blk_sizes();
-	
-	auto x = xbb[0];
-	auto b = xbb[1];
+	auto x = m_mol->dims().x();
+	auto b = m_mol->dims().b();
 	
 	arrvec<int,2> xx = {x,x};
+	arrvec<int,3> xbb = {x,b,b};
 	
 	m_zmat = dbcsr::create<double>()
 		.set_world(m_world)
@@ -32,20 +29,23 @@ void LLMP_FULL_Z::init_tensors() {
 		.blk_sizes(xx)
 		.get();
 		
-	auto bdims = m_eri_batched->batch_dims();
+	auto bdims = m_eri3c2e_batched->batch_dims();
 	
-	std::string intermedtype = m_opt.get<std::string>("intermeds", "core");
+	auto blkmap_b = m_mol->c_basis()->block_to_atom(m_mol->atoms());
+	auto blkmap_x = m_mol->c_dfbasis()->block_to_atom(m_mol->atoms());
 	
-	dbcsr::btype intermedt = dbcsr::get_btype(intermedtype);
-	auto spgrid3_xbb = m_eri_batched->spgrid();	
+	arrvec<int,3> blkmap_xbb = { blkmap_x, blkmap_b, blkmap_b };	
+		
+	auto spgrid3_xbb = m_eri3c2e_batched->spgrid();	
 	
-	m_z_xbb_batched = dbcsr::btensor_create<3>()
+	m_FT3c2e_batched = dbcsr::btensor_create<3>()
 		.pgrid(spgrid3_xbb)
 		.blk_sizes(xbb)
 		.name(m_mol->name() + "_z_xbb_batched")
+		.blk_map(blkmap_xbb)
 		.batch_dims(bdims)
-		.btensor_type(intermedt)
-		.print(m_opt.get<int>("print", 0))
+		.btensor_type(m_intermeds)
+		.print(LOG.global_plev())
 		.get();
 		
 }
@@ -106,7 +106,7 @@ void LLMP_FULL_Z::compute() {
 	auto spgrid3_xob = dbcsr::create_pgrid<3>(m_world.comm())
 		.tensor_dims(xobsizes).get();
 		
-	auto spgrid3_xbb = m_eri_batched->spgrid();
+	auto spgrid3_xbb = m_eri3c2e_batched->spgrid();
 	
 	auto b_xob_1_02 = dbcsr::tensor_create<3,double>()
 		.pgrid(spgrid3_xob)
@@ -139,31 +139,31 @@ void LLMP_FULL_Z::compute() {
 	
 	time_reo_int1.start();
 	LOG.os<1>("Reordering ints to 1|02.\n");
-	m_eri_batched->decompress_init({0},vec<int>{1},vec<int>{0,2});
+	m_eri3c2e_batched->decompress_init({0},vec<int>{1},vec<int>{0,2});
 	time_reo_int1.finish();
 	
-	m_z_xbb_batched->compress_init({0,2}, vec<int>{0}, vec<int>{1,2});
+	m_FT3c2e_batched->compress_init({0,2}, vec<int>{0}, vec<int>{1,2});
 	
 	LOG.os<>("Starting batching over auxiliary functions.\n");
 		
 	// ===== LOOP OVER BATCHES OF AUXILIARY FUNCTIONS ==================
-	for (int ix = 0; ix != m_eri_batched->nbatches(0); ++ix) {
+	for (int ix = 0; ix != m_eri3c2e_batched->nbatches(0); ++ix) {
 		
 		LOG.os<1>("-- (X) Batch ", ix, "\n");
 		
 		LOG.os<1>("-- Fetching ao ints...\n");
 		time_fetchints1.start();
-		m_eri_batched->decompress({ix});
+		m_eri3c2e_batched->decompress({ix});
 		time_fetchints1.finish();
 		
-		auto eri_1_02 = m_eri_batched->get_work_tensor();
+		auto eri_1_02 = m_eri3c2e_batched->get_work_tensor();
 					
 		// first transform 
 	    LOG.os<1>("-- First transform.\n");
 	    
 	    vec<vec<int>> x_nu_bounds = { 
-			m_eri_batched->bounds(0,ix),
-			m_eri_batched->full_bounds(2)
+			m_eri3c2e_batched->bounds(0,ix),
+			m_eri3c2e_batched->full_bounds(2)
 		};
 		
 		//std::cout << "ERI" << std::endl;
@@ -187,7 +187,7 @@ void LLMP_FULL_Z::compute() {
 		dbcsr::copy_matrix_to_tensor(*m_pvir, *m_pvir_01);
 	
 		// new loop over nu
-		for (int inu = 0; inu != m_eri_batched->nbatches(2); ++inu) {
+		for (int inu = 0; inu != m_eri3c2e_batched->nbatches(2); ++inu) {
 			
 			LOG.os<1>("---- (NU) Batch ", inu, "\n");
 			
@@ -195,11 +195,11 @@ void LLMP_FULL_Z::compute() {
 			LOG.os<1>("---- Second transform.\n");
 			
 			vec<vec<int>> nu_bounds = { 
-				m_eri_batched->bounds(2,inu)
+				m_eri3c2e_batched->bounds(2,inu)
 			};
 			
 			vec<vec<int>> x_u_bounds = { 
-				m_eri_batched->bounds(0,ix),
+				m_eri3c2e_batched->bounds(0,ix),
 				vec<int>{0, notot - 1}
 			};
 			
@@ -223,8 +223,8 @@ void LLMP_FULL_Z::compute() {
 			LOG.os<1>("-- Final transform.\n");
 			
 			vec<vec<int>> x_nu_bounds = {
-				m_eri_batched->bounds(0,ix),
-				m_eri_batched->bounds(2,inu)
+				m_eri3c2e_batched->bounds(0,ix),
+				m_eri3c2e_batched->bounds(2,inu)
 			};
 			
 			bool force_sparsity = false;
@@ -235,8 +235,8 @@ void LLMP_FULL_Z::compute() {
 				
 				arrvec<int,3> res;
 				
-				auto xblkbounds = m_eri_batched->blk_bounds(0,ix);
-				auto bblkbounds = m_eri_batched->blk_bounds(2,inu);
+				auto xblkbounds = m_eri3c2e_batched->blk_bounds(0,ix);
+				auto bblkbounds = m_eri3c2e_batched->blk_bounds(2,inu);
 
 				for (int mublk = 0; mublk != b.size(); ++mublk) {
 					for (int nublk = bblkbounds[0]; nublk != bblkbounds[1]+1; ++nublk) {
@@ -287,7 +287,7 @@ void LLMP_FULL_Z::compute() {
 			
 			LOG.os<1>("---- Writing B_xBB to memory.\n");
 			time_write.start();
-			m_z_xbb_batched->compress({ix,inu},b2_xbb_0_12);
+			m_FT3c2e_batched->compress({ix,inu},b2_xbb_0_12);
 			time_write.finish();
 						
 		}
@@ -296,59 +296,59 @@ void LLMP_FULL_Z::compute() {
 		
 	}
 	
-	m_eri_batched->decompress_finalize();
-	m_z_xbb_batched->compress_finalize();
+	m_eri3c2e_batched->decompress_finalize();
+	m_FT3c2e_batched->compress_finalize();
 	
-	LOG.os<>("Occupation of Z_xBB: ", m_z_xbb_batched->occupation()*100, "%\n"); 
+	LOG.os<>("Occupation of FT3c2e: ", m_FT3c2e_batched->occupation()*100, "%\n"); 
 	
 	LOG.os<>("Finished batching.\n");
 	
 	LOG.os<>("Reordering ints 1|02 -> 0|12 \n");
 	
 	time_reo_int2.start();
-	m_eri_batched->decompress_init({2}, vec<int>{0}, vec<int>{1,2});
+	m_eri3c2e_batched->decompress_init({2}, vec<int>{0}, vec<int>{1,2});
 	time_reo_int2.finish();
 	
 	LOG.os<>("Setting up decompression.\n");
 	
 	time_setview.start();
-	m_z_xbb_batched->decompress_init({0,2}, vec<int>{0}, vec<int>{1,2});
+	m_FT3c2e_batched->decompress_init({0,2}, vec<int>{0}, vec<int>{1,2});
 	time_setview.finish();
 	
 	LOG.os<>("Computing Z_XY.\n");
 	
 	m_zmat_01->batched_contract_init();
 	
-	for (int inu = 0; inu != m_eri_batched->nbatches(2); ++inu) {
+	for (int inu = 0; inu != m_eri3c2e_batched->nbatches(2); ++inu) {
 		
 		LOG.os<1>("Batch: ", inu, '\n'); 	
 		LOG.os<1>("Fetching integrals...\n");
 		
 		time_fetchints2.start();
-		m_eri_batched->decompress({inu});
+		m_eri3c2e_batched->decompress({inu});
 		time_fetchints2.finish();
 		
-		auto eri_0_12 = m_eri_batched->get_work_tensor();
+		auto eri_0_12 = m_eri3c2e_batched->get_work_tensor();
 	
-		for (int ix = 0; ix != m_eri_batched->nbatches(0); ++ix) {
+		for (int ix = 0; ix != m_eri3c2e_batched->nbatches(0); ++ix) {
 			
 			LOG.os<1>("-- Batch: ", ix, '\n');
 			
 			LOG.os<1>("-- Fetching intermediate...\n");
 			
 			time_read.start();
-			m_z_xbb_batched->decompress({ix,inu});
+			m_FT3c2e_batched->decompress({ix,inu});
 			time_read.finish();
 			
-			auto z_xbb_0_12 = m_z_xbb_batched->get_work_tensor();
+			auto z_xbb_0_12 = m_FT3c2e_batched->get_work_tensor();
 			
 			vec<vec<int>> x_bounds = {
-				m_eri_batched->bounds(0,ix)
+				m_eri3c2e_batched->bounds(0,ix)
 			};
 			
 			vec<vec<int>> mn_bounds = {
-				m_eri_batched->full_bounds(1),
-				m_eri_batched->bounds(2,inu)
+				m_eri3c2e_batched->full_bounds(1),
+				m_eri3c2e_batched->bounds(2,inu)
 			};
 			
 			// form Z
@@ -366,10 +366,10 @@ void LLMP_FULL_Z::compute() {
 		}
 	}
 	
-	m_eri_batched->decompress_finalize();
-	m_z_xbb_batched->decompress_finalize();
+	m_eri3c2e_batched->decompress_finalize();
+	m_FT3c2e_batched->decompress_finalize();
 	
-	m_z_xbb_batched->reset();
+	m_FT3c2e_batched->reset();
 
 	m_zmat_01->batched_contract_finalize();	
 	

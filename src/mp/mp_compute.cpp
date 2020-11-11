@@ -2,21 +2,19 @@
 #include "mp/mp_defaults.h"
 #include "mp/z_builder.h"
 #include "math/laplace/laplace.h"
-#include "math/solvers/hermitian_eigen_solver.h"
-#include "math/linalg/LLT.h"
 #include "math/linalg/piv_cd.h"
-#include "ints/aofactory.h"
-#include "ints/screening.h"
+#include "ints/aoloader.h"
+#include <omp.h>
 #include <dbcsr_matrix_ops.hpp>
 #include <dbcsr_tensor_ops.hpp>
 #include <dbcsr_btensor.hpp>
 
 namespace mp {
 	
-mpmod::mpmod(hf::shared_hf_wfn& wfn_in, desc::options& opt_in, dbcsr::world& w_in) :
+mpmod::mpmod(dbcsr::world w, hf::shared_hf_wfn wfn_in, desc::options& opt_in) :
 	m_hfwfn(wfn_in),
+	m_world(w),
 	m_opt(opt_in),
-	m_world(w_in),
 	LOG(m_world.comm(),m_opt.get<int>("print", MP_PRINT_LEVEL)),
 	TIME(m_world.comm(), "Moller Plesset", LOG.global_plev())
 {
@@ -36,7 +34,7 @@ mpmod::mpmod(hf::shared_hf_wfn& wfn_in, desc::options& opt_in, dbcsr::world& w_i
 	
 }
 
-void mpmod::compute_batch() {
+void mpmod::compute() {
 
 	LOG.banner<>("Batched CD-LT-SOS-RI-MP2", 50, '*');
 	
@@ -84,7 +82,6 @@ void mpmod::compute_batch() {
 	
 	std::string eri_method = m_opt.get<std::string>("eris", MP_ERIS);
 	std::string intermed_method = m_opt.get<std::string>("intermeds", MP_INTERMEDS);
-	bool force_sparsity = m_opt.get<bool>("force_sparsity", MP_FORCE_SPARSITY);
 		
 	// laplace
 	double emin = eps_o->front();
@@ -120,131 +117,64 @@ void mpmod::compute_batch() {
 	//==================================================================
 	//                        INTEGRALS
 	//==================================================================
+
+	std::string metric_str = m_opt.get<std::string>("df_metric", MP_METRIC);
+	ints::metric coulmet = ints::str_to_metric(metric_str);
 	
-	std::shared_ptr<ints::aofactory> aofac 
-	 = std::make_shared<ints::aofactory>(m_hfwfn->mol(), m_world);
+	ints::aoloader aoload(m_world, m_hfwfn->mol(), m_opt);
 	
-	// screening
-	ints::shared_screener s_scr(new ints::schwarz_screener(aofac, "erfc_coulomb"));
-	
-	scrtime.start();
-	s_scr->compute();
-	scrtime.finish();
-	
-	aofac->ao_3c2e_setup("erfc_coulomb");
-	auto B_xbb = dbcsr::tensor_create<3,double>()
-		.name("i_xbb")
-		.pgrid(spgrid3_xbb)
-		.blk_sizes(xbb)
-		.map1({0}).map2({1,2})
-		.get();
+	if (coulmet == ints::metric::coulomb) {
 		
-	dbcsr::btype eri_type = dbcsr::get_btype(eri_method);
-	dbcsr::btype intermed_type = dbcsr::get_btype(intermed_method);
-	
-	std::array<int,3> bdims = {nbatches_x,nbatches_b,nbatches_b};
-	
-	dbcsr::sbtensor<3,double> B_xbb_batch = 
-		dbcsr::btensor_create<3>()
-		.name(mol->name() + "_eri_batched")
-		.pgrid(spgrid3_xbb)
-		.blk_sizes(xbb)
-		.batch_dims(bdims)
-		.btensor_type(eri_type)
-		.print(LOG.global_plev())
-		.get();
-	
-	auto gen_func = aofac->get_generator(s_scr);
-	B_xbb_batch->set_generator(gen_func);
-	
-	calcints.start();
-	
-	B_xbb_batch->compress_init({0}, vec<int>{0}, vec<int>{1,2});
-	
-	for (int ix = 0; ix != B_xbb_batch->nbatches(0); ++ix) {
-			
-			vec<vec<int>> blkbounds = {
-				B_xbb_batch->blk_bounds(0,ix),
-				B_xbb_batch->full_blk_bounds(1),
-				B_xbb_batch->full_blk_bounds(2)
-			};
+		aoload.request(ints::key::coul_xx, false);
+		aoload.request(ints::key::coul_xx_inv, true);
+		aoload.request(ints::key::scr_xbb, true);
+		aoload.request(ints::key::coul_xbb, true);
 		
-			if (eri_type != dbcsr::btype::direct) {
-				aofac->ao_3c2e_fill(B_xbb, blkbounds, s_scr);
-				B_xbb->filter(dbcsr::global::filter_eps);
-			}
-			
-			B_xbb_batch->compress({ix}, B_xbb);
+	} else if (coulmet == ints::metric::erfc_coulomb) {
+		
+		aoload.request(ints::key::erfc_xx, false);
+		aoload.request(ints::key::coul_xx, false);
+		aoload.request(ints::key::erfc_xx_inv, true);
+		aoload.request(ints::key::scr_xbb, true);
+		aoload.request(ints::key::erfc_xbb, true);
+		
+	} else if (coulmet == ints::metric::qr_fit) {
+		
+		aoload.request(ints::key::coul_xx, true);
+		aoload.request(ints::key::ovlp_xx, false);
+		aoload.request(ints::key::ovlp_xx_inv, false);
+		aoload.request(ints::key::scr_xbb, true);
+		aoload.request(ints::key::qr_xbb, true);
+		
 	}
+
+	aoload.compute();
+	auto aoreg = aoload.get_registry();
 	
-	B_xbb_batch->compress_finalize();
+	dbcsr::sbtensor<3,double> eri3c2e_batched;
+	dbcsr::shared_matrix<double> metric_matrix;
 	
-	util::registry reg;
-	
-	reg.insert_btensor<3,double>("i_xbb_batched", B_xbb_batch);
-	
-	calcints.finish();
+	if (coulmet == ints::metric::coulomb) {
+		
+		eri3c2e_batched = aoreg.get<dbcsr::sbtensor<3,double>>(ints::key::coul_xbb);
+		metric_matrix = aoreg.get<dbcsr::shared_matrix<double>>(ints::key::coul_xx_inv);
+		
+	} else if (coulmet == ints::metric::erfc_coulomb) {
+		
+		eri3c2e_batched = aoreg.get<dbcsr::sbtensor<3,double>>(ints::key::erfc_xbb);
+		metric_matrix = aoreg.get<dbcsr::shared_matrix<double>>(ints::key::erfc_xx_inv);
+		
+	} else if (coulmet == ints::metric::qr_fit) {
+		
+		eri3c2e_batched = aoreg.get<dbcsr::sbtensor<3,double>>(ints::key::qr_xbb);
+		metric_matrix = aoreg.get<dbcsr::shared_matrix<double>>(ints::key::coul_xx);
+		
+	}
 	
 	spinfotime.start();
 	SMatrixXi spinfo = nullptr;
-	if (m_opt.get<bool>("force_sparsity", MP_FORCE_SPARSITY)) {
-		spinfo = get_shellpairs(B_xbb_batch);
-	}
+	spinfo = get_shellpairs(eri3c2e_batched);
 	spinfotime.finish();
-	
-	//==================================================================
-	//                          METRIC
-	//==================================================================
-	
-	invtime.start();
-	
-	auto C_xx = aofac->ao_2c2e("coulomb");
-	auto S_erfc_xx = aofac->ao_2c2e("erfc_coulomb");
-	
-	// Ctilde = (S C-1 S)-1
-	
-	// invert C
-	//dbcsr::print(*S_erfc_xx);
-	
-	LOG.os<>("Inverting erfc overlap metric...\n");
-	
-	math::hermitian_eigen_solver solver(C_xx, 'V', true);
-	
-	solver.compute();
-	
-	auto C_inv_xx = solver.inverse();
-	//auto Ctilde_xx = solver.inverse();
-	
-	LOG.os<>("Forming tilde inv ...\n");
-	
-	auto Ctilde_inv_xx = dbcsr::create_template(C_xx)
-		.name("Ctilde_inv_xx").get();
-		
-	auto temp = dbcsr::create_template(C_xx)
-		.name("temp")
-		.matrix_type(dbcsr::type::no_symmetry)
-		.get();
-		
-	C_xx->clear();
-		
-	dbcsr::multiply('N', 'N', *S_erfc_xx, *C_inv_xx, *temp).perform();
-	dbcsr::multiply('N', 'N', *temp, *S_erfc_xx, *Ctilde_inv_xx).perform();
-	
-	S_erfc_xx->release();
-	C_inv_xx->release();
-	temp->release();
-	
-	math::hermitian_eigen_solver solver2(Ctilde_inv_xx,'V',true);
-	
-	solver2.compute();
-	
-	auto Ctilde_xx = solver2.inverse();
-	
-	Ctilde_inv_xx->release();
-	
-	Ctilde_xx->filter(dbcsr::global::filter_eps);
-	
-	invtime.finish();
 	
 	//==================================================================
 	//                         SETUP OTHER TENSORS
@@ -270,8 +200,8 @@ void mpmod::compute_batch() {
 	auto pseudo_vir = dbcsr::create_template(p_vir)
 		.name("Pseudo Density (VIR)").get();
 		
-	auto Ztilde_XX = dbcsr::create_template(Ctilde_xx)
-		.name("Ztilde_xx")
+	auto ztilde_XX = dbcsr::create_template(metric_matrix)
+		.name("ztilde_xx")
 		.matrix_type(dbcsr::type::no_symmetry)
 		.get();
 		
@@ -281,21 +211,32 @@ void mpmod::compute_batch() {
 	//                          SETUP Z BUILDER 
 	//==================================================================
 	
-	std::string zmethod = m_opt.get<std::string>("build_Z", MP_BUILD_Z);
+	std::string zmethod_str = m_opt.get<std::string>("build_Z", MP_BUILD_Z);
+	std::string intermeds_str = m_opt.get<std::string>("intermeds", MP_INTERMEDS);
 	
-	Z* zbuilder = nullptr;
+	auto zmeth = str_to_zmethod(zmethod_str);
+	auto intermeds = dbcsr::get_btype(intermeds_str);
 	
-	if (zmethod == "LLMPFULL") {
-		zbuilder = new LLMP_FULL_Z(m_world, mol, m_opt);
-	} else if (zmethod == "LLMPMEM") {
-		zbuilder = new LLMP_MEM_Z(m_world, mol, m_opt);
+	std::shared_ptr<Z> zbuilder;
+	
+	if (zmeth == zmethod::llmp_full) {
+		
+		zbuilder = create_LLMP_FULL_Z(m_world, m_hfwfn->mol(), LOG.global_plev())
+			.eri3c2e_batched(eri3c2e_batched)
+			.intermeds(intermeds)
+			.get();
+		
+	} else if (zmeth == zmethod::llmp_mem) {
+		
+		zbuilder = create_LLMP_MEM_Z(m_world, m_hfwfn->mol(), LOG.global_plev())
+			.eri3c2e_batched(eri3c2e_batched)
+			.get();
+		
 	}
 	
 	if (zbuilder == nullptr) throw std::runtime_error("Invalid z builder!");
 	
-	zbuilder->set_reg(reg);
-	
-	zbuilder->init_tensors();
+	zbuilder->init();
 	
 	zbuilder->set_shellpair_info(spinfo);
 	
@@ -382,7 +323,7 @@ void mpmod::compute_batch() {
 		
 		// multiply
 		LOG.os<1>("Ztilde = Z * Jinv\n");
-		dbcsr::multiply('N', 'N', *Z_XX, *Ctilde_xx, *Ztilde_XX)
+		dbcsr::multiply('N', 'N', *Z_XX, *metric_matrix, *ztilde_XX)
 			.filter_eps(dbcsr::global::filter_eps).perform();
 		
 		formZtilde.finish();
@@ -393,23 +334,26 @@ void mpmod::compute_batch() {
 		
 		LOG.os<1>("Local reduction.\n");
 		
-		dbcsr::iter_d iter(*Ztilde_XX);
+		dbcsr::iter_d iter(*ztilde_XX);
 		
 		double sum = 0.0;
 		
 		int nblks = x.size();
 		
-		auto Ztilde_XX_t = dbcsr::transpose(Ztilde_XX).get();
+		auto ztilde_XX_t = dbcsr::transpose(ztilde_XX).get();
 			
 		//dbcsr::print(*Ztilde_XX);
 		//dbcsr::print(*Ztilde_XX_t);
 		
-		const auto loc_rows = Ztilde_XX->local_rows();
-		const auto loc_cols = Ztilde_XX->local_cols();
+		const auto loc_rows = ztilde_XX->local_rows();
+		const auto loc_cols = ztilde_XX->local_cols();
+		
+		const int isize = loc_rows.size();
+		const int jsize = loc_cols.size();
 
 #pragma omp parallel for collapse(2) reduction(+:sum)
-		for (int i = 0; i != loc_rows.size(); ++i) {
-			for (int j = 0; j != loc_cols.size(); ++j) {
+		for (int i = 0; i != isize; ++i) {
+			for (int j = 0; j != jsize; ++j) {
 		//for (auto iblk : loc_rows) {
 		//	for (auto jblk : loc_cols) {
 				int iblk = loc_rows[i];
@@ -420,8 +364,8 @@ void mpmod::compute_batch() {
 				bool found1 = false;
 				bool found2 = false;
 				
-				auto blk = Ztilde_XX->get_block_p(iblk,jblk,found1);
-				auto blk_t = Ztilde_XX_t->get_block_p(iblk,jblk,found2);
+				auto blk = ztilde_XX->get_block_p(iblk,jblk,found1);
+				auto blk_t = ztilde_XX_t->get_block_p(iblk,jblk,found2);
 				
 				//for (int i = 0; i != blk.ntot(); ++i) {
 				//	std::cout << blk.data()[i] << " " << blk_t.data()[i] << std::endl;
@@ -456,11 +400,10 @@ void mpmod::compute_batch() {
 	
 	TIME.finish();
 	
+	aoload.print_info();
 	zbuilder->print_info();
 	TIME.print_info();
-	
-	delete zbuilder;
-	
+		
 	m_mpwfn = std::make_shared<mp_wfn>(*m_hfwfn);
 	m_mpwfn->m_mp_ss_energy = 0.0;
 	m_mpwfn->m_mp_os_energy = mp2_energy;

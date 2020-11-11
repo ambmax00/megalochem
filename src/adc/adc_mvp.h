@@ -3,7 +3,7 @@
 
 #include <dbcsr_matrix_ops.hpp>
 #include <dbcsr_tensor_ops.hpp>
-#include "utils/registry.h"
+#include "utils/ppdirs.h"
 #include "desc/options.h"
 #include "fock/jkbuilder.h"
 #include "mp/z_builder.h"
@@ -11,6 +11,22 @@
 #include "adc/adc_defaults.h"
 
 namespace adc {
+	
+enum class mvpmethod {
+	invalid,
+	ao_adc_1,
+	ao_adc_2
+};
+
+inline mvpmethod str_to_mvpmethod(std::string str) {
+	if (str == "ao_adc_1") {
+		return mvpmethod::ao_adc_1;
+	} else if (str == "ao_adc_2") {
+		return mvpmethod::ao_adc_2;
+	} else {
+		return mvpmethod::invalid;
+	}
+}
 	
 using smat = dbcsr::shared_matrix<double>;
 using stensor2 = dbcsr::shared_tensor<2,double>;
@@ -22,28 +38,17 @@ protected:
 
 	dbcsr::world m_world;
 	desc::smolecule m_mol;
-	desc::options m_opt;
 	
 	util::mpi_log LOG;
 	util::mpi_time TIME;
-	util::registry m_reg;
 	
-	svector<double> m_epso;
-	svector<double> m_epsv;
-			
-	smat m_s_bb;
-	smat m_c_bo, m_sc_bo;
-	smat m_c_bv, m_sc_bv;
-	
-	smat compute_sigma_0(smat& u_ia);
+	smat compute_sigma_0(smat& u_ia, vec<double> epso, vec<double> epsv);
 	
 	smat u_transform(smat& u_ao, char to, smat& c_bo, char tv, smat& c_bv);
 
 public:
 
-	MVP(dbcsr::world& w, desc::smolecule smol, 
-		desc::options opt, util::registry& reg,
-		svector<double> epso, svector<double> epsv);
+	MVP(dbcsr::world w, desc::smolecule smol, int nprint, std::string name);
 		
 	virtual smat compute(smat u_ia, double omega = 0.0) = 0;
 	
@@ -55,18 +60,33 @@ public:
 	
 };
 
-class MVP_ao_ri_adc1 : public MVP {
+class create_MVPAOADC1_base;
+
+class MVPAOADC1 : public MVP {
 private:
 	
 	std::shared_ptr<fock::J> m_jbuilder;
 	std::shared_ptr<fock::K> m_kbuilder;
+	
+	dbcsr::sbtensor<3,double> m_eri3c2e_batched;
+	dbcsr::sbtensor<3,double> m_fitting_batched;
+	dbcsr::shared_matrix<double> m_v_xx;
+	
+	svector<double> m_eps_occ;
+	svector<double> m_eps_vir;
+
+	smat m_c_bo;
+	smat m_c_bv;
+	
+	fock::kmethod m_kmethod;
+	fock::jmethod m_jmethod;
+
+	friend class create_MVPAOADC1_base;
 
 public:
 
-	MVP_ao_ri_adc1(dbcsr::world& w, desc::smolecule smol,
-		desc::options opt, util::registry& reg,
-		svector<double> epso, svector<double> epsv) :
-		MVP(w,smol,opt,reg,epso,epsv) {}
+	MVPAOADC1(dbcsr::world w, desc::smolecule smol, int nprint) : 
+		MVP(w,smol,nprint,"MVPAOADC1") {}
 		
 	void init() override;
 	
@@ -79,10 +99,31 @@ public:
 		m_kbuilder->print_info();
 	}
 	
-	~MVP_ao_ri_adc1() override {}
+	~MVPAOADC1() override {}
 	
 };
 
+MAKE_STRUCT(
+	MVPAOADC1, MVP,
+	(
+		(world, (dbcsr::world)),
+		(mol, (desc::smolecule)),
+		(print, (int))
+	),
+	(
+		(eri3c2e_batched, (dbcsr::sbtensor<3,double>), required, val),
+		(fitting_batched, (dbcsr::sbtensor<3,double>), optional, val, nullptr),
+		(v_xx, (dbcsr::shared_matrix<double>), optional, val, nullptr),
+		(c_bo, (dbcsr::shared_matrix<double>), required, val),
+		(c_bv, (dbcsr::shared_matrix<double>), required, val),
+		(eps_occ, (std::shared_ptr<std::vector<double>>), required, val),
+		(eps_vir, (std::shared_ptr<std::vector<double>>), required, val),
+		(kmethod, (fock::kmethod), optional, val, fock::kmethod::dfao),
+		(jmethod, (fock::jmethod), optional, val, fock::jmethod::dfao)
+	)
+)
+
+/*
 class MVP_ao_ri_adc2 : public MVP {
 private:
 
@@ -156,8 +197,8 @@ public:
 	smat compute(smat u_ia, double omega) override;
 	
 	~MVP_ao_ri_adc2() override {}
-	
-};
+
+};*/
 	
 
 } // end namespace

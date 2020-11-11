@@ -71,23 +71,9 @@ void adcmod::compute() {
 			
 		}
 		
-		MVP* mvfacptr = new MVP_ao_ri_adc1(m_world, m_hfwfn->mol(), 
-			m_opt, m_reg, epso, epsv);
-		std::shared_ptr<MVP> mvfac(mvfacptr);
-		
-		mvfac->init();
-		//auto out = mvfac->compute(dav_guess[0], 0.3); 
-		
-		//double t = out->dot(*dav_guess[0]);
-		//std::cout << "DOT: " << t << std::endl;
-		
-		//dbcsr::print(*dav_guess[0]);
-		
-		//exit(0); 
-		
 		math::davidson<MVP> dav(m_world.comm(), LOG.global_plev());
 		
-		dav.set_factory(mvfac);
+		dav.set_factory(m_adc1_mvp);
 		dav.set_diag(m_d_ov);
 		dav.pseudo(false);
 		dav.conv(1e-6);
@@ -101,16 +87,15 @@ void adcmod::compute() {
 		dav.compute(dav_guess, nroots);
 		t_davidson.finish();
 		
-		mvfac->print_info();
+		m_adc1_mvp->print_info();
 		
 		LOG.os<>("Excitation energy of state nr. ", m_nroots, ": ", dav.eigval(), '\n');
 		
 		auto rvecs = dav.ritz_vectors();
 		auto vec_k = rvecs[m_nroots-1];
 		
-		auto c_bo = m_reg.get_matrix<double>("c_bo");
-		auto c_bv = m_reg.get_matrix<double>("c_bv");
-		auto s_bb = m_reg.get_matrix<double>("s_bb");
+		auto c_bo = m_hfwfn->c_bo_A();
+		auto c_bv = m_hfwfn->c_bv_A();
 		
 		LOG.os<>("AOs\n");
 		
@@ -136,9 +121,6 @@ void adcmod::compute() {
 		
 		auto p = m_hfwfn->po_bb_A();
 		
-		v_bb->filter(1e-5);
-		p->filter(1e-5);
-		
 		//dbcsr::print(*v_bb);
 		
 		LOG.os<>("Occupation: ", v_bb->occupation() * 100, "%\n");
@@ -146,77 +128,49 @@ void adcmod::compute() {
 		
 		// list of exitations
 		
-		int nbas = m_hfwfn->mol()->c_basis()->nbf();
-		
-		auto v_ia_eigen = dbcsr::matrix_to_eigen(v_bb);
-		
-		auto get_lists = [&](std::vector<bool>& occ_list,
-			std::vector<bool>& vir_list, double t)
-		{
-		
-			for (int i = 0; i != nbas; ++i) {
-				for (int a = 0; a != nbas; ++a) {
-					if (fabs(v_ia_eigen(i,a)) > t) {
-						occ_list[i] = true;
-						vir_list[a] = true;
-						//LOG.os<>(i, " -> ", a, " ", v_ia_eigen(i,a), '\n');
-					}
-				}
-			}
-			
-		};
-		
-		auto count = [](std::vector<bool>& v) {
-			int ntot = 0;
-			for (auto b : v) {
-				ntot += (b) ? 1 : 0;
-			}
-			return ntot;
-		};
-		
-		std::vector<std::vector<bool>> occs(8, std::vector<bool>(nbas));
-		std::vector<std::vector<bool>> virs(8, std::vector<bool>(nbas));
-			
-		for (int n = 0; n != 8; ++n) {
-			
-			double t = pow(10.0, -n);
-			
-			get_lists(occs[n], virs[n], t);
-			int no = count(occs[n]);
-			int nv = count(virs[n]);
-			
-			LOG.os<>("T: ", t, " with ", no, "/", nbas, " and ", nv, "/", nbas, '\n');
-			
-		}
-		
 		// Which blocks are absent?
-		std::vector<int> blk_list(b.size(),0);
+		vec<vec<int>> blk_list(10, vec<int>(b.size(),0));
 		
 		dbcsr::iterator<double> iter(*v_bb);
 		iter.start();
+		
+		double eps = 1e-5;
 		
 		while (iter.blocks_left()) {
 			
 			iter.next_block();
 			
-			blk_list[iter.row()] = 1;
-			blk_list[iter.col()] = 1;
+			for (int i = 0; i != iter.row_size(); ++i) {
+				for (int j = 0; j != iter.col_size(); ++j) {
+					
+					for (int e = 0; e != 10; ++e) {
+						if (fabs(iter(i,j)) > pow(10,-e)) {
+							blk_list[e][iter.row()] = 1;
+							blk_list[e][iter.col()] = 1;
+						}
+					}
+				}
+			} 
 			
 		}
 		
 		iter.stop();
 			
 		int nblk = 0;
-		std::vector<int> blk_list_tot(blk_list.size());
+		vec<vec<int>> blk_list_tot(10, vec<int>(b.size(), 0));
 		
-		MPI_Allreduce(blk_list.data(), blk_list_tot.data(), blk_list_tot.size(), 
-			MPI_INT, MPI_LOR, m_world.comm());
-		
-		for (auto b : blk_list_tot) {
-			if (b > 0) nblk++;
+		for (int i = 0; i != 10; ++i) {
+			MPI_Allreduce(blk_list[i].data(), blk_list_tot[i].data(), blk_list_tot[i].size(), 
+				MPI_INT, MPI_LOR, m_world.comm());
 		}
 		
-		LOG.os<>("Basis blocks: ", nblk, " out of ", b.size(), '\n'); 
+		for (int i = 0; i != 10; ++i) {
+			int nblk = 0;
+			for (auto& e : blk_list_tot[i]) {
+				if (e) nblk++;
+			}
+			LOG.os<>("Basis blocks (1e-", i , "): ", nblk, " out of ", b.size(), '\n'); 
+		}
 		
 		TIME.print_info();
 		

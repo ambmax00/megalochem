@@ -5,14 +5,16 @@
 
 namespace fock {
 
-EXACT_J::EXACT_J(dbcsr::world& w, desc::options& iopt) : J(w,iopt,"EXACT_J") {} 
-EXACT_K::EXACT_K(dbcsr::world& w, desc::options& iopt) : K(w,iopt,"EXACT_K") {}
+EXACT_J::EXACT_J(dbcsr::world w, desc::smolecule mol, int print) 
+	: J(w,mol,print,"EXACT_J") {} 
+EXACT_K::EXACT_K(dbcsr::world w, desc::smolecule mol, int print) 
+	: K(w,mol,print,"EXACT_K") {} 
 
 void EXACT_J::init() {
 	
 	init_base();
 
-	auto b = m_p_A->row_blk_sizes();
+	auto b = m_mol->dims().b();
 	vec<int> d = {1};
 	
 	arrvec<int,3> bbd = {b,b,d};
@@ -25,16 +27,14 @@ void EXACT_J::init() {
 		.map1({0,1}).map2({2}).blk_sizes(bbd).get();
 	
 	m_ptot_bbd = dbcsr::tensor_create_template<3>(m_J_bbd).name("p dummy").get();
-	
-	m_eri_batched = m_reg.get<dbcsr::sbtensor<4,double>>(Jkey::eri_bbbb);
-	
+		
 }
 
 void EXACT_K::init() {
 	
 	init_base();
 	
-	auto b = m_p_A->row_blk_sizes();
+	auto b = m_mol->dims().b();
 	vec<int> d = {1};
 	
 	arrvec<int,3> bbd = {b,b,d};
@@ -48,7 +48,6 @@ void EXACT_K::init() {
 	
 	m_p_bbd = dbcsr::tensor_create_template<3>(m_K_bbd).name("p dummy").get();
 	
-	m_eri_batched = m_reg.get<dbcsr::sbtensor<4,double>>(Kkey::eri_bbbb);
 	
 }	
 
@@ -78,17 +77,17 @@ void EXACT_J::compute_J() {
 	m_ptot_bbd->filter(dbcsr::global::filter_eps);
 	
 	//m_J_bbd->batched_contract_init();
-	m_eri_batched->decompress_init({2,3},vec<int>{0,1},vec<int>{2,3});
+	m_eri4c2e_batched->decompress_init({2,3},vec<int>{0,1},vec<int>{2,3});
 	
-	for (int imu = 0; imu != m_eri_batched->nbatches(2); ++imu) {
-		for (int inu = 0; inu != m_eri_batched->nbatches(3); ++inu) {
+	for (int imu = 0; imu != m_eri4c2e_batched->nbatches(2); ++imu) {
+		for (int inu = 0; inu != m_eri4c2e_batched->nbatches(3); ++inu) {
 			
-			m_eri_batched->decompress({imu,inu});
-			auto eri_01_23 = m_eri_batched->get_work_tensor();
+			m_eri4c2e_batched->decompress({imu,inu});
+			auto eri_01_23 = m_eri4c2e_batched->get_work_tensor();
 			
 			vec<vec<int>> ls_bounds = {
-				m_eri_batched->bounds(2, imu),
-				m_eri_batched->bounds(3, inu)
+				m_eri4c2e_batched->bounds(2, imu),
+				m_eri4c2e_batched->bounds(3, inu)
 			};
 			
 			dbcsr::contract(*m_ptot_bbd, *eri_01_23, *m_J_bbd)
@@ -97,7 +96,7 @@ void EXACT_J::compute_J() {
 		}
 	}
 			
-	m_eri_batched->decompress_finalize();
+	m_eri4c2e_batched->decompress_finalize();
 	//m_J_bbd->batched_contract_finalize();
 	
 	if (LOG.global_plev() >= 3) {
@@ -124,18 +123,18 @@ void EXACT_K::compute_K() {
 		LOG.os<1>("Computing exchange term (", x, ") ... \n");
 		
 		//m_K_bbd->batched_contract_init();
-		m_eri_batched->decompress_init({1,3}, vec<int>{0,2}, vec<int>{1,3});
+		m_eri4c2e_batched->decompress_init({1,3}, vec<int>{0,2}, vec<int>{1,3});
 	
-		for (int imu = 0; imu != m_eri_batched->nbatches(1); ++imu) {
-			for (int inu = 0; inu != m_eri_batched->nbatches(3); ++inu) {
+		for (int imu = 0; imu != m_eri4c2e_batched->nbatches(1); ++imu) {
+			for (int inu = 0; inu != m_eri4c2e_batched->nbatches(3); ++inu) {
 			
-				m_eri_batched->decompress({imu,inu});
+				m_eri4c2e_batched->decompress({imu,inu});
 				
-				auto eri_02_13 = m_eri_batched->get_work_tensor();
+				auto eri_02_13 = m_eri4c2e_batched->get_work_tensor();
 				
 				vec<vec<int>> ls_bounds = {
-					m_eri_batched->bounds(1, imu),
-					m_eri_batched->bounds(3, inu)
+					m_eri4c2e_batched->bounds(1, imu),
+					m_eri4c2e_batched->bounds(3, inu)
 				};
 				
 				dbcsr::contract(*m_p_bbd, *eri_02_13, *m_K_bbd)
@@ -145,7 +144,7 @@ void EXACT_K::compute_K() {
 			}
 		}
 			
-		m_eri_batched->decompress_finalize();
+		m_eri4c2e_batched->decompress_finalize();
 		//m_K_bbd->batched_contract_finalize();
 	
 		dbcsr::copy_3Dtensor_to_matrix_new(*m_K_bbd,*k);

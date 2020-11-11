@@ -5,6 +5,7 @@
 #include "hf/hf_wfn.h"
 #include "utils/mpi_time.h"
 #include "adc/adc_defaults.h"
+#include "adc/adc_mvp.h"
 #include "utils/registry.h"
 #include "ints/fitting.h"
 #include <dbcsr_matrix.hpp>
@@ -13,24 +14,7 @@
 #include <mpi.h>
 
 namespace adc {
-	
-enum class method {
-	invalid,
-	//ri_adc_1,
-	//ri_adc_2,
-	//sos_ri_adc_2,
-	ao_adc_1,
-	ao_adc_2
-};
 
-static const std::map<std::string,method> method_map = 
-{
-	//{"ri_adc_1", method::ri_adc_1},
-	//{"ri_adc_2", method::ri_adc_2},
-	//{"sos_ri_adc_2", method::sos_ri_adc_2},
-	{"ao_adc_1", method::ao_adc_1},
-	{"ao_adc_2", method::ao_adc_2}
-};
 	
 class adcmod {
 private:
@@ -47,24 +31,23 @@ private:
 	
 	int m_nroots; 
 	
-	method m_method;
+	mvpmethod m_mvpmethod;
+	ints::metric m_metric;
+	fock::kmethod m_kmethod;
+	fock::jmethod m_jmethod;
 	
-	std::string m_jmethod, m_kmethod, m_zmethod;
+	std::shared_ptr<MVP> m_adc1_mvp;
 	
 	double m_c_os;
 	double m_c_osc;
-	
-	util::registry m_reg;
-	
+		
 	dbcsr::shared_pgrid<2> m_spgrid2;
 	dbcsr::shared_pgrid<2> m_spgrid2_bo;
 	dbcsr::shared_pgrid<2> m_spgrid2_bv;
 	dbcsr::shared_pgrid<3> m_spgrid3_xbb;
 
 	dbcsr::shared_matrix<double> m_d_ov;
-	
-	std::shared_ptr<ints::dfitting> m_dfit;
-	
+		
 	void analyze_sparsity(dbcsr::shared_matrix<double> u_ia, 
 		dbcsr::shared_matrix<double> c_loc_o, dbcsr::shared_matrix<double> u_loc_o,
 		dbcsr::shared_matrix<double> c_loc_v, dbcsr::shared_matrix<double> u_loc_v); 
@@ -79,7 +62,7 @@ private:
 	
 public:	
 
-	adcmod(hf::shared_hf_wfn hfref, desc::options& opt, dbcsr::world& w);
+	adcmod(dbcsr::world w, hf::shared_hf_wfn hfref, desc::options& opt);
 	~adcmod() {}
 	
 	void compute();

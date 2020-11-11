@@ -393,9 +393,7 @@ void aoloader::compute() {
 		
 		if (eri_occupation > 100) throw std::runtime_error(
 			"3c2e integrals occupation more than 100%");
-	
-		auto mat = dfit.compute_idx(eri_batched);
-		
+			
 	}
 	
 	if (comp(key::dfit_coul_xbb) || comp(key::dfit_erfc_xbb)) {
@@ -423,9 +421,7 @@ void aoloader::compute() {
 		
 		auto c_xbb_batched = dfit.compute(eri_batched, inv, 
 			m_opt.get<std::string>("intermeds", "core"));
-			
-		auto mat = dfit.compute_idx(c_xbb_batched);
-			
+						
 		if (comp(key::dfit_coul_xbb)) m_reg.insert(key::dfit_coul_xbb, c_xbb_batched);
 		if (comp(key::dfit_erfc_xbb)) m_reg.insert(key::dfit_erfc_xbb, c_xbb_batched);
 		
@@ -451,7 +447,7 @@ void aoloader::compute() {
 	
 	}
 	
-	if (comp(key::dfit_qr_xbb)) {
+	if (comp(key::qr_xbb)) {
 		
 		LOG.os<>("Computing fitting coefficients (QR)\n");
 		
@@ -470,16 +466,50 @@ void aoloader::compute() {
 		
 		auto c_xbb_qr = dfit.compute_qr_new(s_xx_inv, m_xx, spgrid3, scr, 
 			bdims, dbcsr::btype::core, true);
-		m_reg.insert(key::dfit_qr_xbb, c_xbb_qr);
+		m_reg.insert(key::qr_xbb, c_xbb_qr);
 		
 		auto mat = dfit.compute_idx(c_xbb_qr);
-	
+			
 		time.finish();
 	
 	}
 	
+	if (comp(key::dfit_qr_xbb)) {
+		
+		LOG.os<>("Computing (P|Q) cfit_qr_Pmn\n");
+		
+		auto& time = TIME.sub("(P|Q) Density fitting coefficients");
+		time.start();
+		
+		//LOG.os<1>("Computing fitting coefficients.\n");
+		
+		auto qr_batched = m_reg.get<sbt3>(ints::key::qr_xbb);
+		auto v = m_reg.get<smatd>(ints::key::coul_xx);
+		
+		auto c_xbb_batched = dfit.compute(qr_batched, v, 
+			m_opt.get<std::string>("intermeds", "core"));
+						
+		m_reg.insert(key::dfit_qr_xbb, c_xbb_batched);
+		
+		time.finish();
+		
+	}
+		
+	
 	TIME.finish();
 	LOG.os<>("Finished loading AO quantities.\n");
+	
+	for (int i = 0; i != m_to_compute.size(); ++i) {
+		
+		ints:key k = static_cast<ints::key>(i);
+		if (m_reg.present(k) && !m_to_keep[i]) {
+			m_reg.erase(k);
+		}
+		
+		m_to_compute[i] = false;
+		m_to_keep[i] = false;
+	}
+	
 	
 }
 	

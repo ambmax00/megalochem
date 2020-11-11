@@ -134,10 +134,10 @@ void pivinc_cd::compute() {
 	c_pdgeadd('N', N, N, 1.0, U.data(), 0, 0, U.desc().data(), 
 		0.0, Ucopy.data(), 0, 0, Ucopy.desc().data());
 	
-	if (LOG.global_plev() >= 3) {
-		LOG.os<3>("-- Input matrix: \n");
-		U.print();
-	}
+	//if (LOG.global_plev() >= 3) {
+	//	LOG.os<3>("-- Input matrix: \n");
+	//	U.print();
+	//}
 	
 	// permutation vector
 	
@@ -187,13 +187,13 @@ void pivinc_cd::compute() {
 			
 	}
 	
-	LOG.os<>("-- Problem size: ", N, '\n');
+	LOG.os<1>("-- Problem size: ", N, '\n');
 	LOG.os<1>("-- Maximum diagonal element of input matrix: ", max_U_diag_global, '\n');
 	
 	m_thresh = N * std::numeric_limits<double>::epsilon() * max_U_diag_global;
 	double thresh = m_thresh; /*N * std::numeric_limits<double>::epsilon() * max_U_diag_global;*/
 	
-	LOG.os<>("-- Threshold: ", thresh, '\n');
+	LOG.os<1>("-- Threshold: ", thresh, '\n');
 	
 	std::function<void(int)> cd_step;
 	cd_step = [&](int I) {
@@ -341,10 +341,10 @@ void pivinc_cd::compute() {
 		
 	};
 	
-	LOG.os<>("-- Starting recursive decomposition.\n");
+	LOG.os<1>("-- Starting recursive decomposition.\n");
 	cd_step(0);
 	
-	LOG.os<>("-- Rank of L: ", m_rank, '\n');
+	LOG.os<1>("-- Rank of L: ", m_rank, '\n');
 	
 	for (int ir = 0; ir != LOCr; ++ir) {
 		ipiv_r[ir] = perms[U.iglob(ir)];
@@ -352,7 +352,7 @@ void pivinc_cd::compute() {
 		
 	//printp(ipiv_r,LOCr);
 	
-	LOG.os<>("-- Permuting L.\n");
+	LOG.os<1>("-- Permuting L.\n");
 	
 	//L.print();
 	

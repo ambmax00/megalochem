@@ -4,6 +4,10 @@
 #define CAT(a, ...) PRIMITIVE_CAT(a, __VA_ARGS__)
 #define PRIMITIVE_CAT(a, ...) a ## __VA_ARGS__
 
+#define PASTE(x, ...) x ## __VA_ARGS__
+#define EVALUATING_PASTE(x, ...) PASTE(x, __VA_ARGS__)
+#define UNPAREN_IF(x) EVALUATING_PASTE(NOTHING_, EXTRACT x)
+
 #define UNPAREN(...) __VA_ARGS__
 #define WRAP(FUNC, ...) 
 
@@ -245,12 +249,18 @@ print('\n')
 #define PUSH_FRONT(val, args) \
 	(val,UNPAREN args)
 
-#define INITPARAM(arg) \
+#define INITPARAM(name, type) \
 	private: \
-		_GET_2 arg CAT(c_, _GET_1 arg);
+		UNPAREN type CAT(c_, name);
 
-#define CONSTRUCTOR(arg) \
-	_GET_2 arg CAT(i_, _GET_1 arg)
+#define INITPARAM_WRAP(arg) \
+	INITPARAM(_GET_1 arg, _GET_2 arg)
+
+#define CONSTRUCTOR(name, type) \
+	UNPAREN type CAT(i_, name)
+	
+#define CONSTRUCTOR_WRAP(arg) \
+	CONSTRUCTOR(_GET_1 arg, _GET_2 arg)
 
 #define INITIALIZER(arg) \
 	CAT(c_,_GET_1 arg) (CAT(i_, _GET_1 arg))
@@ -259,9 +269,9 @@ print('\n')
 	CAT(i_,_GET_1 arg)
 
 #define MAKE_CONSTR(structname, args) \
-	ITERATE(INITPARAM, (), args) \
-	private: \
-		CAT(CAT(create_, structname),_base)(ITERATE(CONSTRUCTOR, (,), args)) \
+	ITERATE(INITPARAM_WRAP, (), args) \
+	public: \
+		CAT(CAT(create_, structname),_base)(ITERATE(CONSTRUCTOR_WRAP, (,), args)) \
 		: ITERATE(INITIALIZER, (,), args) {}
 	
 #define MAKE_PARAM_WRAP(arg) \
@@ -269,9 +279,9 @@ print('\n')
 
 #define MAKE_PARAM(name, type, reqopt, valref) \
 	private: \
-	reqopt<type,valref> CAT(c_, name); \
+	reqopt<UNPAREN type,valref> CAT(c_, name); \
 	public: \
-	_create_base& name(reqopt<type,valref> in) { \
+	_create_base& name(reqopt<UNPAREN type,valref> in) { \
 		CAT(c_, name) = in; \
 		return *this; \
 	}
@@ -291,8 +301,8 @@ print('\n')
 
 #define MAKE_GETTER(args1, args2) \
 	std::shared_ptr<_base> get() { \
-		std::shared_ptr<_derived> ptr = new _derived( \
-			ITERATE(INIT_GETTER, (,), args1)); \
+		std::shared_ptr<_derived> ptr(new _derived( \
+			ITERATE(INIT_GETTER, (,), args1))); \
 		ITERATE(INIT_SETTER, (), args2) \
 		std::shared_ptr<_base> out = ptr; \
 		return ptr; \
@@ -308,8 +318,8 @@ print('\n')
 		ITERATE(MAKE_PARAM_WRAP, (), args2) \
 		MAKE_GETTER(args1, args2) \
 	}; \
-	CAT(CAT(create_, structname), _base)& CAT(create_, structname)( \
-		ITERATE(CONSTRUCTOR, (,), args1) \
+	inline CAT(CAT(create_, structname), _base) CAT(create_, structname)( \
+		ITERATE(CONSTRUCTOR_WRAP, (,), args1) \
 		) { \
 		return CAT(CAT(create_, structname), _base)( \
 		ITERATE(FORWARD, (,), args1) \

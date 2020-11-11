@@ -7,7 +7,7 @@
 
 namespace hf {
 	
-hfmod::hfmod(desc::smolecule mol, desc::options opt, dbcsr::world& w) 
+hfmod::hfmod(dbcsr::world w, desc::smolecule mol, desc::options opt) 
 	: m_mol(mol), 
 	  m_opt(opt), 
 	  m_world(w),

@@ -4,7 +4,7 @@
 #include "adc/adc_defaults.h"
 
 namespace adc {
-	
+#if 0
 void MVP_ao_ri_adc2::compute_intermeds() {
 	
 	/* computes
@@ -1565,5 +1565,5 @@ smat MVP_ao_ri_adc2::compute(smat u_ia, double omega) {
 	return sig_0;
 	
 }
-	
+#endif
 } // end namespace

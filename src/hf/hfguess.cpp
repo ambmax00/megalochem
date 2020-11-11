@@ -249,7 +249,7 @@ void hfmod::compute_guess() {
 			
 			dbcsr::world at_world(mycomm);
 			
-			hf::hfmod atomic_hf(at_smol,at_opt,at_world);
+			hf::hfmod atomic_hf(at_world,at_smol,at_opt);
 			
 			LOG(m_world.rank()).os<1>("Starting Atomic UHF for atom nr. ", I, " on rank ", m_world.rank(), '\n');
 			atomic_hf.compute();

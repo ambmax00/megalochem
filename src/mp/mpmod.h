@@ -22,12 +22,10 @@ private:
 	
 public:
 
-	mpmod(hf::shared_hf_wfn& wfn_in, desc::options& opt_in, dbcsr::world& w);
+	mpmod(dbcsr::world w, hf::shared_hf_wfn wfn_in, desc::options& opt_in);
 	~mpmod() {}
 	
 	void compute();
-	
-	void compute_batch();
 	
 	smp_wfn wfn() {
 		return m_mpwfn;

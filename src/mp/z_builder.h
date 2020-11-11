@@ -7,11 +7,29 @@
 #include <dbcsr_btensor.hpp>
 #include <Eigen/Core>
 #include "utils/mpi_time.h"
-#include "utils/registry.h"
-#include "desc/options.h"
+#include "utils/ppdirs.h"
 #include "desc/molecule.h"
 
 namespace mp {
+
+enum class zmethod {
+	invalid,
+	llmp_full,
+	llmp_mem,
+	llmp_asym
+};
+
+inline zmethod str_to_zmethod(std::string str) {
+	if (str == "llmp_full") {
+		return zmethod::llmp_full;
+	} else if (str == "llmp_mem") {
+		return zmethod::llmp_mem;
+	} else if (str == "llmp_asym") {
+		return zmethod::llmp_asym;
+	} else {
+		return zmethod::invalid;
+	}
+}
 
 using SMatrixXi = std::shared_ptr<Eigen::MatrixXi>;
 SMatrixXi get_shellpairs(dbcsr::sbtensor<3,double> eri_batched);
@@ -21,8 +39,6 @@ protected:
 
 	dbcsr::world m_world;
 	desc::smolecule m_mol;
-	desc::options m_opt;
-	util::registry m_reg;
 	util::mpi_log LOG;
 	util::mpi_time TIME;
 	
@@ -40,11 +56,10 @@ protected:
 
 public:
 
-	Z(dbcsr::world& w, desc::smolecule smol, desc::options opt, std::string mname) : 
+	Z(dbcsr::world w, desc::smolecule smol, int nprint, std::string mname) : 
 		m_world(w),
 		m_mol(smol),
-		m_opt(opt),
-		LOG(m_world.comm(), m_opt.get<int>("print", 0)),
+		LOG(m_world.comm(), nprint),
 		TIME (m_world.comm(), mname) {}
 
 	Z& set_occ_density(dbcsr::smat_d& pocc) {
@@ -67,17 +82,12 @@ public:
 		return *this;
 	}
 	
-	Z& set_reg(util::registry& reg) {
-		m_reg = reg;
-		return *this;
-	}
-	
 	Z& set_shellpair_info(SMatrixXi& spinfo) {
 		m_shellpair_info = spinfo;
 		return *this;
 	}
 	 
-	virtual void init_tensors() = 0;
+	virtual void init() = 0;
 	virtual void compute() = 0;
 	
 	virtual ~Z() {}
@@ -92,21 +102,26 @@ public:
 	
 };
 
+class create_LLMP_FULL_Z_base;
+
 class LLMP_FULL_Z : public Z {
 private:	
 	
-	dbcsr::sbtensor<3,double> m_eri_batched;
-	dbcsr::sbtensor<3,double> m_z_xbb_batched;
+	dbcsr::sbtensor<3,double> m_eri3c2e_batched;
+	dbcsr::btype m_intermeds;
 	
+	dbcsr::sbtensor<3,double> m_FT3c2e_batched;
 	dbcsr::shared_tensor<2,double> m_locc_01;
 	dbcsr::shared_tensor<2,double> m_pvir_01;
 	
+	friend class create_LLMP_FULL_Z_base;
+	
 public:
 
-	LLMP_FULL_Z(dbcsr::world& w, desc::smolecule smol, desc::options& opt) :
-		Z(w,smol,opt,"LLMP_FULL") {}
+	LLMP_FULL_Z(dbcsr::world w, desc::smolecule smol, int nprint) :
+		Z(w,smol,nprint,"LLMP_FULL") {}
 
-	void init_tensors() override;
+	void init() override;
 	void compute() override;
 	
 	~LLMP_FULL_Z() override {}
@@ -114,20 +129,37 @@ public:
 	
 };
 
+MAKE_STRUCT(
+	LLMP_FULL_Z, Z,
+	(
+		(world, (dbcsr::world)),
+		(mol, (desc::smolecule)),
+		(print, (int))
+	),
+	(
+		(eri3c2e_batched, (dbcsr::sbtensor<3,double>), required, val),
+		(intermeds, (dbcsr::btype), required, val)
+	)
+)
+
+class create_LLMP_MEM_Z_base;
+
 class LLMP_MEM_Z : public Z {
 private:	
 	
-	dbcsr::sbtensor<3,double> m_eri_batched;
+	dbcsr::sbtensor<3,double> m_eri3c2e_batched;
 	
 	dbcsr::shared_tensor<2,double> m_locc_01;
 	dbcsr::shared_tensor<2,double> m_pvir_01;
 	
+	friend class create_LLMP_MEM_Z_base;
+	
 public:
 
-	LLMP_MEM_Z(dbcsr::world& w, desc::smolecule smol, desc::options& opt) :
-		Z(w,smol,opt,"LLMP_MEM") {}
+	LLMP_MEM_Z(dbcsr::world w, desc::smolecule smol, int nprint) :
+		Z(w,smol,nprint,"LLMP_MEM") {}
 
-	void init_tensors() override;
+	void init() override;
 	void compute() override;
 	
 	~LLMP_MEM_Z() override {}
@@ -135,48 +167,55 @@ public:
 	
 };
 
+MAKE_STRUCT(
+	LLMP_MEM_Z, Z,
+	(
+		(world, (dbcsr::world)),
+		(mol, (desc::smolecule)),
+		(print, (int))
+	),
+	(
+		(eri3c2e_batched, (dbcsr::sbtensor<3,double>), required, val)
+	)
+)
+
+class create_LLMP_ASYM_Z_base;
+
 class LLMP_ASYM_Z : public Z {
 private:	
 	
-	dbcsr::sbtensor<3,double> m_eri_batched;
-	dbcsr::sbtensor<3,double> m_t_batched;
+	dbcsr::sbtensor<3,double> m_t3c2e_right_batched;
+	dbcsr::sbtensor<3,double> m_t3c2e_left_batched;
 	
 	dbcsr::shared_tensor<2,double> m_locc_01;
 	dbcsr::shared_tensor<2,double> m_pvir_01;
 	
+	friend class create_LLMP_ASYM_Z_base;
+	
 public:
 
-	LLMP_ASYM_Z(dbcsr::world& w, desc::smolecule& smol, desc::options& opt) :
-		Z(w,smol,opt,"LLMP_MEM") {}
+	LLMP_ASYM_Z(dbcsr::world w, desc::smolecule& smol, int nprint) :
+		Z(w,smol,nprint,"LLMP_MEM") {}
 
-	void init_tensors() override;
+	void init() override;
 	void compute() override;
 	
 	~LLMP_ASYM_Z() override {}
 	
-	
 };
 
-inline std::shared_ptr<Z> get_Z(
-	std::string name, dbcsr::world& w, desc::smolecule smol, desc::options opt) {
-	
-	std::shared_ptr<Z> out;
-	Z* ptr = nullptr;
-	
-	if (name == "LLMPFULL") {
-		ptr = new LLMP_FULL_Z(w,smol,opt);
-	} else if (name == "LLMPMEM") {
-		ptr = new LLMP_MEM_Z(w,smol,opt);
-	}
-	
-	if (!ptr) {
-		throw std::runtime_error("INVALID Z BUILDER SPECIFIED");
-	}
-	
-	out.reset(ptr);
-	return out;
-
-}
+MAKE_STRUCT(
+	LLMP_ASYM_Z, Z,
+	(
+		(world, (dbcsr::world)),
+		(mol, (desc::smolecule)),
+		(print, (int))
+	),
+	(
+		(t3c2e_left_batched, (dbcsr::sbtensor<3,double>), required, val),
+		(t3c2e_right_batched, (dbcsr::sbtensor<3,double>), required, val)
+	)
+)
 
 } // end namespace
 

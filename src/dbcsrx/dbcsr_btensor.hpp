@@ -75,10 +75,10 @@ inline vec<vec<int>> make_blk_bounds(std::vector<int> blksizes,
 		
 	}
 	
-	std::cout << "BOUNDS: " << out.size() << std::endl;
+	/*std::cout << "BOUNDS: " << out.size() << std::endl;
 	for (auto p : out) {
 		std::cout << p[0] << " " << p[1] << std::endl;
-	}
+	}*/
 	
 	if (out.size() == 0) throw std::runtime_error("Block bounds are zero.");
 	

@@ -35,7 +35,8 @@ enum class key {
 	dfit_pari_xbb = 20,
 	dfit_qr_xbb = 21,
 	scr_xbb = 22,
-	NUM_KEYS = 23
+	qr_xbb = 23,
+	NUM_KEYS = 24
 };
 	
 class aoloader {
@@ -51,6 +52,7 @@ private:
 	util::key_registry<key> m_reg;
 
 	std::array<bool,static_cast<const int>(key::NUM_KEYS)> m_to_compute;
+	std::array<bool,static_cast<const int>(key::NUM_KEYS)> m_to_keep;
 
 	std::pair<dbcsr::shared_matrix<double>,dbcsr::shared_matrix<double>>
 		invert(dbcsr::shared_matrix<double> mat);
@@ -70,8 +72,11 @@ public:
 		for (auto& a : m_to_compute) a = false;		
 	}
 		
-	aoloader& request(key k) {
+	aoloader& request(key k, bool keep) {
 		m_to_compute[static_cast<int>(k)] = true;
+		
+		bool& keep_prev = m_to_keep[static_cast<int>(k)];
+		keep_prev = (keep_prev) ? true : keep;
 		return *this;
 	}
 	
