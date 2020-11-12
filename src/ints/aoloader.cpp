@@ -283,7 +283,7 @@ void aoloader::compute() {
 		std::shared_ptr<ints::screener> scr;
 		//if (comp(key::coul_xbb)) 
 		//if (comp(key::erfc_xbb)) scr.reset(new ints::schwarz_screener(m_aofac,"erfc_coulomb"));
-		scr.reset(new ints::schwarz_screener(m_aofac,"coulomb"));		
+		scr.reset(new ints::schwarz_screener(m_world, m_mol));		
 		scr->compute();
 				
 		m_reg.insert(key::scr_xbb,scr);

@@ -14,28 +14,27 @@ namespace ints {
 class screener {
 protected:
 
-	std::shared_ptr<aofactory> p_fac;
-	std::string m_method;
+	dbcsr::world m_world;
+	desc::smolecule m_mol;
+	
+	aofactory m_fac;
 	
 	double m_blk_threshold = dbcsr::global::filter_eps;
 	double m_int_threshold = global::precision;
 	
 public:
 
-	screener(std::shared_ptr<aofactory> ifac, std::string method) : 
-		p_fac(ifac), m_method(method) {}
-	
+	screener(dbcsr::world w, desc::smolecule mol, std::string method) : 
+		m_world(w), m_mol(mol), m_fac(mol, w) {}
+		
 	virtual void compute() = 0;
 	
-	virtual bool skip_block(int i, int j, int k);
-	virtual bool skip(int i, int j, int k);
+	virtual bool skip_block_xbb(int i, int j, int k) = 0;
+	virtual bool skip_xbb(int i, int j, int k) = 0;
 	
-	virtual double val_x(int i) { return 0; }
-	virtual double val_bb(int i, int j) { return 0; }
-	
-	virtual double blknorm_x(int i) { return 0; }
-	virtual double blknorm_bb(int i, int j) { return 0; }
-	
+	virtual bool skip_block_bbbb(int i, int j, int k, int l) = 0;
+	virtual bool skip_bbbb(int i, int j, int k, int l) = 0;
+		
 	~screener() {}
 	
 };
@@ -47,51 +46,21 @@ protected:
 	Eigen::MatrixXd m_blk_norms_x;
 	Eigen::MatrixXd m_z_mn;
 	Eigen::MatrixXd m_z_x;
-	
-	std::string m_metric;
-	
+		
 public:
 
-	schwarz_screener(std::shared_ptr<aofactory> ifac, std::string metric) : 
-		screener(ifac, "schwarz") {}
+	schwarz_screener(dbcsr::world w, desc::smolecule mol) : 
+		screener(w, mol, "schwarz") {}
 		
 	void compute() override;
+		
+	bool skip_block_xbb(int i, int j, int k) override;
+	bool skip_xbb(int i, int j, int k) override;
 	
-	bool skip_block(int i, int j, int k) override;
-	bool skip(int i, int j, int k) override;
-	
-	double val_x(int i) override { return m_z_x(i,0); }
-	double val_bb(int i, int j) override  { return m_z_mn(i,j); }
-	
-	double blknorm_x(int i) override { return m_blk_norms_x(i,0); }
-	double blknorm_bb(int i, int j) override  { return m_blk_norms_mn(i,j); }
+	bool skip_block_bbbb(int i, int j, int k, int l) override;
+	bool skip_bbbb(int i, int j, int k, int l) override;
 	
 	~schwarz_screener() {}
-	
-};
-
-class ovlp_screener : public screener {
-protected:
-
-	Eigen::MatrixXd m_blk_norms_mn;
-	
-public:
-
-	ovlp_screener(std::shared_ptr<aofactory> ifac) : 
-		screener(ifac, "ovlp") {}
-		
-	void compute() override;
-	
-	bool skip_block(int i, int j, int k) override;
-	bool skip(int i, int j, int k) override;
-	
-	double val_x(int i) override { return 0; }
-	double val_bb(int i, int j) override  { return 0; }
-	
-	double blknorm_x(int i) override { return 1; }
-	double blknorm_bb(int i, int j) override  { return m_blk_norms_mn(i,j); }
-	
-	~ovlp_screener() {}
 	
 };
 

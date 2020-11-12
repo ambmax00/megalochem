@@ -82,6 +82,7 @@ public:
 		m_nroots = nroots;
 		
 		double conv = 1e-6;
+		double prev_rms = std::numeric_limits<double>::max();
 		
 		Eigen::MatrixXd Asub;
 		Eigen::VectorXd evals;
@@ -265,41 +266,6 @@ public:
 			
 			D->apply(dbcsr::func::inverse);
 			
-			/*
-			dbcsr::iterator<double> d_iter(*D);
-			d_iter.start();
-			
-			while (d_iter.blocks_left()) {
-				
-				d_iter.next_block();
-				
-				auto& blksize = d_iter.size();
-				auto& idx = d_iter.idx();
-				
-				bool found = false;
-				
-				dbcsr::block<2> d_blk(blksize);
-				dbcsr::block<2> diag_blk = 
-					m_diag->get_block(irow, icol, blksize, found);
-			
-				if (found) {
-				
-					for (int i = 0; i != d_blk.ntot(); ++i) {
-						d_blk.data()[i] = pow(evals(m_nroots - 1) - diag_blk.data()[i],-1);
-					}
-					
-				} else {
-					
-					for (int i = 0; i != d_blk.ntot(); ++i) {
-						d_blk.data()[i] = pow(evals(m_nroots - 1),-1);
-					}
-					
-				}
-					
-				D.put_block(idx, d_blk);
-				
-			} //end while*/
-			
 			if (LOG.global_plev() >= 2) {			
 				dbcsr::print(*D);
 			}
@@ -312,9 +278,7 @@ public:
 			//dbcsr::print(*r_k);
 			
 			d_k->hadamard_product(*r_k, *D);
-			
-			//dbcsr::ewmult<2>(r_k, D, d_k);
-			
+						
 			r_k->release();
 			D->release();
 			
@@ -367,6 +331,40 @@ public:
 			}
 						
 			m_vecs.push_back(bnew);
+			
+			// collapsing
+			if (m_subspace >= 20) {
+				LOG.os<1>("Collapsing subspace.\n");
+				
+				std::vector<smat> new_vecs;
+				smat tempx = dbcsr::create_template<double>(m_vecs[0])
+					.name("tempx").get();
+				
+				for (int k = 0; k != m_nroots; ++k) {
+				
+					smat x_k = dbcsr::create_template(m_vecs[0])
+						.name("new_guess_"+std::to_string(k))
+						.get(); 
+					
+					for (int i = 0; i != m_vecs.size(); ++i) {
+												
+						tempx->copy_in(*m_vecs[i]);
+						tempx->scale(evecs(i,k));
+											
+						x_k->add(1.0,1.0,*tempx);
+						
+					}
+					
+					new_vecs.push_back(x_k);
+					
+				}
+				
+				m_vecs = new_vecs;
+				m_sigmas.clear();
+			
+			}
+			
+			prev_rms = rms;
 				
 		}
 		

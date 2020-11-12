@@ -33,7 +33,7 @@ void adcmod::compute() {
 		// now order it : there is probably a better way to do it
 		auto eigen_ia = dbcsr::matrix_to_eigen(m_d_ov);
 		
-		//std::cout << eigen_ia << std::endl;
+		std::cout << eigen_ia << std::endl;
 		
 		std::vector<int> index(eigen_ia.size(), 0);
 		for (int i = 0; i!= index.size(); ++i) {

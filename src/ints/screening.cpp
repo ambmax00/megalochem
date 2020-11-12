@@ -3,29 +3,13 @@
 
 namespace ints {
 
-bool screener::skip_block(int i, int j, int k) {
-	return false;
-}
-
-bool screener::skip(int i, int j, int k) {
-	return false;
-}
-
 void schwarz_screener::compute() {
 	
-	m_metric = "coulomb";
-	
-	auto z_mn_dist = p_fac->ao_schwarz();
-	auto z_x_dist = p_fac->ao_3cschwarz();
-	
-	//dbcsr::print(*z_mn_dist);
-	//dbcsr::print(*z_x_dist); 
+	auto z_mn_dist = m_fac.ao_schwarz();
+	auto z_x_dist = m_fac.ao_3cschwarz();
 	
 	m_blk_norms_mn = dbcsr::block_norms(*z_mn_dist);
 	m_blk_norms_x = dbcsr::block_norms(*z_x_dist);
-	
-	//std::cout << m_blk_norms_mn << std::endl;
-	//std::cout << m_blk_norms_x << std::endl;
 	
 	m_z_mn = dbcsr::matrix_to_eigen(z_mn_dist);
 	m_z_x = dbcsr::matrix_to_eigen(z_x_dist);
@@ -35,7 +19,7 @@ void schwarz_screener::compute() {
 	
 }
 
-bool schwarz_screener::skip_block(int i, int j, int k) {
+bool schwarz_screener::skip_block_xbb(int i, int j, int k) {
 	
 	float f = m_blk_norms_mn(j,k) * m_blk_norms_x(i,0);
 	
@@ -44,41 +28,32 @@ bool schwarz_screener::skip_block(int i, int j, int k) {
 	
 }
 
-bool schwarz_screener::skip(int i, int j, int k) {
+bool schwarz_screener::skip_block_bbbb(int i, int j, int k, int l) {
 	
-	//std::cout << "MN X " << i << " " << j << " " << k << std::endl;
-	//std::cout << m_z_mn(j,k) << " " << m_z_x(i,0) << " " << m_z_mn(j,k)*m_z_x(i,0) << std::endl;
-	if (m_z_mn(j,k)*m_z_x(i,0) > m_int_threshold) {
-		//std::cout << " ===== WILL NOT BE SCREENED ===== " << std::endl;
-		return false;
-	}
-		
-	//std::cout << " ===== WILL BE SCREENED ===== " << std::endl;
-	
-	return true;
-	
-}
-
-void ovlp_screener::compute() {
-	
-	auto s_bb = p_fac->ao_overlap();
-	
-	m_blk_norms_mn = dbcsr::block_norms(*s_bb);
-	
-}
-
-bool ovlp_screener::skip_block(int i, int j, int k) {
-	
-	float f = m_blk_norms_mn(j,k);
+	float f = m_blk_norms_mn(i,j) * m_blk_norms_mn(k,l);
 	
 	if (f > m_blk_threshold) return false;
 	return true;
 	
 }
 
-bool ovlp_screener::skip(int i, int j, int k) {
+bool schwarz_screener::skip_xbb(int i, int j, int k) {
 	
-	return false;
+	if (m_z_mn(j,k)*m_z_x(i,0) > m_int_threshold) {
+		return false;
+	}
+			
+	return true;
+	
+}
+
+bool schwarz_screener::skip_bbbb(int i, int j, int k, int l) {
+	
+	if (m_z_mn(i,j)*m_z_mn(k,l) > m_int_threshold) {
+		return false;
+	}
+			
+	return true;
 	
 }
 

@@ -93,7 +93,7 @@ private:
 					
 					if (iblk[dim2] < blkbounds[dim2][0] || iblk[dim2] > blkbounds[dim2][1]) continue;
 					
-					if (scr && scr->skip_block(iblk[0],iblk[1],iblk[2])) {
+					if (scr && scr->skip_block_xbb(iblk[0],iblk[1],iblk[2])) {
 						++totblk;
 						continue;
 					}
@@ -141,7 +141,7 @@ private:
 			for (auto m : idx[1]) {
 				for (auto n : idx[2]) {
 					
-					if (scr && scr->skip_block(x,m,n)) continue;
+					if (scr && scr->skip_block_xbb(x,m,n)) continue;
 					
 					newblks[0].push_back(x);
 					newblks[1].push_back(m);
@@ -205,6 +205,8 @@ private:
 						iblk[dim3] = blk_idx_loc[dim3][i3];
 						
 						if (iblk[dim3] < blkbounds[dim3][0] || iblk[dim3] > blkbounds[dim3][1]) continue;
+					
+						if (scr && scr->skip_block_bbbb(i0,i1,i2,i3)) continue;
 					
 						res[0].push_back(iblk[0]);
 						res[1].push_back(iblk[1]);
