@@ -76,7 +76,7 @@ void adcmod::compute() {
 		dav.set_factory(m_adc1_mvp);
 		dav.set_diag(m_d_ov);
 		dav.pseudo(false);
-		dav.conv(1e-6);
+		dav.conv(1e-5);
 		dav.maxiter(100);	
 		
 		int nroots = m_opt.get<int>("nroots", ADC_NROOTS);
@@ -133,9 +133,7 @@ void adcmod::compute() {
 		
 		dbcsr::iterator<double> iter(*v_bb);
 		iter.start();
-		
-		double eps = 1e-5;
-		
+				
 		while (iter.blocks_left()) {
 			
 			iter.next_block();
