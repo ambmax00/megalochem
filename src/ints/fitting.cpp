@@ -2043,6 +2043,7 @@ dbcsr::sbtensor<3,double> dfitting::compute_qr_new(dbcsr::shared_matrix<double> 
 		//dbcsr::print(*c_xbb_local);
 		
 		dbcsr::copy_local_to_global(*c_xbb_local, *c_xbb_global);
+		c_xbb_global->filter(dbcsr::global::filter_eps);
 		
 		c_xbb_local->clear();
 		//dbcsr::print(*c_xbb_global);

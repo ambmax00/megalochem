@@ -5,6 +5,7 @@
 #include <vector>
 #include <mpi.h>
 #include <functional>
+#include <algorithm>
 
 namespace util {
 
@@ -21,6 +22,9 @@ private:
 	int m_mpisize;
 	int m_mpirank;
 	int64_t m_ntasks;
+	
+	std::vector<int> m_victims;
+	int m_v;
 	
 	std::vector<int64_t> m_transfer;
 	std::vector<int> m_request;
@@ -52,13 +56,20 @@ private:
 		update_status();
 	}
 	
+	bool terminate() {
+		return (m_v == m_mpisize-1);
+	}
+	
 	void acquire() {
 		//std::cout << m_mpirank << " : " << "ACQUIRE" << std::endl;
-		while (true) {
+		while (!terminate()) {
 			
 			m_transfer[m_mpirank] = NO_RESP;
 			
-			int victim = rand() % m_mpisize;
+			//std::cout << m_mpirank << " : " << "STATUS " << m_status[m_mpirank] << std::endl;
+			//std::cout << m_mpirank << " : " << "QSIZE " << m_local_tasks.size() << std::endl;
+			
+			int victim = m_victims[m_v];
 			int v_work = NO_WORK;
 			
 			//std::cout << m_mpirank << " : " << "STEALING FROM " << victim << std::endl;
@@ -67,13 +78,13 @@ private:
 			MPI_Get(&v_work, 1, MPI_INT, victim, victim, 1, 
 				MPI_INT, m_status_win);
 				
-			//std::cout << ((v_work == NO_WORK) ? "NO_WORK" : "HAS_WORK") << std::endl;
+			//std::cout << m_mpirank << " : " << ((v_work == NO_WORK) ? "NO_WORK" : "HAS_WORK") << std::endl;
 			
 			// continue if victim has no work
 			if (v_work == NO_WORK) {
 				communicate();
-				//usleep(1000000);
-				return;
+				++m_v;
+				continue;
 			}
 			
 			// make victim aware that task can be stolen
@@ -84,31 +95,29 @@ private:
 			
 			// continue if not succeeded 
 			if (result != NO_REQU) {
-				//std::cout << m_mpirank << " : " << "CAS FAILED" << std::endl;
 				communicate();
-				//usleep(1000000);
-				return;
+				continue;
 			}
 			
 			//std::cout << m_mpirank << " : " << "CAS SUCCEEDED, NOW WAITING" << std::endl;
 			
 			// loop and check if request accepted
-			while (m_transfer[m_mpirank] == NO_RESP) {
+			while (m_transfer[m_mpirank] == NO_RESP ) {
 				communicate();
 				//usleep(1000000);
 
 			}
 			
 			//std::cout << m_mpirank << " : " << "GOT RESPONSE FROM VICTIM: " 
-			//	<< m_transfer[m_mpirank] << std::endl;
+				//<< m_transfer[m_mpirank] << std::endl;
 			
 			if (m_transfer[m_mpirank] != NO_TASK) {
 				//std::cout << m_mpirank << " : " << "ADDING TASK " << 
-				//	m_transfer[m_mpirank] << " FROM VICTIM" << std::endl;
+					//m_transfer[m_mpirank] << " FROM VICTIM" << std::endl;
 				add_task(m_transfer[m_mpirank]);
 				m_request[m_mpirank] = NO_REQU;
-				//usleep(1000000);
 				return;
+				//usleep(1000000);
 			}
 			
 			communicate();
@@ -122,8 +131,10 @@ private:
 		int thief = m_request[m_mpirank];
 		
 		if (thief != NO_REQU) {
+			
 			//std::cout << m_mpirank << " : " 
-			//	<< " GOT REQUEST FROM THIEF " << thief << std::endl;
+				//<< " GOT REQUEST FROM THIEF/QSIZE " << thief 
+				//<< " " << m_local_tasks.size() << std::endl;
 		} else {
 			//std::cout << m_mpirank << " : " << "NO REQUEST" << std::endl;
 		}
@@ -137,10 +148,11 @@ private:
 		if (!m_local_tasks.empty()) {
 			t = m_local_tasks[0];
 			m_local_tasks.pop_front();
+			update_status();
 		}
 		
 		//std::cout << m_mpirank << " : " << "PUTTING task " << t << " on THIEF " 
-		//	<< thief << std::endl;
+			//<< thief << std::endl;
 		MPI_Put(&t, 1, MPI_LONG_LONG, thief, thief, 1, MPI_LONG_LONG,
 			m_transfer_win);
 		
@@ -172,10 +184,19 @@ public:
 		m_request.resize(m_mpisize, NO_REQU);
 		m_status.resize(m_mpisize, NO_WORK);
 		
-		/*std::cout << "MY QUEUE: " << std::endl;
-		for (auto q : m_local_tasks) {
-			std::cout << q << " ";
-		} std::cout << '\n';*/
+		for (int i = 0; i != m_mpisize; ++i) {
+			if (i == m_mpirank) continue;
+			m_victims.push_back(i);
+		}
+		
+		std::random_shuffle(std::begin(m_victims), std::end(m_victims));
+		m_v = 0;
+		
+	}
+	
+	void run() {
+		
+		m_v = 0;
 		
 		MPI_Win_create(m_transfer.data(), m_mpisize * sizeof(int64_t),
 			sizeof(int64_t), MPI_INFO_NULL, m_comm, &m_transfer_win);
@@ -190,14 +211,8 @@ public:
 		MPI_Win_fence(0, m_request_win); 
 		MPI_Win_fence(0, m_status_win); 
 		
-	}
-	
-	void run() {
-		
-		const int nmax_run = 10;
-		int nrun = 0;
-		
-		while (true) {
+		while (!terminate()) {
+			
 			if (m_local_tasks.empty()) {
 				acquire();
 			} else {
@@ -209,39 +224,19 @@ public:
 				execute(task);
 			}
 			
-			
-			// check every namx_run iterations wether all procs are empty
-			if (nrun++ > nmax_run) {
-				
-				MPI_Request barrier_request;
-				int flag = 0;
-				
-				//std::cout << "FLAGGING" << std::endl;
-				MPI_Ibarrier(m_comm,&barrier_request);
-				
-				while (!flag) {
-					MPI_Test(&barrier_request, &flag, MPI_STATUS_IGNORE);
-					communicate();
-				}
-				
-				//std::cout << m_mpirank << " : " << "REDUCE" << std::endl;
-				
-				int empty = m_local_tasks.empty() ? 1 : 0;
-				int all_empty = 0;
-				//if (empty) std::cout << m_mpirank << " : " << "IS EMPTY" << std::endl;
-				MPI_Allreduce(&empty, &all_empty, 1, MPI_INT, MPI_LAND, m_comm);
-				
-				//std::cout << m_mpirank << " : " << "CONTINUEING" << std::endl;
-				
-				// ==== EXIT ====
-				if (all_empty) return;
-				nrun = 0;
-			}
 		}
 		
-	}
-	
-	~scheduler() {
+		std::cout << m_mpirank << " : EXIT" << std::endl;
+		
+		MPI_Request barrier_request;
+		int flag = 0;
+		
+		MPI_Ibarrier(m_comm,&barrier_request);
+		
+		while (!flag) {
+			MPI_Test(&barrier_request, &flag, MPI_STATUS_IGNORE);
+			communicate();
+		}
 		
 		MPI_Win_fence(0, m_transfer_win); 
 		MPI_Win_fence(0, m_request_win); 
@@ -250,7 +245,10 @@ public:
 		MPI_Win_free(&m_transfer_win);
 		MPI_Win_free(&m_request_win);
 		MPI_Win_free(&m_status_win);
+				
 	}
+	
+	~scheduler() {}
 	
 };
 
