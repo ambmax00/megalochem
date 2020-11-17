@@ -21,13 +21,14 @@ private:
 	smat m_diag; // diagonal of matrix
 	std::shared_ptr<MVFactory> m_fac; // Matrix vector product engine
 
-	int m_nroots; // targeted eigenvalue
+	int m_nroots; // requested number of eigenvalues
 	int m_subspace; // current size of subspace
 	
 	bool m_pseudo; //whether this is a pseudo-eval problem
 	bool m_converged; //wether procedure has converged
 	
-	double m_eigval; // targeted eigenvalue
+	std::vector<double> m_eigvals; // eignvalues
+	std::vector<double> m_errs; // errors of the roots
 	
 	std::vector<smat> m_vecs; // b vectors
 	std::vector<smat> m_sigmas; // Ab vectors
@@ -65,7 +66,6 @@ public:
 	
 	davidson(MPI_Comm comm, int nprint) : 
 		LOG(comm, nprint),
-		m_eigval(0.0), 
 		m_converged(false) {}
 
 	void compute(std::vector<smat>& guess, int nroots, std::optional<double> omega = std::nullopt) {
@@ -81,8 +81,15 @@ public:
 		
 		m_nroots = nroots;
 		
+		if (m_nroots > m_vecs.size()) {
+			std::string msg = std::to_string(m_nroots) + " roots requested, but only "
+				+ std::to_string(m_vecs.size()) + " guesses given.\n";
+			throw std::runtime_error(msg);
+		}
+		
 		double conv = 1e-6;
-		double prev_rms = std::numeric_limits<double>::max();
+		m_errs.clear();
+		m_errs.resize(m_nroots);
 		
 		Eigen::MatrixXd Asub;
 		Eigen::VectorXd evals;
@@ -159,42 +166,6 @@ public:
 			
 			LOG.os<2>("EIGENVECTORS: \n", evecs, '\n');
 			
-			/* reorder 
-			if (prev_evals.size() != 0) {
-				
-				// order the eigenvals/eigenvecs such that they correspond best to previous ones
-				
-				std::vector<int> associated(evals.size(), -1);
-				for (int iprev = 0; iprev != prev_evals.size(); ++iprev) {
-					
-					int min_diff_idx = -1;
-					double min_diff = std::numeric_limits<double>::max();
-					
-					// find minimum vec
-					for (int icurrent = 0; icurrent != evals.size(); ++icurrent) {
-						// compute error norm
-						if (associated[icurrent] != -1) continue;
-						
-						auto err = prev_evecs.col(iprev) - evecs.col(icurrent);
-						double diff = err.norm();
-						
-						if (diff < min_diff) {
-							min_diff = diff;
-							min_diff_idx = icurrent;
-						}
-					}
-					
-					associated[min_diff_idx] = iprev;
-					
-				}
-				
-				std::cout << "ASSOC: " << std::endl;
-				for (auto e : associated) {
-					std::cout << e << " ";
-				} std::cout << std::endl;
-				
-			}*/
-			
 			prev_evals = evals;
 			prev_evecs = evecs;	 
 			
@@ -203,51 +174,58 @@ public:
 			
 			LOG.os<1>("Computing residual.\n");
 			
-			// ======= r_k ========
+			// ======= Compute all residuals r_k ========
 			
-			smat r_k = dbcsr::create_template<double>(m_vecs[0]).name("r_k").get();
+			std::vector<smat> residuals;
 			smat temp = dbcsr::create_template<double>(m_vecs[0]).name("temp").get();
-						
-			for (int i = 0; i != m_subspace; ++i) {
+			double max_err = 0;
+			
+			for (int iroot = 0; iroot != m_nroots; ++iroot) {
 				
-				temp->copy_in(*m_sigmas[i]);
+				smat r_k = dbcsr::create_template<double>(m_vecs[0]).name("temp").get();
 				
-				//dbcsr::copy(*m_sigmas[i], temp).perform();
+				for (int i = 0; i != m_subspace; ++i) {
+					
+					temp->copy_in(*m_sigmas[i]);
+					temp->scale(evecs(i,iroot));
+					
+					r_k->add(1.0, 1.0, *temp);
+					
+					temp->clear();
+					temp->copy_in(*m_vecs[i]);
+					
+					temp->scale(- evals(iroot) * evecs(i,iroot));
+					
+					r_k->add(1.0,1.0, *temp);
+					
+					temp->clear();
+				}
 				
-				temp->scale(evecs(i,m_nroots-1));
+				m_errs[iroot] = r_k->norm(dbcsr_norm_frobenius);
+				max_err = std::max(max_err, m_errs[iroot]);
 				
-				r_k->add(1.0, 1.0, *temp);
-				//dbcsr::copy(temp, r_k).sum(true).move_data(true).perform();
-				
-				temp->clear();
-				temp->copy_in(*m_vecs[i]);
-				//dbcsr::copy(*m_vecs[i], temp).perform();
-				
-				temp->scale(- evals(m_nroots - 1) * evecs(i,m_nroots-1));
-				
-				r_k->add(1.0,1.0, *temp);
-				//dbcsr::copy(temp, r_k).sum(true).move_data(true).perform();
-				
-				temp->clear();
+				residuals.push_back(r_k);
 				
 			}
 			
 			temp->release();
 			
-			if (LOG.global_plev() >= 2) {
-				dbcsr::print(*r_k);
+			//if (LOG.global_plev() >= 2) {
+			//	dbcsr::print(*r_k);
+			//}
+			
+			LOG.os<>("Root errors: \n");
+			for (int iroot = 0; iroot != m_nroots; ++iroot) {
+				LOG.os<>("Root ", iroot, ": ", m_errs[iroot], '\n');
 			}
 			
-			double rms = r_k->norm(dbcsr_norm_frobenius);
-			LOG.os<>("RMS: ", rms, '\n');
-			
 			// Convergence criteria
-			// Normal davidson: RMS of residual is below certain threshold
-			// pseudo davidson: RMS of residual is higher than |omega - omega'| 
+			// Normal davidson: largest norm of residuals is below certain threshold
+			// pseudo davidson: largest norm of residual is higher than |omega - omega'| 
 			
 			if (m_pseudo) LOG.os<1>("EVALS: ", *omega, " ", evals(m_nroots-1), '\n');
 			
-			m_converged = (m_pseudo) ? (rms < fabs(*omega - evals(m_nroots - 1))) : (rms < conv);
+			m_converged = (m_pseudo) ? (max_err < fabs(*omega - evals(m_nroots - 1))) : (max_err < conv);
 			
 			if (m_converged) break;
 			
@@ -255,85 +233,78 @@ public:
 			// Only Diagonal-Preconditioned-Residue for now (DPR)
 			// D_ia = (lamda_k - A_iaia)^-1
 			
-			LOG.os<1>("Computing preconditioner.\n");
+			LOG.os<1>("Computing correction vectors.\n");
 			
-			smat D = dbcsr::create_template(r_k).name("D").get();
-			
-			D->reserve_all();
-			
-			D->set(evals(m_nroots - 1));
-			D->add(1.0,-1.0,*m_diag);
-			
-			D->apply(dbcsr::func::inverse);
-			
-			if (LOG.global_plev() >= 2) {			
-				dbcsr::print(*D);
-			}
-			
-			// form new vector
-			smat d_k = dbcsr::create_template(r_k).name("d_k").get();
-			
-			// d(k)_ia = D(k)_ia * q(k)_ia
-			
-			//dbcsr::print(*r_k);
-			
-			d_k->hadamard_product(*r_k, *D);
-						
-			r_k->release();
-			D->release();
-			
-			//dbcsr::print(*d_k);
-			
-			// GRAM SCHMIDT
-			// b_new = d_k - sum_j proj_bi(d_k)
-			// where proj_b(v) = dot(b,v)/dot(b,b)
-			
-			smat bnew = dbcsr::create_template(d_k).name("b_" + std::to_string(m_subspace)).get();
-			smat temp2 = dbcsr::create_template(d_k).name("temp2").get();
-			
-			//dbcsr::copy(d_k, bnew).perform();
-			bnew->copy_in(*d_k);
-			
-			LOG.os<1>("Computing new guess vector.\n");
-			for (int i = 0; i != m_vecs.size(); ++i) {
+			for (int iroot = 0; iroot != m_nroots; ++iroot) {
+				
+				LOG.os<1>("Computing for root ", iroot, '\n');
+				LOG.os<1>("Computing preconditioner.\n");
+				
+				smat D = dbcsr::create_template(residuals[iroot]).name("D").get();
+				
+				D->reserve_all();
+				
+				D->set(evals(iroot));
+				D->add(1.0,-1.0,*m_diag);
+				
+				D->apply(dbcsr::func::inverse);
+				
+				if (LOG.global_plev() >= 2) {			
+					dbcsr::print(*D);
+				}
+				
+				// form new vector
+				smat d_k = dbcsr::create_template(residuals[iroot])
+					.name("d_k").get();
+				
+				// d(k)_ia = D(k)_ia * q(k)_ia
 								
-				//dbcsr::copy(*m_vecs[i], temp2).perform();
-				temp2->copy_in(*m_vecs[i]);
+				d_k->hadamard_product(*residuals[iroot], *D);
+							
+				residuals[iroot]->release();
+				D->release();
+								
+				// GRAM SCHMIDT
+				// b_new = d_k - sum_j proj_bi(d_k)
+				// where proj_b(v) = dot(b,v)/dot(b,b)
 				
-				//dbcsr::print(*m_vecs[i]);
-				//dbcsr::print(*temp2);
+				smat bnew = dbcsr::create_template(d_k).name("b_" + std::to_string(m_subspace)).get();
+				smat temp2 = dbcsr::create_template(d_k).name("temp2").get();
 				
-				double proj = (d_k->dot(*m_vecs[i])) / (m_vecs[i]->dot(*m_vecs[i]));
+				//dbcsr::copy(d_k, bnew).perform();
+				bnew->copy_in(*d_k);
 				
-				//dbcsr::dot(*m_vecs[i], d_k)/dbcsr::dot(*m_vecs[i],*m_vecs[i]);
+				LOG.os<1>("Computing new guess vector.\n");
+				for (int i = 0; i != m_vecs.size(); ++i) {
+									
+					//dbcsr::copy(*m_vecs[i], temp2).perform();
+					temp2->copy_in(*m_vecs[i]);
+					
+					double proj = (d_k->dot(*m_vecs[i])) / (m_vecs[i]->dot(*m_vecs[i]));
+					
+					temp2->scale(-proj);
+					
+					bnew->add(1.0,1.0,*temp2);
+					
+				}
+					
+				temp2->release();
 				
-				//std::cout << proj << std::endl;
+				// normalize
+				double bnorm = sqrt(bnew->dot(*bnew));
 				
-				temp2->scale(-proj);
+				bnew->scale(1.0/bnorm);
 				
-				bnew->add(1.0,1.0,*temp2);
-				
-				//dbcsr::copy(temp2, bnew).sum(true).perform();
-				
-				//dbcsr::print(*bnew);
+				if (LOG.global_plev() >= 2) {
+					dbcsr::print(*bnew);
+				}
+							
+				m_vecs.push_back(bnew);
 				
 			}
-				
-			temp2->release();
 			
-			// normalize
-			double bnorm = sqrt(bnew->dot(*bnew));
-			
-			bnew->scale(1.0/bnorm);
-			
-			if (LOG.global_plev() >= 2) {
-				dbcsr::print(*bnew);
-			}
-						
-			m_vecs.push_back(bnew);
-			
-			// collapsing
-			if (m_subspace >= 20) {
+			/* collapsing
+			if (m_subspace >= 30) {
 				LOG.os<1>("Collapsing subspace.\n");
 				
 				std::vector<smat> new_vecs;
@@ -362,35 +333,16 @@ public:
 				m_vecs = new_vecs;
 				m_sigmas.clear();
 			
-			}
-			
-			prev_rms = rms;
-				
+			}*/
+							
 		}
 		
-		m_eigval = evals(m_nroots-1);
-		
+		m_eigvals.resize(m_nroots);
+		std::copy(evals.data(), evals.data() + m_nroots, m_eigvals.data());
+				
 		smat temp3 = dbcsr::create_template<double>(m_vecs[0]).name("temp3").get();
 		
 		m_ritzvecs.clear();
-		
-		// Make sure that abs max element of eigenvectors is positive.
-		
-		//std::cout << "EVECS" << std::endl;
-		//std::cout << evecs << std::endl;
-		
-		/*for (int i = 0; i != m_subspace; ++i) {
-				// get min and max coeff
-				double minc = evecs.col(i).minCoeff();
-				double maxc = evecs.col(i).maxCoeff();
-				double maxabs = (fabs(maxc) > fabs(minc)) ? maxc : minc;
-				
-				if (maxabs < 0) evecs.col(i) *= -1;
-				
-		}*/
-		
-		//std::cout << "EVECS" << std::endl;
-		//std::cout << evecs << std::endl;
 		
 		LOG.os<1>("Forming Ritz vectors.\n");
 		// x_k = sum_i ^M U_ik * b_i
@@ -402,21 +354,13 @@ public:
 			
 			for (int i = 0; i != m_vecs.size(); ++i) {
 				
-				//dbcsr::print(*m_vecs[i]);
-				//std::cout << evecs(i,k) << std::endl;
-				
 				temp3->copy_in(*m_vecs[i]);
-				//dbcsr::copy<2>(*m_vecs[i], temp3).perform();
 				temp3->scale(evecs(i,k));
-				
-				//dbcsr::print(*temp3);
-				
+								
 				x_k->add(1.0,1.0,*temp3);
-				//dbcsr::copy(temp3, x_k).sum(true).move_data(true).perform();
 				
 			}
 				
-			//dbcsr::print(*x_k);
 			m_ritzvecs.push_back(x_k);
 			
 		}
@@ -432,8 +376,8 @@ public:
 		
 	}
 	
-	double eigval() {
-		return m_eigval;
+	std::vector<double> eigvals() {
+		return m_eigvals;
 	}
 
 }; // end class 

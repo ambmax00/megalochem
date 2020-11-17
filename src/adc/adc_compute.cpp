@@ -44,8 +44,6 @@ void adcmod::compute() {
 			[&](const int& a, const int& b) {
 				return (eigen_ia.data()[a] < eigen_ia.data()[b]);
 		});
-		
-		std::vector<dbcsr::shared_matrix<double>> dav_guess(m_nroots);
 			
 		// generate the guesses
 		
@@ -53,7 +51,10 @@ void adcmod::compute() {
 		auto v = m_hfwfn->mol()->dims().va();
 		auto b = m_hfwfn->mol()->dims().b();
 		
-		for (int i = 0; i != m_nroots; ++i) {
+		int nguesses = m_opt.get<int>("nguesses", ADC_NGUESSES);
+		std::vector<dbcsr::shared_matrix<double>> dav_guess(nguesses);
+		
+		for (int i = 0; i != nguesses; ++i) {
 			
 			LOG.os<>("Guess ", i, '\n');
 			
@@ -89,7 +90,7 @@ void adcmod::compute() {
 		
 		m_adc1_mvp->print_info();
 		
-		LOG.os<>("Excitation energy of state nr. ", m_nroots, ": ", dav.eigval(), '\n');
+		LOG.os<>("Excitation energy of state nr. ", m_nroots, ": ", dav.eigvals()[m_nroots-1], '\n');
 		
 		auto rvecs = dav.ritz_vectors();
 		auto vec_k = rvecs[m_nroots-1];
@@ -169,6 +170,14 @@ void adcmod::compute() {
 			}
 			LOG.os<>("Basis blocks (1e-", i , "): ", nblk, " out of ", b.size(), '\n'); 
 		}
+		
+		// 0.9975
+		
+		// go through rows of c_bo
+		//if (m_world.rank() == 0) {
+			
+			
+			
 		
 		TIME.print_info();
 		

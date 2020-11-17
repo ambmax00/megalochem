@@ -57,7 +57,7 @@ private:
 	}
 	
 	bool terminate() {
-		return (m_v == m_mpisize-1);
+		return (m_mpisize == 1) ? m_local_tasks.empty() : (m_v == m_mpisize-1);
 	}
 	
 	void acquire() {

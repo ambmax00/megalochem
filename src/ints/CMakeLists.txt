@@ -7,6 +7,8 @@ set(SOURCES
 	screening.cpp
 	fitting.h
 	fitting.cpp
+	fitting_pari.cpp
+	fitting_qr.cpp
 	aoloader.h
 	aoloader.cpp
 )
