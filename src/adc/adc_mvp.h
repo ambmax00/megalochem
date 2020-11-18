@@ -33,6 +33,8 @@ using stensor2 = dbcsr::shared_tensor<2,double>;
 using stensor3 = dbcsr::shared_tensor<3,double>;
 using sbtensor3 = dbcsr::sbtensor<3,double>;
 
+smat u_transform(smat& u_ao, char to, smat& c_bo, char tv, smat& c_bv);
+
 class MVP {
 protected:
 
@@ -43,8 +45,6 @@ protected:
 	util::mpi_time TIME;
 	
 	smat compute_sigma_0(smat& u_ia, vec<double> epso, vec<double> epsv);
-	
-	smat u_transform(smat& u_ao, char to, smat& c_bo, char tv, smat& c_bv);
 
 public:
 

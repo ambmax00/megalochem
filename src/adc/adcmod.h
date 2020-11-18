@@ -48,9 +48,8 @@ private:
 
 	dbcsr::shared_matrix<double> m_d_ov;
 		
-	void analyze_sparsity(dbcsr::shared_matrix<double> u_ia, 
-		dbcsr::shared_matrix<double> c_loc_o, dbcsr::shared_matrix<double> u_loc_o,
-		dbcsr::shared_matrix<double> c_loc_v, dbcsr::shared_matrix<double> u_loc_v); 
+	std::vector<int> get_significant_blocks(dbcsr::shared_matrix<double> u_bb, 
+		double theta, dbcsr::shared_matrix<double> metric_bb, double gamma);
 	
 	void init();
 	void init_ao_tensors();
@@ -59,6 +58,8 @@ private:
 	void compute_diag();
 	dbcsr::shared_matrix<double> compute_diag_0();
 	dbcsr::shared_matrix<double> compute_diag_1();
+	
+	dbcsr::shared_matrix<double> m_s_bb;
 	
 public:	
 

@@ -16,6 +16,7 @@ static const int ADC_NGUESSES = 1;
 
 static const double ADC_C_OS = 1.3;
 static const double ADC_C_OS_COUPLING = 1.17;
+static const double ADC_DAV_CONV = 1e-5;
 
 static const std::string ADC_METHOD = "ri_adc_1";
 static const std::string ADC_ERIS = "core";

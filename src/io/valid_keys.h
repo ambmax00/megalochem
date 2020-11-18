@@ -88,6 +88,7 @@ static const json valid_keys =
 		{"nlap", 5u},
 		{"nroots", 1u},
 		{"nguesses", 1},
+		{"dav_conv", 1e-5},
 		{"method", "ADC1"}, /* what method? 
 			(ri-adc1, ri-adc2, sos-ri-adc, ao-ri-adc1, ao-ri-adc2) */
 		{"diag_order", 0}, // at which order to compute the ADC diagonal

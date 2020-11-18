@@ -538,6 +538,17 @@ public:
 		
 	}
 	
+	T max_abs() {
+		
+		T* max_it = std::max_element(m_data, m_data + m_nfull, 
+			[](const T a, const T b) {
+				return fabs(a) < fabs(b);
+		});
+		return *max_it;
+		
+	}
+		
+	
 	~block() {
 		
 		if (m_data != nullptr && m_own) {

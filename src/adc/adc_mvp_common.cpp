@@ -2,37 +2,8 @@
 
 namespace adc {
 	
-MVP::MVP(dbcsr::world w, desc::smolecule smol, int nprint, std::string name) :
-	m_world(w), m_mol(smol), 
-	LOG(w.comm(), nprint),
-	TIME(w.comm(), name)
-{}
-	
-smat MVP::compute_sigma_0(smat& u_ia, std::vector<double> epso, 
-	std::vector<double> epsv) {
-	
-	// ADC0 : u_ia = - f_ij u_ja + f_ab u_ib
-	
-	smat s_ia_o = dbcsr::copy(u_ia).get();
-	smat s_ia_v = dbcsr::copy(u_ia).get();
-	
-	//dbcsr::print(*s_ia_o);
-	
-	s_ia_o->scale(epso, "left");
-	s_ia_v->scale(epsv, "right");
-	
-	//std::cout << "SIAO + V" << std::endl;
-	//dbcsr::print(*s_ia_o);
-	//dbcsr::print(*s_ia_v);
-		
-	s_ia_o->add(-1.0,1.0,*s_ia_v);
-		
-	return s_ia_o;
-	
-}
-
 /* transforms u */
-smat MVP::u_transform(smat& u, char to, smat& c_bo, char tv, smat& c_bv) {
+smat u_transform(smat& u, char to, smat& c_bo, char tv, smat& c_bv) {
 	
 	auto w = u->get_world();
 	
@@ -66,5 +37,33 @@ smat MVP::u_transform(smat& u, char to, smat& c_bo, char tv, smat& c_bv) {
 	
 }
 	
+MVP::MVP(dbcsr::world w, desc::smolecule smol, int nprint, std::string name) :
+	m_world(w), m_mol(smol), 
+	LOG(w.comm(), nprint),
+	TIME(w.comm(), name)
+{}
+	
+smat MVP::compute_sigma_0(smat& u_ia, std::vector<double> epso, 
+	std::vector<double> epsv) {
+	
+	// ADC0 : u_ia = - f_ij u_ja + f_ab u_ib
+	
+	smat s_ia_o = dbcsr::copy(u_ia).get();
+	smat s_ia_v = dbcsr::copy(u_ia).get();
+	
+	//dbcsr::print(*s_ia_o);
+	
+	s_ia_o->scale(epso, "left");
+	s_ia_v->scale(epsv, "right");
+	
+	//std::cout << "SIAO + V" << std::endl;
+	//dbcsr::print(*s_ia_o);
+	//dbcsr::print(*s_ia_v);
+		
+	s_ia_o->add(-1.0,1.0,*s_ia_v);
+		
+	return s_ia_o;
+	
+}
 
 } // end namespace

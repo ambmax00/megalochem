@@ -33,8 +33,6 @@ void adcmod::compute() {
 		// now order it : there is probably a better way to do it
 		auto eigen_ia = dbcsr::matrix_to_eigen(m_d_ov);
 		
-		std::cout << eigen_ia << std::endl;
-		
 		std::vector<int> index(eigen_ia.size(), 0);
 		for (int i = 0; i!= index.size(); ++i) {
 			index[i] = i;
@@ -77,7 +75,7 @@ void adcmod::compute() {
 		dav.set_factory(m_adc1_mvp);
 		dav.set_diag(m_d_ov);
 		dav.pseudo(false);
-		dav.conv(1e-5);
+		dav.conv(m_opt.get<int>("dav_conv", ADC_DAV_CONV));
 		dav.maxiter(100);	
 		
 		int nroots = m_opt.get<int>("nroots", ADC_NROOTS);
@@ -130,7 +128,7 @@ void adcmod::compute() {
 		// list of exitations
 		
 		// Which blocks are absent?
-		vec<vec<int>> blk_list(10, vec<int>(b.size(),0));
+		vec<std::vector<int>> blk_list(10, std::vector<int>(b.size(),0));
 		
 		dbcsr::iterator<double> iter(*v_bb);
 		iter.start();
@@ -143,9 +141,9 @@ void adcmod::compute() {
 				for (int j = 0; j != iter.col_size(); ++j) {
 					
 					for (int e = 0; e != 10; ++e) {
-						if (fabs(iter(i,j)) > pow(10,-e)) {
-							blk_list[e][iter.row()] = 1;
-							blk_list[e][iter.col()] = 1;
+						if (fabs(iter(i,j)) > pow(10.0,-e)) {
+							blk_list[e][iter.row()] += 1;
+							blk_list[e][iter.col()] += 1;
 						}
 					}
 				}
@@ -156,135 +154,247 @@ void adcmod::compute() {
 		iter.stop();
 			
 		int nblk = 0;
-		vec<vec<int>> blk_list_tot(10, vec<int>(b.size(), 0));
 		
 		for (int i = 0; i != 10; ++i) {
-			MPI_Allreduce(blk_list[i].data(), blk_list_tot[i].data(), blk_list_tot[i].size(), 
-				MPI_INT, MPI_LOR, m_world.comm());
+			MPI_Allreduce(MPI_IN_PLACE, blk_list[i].data(), blk_list[i].size(), 
+				MPI_INT, MPI_SUM, m_world.comm());
 		}
 		
 		for (int i = 0; i != 10; ++i) {
 			int nblk = 0;
-			for (auto& e : blk_list_tot[i]) {
-				if (e) nblk++;
+			for (auto& e : blk_list[i]) {
+				if (e != 0) nblk++;
 			}
-			LOG.os<>("Basis blocks (1e-", i , "): ", nblk, " out of ", b.size(), '\n'); 
+			LOG.os<>("Basis blocks (", pow(10.0,-i), "): ", nblk, " out of ", b.size(), '\n'); 
 		}
 		
-		// 0.9975
-		
-		// go through rows of c_bo
-		//if (m_world.rank() == 0) {
-			
-			
-			
-		
+		auto v1 = get_significant_blocks(v_bb,0.9975,nullptr,0);
+		auto v2 = get_significant_blocks(v_bb,0.99975,nullptr,0);
+		auto v3 = get_significant_blocks(v_bb,0.999975,nullptr,0);
+		auto v4 = get_significant_blocks(v_bb,0.9999975,nullptr,0);
+		auto v5 = get_significant_blocks(v_bb,0.9975,m_s_bb,1e-4);
+
 		TIME.print_info();
 		
 }
 
-void adcmod::analyze_sparsity(dbcsr::shared_matrix<double> u_ia, 
-		dbcsr::shared_matrix<double> c_loc_o, dbcsr::shared_matrix<double> u_loc_o,
-		dbcsr::shared_matrix<double> c_loc_v, dbcsr::shared_matrix<double> u_loc_v)
+std::vector<int> adcmod::get_significant_blocks(dbcsr::shared_matrix<double> u_bb, 
+	double theta, dbcsr::shared_matrix<double> metric_bb, double gamma) 
 {
-	/* Function to analyse sparsity f a trial vector u in a certain basis
-	 * if u_loc's are not given -> canonical MOs are assumed
-	 * if c_loc's are not given -> AOs are assumed
-	 * 
-	 * Outputs:
-	 * 	- list of excitations o -> v for certain thresholds
-	 * 	(1e-3,1e-4,1e-5 ...)
-	 * 	- list & number of occ MOs and vir MOs involved
-	 * 	- list & number of AOs involved
-	 * 	- sparsity of u_ia_loc (different blk thresholds)
-	 */
 	
-	auto b = c_loc_o->row_blk_sizes();
-	auto o = u_ia->row_blk_sizes();
-	auto oloc = c_loc_o->col_blk_sizes();
-	auto vloc = c_loc_v->col_blk_sizes();
-	auto w = c_loc_o->get_world();
+	//dbcsr::print(*u_bb);
+	//dbcsr::print(*metric_bb);
 	
-	int nocc = c_loc_o->nfullcols_total();
-	int nvir = c_loc_v->nfullcols_total();
-	int nbas = c_loc_o->nfullrows_total();
+	auto u_bb_a = dbcsr::copy<double>(u_bb).get();
+	auto b = m_hfwfn->mol()->dims().b();
 	
-	LOG.os<>("Number of occ./vir. MOs: ", nocc, " / ", nvir, '\n');
-	
-	decltype(u_ia) v_ia;
-	
-	// transform u_ia
-	if (u_loc_o && u_loc_v) {
+	auto dims = m_world.dims();
+    auto dist = dbcsr::default_dist(b.size(), m_world.size(), b);
+    
+    double norm = u_bb_a->norm(dbcsr_norm_frobenius);
+    
+    u_bb_a->scale(1.0/norm);
+        
+    u_bb_a->replicate_all();
+
+    std::vector<double> occ_norms(b.size(),0.0);
+    std::vector<double> vir_norms(b.size(),0.0);
+    std::vector<int> idx_occ(b.size());
+    std::vector<int> idx_vir(b.size());
+    
+    std::iota(idx_occ.begin(), idx_occ.end(), 0);
+    std::iota(idx_vir.begin(), idx_vir.end(), 0);
+    
+    auto atoms = m_hfwfn->mol()->atoms();
+    int natoms = atoms.size();
+    auto blkmap = m_hfwfn->mol()->c_basis()->block_to_atom(atoms);
+    
+    // loop over blocks rows/cols
+    for (int iblk = 0; iblk != b.size(); ++iblk) {
 		
-		auto v_ht = dbcsr::create<double>()
-			.name("ht")
-			.set_world(w)
-			.row_blk_sizes(o)
-			.col_blk_sizes(vloc)
-			.matrix_type(dbcsr::type::no_symmetry)
-			.get();
+		if (dist[iblk] == m_world.rank()) {
 			
-		v_ia = dbcsr::create<double>()
-			.name("ht")
-			.set_world(w)
-			.row_blk_sizes(oloc)
-			.col_blk_sizes(vloc)
-			.matrix_type(dbcsr::type::no_symmetry)
-			.get();
-		
-		std::cout << "1" << std::endl;
-		dbcsr::multiply('N', 'T', *u_ia, *u_loc_v, *v_ht).perform();
-		std::cout << "2" << std::endl;
-		dbcsr::multiply('N', 'N', *u_loc_o, *v_ht, *v_ia).perform();
-	} else {
-		v_ia = u_ia;
-	} 
-	
-	dbcsr::print(*v_ia);
-		
-	// list of exitations
-	
-	auto v_ia_eigen = dbcsr::matrix_to_eigen(v_ia);
-	
-	auto get_lists = [&](std::vector<bool>& occ_list,
-		std::vector<bool>& vir_list, double t)
-	{
-	
-		for (int i = 0; i != nocc; ++i) {
-			for (int a = 0; a != nvir; ++a) {
-				if (fabs(v_ia_eigen(i,a)) > t) {
-					occ_list[i] = true;
-					vir_list[a] = true;
-					//LOG.os<>(i, " -> ", a, " ", v_ia_eigen(i,a), '\n');
+			int blksize_i = b[iblk];
+			
+			std::vector<double> blknorms_r(blksize_i,0.0);
+			std::vector<double> blknorms_c(blksize_i,0.0);
+			
+			for (int jblk = 0; jblk != b.size(); ++jblk) {
+				
+				bool foundr = false;
+				bool foundc = false;
+				
+				auto blkr_p = u_bb_a->get_block_p(iblk,jblk,foundr);
+				auto blkc_p = u_bb_a->get_block_p(jblk,iblk,foundc);
+				
+				int blksize_j = b[jblk];
+				
+				if (foundr) { 
+					
+					for (int i = 0; i != blksize_i; ++i) {
+						for (int j = 0; j != blksize_j; ++j) {
+							blknorms_r[i] += pow(blkr_p(i,j),2.0);
+						}
+					}
 				}
+				
+				if (foundc) {
+					
+					for (int i = 0; i != blksize_i; ++i) {
+						for (int j = 0; j != blksize_j; ++j) {
+							blknorms_c[i] += pow(blkc_p(j,i),2.0);
+						}
+					}
+				}
+				
+				
+				
 			}
+			
+			occ_norms[iblk] = std::accumulate(blknorms_r.begin(),blknorms_r.end(),0.0);
+			vir_norms[iblk] = std::accumulate(blknorms_c.begin(),blknorms_c.end(),0.0);
+			
 		}
-		
-	};
-	
-	auto count = [](std::vector<bool>& v) {
-		int ntot = 0;
-		for (auto b : v) {
-			ntot += (b) ? 1 : 0;
-		}
-		return ntot;
-	};
-	
-	std::vector<std::vector<bool>> occs(8, std::vector<bool>(nocc));
-	std::vector<std::vector<bool>> virs(8, std::vector<bool>(nvir));
-		
-	for (int n = 0; n != 8; ++n) {
-		
-		double t = pow(10.0, -n);
-		
-		get_lists(occs[n], virs[n], t);
-		int no = count(occs[n]);
-		int nv = count(virs[n]);
-		
-		LOG.os<>("T: ", t, " with ", no, "/", nocc, " and ", nv, "/", nvir, '\n');
 		
 	}
 	
+	// communicate to all processes
+	MPI_Allreduce(MPI_IN_PLACE, occ_norms.data(), b.size(), MPI_DOUBLE,
+		MPI_SUM, m_world.comm());
+		
+	MPI_Allreduce(MPI_IN_PLACE, vir_norms.data(), b.size(), MPI_DOUBLE,
+		MPI_SUM, m_world.comm());
+	
+	LOG.os<>("NORMS ALL (OCC): \n");
+	for (auto v : occ_norms) {
+		LOG.os<>(v, " ");
+	} LOG.os<>('\n');
+	
+	LOG.os<>("NORMS ALL (VIR): \n");
+	for (auto v : vir_norms) {
+		LOG.os<>(v, " ");
+	} LOG.os<>('\n');
+	
+	std::sort(idx_occ.begin(), idx_occ.end(), 
+		[&occ_norms](const int a, const int b) {
+			return (occ_norms[a] > occ_norms[b]);
+		});
+		
+	std::sort(idx_vir.begin(), idx_vir.end(), 
+		[&vir_norms](const int a, const int b) {
+			return (vir_norms[a] > vir_norms[b]);
+		});
+	
+	double totnorm_occ = 0.0;
+	double totnorm_vir = 0.0;
+	
+	std::vector<int> atoms_check(natoms,0);
+	
+	for (auto idx : idx_occ) {
+		//std::cout << totnorm << std::endl;
+		if (totnorm_occ < theta) {
+			totnorm_occ += occ_norms[idx];
+			int iatom = blkmap[idx];
+			atoms_check[iatom] = 1;
+		} else {
+			break;
+		}
+	}
+	
+	for (auto idx : idx_vir) {
+		//std::cout << totnorm << std::endl;
+		if (totnorm_vir < theta) {
+			totnorm_vir += vir_norms[idx];
+			int iatom = blkmap[idx];
+			atoms_check[iatom] = 1;
+		} else {
+			break;
+		}
+	}
+	
+	LOG.os<>("ATOM CHECK: \n");
+	for (auto v : atoms_check) {
+		LOG.os<>(v, " ");
+	} LOG.os<>('\n');
+	
+	u_bb_a->distribute();
+	u_bb_a->clear();
+	
+	// add all blocks centered on atoms
+	vec<int> idx_check(b.size(),0);
+	vec<int> idx_all;
+	
+	for (int iblk = 0; iblk != b.size(); ++iblk) {
+		for (int iatom = 0; iatom != natoms; ++iatom) {
+			if (!atoms_check[iatom]) continue;
+			if (blkmap[iblk] == iatom) idx_check[iblk] = 1;
+		}
+	}
+	
+	LOG.os<>("IDX CHECK: \n");
+	for (auto v : idx_check) {
+		LOG.os<>(v, " ");
+	} LOG.os<>('\n');
+	
+	int idx = 0;
+	for (auto b : idx_check) {
+		if (b) idx_all.push_back(idx);
+		idx++;
+	}
+		
+	LOG.os<>("IDX ALL: \n");
+	for (auto v : idx_all) {
+		LOG.os<>(v, " ");
+	} LOG.os<>('\n');
+	
+	if (metric_bb == nullptr) return idx_all;
+	
+	// now add blocks connected to indices by metric
+		
+	MPI_Comm comm = m_world.comm();
+	
+	auto idx_check_aug = idx_check;
+	int nblk = idx_check.size();
+		
+	for (int iblk = 0; iblk != nblk; ++iblk) {
+		if (!idx_check[iblk]) continue;
+		for (int jblk = 0; jblk != nblk; ++jblk) {
+			bool found = false;
+			
+			int i = (iblk <= jblk) ? iblk : jblk;
+			int j = (iblk <= jblk) ? jblk : iblk;
+			
+			auto blk_p = metric_bb->get_block_p(i,j,found);
+			if (!found) continue;
+			double max = blk_p.max_abs();
+			if (max > gamma) idx_check_aug[jblk] = 1;
+		}
+	}
+	
+	MPI_Allreduce(MPI_IN_PLACE, idx_check_aug.data(), idx_check_aug.size(), 
+		MPI_INT, MPI_LOR, comm);
+			
+	LOG.os<>("IDX CHECK NEW: \n");
+	for (auto v : idx_check_aug) {
+		LOG.os<>(v, " ");
+	} LOG.os<>('\n');
+	
+	vec<int> idx_all_aug;
+	idx = 0;
+	for (auto b : idx_check_aug) {
+		if (b) idx_all_aug.push_back(idx);
+		++idx;
+	}
+	
+	LOG.os<>("IDX ALL (AUG): \n");
+	for (auto v : idx_all_aug) {
+		LOG.os<>(v, " ");
+	} LOG.os<>('\n');
+	
+	exit(0);
+	return idx_all_aug;	
+	
 }
+
 
 }

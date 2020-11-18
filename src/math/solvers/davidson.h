@@ -87,7 +87,6 @@ public:
 			throw std::runtime_error(msg);
 		}
 		
-		double conv = 1e-6;
 		m_errs.clear();
 		m_errs.resize(m_nroots);
 		
@@ -225,7 +224,7 @@ public:
 			
 			if (m_pseudo) LOG.os<1>("EVALS: ", *omega, " ", evals(m_nroots-1), '\n');
 			
-			m_converged = (m_pseudo) ? (max_err < fabs(*omega - evals(m_nroots - 1))) : (max_err < conv);
+			m_converged = (m_pseudo) ? (max_err < fabs(*omega - evals(m_nroots - 1))) : (max_err < m_conv);
 			
 			if (m_converged) break;
 			

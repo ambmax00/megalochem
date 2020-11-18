@@ -92,6 +92,8 @@ void adcmod::init_ao_tensors() {
 	
 	ints::aoloader m_aoloader(m_world, m_hfwfn->mol(), m_opt);
 	
+	m_aoloader.request(ints::key::ovlp_bb,true);
+	
 	if (met == ints::metric::coulomb) {
 		
 		m_aoloader.request(ints::key::coul_xx, true);
@@ -181,6 +183,8 @@ void adcmod::init_ao_tensors() {
 			.get();
 			
 	m_adc1_mvp->init();
+	
+	m_s_bb = aoreg.get<dbcsr::shared_matrix<double>>(ints::key::ovlp_bb);
 	
 }
 
