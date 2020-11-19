@@ -143,8 +143,13 @@ void fockmod::init() {
 		
 	}
 	
+	
+	m_ao.request(ints::key::dfit_pari_xbb,false);
+	
 	m_ao.compute();
 	auto aoreg = m_ao.get_registry();
+	
+	exit(0);
 	
 	LOG.os<>("Setting up JK builder.\n");
 	LOG.os<>("J method: ", j_method_str, '\n');

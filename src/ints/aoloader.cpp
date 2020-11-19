@@ -436,11 +436,20 @@ void aoloader::compute() {
 		auto& time = TIME.sub("Density fitting coefficients (PARI)");
 		time.start();
 				
-		auto eri_batched = m_reg.get<sbt3>(key::coul_xbb);
 		auto m_xx = m_reg.get<smatd>(key::coul_xx);
 		auto scr = m_reg.get<ints::shared_screener>(key::scr_xbb);
 		
-		auto c_xbb_pari = dfit.compute_pari(eri_batched, m_xx, scr);
+		int nbatches_x = m_opt.get<int>("nbatches_x", 5);
+		int nbatches_b = m_opt.get<int>("nbatches_b", 5);
+		std::string type_str = m_opt.get<std::string>("intermeds", "core");
+		auto mytype = dbcsr::get_btype(type_str);
+		
+		std::array<int,3> bdims = {nbatches_x,nbatches_b,nbatches_b};
+		
+		auto c_xbb_pari = dfit.compute_pari(m_xx, scr, bdims, mytype);
+		
+		exit(0);
+		
 		m_reg.insert(key::dfit_pari_xbb, c_xbb_pari);
 	
 		time.finish();
