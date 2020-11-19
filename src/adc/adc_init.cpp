@@ -80,109 +80,57 @@ void adcmod::init_ao_tensors() {
 	
 	LOG.os<>("Setting up AO integral tensors.\n");
 	
-	// setting up what we need
-	bool compute_3c2e(false), 
-		compute_metric_inv(false), 
-		compute_metric_invsqrt(false),
-		compute_s_bb(true);
-	
-	std::string metric_str = m_opt.get<std::string>("df_metric", ADC_METRIC);
-	auto met = ints::str_to_metric(metric_str);
-	m_metric = met;
-	
-	ints::aoloader m_aoloader(m_world, m_hfwfn->mol(), m_opt);
-	
-	m_aoloader.request(ints::key::ovlp_bb,true);
-	
-	if (met == ints::metric::coulomb) {
-		
-		m_aoloader.request(ints::key::coul_xx, true);
-		m_aoloader.request(ints::key::coul_xx_inv, true);
-		m_aoloader.request(ints::key::scr_xbb, true);
-		m_aoloader.request(ints::key::coul_xbb, true);
-		
-		if (m_kmethod == fock::kmethod::dfao) {
-			m_aoloader.request(ints::key::dfit_coul_xbb, true);
-		}
-		
-	} else if (met == ints::metric::erfc_coulomb) {
-		
-		m_aoloader.request(ints::key::coul_xx, true);
-		m_aoloader.request(ints::key::erfc_xx, true);
-		m_aoloader.request(ints::key::erfc_xx_inv, true);
-		m_aoloader.request(ints::key::scr_xbb, true);
-		m_aoloader.request(ints::key::erfc_xbb, true);
-		
-		if (m_kmethod == fock::kmethod::dfao) {
-			m_aoloader.request(ints::key::dfit_erfc_xbb, true);
-		}
-		
-	} else if (met == ints::metric::qr_fit) {
-		
-		m_aoloader.request(ints::key::coul_xx, true);
-		m_aoloader.request(ints::key::ovlp_xx, false);
-		m_aoloader.request(ints::key::ovlp_xx_inv, false);
-		m_aoloader.request(ints::key::scr_xbb, true);
-		m_aoloader.request(ints::key::qr_xbb, true);
-		
-		if (m_kmethod == fock::kmethod::dfao) {
-			m_aoloader.request(ints::key::dfit_qr_xbb, true);
-		}
-		
-	}
-	
-	m_aoloader.compute();
-	auto aoreg = m_aoloader.get_registry();
-	
-	dbcsr::sbtensor<3,double> eri3c2e_batched;
-	dbcsr::shared_matrix<double> metric_matrix;
-	dbcsr::sbtensor<3,double> fitting_batched;
-	
-	if (met == ints::metric::coulomb) {
-		
-		eri3c2e_batched = aoreg.get<dbcsr::sbtensor<3,double>>(ints::key::coul_xbb);
-		metric_matrix = aoreg.get<dbcsr::shared_matrix<double>>(ints::key::coul_xx_inv);
-		if (m_kmethod == fock::kmethod::dfao) {
-			fitting_batched = aoreg.get<dbcsr::sbtensor<3,double>>(
-				ints::key::dfit_coul_xbb);
-		}
-		
-	} else if (met == ints::metric::erfc_coulomb) {
-		
-		eri3c2e_batched = aoreg.get<dbcsr::sbtensor<3,double>>(ints::key::erfc_xbb);
-		metric_matrix = aoreg.get<dbcsr::shared_matrix<double>>(ints::key::erfc_xx_inv);
-		if (m_kmethod == fock::kmethod::dfao) {
-			fitting_batched = aoreg.get<dbcsr::sbtensor<3,double>>(
-				ints::key::dfit_erfc_xbb);
-		}
-		
-	} else if (met == ints::metric::qr_fit) {
-		
-		eri3c2e_batched = aoreg.get<dbcsr::sbtensor<3,double>>(ints::key::qr_xbb);
-		metric_matrix = aoreg.get<dbcsr::shared_matrix<double>>(ints::key::coul_xx);
-		if (m_kmethod == fock::kmethod::dfao) {
-			fitting_batched = aoreg.get<dbcsr::sbtensor<3,double>>(
-				ints::key::dfit_qr_xbb);
-		}
-		
-	}
-	
 	LOG.os<>("Finished setting up AO integral tensors.\n");
+	
+	auto jstr = m_opt.get<std::string>("build_J", ADC_BUILD_J);
+	auto kstr = m_opt.get<std::string>("build_K", ADC_BUILD_K);
+	
+	auto metr = ints::metric::coulomb;
+	auto jmet = fock::str_to_jmethod(jstr);
+	auto kmet = fock::str_to_kmethod(kstr);
+	
+	int nprint = LOG.global_plev();
+	
+	ints::aoloader ao(m_world, m_hfwfn->mol(), m_opt);
+	
+	fock::load_jints(jmet, metr, ao);
+	fock::load_kints(kmet, metr, ao);
+	
+	ao.request(ints::key::ovlp_bb, true);
+	
+	ao.compute();
+	
+	std::shared_ptr<fock::J> jbuilder = fock::create_j()
+		.world(m_world)
+		.mol(m_hfwfn->mol())
+		.metric(metr)
+		.method(jmet)
+		.aoloader(ao)
+		.print(nprint)
+		.get();
+	
+	std::shared_ptr<fock::K> kbuilder = fock::create_k()
+		.world(m_world)
+		.mol(m_hfwfn->mol())
+		.metric(metr)
+		.aoloader(ao)
+		.method(kmet)
+		.print(nprint)
+		.get();
 	
 	m_adc1_mvp = create_MVPAOADC1(
 			m_world, m_hfwfn->mol(), LOG.global_plev())
-			.eri3c2e_batched(eri3c2e_batched)
-			.fitting_batched(fitting_batched)
-			.v_xx(metric_matrix)
 			.c_bo(m_hfwfn->c_bo_A())
 			.c_bv(m_hfwfn->c_bv_A())
 			.eps_occ(m_hfwfn->eps_occ_A())
 			.eps_vir(m_hfwfn->eps_vir_A())
-			.kmethod(m_kmethod)
-			.jmethod(m_jmethod)
+			.kbuilder(kbuilder)
+			.jbuilder(jbuilder)
 			.get();
 			
 	m_adc1_mvp->init();
+	
+	auto aoreg = ao.get_registry();
 	
 	m_s_bb = aoreg.get<dbcsr::shared_matrix<double>>(ints::key::ovlp_bb);
 	

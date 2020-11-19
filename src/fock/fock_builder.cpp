@@ -45,230 +45,42 @@ void fockmod::init() {
 	kmethod kmet = str_to_kmethod(k_method_str);	
 	ints::metric metr = ints::str_to_metric(metric_str);
 		
-	// set J
-	if (jmet == jmethod::exact) {
-		
-		m_ao.request(ints::key::coul_bbbb, true);
-		
-	} else if (jmet == jmethod::dfao) {
-		
-		m_ao.request(ints::key::scr_xbb,true);
-		
-		if (metr == ints::metric::coulomb) {
-			m_ao.request(ints::key::coul_xx, false);
-			m_ao.request(ints::key::coul_xx_inv, true);
-			m_ao.request(ints::key::coul_xbb, true);
-		} else if (metr == ints::metric::erfc_coulomb) {
-			m_ao.request(ints::key::erfc_xx, false);
-			m_ao.request(ints::key::erfc_xx_inv, true);
-			m_ao.request(ints::key::erfc_xbb, true);
-		} else if (metr == ints::metric::qr_fit) {
-			m_ao.request(ints::key::coul_xx, true);
-			m_ao.request(ints::key::ovlp_xx, false);
-			m_ao.request(ints::key::ovlp_xx_inv, false);
-			m_ao.request(ints::key::qr_xbb, true);
-		}
-		
-	} else {
-		
-		throw std::runtime_error("Unknown J method: " + j_method_str);
-		
-	}
-		
+	// jload
 	
-	// set K
-	if (kmet == kmethod::exact) {
-		
-		m_ao.request(ints::key::coul_bbbb,true);
-		
-	} else if (kmet == kmethod::dfao) {
-		
-		m_ao.request(ints::key::scr_xbb,true);
-		
-		if (metr == ints::metric::coulomb) {
-			m_ao.request(ints::key::coul_xx,false);
-			m_ao.request(ints::key::coul_xx_inv,false);
-			m_ao.request(ints::key::coul_xbb,true);
-			m_ao.request(ints::key::dfit_coul_xbb,true);
-		} else if (metr == ints::metric::erfc_coulomb) {
-			m_ao.request(ints::key::erfc_xx,false);
-			m_ao.request(ints::key::erfc_xx_inv,false);
-			m_ao.request(ints::key::erfc_xbb,true);
-			m_ao.request(ints::key::dfit_erfc_xbb,true);
-		} else if (metr == ints::metric::qr_fit) {
-			m_ao.request(ints::key::coul_xx, true);
-			m_ao.request(ints::key::ovlp_xx, false);
-			m_ao.request(ints::key::ovlp_xx_inv, false);
-			m_ao.request(ints::key::qr_xbb, true);
-			m_ao.request(ints::key::dfit_qr_xbb, true);
-		}
-		
-	} else if (kmet == kmethod::dfmo) {
-		
-		m_ao.request(ints::key::scr_xbb,true);
-		
-		if (metr == ints::metric::coulomb) {
-			m_ao.request(ints::key::coul_xx,false);
-			m_ao.request(ints::key::coul_xx_invsqrt,true);
-			m_ao.request(ints::key::coul_xbb,true);
-		} else {
-			throw std::runtime_error("DFMO with non coulomb metric disabled.");
-		}
-		
-	} else if (kmet == kmethod::dfmem) {
-		
-		m_ao.request(ints::key::scr_xbb,true);
-		
-		if (metr == ints::metric::coulomb) {
-			m_ao.request(ints::key::coul_xx,false);
-			m_ao.request(ints::key::coul_xx_inv,false);
-			m_ao.request(ints::key::coul_xbb,true);
-			m_ao.request(ints::key::dfit_coul_xbb,true);
-		} else if (metr == ints::metric::erfc_coulomb) {
-			m_ao.request(ints::key::erfc_xx,false);
-			m_ao.request(ints::key::erfc_xx_inv,false);
-			m_ao.request(ints::key::erfc_xbb,true);
-			m_ao.request(ints::key::dfit_erfc_xbb,true);
-		} else if (metr == ints::metric::qr_fit) {
-			m_ao.request(ints::key::coul_xx, false);
-			m_ao.request(ints::key::ovlp_xx, false);
-			m_ao.request(ints::key::ovlp_xx_inv, false);
-			m_ao.request(ints::key::qr_xbb, false);
-			m_ao.request(ints::key::dfit_qr_xbb, true);
-		}
-		
-	} else {
-		
-		throw std::runtime_error("Unknown K method: " + k_method_str);
-		
-	}
+	load_jints(jmet, metr, m_ao);
 	
+	// kload 
 	
-	m_ao.request(ints::key::dfit_pari_xbb,false);
-	
+	load_kints(kmet, metr, m_ao);
+		
 	m_ao.compute();
-	auto aoreg = m_ao.get_registry();
-	
-	exit(0);
-	
+		
 	LOG.os<>("Setting up JK builder.\n");
 	LOG.os<>("J method: ", j_method_str, '\n');
 	LOG.os<>("K method: ", k_method_str, '\n');
 	
-	std::shared_ptr<J> jbuilder;
-	std::shared_ptr<K> kbuilder;
-	
 	int nprint = LOG.global_plev();
 	
-	if (jmet == jmethod::exact) {
-		
-		auto eris = aoreg.get<dbcsr::sbtensor<4,double>>(ints::key::coul_bbbb);
-		
-		jbuilder = create_EXACT_J(m_world, m_mol, nprint)
-			.eri4c2e_batched(eris)
-			.get();
-		
-	} else if (jmet == jmethod::dfao) {
-		
-		dbcsr::sbtensor<3,double> eris;
-		dbcsr::shared_matrix<double> v_inv;
-		
-		if (metr == ints::metric::coulomb) {
-			
-			eris = aoreg.get<decltype(eris)>(ints::key::coul_xbb);
-			v_inv = aoreg.get<decltype(v_inv)>(ints::key::coul_xx_inv);
-			
-		} else if (metr == ints::metric::erfc_coulomb) {
-			
-			eris = aoreg.get<decltype(eris)>(ints::key::erfc_xbb);
-			v_inv = aoreg.get<decltype(v_inv)>(ints::key::erfc_xx_inv);
-			
-		} else if (metr == ints::metric::qr_fit) {
-			
-			eris = aoreg.get<decltype(eris)>(ints::key::qr_xbb);
-			v_inv = aoreg.get<decltype(v_inv)>(ints::key::coul_xx);
-			
-		}
-		
-		jbuilder = create_DF_J(m_world, m_mol, nprint)
-			.eri3c2e_batched(eris)
-			.v_inv(v_inv)
-			.get();
-		
-	}
+	int noccbatches = m_opt.get<int>("occ_nbatches", FOCK_NOCCBATCHES);
 	
-	// set K
-	if (kmet == kmethod::exact) {
-		
-		auto eris = aoreg.get<dbcsr::sbtensor<4,double>>(ints::key::coul_bbbb);
-		
-		kbuilder = create_EXACT_K(m_world, m_mol, nprint)
-			.eri4c2e_batched(eris)
-			.get();
-		
-	} else if (kmet == kmethod::dfao) {
-		
-		dbcsr::sbtensor<3,double> eris;
-		dbcsr::sbtensor<3,double> cfit;
-		
-		switch (metr) {
-			case ints::metric::coulomb:
-				eris = aoreg.get<decltype(eris)>(ints::key::coul_xbb);
-				cfit = aoreg.get<decltype(eris)>(ints::key::dfit_coul_xbb);
-				break;
-			case ints::metric::erfc_coulomb:
-				eris = aoreg.get<decltype(eris)>(ints::key::erfc_xbb);
-				cfit = aoreg.get<decltype(eris)>(ints::key::dfit_erfc_xbb);
-				break;
-			case ints::metric::qr_fit:
-				eris = aoreg.get<decltype(eris)>(ints::key::qr_xbb);
-				cfit = aoreg.get<decltype(eris)>(ints::key::dfit_qr_xbb);
-				break;
-		}
-		
-		kbuilder = create_DFAO_K(m_world, m_mol, nprint)
-			.eri3c2e_batched(eris)
-			.fitting_batched(cfit)
-			.get();
-		
-	} else if (kmet == kmethod::dfmo) {
-		
-		auto eris = aoreg.get<dbcsr::sbtensor<3,double>>(ints::key::coul_xbb);
-		auto invsqrt = aoreg.get<dbcsr::shared_matrix<double>>(ints::key::coul_xx_invsqrt);
-		int nbatches = m_opt.get<int>("occ_nbatches");
-		
-		kbuilder = create_DFMO_K(m_world, m_mol, nprint)
-			.eri3c2e_batched(eris)
-			.v_invsqrt(invsqrt)
-			.occ_nbatches(nbatches)
-			.get();
-		
-	} else if (kmet == kmethod::dfmem) {
-		
-		dbcsr::sbtensor<3,double> eris;
-		dbcsr::shared_matrix<double> v_xx;
-		
-		switch (metr) {
-			case ints::metric::coulomb:
-				eris = aoreg.get<decltype(eris)>(ints::key::coul_xbb);
-				v_xx = aoreg.get<decltype(v_xx)>(ints::key::coul_xx_inv);
-				break;
-			case ints::metric::erfc_coulomb:
-				eris = aoreg.get<decltype(eris)>(ints::key::erfc_xbb);
-				v_xx = aoreg.get<decltype(v_xx)>(ints::key::erfc_xx_inv);
-				break;
-			case ints::metric::qr_fit:
-				eris = aoreg.get<decltype(eris)>(ints::key::qr_xbb);
-				v_xx = aoreg.get<decltype(v_xx)>(ints::key::coul_xx);
-				break;
-		}
-		
-		kbuilder = create_DFMEM_K(m_world, m_mol, nprint)
-			.eri3c2e_batched(eris)
-			.v_xx(v_xx)
-			.get();
-			
-	}
+	std::shared_ptr<J> jbuilder = create_j()
+		.world(m_world)
+		.mol(m_mol)
+		.metric(metr)
+		.method(jmet)
+		.aoloader(m_ao)
+		.print(nprint)
+		.get();
+	
+	std::shared_ptr<K> kbuilder = create_k()
+		.world(m_world)
+		.mol(m_mol)
+		.metric(metr)
+		.method(kmet)
+		.aoloader(m_ao)
+		.print(nprint)
+		.occ_nbatches(noccbatches)
+		.get();
 	
 	m_J_builder = jbuilder;
 	m_K_builder = kbuilder;

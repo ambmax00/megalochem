@@ -429,7 +429,7 @@ void aoloader::compute() {
 		
 	}
 	
-	if (comp(key::dfit_pari_xbb)) {
+	if (comp(key::pari_xbb)) {
 		
 		LOG.os<>("Computing fitting coefficients (PARI)\n");
 		
@@ -447,10 +447,8 @@ void aoloader::compute() {
 		std::array<int,3> bdims = {nbatches_x,nbatches_b,nbatches_b};
 		
 		auto c_xbb_pari = dfit.compute_pari(m_xx, scr, bdims, mytype);
-		
-		exit(0);
-		
-		m_reg.insert(key::dfit_pari_xbb, c_xbb_pari);
+				
+		m_reg.insert(key::pari_xbb, c_xbb_pari);
 	
 		time.finish();
 	
@@ -503,7 +501,27 @@ void aoloader::compute() {
 		time.finish();
 		
 	}
+	
+	if (comp(key::dfit_pari_xbb)) {
 		
+		LOG.os<>("Computing (P|Q) cfit_pari_Pmn\n");
+		
+		auto& time = TIME.sub("(P|Q) Density fitting coefficients");
+		time.start();
+		
+		//LOG.os<1>("Computing fitting coefficients.\n");
+		
+		auto pari_batched = m_reg.get<sbt3>(ints::key::pari_xbb);
+		auto v = m_reg.get<smatd>(ints::key::coul_xx);
+		
+		auto c_xbb_batched = dfit.compute(pari_batched, v, 
+			m_opt.get<std::string>("intermeds", "core"));
+						
+		m_reg.insert(key::dfit_pari_xbb, c_xbb_batched);
+		
+		time.finish();
+		
+	}
 	
 	TIME.finish();
 	LOG.os<>("Finished loading AO quantities.\n");

@@ -71,6 +71,7 @@ public:
 	void compute(std::vector<smat>& guess, int nroots, std::optional<double> omega = std::nullopt) {
 		
 		LOG.os<>("Launching davidson diagonalization.\n");
+		LOG.os<>("Convergence: ", m_conv, '\n');
 		
 		if (!omega && m_pseudo) 
 			throw std::runtime_error("Davidson solver initialized as pseudo-eigenvalue problem, but no omega given.");
@@ -217,6 +218,7 @@ public:
 			for (int iroot = 0; iroot != m_nroots; ++iroot) {
 				LOG.os<>("Root ", iroot, ": ", m_errs[iroot], '\n');
 			}
+			LOG.os<>("Max Error: ", max_err, '\n');
 			
 			// Convergence criteria
 			// Normal davidson: largest norm of residuals is below certain threshold

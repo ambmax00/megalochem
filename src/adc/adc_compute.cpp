@@ -75,7 +75,7 @@ void adcmod::compute() {
 		dav.set_factory(m_adc1_mvp);
 		dav.set_diag(m_d_ov);
 		dav.pseudo(false);
-		dav.conv(m_opt.get<int>("dav_conv", ADC_DAV_CONV));
+		dav.conv(m_opt.get<double>("dav_conv", ADC_DAV_CONV));
 		dav.maxiter(100);	
 		
 		int nroots = m_opt.get<int>("nroots", ADC_NROOTS);

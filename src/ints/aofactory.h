@@ -28,13 +28,15 @@ enum class metric {
 	invalid,
 	coulomb,
 	erfc_coulomb,
-	qr_fit
+	qr_fit,
+	pari
 };
 
 inline metric str_to_metric(std::string m) {
 	if (m == "coulomb") return metric::coulomb;
 	if (m == "erfc_coulomb") return metric::erfc_coulomb;
 	if (m == "qr_fit") return metric::qr_fit;
+	if (m == "pari") return metric::pari;
 	return metric::invalid;
 }
 	

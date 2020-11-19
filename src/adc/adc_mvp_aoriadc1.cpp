@@ -1,4 +1,5 @@
 #include "adc/adc_mvp.h"
+#include "ints/aoloader.h"
 
 namespace adc {
 
@@ -8,51 +9,10 @@ void MVPAOADC1::init() {
 	
 	LOG.os<>("Setting up j builder for AO-ADC1.\n");
 	
-	switch (m_jmethod) {
-		case fock::jmethod::dfao:
-		
-			m_jbuilder = fock::create_DF_J(
-				m_world, m_mol, LOG.global_plev())
-				.eri3c2e_batched(m_eri3c2e_batched)
-				.v_inv(m_v_xx)
-				.get();
-			break;
-		
-		default:
-		
-			throw std::runtime_error("AOADC1 does not support this J builder.\n");
-			
-	}
-	
 	m_jbuilder->set_sym(false);
 	m_jbuilder->init();
 	
 	LOG.os<>("Setting up k builder for AO-ADC1.\n");
-	
-	switch (m_kmethod) {
-		case fock::kmethod::dfao:
-			
-			m_kbuilder = fock::create_DFAO_K(
-				m_world, m_mol, LOG.global_plev())
-				.eri3c2e_batched(m_eri3c2e_batched)
-				.fitting_batched(m_fitting_batched)
-				.get();
-			break;
-			
-		case fock::kmethod::dfmem:
-		
-			m_kbuilder = fock::create_DFMEM_K(
-				m_world, m_mol, LOG.global_plev())
-				.eri3c2e_batched(m_eri3c2e_batched)
-				.v_xx(m_v_xx)
-				.get();
-			break;	
-		
-		default:
-		
-			throw std::runtime_error("AOADC1 does not support this K builder.\n");
-			
-	}
 	
 	m_kbuilder->set_sym(false);	
 	m_kbuilder->init();

@@ -19,8 +19,10 @@ void DFROBUST_K::init() {
 	auto x = m_mol->dims().x();
 	arrvec<int,2> bb = {b,b};
 	arrvec<int,2> xx = {x,x};
+	arrvec<int,3> xbb = {x,b,b};
 		
 	m_spgrid2 = dbcsr::create_pgrid<2>(m_world.comm()).get();
+	auto spgrid3 = m_eri3c2e_batched->spgrid();
 	
 	m_K_01 = dbcsr::tensor_create<2,double>().pgrid(m_spgrid2).name("K_01")
 		.map1({0}).map2({1}).blk_sizes(bb).get();
@@ -28,11 +30,48 @@ void DFROBUST_K::init() {
 	m_p_bb = dbcsr::tensor_create_template<2,double>(m_K_01)
 			.name("p_bb_0_1").map1({0}).map2({1}).get();
 	
-	m_s_xx_01 = dbcsr::tensor_create<2>()
+	m_v_xx_01 = dbcsr::tensor_create<2>()
 		.name("s_xx_01")
 		.pgrid(m_spgrid2)
 		.map1({0}).map2({1})
 		.blk_sizes(xx)
+		.get();
+		
+	m_cbar_xbb_01_2 = dbcsr::tensor_create<3,double>()
+		.name("cbar_xbb_01_2")
+		.pgrid(spgrid3)
+		.map1({0,1}).map2({2})
+		.blk_sizes(xbb)
+		.get();
+		
+	m_cbar_xbb_02_1 = 
+		dbcsr::tensor_create_template<3,double>(m_cbar_xbb_01_2)
+		.name("cbar_xbb_02_1")
+		.map1({0,2}).map2({1})
+		.get();
+		
+	m_cbar_xbb_0_12 = 
+		dbcsr::tensor_create_template<3,double>(m_cbar_xbb_01_2)
+		.name("cbar_xbb_0_12")
+		.map1({0}).map2({1,2})
+		.get();
+		
+	m_cfit_xbb_01_2 = 
+		dbcsr::tensor_create_template<3,double>(m_cbar_xbb_01_2)
+		.name("cfit_xbb_01_2")
+		.map1({0,1}).map2({2})
+		.get();
+		
+	m_cpq_xbb_0_12 = 
+		dbcsr::tensor_create_template<3,double>(m_cbar_xbb_01_2)
+		.name("cpq_xbb_0_12")
+		.map1({0}).map2({1,2})
+		.get();
+		
+	m_cpq_xbb_02_1 = 
+		dbcsr::tensor_create_template<3,double>(m_cbar_xbb_01_2)
+		.name("cpq_xbb_02_1")
+		.map1({0,2}).map2({1})
 		.get();
 	
 }
@@ -41,6 +80,158 @@ void DFROBUST_K::compute_K() {
 	
 	TIME.start();
 	
+	dbcsr::copy_matrix_to_tensor(*m_v_xx, *m_v_xx_01);
+	
+	auto compute_K_single = 
+	[&] (dbcsr::smat_d& p_bb, dbcsr::smat_d& k_bb, std::string x) {
+		
+		// c_bar(X,n,l) = c_fit(X,n,s) * P(s,l)
+		auto k_1 = dbcsr::tensor_create_template<2>(m_K_01)
+			.name("k_1")
+			.get();
+			
+		auto k_2 = dbcsr::tensor_create_template<2>(m_K_01)
+			.name("k_2")
+			.get();
+			
+		dbcsr::copy_matrix_to_tensor(*p_bb, *m_p_bb);
+		
+		m_eri3c2e_batched->decompress_init({0}, vec<int>{0,2}, vec<int>{1});
+		m_fitting_batched->decompress_init({0}, vec<int>{0}, vec<int>{1,2});
+		
+		int nbbatches = m_eri3c2e_batched->nbatches(2);
+		int nxbatches = m_eri3c2e_batched->nbatches(0);
+		
+		auto fullbbounds = m_eri3c2e_batched->full_bounds(1);
+		
+		for (int ix = 0; ix != nxbatches; ++ix) {
+			
+			auto xbounds = m_eri3c2e_batched->bounds(0,ix);
+			
+			// form cpq
+			for (int iy = 0; iy != nbbatches; ++iy) {
+				
+				auto ybounds = m_eri3c2e_batched->bounds(0,iy);
+				
+				m_fitting_batched->decompress({iy});
+				auto cfit_xbb_0_12 = m_fitting_batched->get_work_tensor();
+			
+				vec<vec<int>> xbds = {
+					xbounds
+				};
+			
+				vec<vec<int>> ybds = {
+					ybounds
+				};  
+			
+				dbcsr::contract(*m_v_xx_01, *cfit_xbb_0_12, *m_cpq_xbb_0_12)
+					.bounds1(ybds)
+					.bounds2(xbds)
+					.perform("XY, Ynl -> Xnl");
+					
+				vec<vec<int>> xmnbds = {
+					xbounds,
+					fullbbounds,
+					fullbbounds
+				};
+				
+				dbcsr::copy(*m_cpq_xbb_0_12, *m_cpq_xbb_02_1)
+					.bounds(xmnbds)
+					.sum(true)
+					.move_data(true)
+					.perform();
+					
+			}
+			
+			m_fitting_batched->decompress({ix});
+			m_eri3c2e_batched->decompress({ix});
+			
+			auto eri_xbb_02_1 = m_eri3c2e_batched->get_work_tensor();
+			auto cfit_xbb_0_12 = m_fitting_batched->get_work_tensor();
+			
+			for (int isig = 0; isig != nbbatches; ++isig) {
+				
+				// form cbar 
+				
+				auto sigbounds = m_eri3c2e_batched->bounds(2,isig);
+				
+				vec<vec<int>> xmsbds = {
+					xbounds,
+					fullbbounds,
+					sigbounds
+				};
+				
+				dbcsr::copy(*cfit_xbb_0_12, *m_cfit_xbb_01_2)
+					.bounds(xmsbds)
+					.perform();
+				
+				vec<vec<int>> xnbds = {
+					xbounds,
+					fullbbounds
+				};
+				
+				vec<vec<int>> sbds = {
+					sigbounds
+				};
+				
+				dbcsr::contract(*m_cfit_xbb_01_2, *m_p_bb, *m_cbar_xbb_01_2)
+					.bounds2(xnbds)
+					.bounds3(sbds)
+					.filter(dbcsr::global::filter_eps)
+					.perform("Xnl, ls -> Xns");
+			
+				// form k_1
+				
+				dbcsr::copy(*m_cbar_xbb_01_2, *m_cbar_xbb_02_1)
+					.bounds(xmsbds)
+					.move_data(true)
+					.perform();
+					
+				vec<vec<int>> xsbds = {
+					xbounds,
+					sigbounds
+				};
+				
+				dbcsr::contract(*eri_xbb_02_1, *m_cbar_xbb_02_1, *k_1)
+					.bounds1(xsbds)
+					.beta(1.0)
+					.perform("Xns, Xms -> mn");
+				
+				// form k_2
+				
+				dbcsr::contract(*m_cpq_xbb_02_1, *m_cbar_xbb_02_1, *k_2)
+					.bounds1(xsbds)
+					.beta(1.0)
+					.perform();
+					
+				m_cbar_xbb_02_1->clear();
+				
+			} // end loop sig
+			
+			m_cpq_xbb_02_1->clear();
+			
+		} // end loop x
+		
+		k_2->scale(-0.5);
+		dbcsr::copy(*k_1, *k_2).sum(true).perform();
+		dbcsr::copy(*k_1, *k_2).sum(true).order(vec<int>{1,0}).perform();
+		
+		dbcsr::copy_tensor_to_matrix(*k_2, *k_bb);
+		
+	}; // end lambda
+				
+	compute_K_single(m_p_A, m_K_A, "A");
+	
+	if (m_K_B) compute_K_single(m_p_B, m_K_B, "B");
+	
+	if (LOG.global_plev() >= 2) {
+		dbcsr::print(*m_K_A);
+		if (m_K_B) dbcsr::print(*m_K_B);
+	}
+	
+	m_v_xx_01->clear();
+	
+	/*
 	auto& time_reo_int1 = TIME.sub("Reordering integrals (1)");
 	auto& time_fetch_ints = TIME.sub("Fetching ints");
 	auto& time_reo_cbar = TIME.sub("Reordering c_bar");
@@ -50,218 +241,9 @@ void DFROBUST_K::compute_K() {
 	auto& time_copy_cfit = TIME.sub("Copying c_fit");
 	auto& time_form_K1 = TIME.sub("Forming K1");
 	auto& time_form_K2 = TIME.sub("Forming K2");
+	*/
 	
-	// allocate tensors
 	
-	auto cfit_xbb_01_2 = m_fitting;
-	
-	auto cfit_xbb_0_12 = dbcsr::tensor_create_template(m_fitting)
-		.name("cfit_xbb_0_12")
-		.map1({0}).map2({1,2})
-		.get();
-	
-	auto cbar_xbb_01_2 = dbcsr::tensor_create_template(m_fitting)
-		.name("cbar_xbb_01_2")
-		.map1({0,1}).map2({2})
-		.get();
-		
-	auto cbar_xbb_02_1 = dbcsr::tensor_create_template(m_fitting)
-		.name("cbar_xbb_02_1")
-		.map1({0,2}).map2({1})
-		.get();
-	
-	auto ctil_xbb_0_12 = dbcsr::tensor_create_template(m_fitting)
-		.name("ctil_xbb_0_12")
-		.map1({0}).map2({1,2})
-		.get();
-		
-	auto ctil_xbb_02_1 = dbcsr::tensor_create_template(m_fitting)
-		.name("ctil_xbb_02_1")
-		.map1({0,2}).map2({1})
-		.get();
-	
-	auto K1 = dbcsr::tensor_create_template(m_K_01)
-		.name("K1").get();
-		
-	auto K2 = dbcsr::tensor_create_template(m_K_01)
-		.name("K2").get();
-		
-	time_reo_int1.start();
-	m_eri3c2e_batched->decompress_init({0}, vec<int>{0,2},vec<int>{1});
-	time_reo_int1.finish();
-	
-	K1->batched_contract_init();
-	K2->batched_contract_init();
-	
-	cfit_xbb_01_2->batched_contract_init();
-	cfit_xbb_0_12->batched_contract_init();
-	cbar_xbb_01_2->batched_contract_init();
-	cbar_xbb_02_1->batched_contract_init();
-	ctil_xbb_0_12->batched_contract_init();
-	ctil_xbb_02_1->batched_contract_init();
-	
-	dbcsr::copy_matrix_to_tensor(*m_p_A, *m_p_bb);
-	dbcsr::copy_matrix_to_tensor(*m_v_xx, *m_s_xx_01);
-	
-	// Loop ix
-	for (int ix = 0; ix != m_eri3c2e_batched->nbatches(0); ++ix) {
-		
-		LOG.os<1>("Fetching integrals.\n");
-		time_fetch_ints.start();
-		m_eri3c2e_batched->decompress({ix});
-		auto eri_02_1 = m_eri3c2e_batched->get_work_tensor();
-		time_fetch_ints.finish();
-		
-		//m_p_bb->batched_contract_init();
-		//m_s_xx_01->batched_contract_init();
-		
-		// Loop inu
-		for (int isig = 0; isig != m_eri3c2e_batched->nbatches(2); ++isig) {
-			
-			LOG.os<1>("Loop PARI K, batch nr ", ix, " ", isig, '\n');
-			
-			vec<vec<int>> xm_bounds = {
-				m_eri3c2e_batched->bounds(0,ix),
-				m_eri3c2e_batched->full_bounds(1)
-			};
-			
-			vec<vec<int>> s_bounds = {
-				m_eri3c2e_batched->bounds(2,isig)
-			};
-			
-			LOG.os<1>("Forming cbar.\n");
-			
-			// form cbar
-			
-			time_form_cbar.start();
-			dbcsr::contract(*cfit_xbb_01_2, *m_p_bb, *cbar_xbb_01_2)
-				.bounds2(xm_bounds)
-				.bounds3(s_bounds)
-				.filter(dbcsr::global::filter_eps)
-				.perform("Qml, ls -> Qms");
-			time_form_cbar.finish();	
-				
-			vec<vec<int>> rns_bounds = {
-				m_eri3c2e_batched->full_bounds(0),
-				m_eri3c2e_batched->full_bounds(1),
-				m_eri3c2e_batched->bounds(2,isig)
-			};
-			 
-			LOG.os<1>("Copying...\n");
-			time_copy_cfit.start();
-			dbcsr::copy(*cfit_xbb_01_2,*cfit_xbb_0_12)
-				.bounds(rns_bounds)
-				.perform();
-			time_copy_cfit.finish();
-		
-			vec<vec<int>> ns_bounds = {
-				m_eri3c2e_batched->full_bounds(1),
-				m_eri3c2e_batched->bounds(2,isig)
-			};
-			
-			vec<vec<int>> x_bounds = {
-				m_eri3c2e_batched->bounds(0,ix)
-			};
-			
-			LOG.os<1>("Forming ctil.\n");
-			time_form_ctil.start();
-			dbcsr::contract(*cfit_xbb_0_12, *m_s_xx_01, *ctil_xbb_0_12)
-				.bounds2(ns_bounds)
-				.bounds3(x_bounds)
-				.filter(dbcsr::global::filter_eps)
-				.perform("Rns, RQ -> Qns");	
-			time_form_ctil.finish();
-			
-			cfit_xbb_0_12->clear();
-			
-			LOG.os<1>("Reordering ctil.\n");
-			time_reo_ctil.start();
-			dbcsr::copy(*ctil_xbb_0_12, *ctil_xbb_02_1).move_data(true).perform();
-			time_reo_ctil.finish();
-			
-			LOG.os<1>("Reordering cbar.\n");
-			time_reo_cbar.start();
-			dbcsr::copy(*cbar_xbb_01_2, *cbar_xbb_02_1).move_data(true).perform();
-			time_reo_cbar.finish();
-			
-			vec<vec<int>> xs_bounds = {
-				m_eri3c2e_batched->bounds(0,ix),
-				m_eri3c2e_batched->bounds(2,isig)
-			};
-			
-			LOG.os<1>("Forming K (1).\n");
-			
-			time_form_K1.start();
-			dbcsr::contract(*cbar_xbb_02_1, *eri_02_1, *K1)
-				.bounds1(xs_bounds)
-				.filter(dbcsr::global::filter_eps/m_eri3c2e_batched->nbatches(0))
-				.beta(1.0)
-				.perform("Qms, Qns -> mn");
-			time_form_K1.finish();
-							
-			LOG.os<1>("Forming K (2).\n");
-			
-			time_form_K2.start();
-			dbcsr::contract(*ctil_xbb_02_1, *cbar_xbb_02_1, *K2)
-				.bounds1(xs_bounds)
-				.filter(dbcsr::global::filter_eps/m_eri3c2e_batched->nbatches(0))
-				.beta(1.0)
-				.perform("Qns, Qms -> mn");	
-			time_form_K2.finish();
-			
-			ctil_xbb_02_1->clear();
-			cbar_xbb_02_1->clear();
-		
-			LOG.os<1>("Done.\n");
-				
-		} // end loop sig
-		
-		//m_p_bb->batched_contract_finalize();
-		//m_s_xx_01->batched_contract_finalize();
-		
-	} // end loop x
-	
-	K1->batched_contract_finalize();
-	K2->batched_contract_finalize();
-	
-	cfit_xbb_01_2->batched_contract_finalize();
-	cfit_xbb_0_12->batched_contract_finalize();
-	cbar_xbb_01_2->batched_contract_finalize();
-	cbar_xbb_02_1->batched_contract_finalize();
-	ctil_xbb_0_12->batched_contract_finalize();
-	ctil_xbb_02_1->batched_contract_finalize();
-	
-	m_eri3c2e_batched->decompress_finalize();
-	m_s_xx_01->clear();
-	
-	K2->scale(-0.5);	
-	
-	//dbcsr::print(*K1);
-	//dbcsr::print(*K2);
-		
-	dbcsr::copy(*K1, *m_K_01).move_data(true).sum(true).perform();
-	dbcsr::copy(*K2, *m_K_01).move_data(true).sum(true).perform();		
-			
-	//dbcsr::print(*m_K_01);
-	
-	LOG.os<1>("Forming final K.\n");
-	
-	auto K_copy = dbcsr::tensor_create_template<2,double>(m_K_01)
-		.name("K copy").get();
-		
-	dbcsr::copy(*m_K_01, *K_copy).order({1,0}).perform();
-	dbcsr::copy(*K_copy, *m_K_01).move_data(true).sum(true).perform();
-		
-	dbcsr::copy_tensor_to_matrix(*m_K_01, *m_K_A);
-	
-	m_K_01->clear();
-	
-	m_K_A->scale(-1.0);
-	//dbcsr::print(*m_K_A);
-	
-	//time_reo_int2.start();
-	//m_eri_batched->reorder(vec<int>{0}, vec<int>{1,2});
-	//time_reo_int2.finish();	
 		
 	TIME.finish();
 			

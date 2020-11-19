@@ -68,18 +68,11 @@ private:
 	std::shared_ptr<fock::J> m_jbuilder;
 	std::shared_ptr<fock::K> m_kbuilder;
 	
-	dbcsr::sbtensor<3,double> m_eri3c2e_batched;
-	dbcsr::sbtensor<3,double> m_fitting_batched;
-	dbcsr::shared_matrix<double> m_v_xx;
-	
 	svector<double> m_eps_occ;
 	svector<double> m_eps_vir;
 
 	smat m_c_bo;
 	smat m_c_bv;
-	
-	fock::kmethod m_kmethod;
-	fock::jmethod m_jmethod;
 
 	friend class create_MVPAOADC1_base;
 
@@ -111,15 +104,12 @@ MAKE_STRUCT(
 		(print, (int))
 	),
 	(
-		(eri3c2e_batched, (dbcsr::sbtensor<3,double>), required, val),
-		(fitting_batched, (dbcsr::sbtensor<3,double>), optional, val, nullptr),
-		(v_xx, (dbcsr::shared_matrix<double>), optional, val, nullptr),
 		(c_bo, (dbcsr::shared_matrix<double>), required, val),
 		(c_bv, (dbcsr::shared_matrix<double>), required, val),
 		(eps_occ, (std::shared_ptr<std::vector<double>>), required, val),
 		(eps_vir, (std::shared_ptr<std::vector<double>>), required, val),
-		(kmethod, (fock::kmethod), optional, val, fock::kmethod::dfao),
-		(jmethod, (fock::jmethod), optional, val, fock::jmethod::dfao)
+		(kbuilder, (std::shared_ptr<fock::K>), required, val),
+		(jbuilder, (std::shared_ptr<fock::J>), required, val)
 	)
 )
 

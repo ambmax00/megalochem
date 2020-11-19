@@ -36,7 +36,8 @@ enum class key {
 	dfit_qr_xbb = 21,
 	scr_xbb = 22,
 	qr_xbb = 23,
-	NUM_KEYS = 24
+	pari_xbb = 24,
+	NUM_KEYS = 25
 };
 	
 class aoloader {
