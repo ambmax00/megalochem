@@ -8,10 +8,10 @@
 
 namespace fock {
 
-BATCHED_PARI_K::BATCHED_PARI_K(dbcsr::world w, desc::smolecule mol, int print) 
+DFROBUST_K::DFROBUST_K(dbcsr::world w, desc::smolecule mol, int print) 
 	: K(w,mol,print,"PARI-K") {}
 
-void BATCHED_PARI_K::init() {
+void DFROBUST_K::init() {
 	
 	init_base();
 	
@@ -37,7 +37,7 @@ void BATCHED_PARI_K::init() {
 	
 }
 
-void BATCHED_PARI_K::compute_K() {
+void DFROBUST_K::compute_K() {
 	
 	TIME.start();
 	

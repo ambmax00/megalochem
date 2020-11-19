@@ -190,7 +190,7 @@ void fockmod::init() {
 			
 		}
 		
-		jbuilder = create_BATCHED_DF_J(m_world, m_mol, nprint)
+		jbuilder = create_DF_J(m_world, m_mol, nprint)
 			.eri3c2e_batched(eris)
 			.v_inv(v_inv)
 			.get();
@@ -226,7 +226,7 @@ void fockmod::init() {
 				break;
 		}
 		
-		kbuilder = create_BATCHED_DFAO_K(m_world, m_mol, nprint)
+		kbuilder = create_DFAO_K(m_world, m_mol, nprint)
 			.eri3c2e_batched(eris)
 			.fitting_batched(cfit)
 			.get();
@@ -237,7 +237,7 @@ void fockmod::init() {
 		auto invsqrt = aoreg.get<dbcsr::shared_matrix<double>>(ints::key::coul_xx_invsqrt);
 		int nbatches = m_opt.get<int>("occ_nbatches");
 		
-		kbuilder = create_BATCHED_DFMO_K(m_world, m_mol, nprint)
+		kbuilder = create_DFMO_K(m_world, m_mol, nprint)
 			.eri3c2e_batched(eris)
 			.v_invsqrt(invsqrt)
 			.occ_nbatches(nbatches)
@@ -263,7 +263,7 @@ void fockmod::init() {
 				break;
 		}
 		
-		kbuilder = create_BATCHED_DFMEM_K(m_world, m_mol, nprint)
+		kbuilder = create_DFMEM_K(m_world, m_mol, nprint)
 			.eri3c2e_batched(eris)
 			.v_xx(v_xx)
 			.get();

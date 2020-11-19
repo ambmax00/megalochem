@@ -11,7 +11,7 @@ void MVPAOADC1::init() {
 	switch (m_jmethod) {
 		case fock::jmethod::dfao:
 		
-			m_jbuilder = fock::create_BATCHED_DF_J(
+			m_jbuilder = fock::create_DF_J(
 				m_world, m_mol, LOG.global_plev())
 				.eri3c2e_batched(m_eri3c2e_batched)
 				.v_inv(m_v_xx)
@@ -32,7 +32,7 @@ void MVPAOADC1::init() {
 	switch (m_kmethod) {
 		case fock::kmethod::dfao:
 			
-			m_kbuilder = fock::create_BATCHED_DFAO_K(
+			m_kbuilder = fock::create_DFAO_K(
 				m_world, m_mol, LOG.global_plev())
 				.eri3c2e_batched(m_eri3c2e_batched)
 				.fitting_batched(m_fitting_batched)
@@ -41,7 +41,7 @@ void MVPAOADC1::init() {
 			
 		case fock::kmethod::dfmem:
 		
-			m_kbuilder = fock::create_BATCHED_DFMEM_K(
+			m_kbuilder = fock::create_DFMEM_K(
 				m_world, m_mol, LOG.global_plev())
 				.eri3c2e_batched(m_eri3c2e_batched)
 				.v_xx(m_v_xx)

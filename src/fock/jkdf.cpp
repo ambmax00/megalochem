@@ -6,10 +6,10 @@
 
 namespace fock {
 
-BATCHED_DF_J::BATCHED_DF_J(dbcsr::world w, desc::smolecule mol, int print) 
-	: J(w,mol,print,"BATCHED_DF_J") {} 
+DF_J::DF_J(dbcsr::world w, desc::smolecule mol, int print) 
+	: J(w,mol,print,"DF_J") {} 
 
-void BATCHED_DF_J::init() {
+void DF_J::init() {
 	
 	init_base();
 	
@@ -54,7 +54,7 @@ void BATCHED_DF_J::init() {
 	
 }
 
-void BATCHED_DF_J::compute_J() {
+void DF_J::compute_J() {
 	
 	auto& con1 = TIME.sub("first contraction");
 	auto& con2 = TIME.sub("second contraction");
@@ -185,10 +185,10 @@ void BATCHED_DF_J::compute_J() {
 	
 }
 
-BATCHED_DFMO_K::BATCHED_DFMO_K(dbcsr::world w, desc::smolecule mol, int print)
-	: K(w,mol,print,"BATCHED_DFMO_K") {}
+DFMO_K::DFMO_K(dbcsr::world w, desc::smolecule mol, int print)
+	: K(w,mol,print,"DFMO_K") {}
 
-void BATCHED_DFMO_K::init() {
+void DFMO_K::init() {
 	
 	init_base();
 	
@@ -208,7 +208,7 @@ void BATCHED_DFMO_K::init() {
 			
 }
 
-void BATCHED_DFMO_K::compute_K() {
+void DFMO_K::compute_K() {
 	
 	TIME.start();
 	
@@ -442,9 +442,9 @@ void BATCHED_DFMO_K::compute_K() {
 		
 }
 
-BATCHED_DFAO_K::BATCHED_DFAO_K(dbcsr::world w, desc::smolecule mol, int print)
-	: K(w,mol,print,"BATCHED_DFAO_K") {}
-void BATCHED_DFAO_K::init() {
+DFAO_K::DFAO_K(dbcsr::world w, desc::smolecule mol, int print)
+	: K(w,mol,print,"DFAO_K") {}
+void DFAO_K::init() {
 	
 	init_base();
 	
@@ -480,7 +480,7 @@ void BATCHED_DFAO_K::init() {
 
 }
 
-void BATCHED_DFAO_K::compute_K() {
+void DFAO_K::compute_K() {
 	
 	TIME.start();
 	
@@ -627,9 +627,9 @@ void BATCHED_DFAO_K::compute_K() {
 			
 }
 
-BATCHED_DFMEM_K::BATCHED_DFMEM_K(dbcsr::world w, desc::smolecule mol, int print)
-	: K(w,mol,print,"BATCHED_DFMEM_K") {}
-void BATCHED_DFMEM_K::init() {
+DFMEM_K::DFMEM_K(dbcsr::world w, desc::smolecule mol, int print)
+	: K(w,mol,print,"DFMEM_K") {}
+void DFMEM_K::init() {
 	
 	init_base();
 			
@@ -696,7 +696,7 @@ void BATCHED_DFMEM_K::init() {
 		
 }
 
-void BATCHED_DFMEM_K::compute_K() {
+void DFMEM_K::compute_K() {
 	
 	TIME.start();
 	
