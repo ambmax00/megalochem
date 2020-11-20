@@ -9,7 +9,7 @@
 
 namespace ints {
 
-dbcsr::shared_tensor<3,double> dfitting::compute_pari(dbcsr::shared_matrix<double> s_xx, 
+dbcsr::sbtensor<3,double> dfitting::compute_pari(dbcsr::shared_matrix<double> s_xx, 
 	shared_screener scr_s, std::array<int,3> bdims, dbcsr::btype mytype) {
 	
 	auto aofac = std::make_shared<aofactory>(m_mol, m_world);
@@ -373,8 +373,6 @@ dbcsr::shared_tensor<3,double> dfitting::compute_pari(dbcsr::shared_matrix<doubl
 			inv_local->filter(dbcsr::global::filter_eps);
 			
 			dbcsr::contract(*inv_local, *eri_local, *c_xbb_AB)
-				.alpha(1.0)
-				.beta(1.0)
 				.filter(dbcsr::global::filter_eps)
 				.perform("XY, YMN -> XMN");
 		
@@ -402,9 +400,12 @@ dbcsr::shared_tensor<3,double> dfitting::compute_pari(dbcsr::shared_matrix<doubl
 	
 		util::scheduler worker(m_world.comm(), ntasks, workfunc);
 		worker.run();
-		
+				
 		dbcsr::copy_local_to_global(*c_xbb_local, *c_xbb_global);
+				
 		c_xbb_batched->compress({inu}, c_xbb_global);
+		c_xbb_local->clear();
+		c_xbb_global->clear();
 		
 		task_off += ntasks;
 	
@@ -412,7 +413,15 @@ dbcsr::shared_tensor<3,double> dfitting::compute_pari(dbcsr::shared_matrix<doubl
 	
 	c_xbb_batched->compress_finalize();
 	
-	return nullptr;
+	TIME.finish();
+	
+	double occupation = c_xbb_batched->occupation() * 100;
+	LOG.os<>("Occupation of PARI fitting coefficients: ", occupation, "%\n");
+	
+	if (occupation > 100) throw std::runtime_error(
+		"Fitting coefficients occupation more than 100%");
+	
+	return c_xbb_batched;
 	
 }
 	

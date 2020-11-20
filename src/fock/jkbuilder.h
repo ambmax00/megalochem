@@ -584,6 +584,11 @@ public:
 				eris = aoreg.get<decltype(eris)>(ints::key::qr_xbb);
 				v_inv = aoreg.get<decltype(v_inv)>(ints::key::coul_xx);
 				
+			} else if (*c_metric == ints::metric::pari) {
+				
+				eris = aoreg.get<decltype(eris)>(ints::key::pari_xbb);
+				v_inv = aoreg.get<decltype(v_inv)>(ints::key::coul_xx);
+				
 			}
 			
 			jbuilder = create_DF_J(*c_world, *c_mol, nprint)

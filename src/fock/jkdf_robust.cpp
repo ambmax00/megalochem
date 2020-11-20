@@ -109,7 +109,7 @@ void DFROBUST_K::compute_K() {
 			auto xbounds = m_eri3c2e_batched->bounds(0,ix);
 			
 			// form cpq
-			for (int iy = 0; iy != nbbatches; ++iy) {
+			for (int iy = 0; iy != nxbatches; ++iy) {
 				
 				auto ybounds = m_eri3c2e_batched->bounds(0,iy);
 				
@@ -149,21 +149,21 @@ void DFROBUST_K::compute_K() {
 			auto eri_xbb_02_1 = m_eri3c2e_batched->get_work_tensor();
 			auto cfit_xbb_0_12 = m_fitting_batched->get_work_tensor();
 			
+			vec<vec<int>> xmnbds = {
+				xbounds,
+				fullbbounds,
+				fullbbounds
+			};
+			
+			dbcsr::copy(*cfit_xbb_0_12, *m_cfit_xbb_01_2)
+				.bounds(xmnbds)
+				.perform();
+			
 			for (int isig = 0; isig != nbbatches; ++isig) {
 				
 				// form cbar 
 				
 				auto sigbounds = m_eri3c2e_batched->bounds(2,isig);
-				
-				vec<vec<int>> xmsbds = {
-					xbounds,
-					fullbbounds,
-					sigbounds
-				};
-				
-				dbcsr::copy(*cfit_xbb_0_12, *m_cfit_xbb_01_2)
-					.bounds(xmsbds)
-					.perform();
 				
 				vec<vec<int>> xnbds = {
 					xbounds,
@@ -181,6 +181,12 @@ void DFROBUST_K::compute_K() {
 					.perform("Xnl, ls -> Xns");
 			
 				// form k_1
+				
+				vec<vec<int>> xmsbds = {
+					xbounds,
+					fullbbounds,
+					sigbounds
+				};
 				
 				dbcsr::copy(*m_cbar_xbb_01_2, *m_cbar_xbb_02_1)
 					.bounds(xmsbds)
@@ -202,21 +208,33 @@ void DFROBUST_K::compute_K() {
 				dbcsr::contract(*m_cpq_xbb_02_1, *m_cbar_xbb_02_1, *k_2)
 					.bounds1(xsbds)
 					.beta(1.0)
-					.perform();
+					.perform("Xns, Xms -> mn");
 					
 				m_cbar_xbb_02_1->clear();
 				
 			} // end loop sig
 			
 			m_cpq_xbb_02_1->clear();
+			m_cfit_xbb_01_2->clear();
 			
 		} // end loop x
 		
 		k_2->scale(-0.5);
-		dbcsr::copy(*k_1, *k_2).sum(true).perform();
-		dbcsr::copy(*k_1, *k_2).sum(true).order(vec<int>{1,0}).perform();
 		
-		dbcsr::copy_tensor_to_matrix(*k_2, *k_bb);
+		dbcsr::copy(*k_1, *m_K_01).perform();
+		dbcsr::copy(*k_2, *m_K_01).sum(true).perform();
+		
+		dbcsr::copy(*m_K_01, *k_1).perform();
+		dbcsr::copy(*k_1, *m_K_01)
+			.order(vec<int>{1,0})
+			.sum(true)
+			.perform();
+		
+		dbcsr::copy_tensor_to_matrix(*m_K_01, *k_bb);
+		
+		k_bb->scale(-1.0);
+		
+		m_K_01->clear();
 		
 	}; // end lambda
 				
