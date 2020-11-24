@@ -14,6 +14,7 @@
 #include <random>
 #include <algorithm>
 #include <iostream>
+#include <fortran_utils.hpp>
 
 #include "utils/params.hpp"
 
@@ -512,6 +513,17 @@ public:
     #:endfor
         ];
     }
+#:endfor
+
+#:for idim in range(2,MAXDIM+1)
+	template <typename D = T, int M = N> 
+	typename std::enable_if<M == ${idim}$, void>::type
+	reshape(D* data, std::array<int,2> sizes, vec<int>& map1, vec<int>& map2) {
+	
+		fortran_reshape_${idim}$d(data, sizes.data(), m_data,
+			m_size.data(), map1.data(), map1.size(), map2.data(), map2.size());
+
+	}
 #:endfor
 	
 	void fill_rand(T a, T b) {

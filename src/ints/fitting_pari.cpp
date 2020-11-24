@@ -96,7 +96,7 @@ dbcsr::sbtensor<3,double> dfitting::compute_pari(dbcsr::shared_matrix<double> s_
 		.name("fitting coefficients")
 		.pgrid(spgrid3_xbb)
 		.blk_sizes(xbb)
-		.map1({0,1}).map2({2})
+		.map1({0}).map2({1,2})
 		.get();
 		
 	auto c_xbb_local = dbcsr::tensor_create<3,double>()

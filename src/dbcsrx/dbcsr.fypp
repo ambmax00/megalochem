@@ -17,6 +17,16 @@
     #:endfor
 #:enddef
 
+#:def shape_colon(n=MAXDIM)
+#!    repeated colon ':' for e.g. assumed shape array notation
+$:    ','.join([':']*n)
+#:enddef
+
+#:def shape_explicit(name, n=MAXDIM)
+#!    explicit shape for pointer bounds remapping
+$:    ", ".join(['LBOUND('+name+', '+ str(i) + '):UBOUND('+name+', '+str(i)+')' for i in range(1,n+1)])
+#:enddef
+
 #:def make_struct(structname, friend, params)
 struct ${structname}$ {
     
@@ -58,5 +68,26 @@ $:    ", ".join([name + str(i) + suffix for i in range(nmin, nmax+1)]) + end
 
 #:set typelist = ['double', 'float', 'double _Complex', 'float _Complex']
 #:set typesuffix = ['d', 'f', 'c', 'z']
+
+#! c datatypes
+
+#:set dtype_float_prec = ['real_8', 'real_4', 'real_8', 'real_4']
+#:set dtype_float_type = ['REAL(kind=real_8)', 'REAL(kind=real_4)', 'COMPLEX(kind=real_8)', 'COMPLEX(kind=real_4)']
+#:set dtype_float_suffix = ['r_dp', 'r_sp', 'c_dp', 'c_sp']
+#:set dtype_float_param = ['dbcsr_type_real_8', 'dbcsr_type_real_4', 'dbcsr_type_complex_8', 'dbcsr_type_complex_4']
+
+#: set base_dtype_float_type = ['REAL', 'REAL', 'COMPLEX', 'COMPLEX']
+#: set cf_dtype_float_type = ['c_double', 'c_float', 'c_double_complex', 'c_float_complex']
+
+#: set c_dtype_float_type = ['double', 'float', 'double _Complex', 'float _Complex']
+
+#:set cf_dtype_float_list = list(zip(dtype_float_param, dtype_float_type, dtype_float_suffix, base_dtype_float_type, cf_dtype_float_type))
+#:set cf_dtype_float_list_prec = list(zip(dtype_float_prec, dtype_float_param, dtype_float_type, dtype_float_suffix, base_dtype_float_type, cf_dtype_float_type))
+#:set c_dtype_float_list = list(zip(dtype_float_suffix, c_dtype_float_type))
+
+#:def arrlist(name, nmin=1, nmax=MAXDIM, ndim_pre=0, ndim_post=0)
+#!    expand array into list of elements "name(1), name(2), ..., name(n)
+$:    ", ".join([name + "(" + ":," * ndim_pre + str(i) + ",:"*ndim_post + ")" for i in range(nmin, nmax+1)])
+#:enddef
 
 #:endmute

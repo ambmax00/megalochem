@@ -87,7 +87,7 @@ inline vec<vec<int>> make_blk_bounds(std::vector<int> blksizes,
 }
 	
 template <int N, typename T, 
-	typename = typename std::enable_if<(N >= 2 && N <= 4)>::type>
+	typename = typename std::enable_if<(N >= 3 && N <= 4)>::type>
 class btensor {
 protected:
 
@@ -442,7 +442,14 @@ public:
 	void compress(std::initializer_list<int> idx_list, stensor<N,T> tensor_in) {
 	
 		vec<int> idx = idx_list;
+	
+		auto map1 = tensor_in->map1_2d();
+		auto map2 = tensor_in->map2_2d();
 		
+		if (map1 != m_wrview.map1 || map2 != m_wrview.map2) {
+			throw std::logic_error("Batchtensor compression: incompatible maps.\n");
+		}
+					
 		switch(m_type) {
 			case btype::disk: compress_disk(idx,tensor_in);
 			break;
@@ -480,7 +487,7 @@ public:
 	}
     
 	void compress_disk(vec<int> idx, stensor<N,T> tensor_in) {
-		
+				
 		auto dims = m_wrview.dims;
 		int ibatch = flatten(idx,dims);
 		int nbatches = m_wrview.nbatches;
@@ -742,34 +749,12 @@ public:
 		
 		std::reverse(order.begin(),order.end());
 		
-		// reorder indices
 		for (auto i : order) {
 			LOG.os<1>(i, " ");
 		} LOG.os<1>('\n');
 		
-		for (auto rd : rview.dims) {
-			for (auto wd : w_dims) {
-				
-				LOG.os<1>("rd/wd ", rd, " ", wd, '\n');
-				
-				auto w_iter = std::find(order.begin(), order.end(), wd);
-				int w_npos = order.end() - w_iter;
-				
-				auto r_iter = std::find(order.begin(), order.end(), rd);
-				int r_npos = order.end() - r_iter;
-				
-				LOG.os<1>("w/rpos ", w_npos, " ", r_npos, '\n');
-				
-				if (r_npos > w_npos) 
-					throw std::runtime_error("Reading dimension(s) are too slow. \n Use direct or core.\n");
-				
-			}
-		}	
-		
 		// compute super indices
 		
-		auto& nblksprocbatch = rview.nblksprocbatch;
-		auto& nzeprocbatch = rview.nzeprocbatch;
 		arrvec<int,N> rlocblkidx, wlocblkidx; 
 		vec<MPI_Offset> rlocblkoff, wlocblkoff;
 		
@@ -841,118 +826,139 @@ public:
 					
 		// prepare
 		
-		vec<size_t> perm(wlocblkidx[0].size()), superidx(wlocblkidx[0].size());
+		vec<size_t> perm(wlocblkidx[0].size());
+		vec<size_t> batchidx(wlocblkidx[0].size());
 		
 		std::iota(perm.begin(),perm.end(),(size_t)0);
 		
-		// get nblk_per_batch for all dims
-		vec<double> nele_per_batch(N);
+		// start computing superindices
+		std::array<int,N> bsizes;
+		for (int i = 0; i != N; ++i) {
+			bsizes[i] = (dims.size() > i) ? m_nbatches_dim[dims[i]] : 1;
+		}
+		int nbatches = std::accumulate(bsizes.begin(), bsizes.end(), 1, std::multiplies<int>());
 		
-		auto& blksizes = m_blk_sizes;
+		LOG.os<1>("NBATCHES: ", nbatches, '\n');
+		
+		rview.nbatches = nbatches;
+		
+		auto& sizes = m_blk_sizes;
+		arrvec<int,N> off = sizes;
+		std::array<int,N> full;
 		
 		for (int i = 0; i != N; ++i) {
-			int nele = std::accumulate(blksizes[i].begin(),
-				blksizes[i].end(),0);
-			int nbatch = m_nbatches_dim[i];
-			nele_per_batch[i] = (double) nele / (double) nbatch;
-			//std::cout << "NELE: " << nele_per_batch[i] << std::endl;
-		}	
-		
-		if (N == 3) {
-			
-			const size_t ix0 = order[0];
-			const size_t ix1 = order[1];
-			const size_t ix2 = order[2];
-			
-			const size_t bsize0 = (dims.size() > 0) ? m_nbatches_dim[dims[0]] : 1;
-			const size_t bsize1 = (dims.size() > 1) ? m_nbatches_dim[dims[1]] : 1;
-			const size_t bsize2 = (dims.size() > 2) ? m_nbatches_dim[dims[2]] : 1;
-			
-			const size_t batchsize = bsize0 * bsize1 * bsize2;
-			
-			//std::cout << "BATCHSIZE: " << batchsize << std::endl;
-			
-			rview.nbatches = batchsize;
-			
-			auto sizes = m_read_tensor->blk_sizes();
-			auto full = m_read_tensor->nblks_total();
-			auto off = m_read_tensor->blk_offsets();
-			
-			size_t nblks = std::accumulate(full.begin(),full.end(),
-				1, std::multiplies<size_t>());
-				
-			const size_t blksize1 = full[ix1];
-			const size_t blksize2 = full[ix2];
-			
-			nblksprocbatch = vec<vec<int>>(batchsize,vec<int>(m_mpisize));
-			nzeprocbatch = vec<vec<int>>(batchsize,vec<int>(m_mpisize));
-			
-			#pragma omp parallel for
-			for (size_t i = 0; i != superidx.size(); ++i) {	
-									
-					const size_t i0 = wlocblkidx[ix0][i];
-					const size_t i1 = wlocblkidx[ix1][i];
-					const size_t i2 = wlocblkidx[ix2][i];
-					
-					// compute batch indices
-					const size_t b0 = std::floor(
-						(double)off[dims[0]][wlocblkidx[dims[0]][i]]
-						/ nele_per_batch[dims[0]]);
-					const size_t b1 = (dims.size() > 1) ? 
-						std::floor(
-						(double)off[dims[1]][wlocblkidx[dims[1]][i]] 
-						/ nele_per_batch[dims[1]]) : 0;
-					const size_t b2 = (dims.size() > 2) ?
-						std::floor(
-						(double)off[dims[2]][wlocblkidx[dims[2]][i]] 
-						/ nele_per_batch[dims[2]]) : 0;
-						
-					const size_t batch_idx = b0 * bsize1 * bsize2 + b1 * bsize2 + b2;
-					
-					#pragma omp critical 
-					{
-						nblksprocbatch[batch_idx][m_mpirank]++;
-						nzeprocbatch[batch_idx][m_mpirank]++;
-					}
-					
-					//std::cout << "BATCHIDX: " << batch_idx << std::endl;
-									
-					superidx[i] = batch_idx * nblks
-					 + i0 * blksize2 * blksize1
-					 + i1 * blksize2
-					 + i2;
-					 
-					// std::cout << "INTEGER: " << superidx[i] << " "
-					//	<< " BATCHES " << b0 << " " << b1 << " " << b2
-					//	<< " IDX " << i0 << " " << i1 << " " << i2 << std::endl;
-					 
+			int n = 0;
+			for (int iblk = 0; iblk != sizes[i].size(); ++iblk) {
+				off[i][iblk] = n;
+				n += sizes[i][iblk];
+				full[i] += sizes[i][iblk];
 			}
-				 
-			// communicate
-			LOG.os<1>("Gathering nze and nblocks...\n");
-		
-			for (int i = 0; i != batchsize; ++i) {
-				
-				int nblk = nblksprocbatch[i][m_mpirank];
-				int nze = nzeprocbatch[i][m_mpirank];
-				
-				MPI_Allgather(&nze,1,MPI_INT,nzeprocbatch[i].data(),1,MPI_INT,m_comm);
-				MPI_Allgather(&nblk,1,MPI_INT,nblksprocbatch[i].data(),1,MPI_INT,m_comm);
-				
-			}
-			
-			if (LOG.global_plev() >= 10 && m_mpirank == 0) {
-				std::cout << "BATCHSIZES:" << std::endl;
-				for (int i = 0; i != nblksprocbatch.size(); ++i) {
-					std::cout << "BATCH " << i << " " << nblksprocbatch[i][0] << std::endl;
-				}
-			}
-				 
 		}
 		
+		size_t nblks = std::accumulate(full.begin(),full.end(),
+			1, std::multiplies<size_t>());
+			
+		auto& nblksprocbatch = rview.nblksprocbatch;
+		auto& nzeprocbatch = rview.nzeprocbatch;
+		
+		nblksprocbatch.resize(nbatches);
+		nzeprocbatch.resize(nbatches); 
+		for (int i = 0; i != nbatches; ++i) {
+			nblksprocbatch[i].resize(m_mpisize);
+			nzeprocbatch[i].resize(m_mpisize);
+		}
+		
+		for (size_t iblk = 0; iblk != batchidx.size(); ++iblk) {
+			
+			//std::cout << "IBLK: " << iblk << std::endl;
+			
+			// get block index
+			std::array<int,N> blk_idx;
+			for (int i = 0; i != N; ++i) {
+				blk_idx[i] = wlocblkidx[i][iblk];
+			}
+			
+			// compute batch indices
+			std::array<int,N> bidx;
+			for (int i = 0; i != N; ++i) {
+				
+				if (bsizes[i] == 1) {
+					bidx[i] = 0;
+					continue;
+				}
+				
+				int idim = dims[i];
+				for (int ibatch = 0; ibatch != m_nbatches_dim[idim]; ++ibatch) {
+					if (blk_idx[idim] >= m_blk_bounds[idim][ibatch][0] 
+						&& blk_idx[idim] <= m_blk_bounds[idim][ibatch][1])
+						bidx[i] = ibatch;
+				}
+				
+			}
+			
+			// compute flattened batch index and super index
+			size_t sbatch_idx = 0;
+			
+			switch (N) {
+				case 3: {
+				
+					sbatch_idx = bidx[0] * bsizes[1] * bsizes[2] 
+						+ bidx[1] * bsizes[2] 
+						+ bidx[2];
+					break;
+					
+				}
+				case 4: {
+					
+					sbatch_idx = bidx[0] * bsizes[1] * bsizes[2] * bsizes[3]
+						+ bidx[1] * bsizes[2] * bsizes[3]
+						+ bidx[2] * bsizes[3]
+						+ bidx[3];
+					break;
+					
+				}
+			}
+			
+			// compute block size 
+			int blksize = 1;
+			for (int i = 0; i != N; ++i) {
+				blksize *= sizes[i][blk_idx[i]];
+			}
+			
+			nblksprocbatch[sbatch_idx][m_mpirank] += 1;
+			nzeprocbatch[sbatch_idx][m_mpirank] += blksize;
+			
+			batchidx[iblk] = sbatch_idx;
+			
+		}
+			
+		// communicate
+		LOG.os<1>("Gathering nze and nblocks...\n");
+	
+		for (int ibatch = 0; ibatch != nbatches; ++ibatch) {
+			
+			int nblk = nblksprocbatch[ibatch][m_mpirank];
+			int nze = nzeprocbatch[ibatch][m_mpirank];
+			
+			MPI_Allgather(&nze,1,MPI_INT,nzeprocbatch[ibatch].data(),1,MPI_INT,m_comm);
+			MPI_Allgather(&nblk,1,MPI_INT,nblksprocbatch[ibatch].data(),1,MPI_INT,m_comm);
+			
+		}
+		
+		if (LOG.global_plev() >= 10 && m_mpirank == 0) {
+			std::cout << "BATCHSIZES:" << std::endl;
+			for (int i = 0; i != nblksprocbatch.size(); ++i) {
+				std::cout << "BATCH " << i << " " << nblksprocbatch[i][0] << std::endl;
+			}
+		}
+		
+		// sort the indices such that they are grouped in batches, but
+		// offsets are in increasing order within batches
 		std::sort(perm.begin(),perm.end(),
 			[&](size_t i0, size_t i1) {
-				return superidx[i0] < superidx[i1];
+				return (batchidx[i0] != batchidx[i1]) ? 
+					(batchidx[i0] < batchidx[i1]) :
+					(wlocblkoff[i0] < wlocblkoff[i1]);
 			});
 		
 		rlocblkidx = wlocblkidx;
@@ -1019,9 +1025,9 @@ public:
 				
 			}
 		}
-						
+				
 		MPI_File_close(&fh_read);
-		
+				
 		return rview;
 			
 	}
@@ -1189,12 +1195,15 @@ public:
 	}
 
 	void decompress_disk(vec<int> idx) {
-			
+		
 		vec<int> dims = (m_read_current_is_contiguous) ?
 			m_wrview.dims : m_rdviewmap[m_read_current_dims].dims;
 		
 		int ibatch = flatten(idx, dims);
 		LOG.os<1>("Reading batch ", ibatch, '\n');
+		
+		m_work_tensor->clear();
+		m_read_tensor->clear();
 		
 		// if reading is done in same way as writing
 		if (m_read_current_is_contiguous) {
@@ -1310,11 +1319,19 @@ public:
 				nze,MPI_DOUBLE,MPI_STATUS_IGNORE);
 			
 			MPI_File_close(&fh_data);
+			
+			LOG.os<1>("Copying to work tensor\n");
+		
+			auto copy_bounds = get_bounds(idx, m_read_current_dims);
+			dbcsr::copy(*m_read_tensor, *m_work_tensor)
+				.move_data(true)
+				.bounds(copy_bounds)
+				.perform();
 		
 		// needs special offsets
 		} else {
 			
-			LOG.os<1>("Different dimension.\n");
+			LOG.os<1>("Different dimension, but faster indices.\n");
 			
 			auto& rdview = m_rdviewmap[m_read_current_dims];
 			
@@ -1329,17 +1346,14 @@ public:
 		
 			int64_t nzetotbatch = std::accumulate(nzeprocbatch[ibatch].begin(),
 				nzeprocbatch[ibatch].end(),int64_t(0));
+	
 			
-			// === Allocating blocks for tensor ===
-			//// offsets
-			
+			// read idx and offset
 			int64_t blkoff = 0;
 			
 			for (int i = 0; i < ibatch; ++i) {
 				blkoff += nblksprocbatch[i][m_mpirank];
 			}
-			
-			// read idx and offset
 			
 			int64_t nblk_prev = 0;
 			
@@ -1414,7 +1428,8 @@ public:
 			}
 			
 			//// reserving
-			m_read_tensor->reserve(newlocblkidx);
+			T* buffer = new T[nze];
+			//m_read_tensor->reserve(newlocblkidx);
 			
 			vec<int> blksizes(nblk);
 			auto& tsizes = m_blk_sizes;
@@ -1431,10 +1446,10 @@ public:
 			
 			LOG.os<1>("Reserving.\n");
 						
-			for (auto& a : newlocblkidx) a.clear();
+			//for (auto& a : newlocblkidx) a.clear();
 			
 			// now adjust the file view
-			nze = m_read_tensor->num_nze();
+			//nze = m_read_tensor->num_nze();
 			
 			LOG.os<1>("Creating MPI TYPE.\n");
 			
@@ -1461,12 +1476,9 @@ public:
 			
 			MPI_File_set_view(fh_data, 0, MPI_DOUBLE, MPI_HINDEXED, "native", MPI_INFO_NULL);
 			
-			long long int datasize;
-			T* data = m_read_tensor->data(datasize);
-			
 			LOG.os<1>("Reading from file...\n");
 			
-			MPI_File_read_at_all(fh_data,0,data,nze,MPI_DOUBLE,MPI_STATUS_IGNORE);
+			MPI_File_read_at_all(fh_data,0,buffer,nze,MPI_DOUBLE,MPI_STATUS_IGNORE);
 			
 			MPI_File_close(&fh_data);
 			
@@ -1474,23 +1486,46 @@ public:
 			
 			MPI_Type_free(&MPI_HINDEXED);
 			
-			/*std::cout << "READTENSOR" << std::endl;
-			dbcsr::print(*read_tensor);
+			LOG.os<1>("Copying to work tensor\n");
+						
+			m_work_tensor->reserve(newlocblkidx);
 			
-			for (int i = 0; i != 1000; ++i) {
-				std::cout << data[i] << " ";
-			} std::cout << std::endl;*/
+			MPI_Offset buffer_offset = 0;
 			
-		} // end if
+			auto map1 = m_work_tensor->map1_2d();
+			auto map2 = m_work_tensor->map2_2d();
+									
+			std::array<int,N> idx, blksize;
+			std::array<int,2> blk2size;
+			
+			for (int iblk = 0; iblk != nblk; ++iblk) {
+								
+				for (int i = 0; i != N; ++i) {
+					idx[i] = newlocblkidx[i][iblk];
+					blksize[i] = m_blk_sizes[i][idx[i]];
+				}
+								
+				// get work tensor block
+				bool found = false;
+				auto blk_work = m_work_tensor->get_block(idx, blksize, found);
+				
+				T* data = buffer + buffer_offset;
+				
+				blk2size[0] = 1;
+				blk2size[1] = 1;
+				
+				blk_work.reshape(data, blk2size, map1, map2);
+				
+				m_work_tensor->put_block(idx, blk_work);
+				
+				buffer_offset += blk_work.ntot();
+				
+			}
+			
+			delete [] buffer;
 		
-		LOG.os<1>("Copying to work tensor\n");
+		}// end if-else
 		
-		auto copy_bounds = get_bounds(idx, m_read_current_dims);
-		dbcsr::copy(*m_read_tensor, *m_work_tensor)
-			.move_data(true)
-			.bounds(copy_bounds)
-			.perform();
-
 	}
 	
 	void decompress_finalize() {
