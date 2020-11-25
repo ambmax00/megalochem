@@ -20,7 +20,7 @@ static const double ADC_DAV_CONV = 1e-5;
 
 static const std::string ADC_METHOD = "ri_adc_1";
 static const std::string ADC_ERIS = "core";
-static const std::string ADC_METRIC = "coulomb";
+static const std::string ADC_DF_METRIC = "coulomb";
 static const std::string ADC_BUILD_Z = "llmp_full";
 static const std::string ADC_BUILD_J = "dfao";
 static const std::string ADC_BUILD_K = "dfao";

@@ -84,8 +84,9 @@ void adcmod::init_ao_tensors() {
 	
 	auto jstr = m_opt.get<std::string>("build_J", ADC_BUILD_J);
 	auto kstr = m_opt.get<std::string>("build_K", ADC_BUILD_K);
+	auto mstr = m_opt.get<std::string>("df_metric", ADC_DF_METRIC);
 	
-	auto metr = ints::metric::coulomb;
+	auto metr = ints::str_to_metric(mstr);
 	auto jmet = fock::str_to_jmethod(jstr);
 	auto kmet = fock::str_to_kmethod(kstr);
 	
