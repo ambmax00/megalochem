@@ -57,12 +57,10 @@ private:
 	}
 	
 	void update_status() {
-		//std::cout << m_mpirank << " : " << "UPDATE STATUS" << std::endl;
 		m_status[m_mpirank] = (m_local_tasks.empty()) ? NO_WORK : HAS_WORK;
 	}
 	
 	void add_task(int64_t t) {
-		//std::cout << m_mpirank << " : " << "ADD TASK" << std::endl;
 		m_local_tasks.push_front(t);
 		update_status();
 	}
@@ -92,6 +90,7 @@ private:
 		//std::cout << m_mpirank << " : " << "ACQUIRE" << std::endl;
 		while (!terminate()) {
 			
+			// transfer[i] = NO_RESP
 			m_transfer[m_mpirank] = NO_RESP;
 			
 			std::cout << m_mpirank << " : " << "STATUS " << m_status[m_mpirank] << std::endl;
@@ -103,13 +102,9 @@ private:
 			std::cout << m_mpirank << " : " << "STEALING FROM " << victim << std::endl;
 			
 			// get status of victim
-			MPI_Win_lock(MPI_LOCK_SHARED, victim, 0, m_status_win);
-			MPI_Get(&v_work, 1, MPI_INT, victim, victim, 1, 
-				MPI_INT, m_status_win);
-			MPI_Win_unlock(victim, m_status_win);
-				
-			//std::cout << m_mpirank << " : " << ((v_work == NO_WORK) ? "NO_WORK" : "HAS_WORK") << std::endl;
-			
+			MPI_Get(&v_work, 1, MPI_INT, victim, victim, 1, MPI_INT, m_status_win);
+			MPI_Win_flush_local(victim, m_status_win);
+							
 			// continue if victim has no work
 			if (v_work == NO_WORK) {
 				communicate();
@@ -120,10 +115,9 @@ private:
 			//std::cout << "PROC: " << m_mpirank << " WRITING" << std::endl;
 			int result = NO_REQU;
 			
-			MPI_Win_lock(MPI_LOCK_SHARED, victim, 0, m_request_win);
 			MPI_Compare_and_swap(&m_mpirank, &NO_REQU, &result, MPI_INT,
 				victim, victim, m_request_win);
-			MPI_Win_unlock(victim, m_request_win);
+			MPI_Win_flush(victim, m_request_win);
 						
 			// continue if not succeeded 
 			if (result != NO_REQU) {
@@ -134,7 +128,7 @@ private:
 			std::cout << m_mpirank << " : " << "CAS SUCCEEDED, NOW WAITING" << std::endl;
 			
 			// loop and check if request accepted
-			while (m_transfer[m_mpirank] == NO_RESP ) {
+			while (m_transfer[m_mpirank] == NO_RESP && !terminate()) {
 				communicate();
 				//usleep(1000000);
 			}
@@ -145,8 +139,10 @@ private:
 			if (m_transfer[m_mpirank] != NO_TASK) {
 				//std::cout << m_mpirank << " : " << "ADDING TASK " << 
 					//m_transfer[m_mpirank] << " FROM VICTIM" << std::endl;
-				add_task(m_transfer[m_mpirank]);
+				
 				m_request[m_mpirank] = NO_REQU;
+				add_task(m_transfer[m_mpirank]);
+				
 				return;
 				//usleep(1000000);
 			}
@@ -158,19 +154,23 @@ private:
 	
 	void communicate() {
 		
-		//std::cout << m_mpirank << " : " << "COMM" << std::endl;
+		std::cout << m_mpirank << " : " << "COMM" << std::endl;
 		
 		// check for token
-		int mytoken = m_token[m_mpirank];
+		
+		int mytoken = NO_TOKEN;
+		
+		MPI_Fetch_and_op(&NO_TOKEN, &mytoken, MPI_INT, m_mpirank, m_mpirank,
+			MPI_REPLACE, m_token_win);
+		MPI_Win_flush(m_mpirank, m_token_win);
+		
 		if (mytoken < -2 || mytoken > m_mpisize) {
 			throw std::runtime_error("Scheduler: something went wrong.");
 		}
 		
-		//std::cout << m_mpirank << " : " << "TOKEN " << mytoken << std::endl;
+		std::cout << m_mpirank << " : " << "TOKEN " << mytoken << std::endl;
 		
-		if (mytoken == TERMINATE) {
-			m_terminate_flag = true;
-		} else if (mytoken != NO_TOKEN) {
+		if (mytoken != NO_TOKEN && mytoken != TERMINATE) {
 			
 			if (m_mpirank == 0 && mytoken == 0) {
 				mytoken = TERMINATE;
@@ -182,26 +182,28 @@ private:
 						
 		}
 		
-		if (mytoken != NO_TOKEN) {
+		if (mytoken != NO_TOKEN && !terminate()) {
 			// give neighbour token
 			int neigh = (m_mpirank + 1) % m_mpisize;
 			
 			std::cout << m_mpirank << " : " << "GIVING TOKEN " << mytoken 
 				<< " to " << neigh << std::endl;
 			
-			MPI_Win_lock(MPI_LOCK_EXCLUSIVE, neigh, 0, m_token_win);
 			MPI_Put(&mytoken, 1, MPI_INT, neigh, neigh, 1, MPI_INT, m_token_win);
 			MPI_Win_flush(neigh, m_token_win);
-			MPI_Win_unlock(neigh, m_token_win);
-		
-			mytoken = NO_TOKEN;
-			
-			m_token[m_mpirank] = mytoken;
 			
 		}
 		
+		if (mytoken == TERMINATE) {
+			m_terminate_flag = true;
+		}
+		
 		// check if there is a processor request
-		int thief = m_request[m_mpirank];
+		int thief = NO_REQU;
+		
+		MPI_Fetch_and_op(&NO_REQU, &thief, MPI_INT, m_mpirank, m_mpirank,
+			MPI_REPLACE, m_request_win);
+		MPI_Win_flush(m_mpirank, m_request_win);
 		
 		//usleep(500000);
 		
@@ -218,13 +220,10 @@ private:
 		std::cout << m_mpirank << " : " << "PUTTING task " << t << " on THIEF " 
 			<< thief << std::endl;
 		
-		MPI_Win_lock(MPI_LOCK_EXCLUSIVE, thief, 0, m_transfer_win);
 		MPI_Put(&t, 1, MPI_LONG_LONG, thief, thief, 1, MPI_LONG_LONG,
 			m_transfer_win);
-		MPI_Win_unlock(thief, m_transfer_win);
-				
-		m_request[m_mpirank] = NO_REQU;
-		
+		MPI_Win_flush(thief, m_transfer_win);
+						
 	}
 	
 	void execute(int64_t task) {
@@ -274,6 +273,11 @@ public:
 		m_terminate_flag = false;
 		if (m_mpirank == 0) m_token[0] = 1;
 		
+		MPI_Win_lock_all(0, m_transfer_win);
+		MPI_Win_lock_all(0, m_request_win);
+		MPI_Win_lock_all(0, m_status_win);
+		MPI_Win_lock_all(0, m_token_win);
+		
 		while (!terminate()) {
 			
 			if (m_local_tasks.empty()) {
@@ -300,6 +304,11 @@ public:
 			MPI_Test(&barrier_request, &flag, MPI_STATUS_IGNORE);
 			communicate();
 		}
+		
+		MPI_Win_unlock_all(m_transfer_win);
+		MPI_Win_unlock_all(m_request_win);
+		MPI_Win_unlock_all(m_status_win);
+		MPI_Win_unlock_all(m_token_win);
 		
 		MPI_Win_free(&m_transfer_win);
 		MPI_Win_free(&m_request_win);

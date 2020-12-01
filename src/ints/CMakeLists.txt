@@ -13,6 +13,8 @@ set(SOURCES
 	aoloader.cpp
 )
 
+set_source_files_properties(fitting_qr.cpp PROPERTIES COMPILE_FLAGS -fno-math-errno)
+
 add_library(chem_ints ${SOURCES})
 
 if (${USE_LIBCINT})

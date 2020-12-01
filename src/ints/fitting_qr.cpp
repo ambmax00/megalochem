@@ -39,10 +39,16 @@ dbcsr::sbtensor<3,double> dfitting::compute_qr_new(dbcsr::shared_matrix<double> 
 	
 	TIME.start();
 	
+	auto& prep_time = TIME.sub("Preparations for QRFIT");
+	auto& work_time = TIME.sub("Worker function");
+	auto& comp_time = TIME.sub("Compression");
+	
 	auto aofac = std::make_shared<aofactory>(m_mol, m_world);
 	
 	double T = 1e-5;
 	double R2 = 40;
+	
+	prep_time.start();
 	
 	auto x = m_mol->dims().x();
 	auto b = m_mol->dims().b();
@@ -245,6 +251,8 @@ dbcsr::sbtensor<3,double> dfitting::compute_qr_new(dbcsr::shared_matrix<double> 
 	
 	c_xbb_batched->compress_init({2}, vec<int>{0}, vec<int>{1,2});
 	
+	prep_time.finish();
+	
 	for (int ibatch_nu = 0; ibatch_nu != c_xbb_batched->nbatches(2); ++ibatch_nu) {
 		
 		LOG.os<>("BATCH: ", ibatch_nu, '\n');
@@ -313,6 +321,14 @@ dbcsr::sbtensor<3,double> dfitting::compute_qr_new(dbcsr::shared_matrix<double> 
 			// === COMPUTE 3c1e overlap integrals
 			// 1. allocate blocks
 			
+			auto& ovlp_time = work_time.sub("Computing ovlp integrals");
+			auto& coul_time = work_time.sub("Computing coul integrals");
+			auto& dgels_time = work_time.sub("DGELS");
+			auto& setup_time = work_time.sub("Setting up");
+			auto& move_time = work_time.sub("Moving data");
+			
+			work_time.start();
+			
 			arrvec<int,3> blkidx;
 			int64_t ovlp_nblks = 0;
 			
@@ -351,6 +367,8 @@ dbcsr::sbtensor<3,double> dfitting::compute_qr_new(dbcsr::shared_matrix<double> 
 			
 			// 2. Compute 
 			
+			ovlp_time.start();
+			
 			ovlp_xbb_local->reserve(blkidx);
 			aofac->ao_3c1e_ovlp_setup();
 			aofac->ao_3c_fill(ovlp_xbb_local);
@@ -369,9 +387,13 @@ dbcsr::sbtensor<3,double> dfitting::compute_qr_new(dbcsr::shared_matrix<double> 
 						
 			ovlp_xbb_local->clear();
 			
+			ovlp_time.finish();
+			
 			// === LOOP OVER CHUNKS OF FRAGMENTS 
 			
 			for (auto chunk : global_tasks[itask]) {
+				
+				setup_time.start();
 				
 				int ifrag = chunk.first;
 				int jfrag = chunk.second;
@@ -429,8 +451,10 @@ dbcsr::sbtensor<3,double> dfitting::compute_qr_new(dbcsr::shared_matrix<double> 
 				int nblkp = blk_P.size();
 				//std::cout << "FUNCS: " << nblkp << "/" << x.size() << std::endl;
 			
-				if (nblkp == 0) continue;
-					
+				if (nblkp == 0) {
+					setup_time.finish();
+					continue;
+				}
 					
 				// ==== Get all Q functions ====	
 				std::vector<bool> blk_Q_bool(x.size(),false); // whether block x is involved 
@@ -480,10 +504,16 @@ dbcsr::sbtensor<3,double> dfitting::compute_qr_new(dbcsr::shared_matrix<double> 
 				}
 				
 				nb = nstride * mstride;
+				
+				setup_time.finish();
+			
+				coul_time.start();
 			
 				// generate integrals
 				aofac->ao_3c2e_setup(metric::coulomb);
 				aofac->ao_3c_fill_idx(eri_local, coul_blk_idx, nullptr);
+			
+				coul_time.finish();
 			
 				//dbcsr::print(*eri_local);
 			
@@ -501,8 +531,9 @@ dbcsr::sbtensor<3,double> dfitting::compute_qr_new(dbcsr::shared_matrix<double> 
 			
 				std::cout << "RANK: " << m_world.rank() << " NP,NQ,NB: " << np << "/" << nq << "/" << nb << std::endl;
 			
-			
 				// ==== Prepare matrices for QR decomposition ====
+				
+				move_time.start();
 				
 				Eigen::MatrixXd eris_eigen = Eigen::MatrixXd::Zero(nq,nb);
 				Eigen::MatrixXd m_qp_eigen = Eigen::MatrixXd::Zero(nq,np);
@@ -567,22 +598,24 @@ dbcsr::sbtensor<3,double> dfitting::compute_qr_new(dbcsr::shared_matrix<double> 
 				
 				
 				// ===== Compute QR decomposition ==== 
-			
-				Eigen::MatrixXd c_eigen;
 				
-				if (nblkq == x.size() && nblkp == x.size() && !full_is_computed) {
-					full_qr.compute(m_qp_eigen);
-					full_is_computed = true;
-					c_eigen = full_qr.solve(eris_eigen);
-				} else if (nblkq == x.size() && nblkp == x.size() && full_is_computed) {
-					c_eigen = full_qr.solve(eris_eigen);
-				} else if (nq != x.size() || np != x.size()) {
-					blk_qr.compute(m_qp_eigen);
-					c_eigen = blk_qr.solve(eris_eigen);
-				}
-						
-				eris_eigen.resize(0,0);
-			
+				move_time.finish();			
+				
+				dgels_time.start();
+				
+				int info = 0;
+				int MN = std::min(nq,np);
+				int lwork = std::max(1, MN + std::max(MN, nb)) * 2;
+				double* work = new double[lwork];
+				
+				c_dgels('N', nq, np, nb, m_qp_eigen.data(), nq, eris_eigen.data(),
+					nq, work, lwork, &info);
+				
+				delete[] work;
+				
+				dgels_time.finish();
+				
+				move_time.start();
 				
 				// ==== Transfer fitting coefficients to tensor
 				
@@ -616,7 +649,7 @@ dbcsr::sbtensor<3,double> dfitting::compute_qr_new(dbcsr::shared_matrix<double> 
 							for (int pp = 0; pp != size[0]; ++pp) {
 								for (int mm = 0; mm != size[1]; ++mm) {
 									for (int nn = 0; nn != size[2]; ++nn) {
-										blk(pp,mm,nn) = c_eigen(pp + poff, 
+										blk(pp,mm,nn) = eris_eigen(pp + poff, 
 											mm + moff + (nn+noff)*mstride);
 							}}}
 							c_xbb_local->put_block(idx, blk);
@@ -628,10 +661,14 @@ dbcsr::sbtensor<3,double> dfitting::compute_qr_new(dbcsr::shared_matrix<double> 
 					moff = 0;	
 					poff += x[ip];
 				}
+				
+				move_time.finish();
 			
 			} // end loop over chunks
 			
 			prs_xbb_local->clear();
+			
+			work_time.finish();
 				
 		}; // end task function
 			
@@ -646,6 +683,8 @@ dbcsr::sbtensor<3,double> dfitting::compute_qr_new(dbcsr::shared_matrix<double> 
 		
 		
 		//dbcsr::print(*c_xbb_local);
+	
+		comp_time.start();
 		
 		dbcsr::copy_local_to_global(*c_xbb_local, *c_xbb_global);
 		c_xbb_global->filter(dbcsr::global::filter_eps);
@@ -653,7 +692,9 @@ dbcsr::sbtensor<3,double> dfitting::compute_qr_new(dbcsr::shared_matrix<double> 
 		c_xbb_local->clear();
 		//dbcsr::print(*c_xbb_global);
 		
-		c_xbb_batched->compress({ibatch_nu}, c_xbb_global);		
+		c_xbb_batched->compress({ibatch_nu}, c_xbb_global);
+		
+		comp_time.finish();		
 		
 	} // end loop over batches
 	
@@ -666,7 +707,8 @@ dbcsr::sbtensor<3,double> dfitting::compute_qr_new(dbcsr::shared_matrix<double> 
 		"Fitting coefficients occupation more than 100%");
 	
 	TIME.finish();
-	
+	TIME.print_info();
+		
 	return c_xbb_batched;
 	
 }
