@@ -28,7 +28,7 @@
 namespace filio {
 
 void validate(std::string section, const json& j, const json& compare) {
-	
+			
 	// check if all required keys are present
 	std::vector<std::string> reqkeys = compare["_required"];
 	
@@ -147,23 +147,28 @@ std::vector<desc::Atom> get_geometry(const json& j, std::string filename, util::
 	
 }
 
-void unpack(const json& j_in, desc::options& opt, std::string root, util::mpi_log& LOG) {
+void unpack(const json& j_in, desc::options& opt, std::string root, std::string totalpath, util::mpi_log& LOG) {
 	
 	auto j = j_in[root];
 	
 	for (auto it = j.begin(); it != j.end(); ++it) {
 		
 		if (it->type() == json::value_t::boolean) {
-			opt.set<bool>(root + "/" + it.key(), *it);
+			opt.set<bool>(totalpath + "/" + it.key(), *it);
 		} else if (it->type() == json::value_t::number_integer ||
 			it->type() == json::value_t::number_unsigned) {
-			opt.set<int>(root + "/" + it.key(), *it);
+			opt.set<int>(totalpath + "/" + it.key(), *it);
 		} else if (it->type() == json::value_t::number_float) {
-			opt.set<double>(root + "/" + it.key(), *it);
+			opt.set<double>(totalpath + "/" + it.key(), *it);
 		} else if (it->type() == json::value_t::string) {
-			opt.set<std::string>(root + "/" + it.key(), *it);
+			opt.set<std::string>(totalpath + "/" + it.key(), *it);
+		} else if (it->type() == json::value_t::object) {
+			std::string newroot = it.key();
+			std::string newpath = totalpath + "/" + it.key();
+			unpack(j, opt, newroot, newpath, LOG);
 		} else {
-			throw std::runtime_error("Invalid type for keyword.");
+			std::string msg = "Invalid type for keyword in " + root + "/";
+			throw std::runtime_error(msg);
 		}
 		
 		//if (it->type() == json::value_t::array) {
@@ -190,56 +195,6 @@ reader::reader(MPI_Comm comm, std::string filename, int print) : m_comm(comm), L
 	}
 	
 	LOG.os<>("Reading input file...\n\n");
-
-/*
-	std::string c_filename = filename + ".json";
-	std::string qcschema_validate = 
-R"(
-import json
-import qcschema
-
-def qcschema_validate(filename):
-	json_file = open(filename)
-	data  = json.load(json_file)
-	try:
-		qcschema.validate(data, 'input')
-		return str("success")
-	except Exception as inst:
-		return str(inst)
-)"; 
-
-    //std::cout << qcschema_validate << std::endl;
-    
-    Py_Initialize();
-   
-	PyObject *main_module, *global_dict, *expression, 
-		*result, *temp_bytes, *p_filename, *p_args;
-	char* cstr;
-   
-    PyRun_SimpleString(qcschema_validate.c_str());
-    main_module = PyImport_AddModule("__main__");
-    global_dict = PyModule_GetDict(main_module);
-    expression = PyDict_GetItemString(global_dict, "qcschema_validate");
-    p_filename = PyUnicode_FromString(c_filename.c_str());
-    p_args = PyTuple_New(1);
-    PyTuple_SetItem(p_args, 0, p_filename);
-    
-    result = PyObject_CallObject(expression, p_args);
-    
-    if (!result) {
-		PyErr_Print();
-		throw std::runtime_error("Something went wrong calling Python.");
-	}
-    
-	temp_bytes = PyUnicode_AsEncodedString(result, "UTF-8", "strict");
-	cstr = PyBytes_AS_STRING(temp_bytes);
-	cstr = strdup(cstr);
-    
-    if (cstr != "success") {
-		LOG.os<>(cstr);
-		throw std::runtime_error("Error while validating QCSchema");
-	}
-*/
 
 	json data;
 	
@@ -341,7 +296,7 @@ def qcschema_validate(filename):
 	auto read_section = [&](std::string r)
 	{
 		if (data.find(r) != data.end()) {
-			unpack(data, opt, r, LOG);
+			unpack(data, opt, r, r, LOG);
 			opt.set<bool>("do_"+r, true);
 		} else {
 			opt.set<bool>("do_"+r, false);

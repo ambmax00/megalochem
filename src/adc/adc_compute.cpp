@@ -10,15 +10,7 @@ namespace adc {
 
 void adcmod::compute() {
 	
-		// BEFORE: init tensors base (ints, metrics, etc..., put into m_reg)
-		
-		init_ao_tensors();
-		
-		// AFTER: init tensors (2) (mo-ints, diags, amplitudes ...) 
-		
-		init_mo_tensors();
-				
-		// SECOND: Generate guesses
+		// Generate guesses
 		
 		compute_diag();
 		
@@ -70,12 +62,15 @@ void adcmod::compute() {
 			
 		}
 		
+		// set up ADC(1) and davidson 
+		
+		auto adc1_mvp = create_adc1();
 		math::davidson<MVP> dav(m_world.comm(), LOG.global_plev());
 		
-		dav.set_factory(m_adc1_mvp);
+		dav.set_factory(adc1_mvp);
 		dav.set_diag(m_d_ov);
 		dav.pseudo(false);
-		dav.conv(m_opt.get<double>("dav_conv", ADC_DAV_CONV));
+		dav.conv(m_opt.get<double>("adc1/dav_conv", ADC_ADC1_DAV_CONV));
 		dav.maxiter(100);	
 		
 		int nroots = m_opt.get<int>("nroots", ADC_NROOTS);
@@ -86,12 +81,12 @@ void adcmod::compute() {
 		dav.compute(dav_guess, nroots);
 		t_davidson.finish();
 		
-		m_adc1_mvp->print_info();
+		adc1_mvp->print_info();
 		
-		LOG.os<>("Excitation energy of state nr. ", m_nroots, ": ", dav.eigvals()[m_nroots-1], '\n');
+		LOG.os<>("Excitation energy of state nr. ", nroots, ": ", dav.eigvals()[nroots-1], '\n');
 		
 		auto rvecs = dav.ritz_vectors();
-		auto vec_k = rvecs[m_nroots-1];
+		auto vec_k = rvecs[nroots-1];
 		
 		auto c_bo = m_hfwfn->c_bo_A();
 		auto c_bv = m_hfwfn->c_bv_A();
@@ -169,10 +164,10 @@ void adcmod::compute() {
 		}
 		
 		auto v1 = get_significant_blocks(v_bb,0.9975,nullptr,0);
-		auto v2 = get_significant_blocks(v_bb,0.99975,nullptr,0);
-		auto v3 = get_significant_blocks(v_bb,0.999975,nullptr,0);
-		auto v4 = get_significant_blocks(v_bb,0.9999975,nullptr,0);
-		auto v5 = get_significant_blocks(v_bb,0.9975,m_s_bb,1e-4);
+		//auto v2 = get_significant_blocks(v_bb,0.99975,nullptr,0);
+		//auto v3 = get_significant_blocks(v_bb,0.999975,nullptr,0);
+		//auto v4 = get_significant_blocks(v_bb,0.9999975,nullptr,0);
+		//auto v5 = get_significant_blocks(v_bb,0.9975,m_s_bb,1e-4);
 
 		TIME.print_info();
 		

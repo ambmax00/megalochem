@@ -76,29 +76,42 @@ static const json valid_keys =
 		{"build_Z", "LLMPFULL"},
 		{"_required", {"dfbasis"}}
 	}},
-	{"adc", {
+	{"adc", { // adc module runs through two submodules: adc1 and adc2
+		// global options
 		{"print", 1u},
-		{"c_os", 1.3},
-		{"c_os_coupling", 1.15},
-		{"dfbasis", "basis"},
-		{"df_augmentation", true},
-		{"df_metric", "string"},
 		{"nbatches_b", 3u},
 		{"nbatches_x", 3u},
-		{"nlap", 5u},
+		{"dfbasis", "basis"},
+		{"df_augmentation", true},
 		{"nroots", 1u},
 		{"nguesses", 1},
-		{"dav_conv", 1e-5},
-		{"method", "ADC1"}, /* what method? 
-			(ri-adc1, ri-adc2, sos-ri-adc, ao-ri-adc1, ao-ri-adc2) */
-		{"diag_order", 0}, // at which order to compute the ADC diagonal
-		{"build_J", "df"},
-		{"build_K", "df"},
-		{"build_Z", "LLMPFULL"},
-		{"eris", "core"},
-		{"intermeds", "core"},
-		{"doubles", "full"},
-		{"_required", {"nroots", "dfbasis", "method"}}
+		// first go through adc1 (required)
+		{"adc1", {
+			{"df_metric", "string"},
+			{"dav_conv", 1e-5},
+			{"jmethod", "dfao"},
+			{"kmethod", "dfao"},
+			{"eris", "core"},
+			{"intermeds", "core"},
+			{"_required", {"none"}}
+		}},
+		// then go through adc2 (optional)
+		{"adc2", {
+			{"c_os", 1.3},
+			{"c_os_coupling", 1.15},
+			{"df_metric", "string"},
+			{"local", true},
+			{"dav_conv", 1e-5},
+			{"jmethod", "dfao"},
+			{"kmethod", "dfao"},
+			{"zmethod", "llmpfull"},
+			{"eris", "core"},
+			{"intermeds", "core"},
+			{"nlap", 5u},
+			{"_required", {"none"}}
+		}},
+		
+		{"_required", {"nroots", "dfbasis", "adc1"}}
 	}},
 	{"_required", {"molecule", "hf"}}	
 };

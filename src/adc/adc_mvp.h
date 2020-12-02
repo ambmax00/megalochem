@@ -13,7 +13,6 @@
 namespace adc {
 	
 enum class mvpmethod {
-	invalid,
 	ao_adc_1,
 	ao_adc_2
 };
@@ -24,7 +23,7 @@ inline mvpmethod str_to_mvpmethod(std::string str) {
 	} else if (str == "ao_adc_2") {
 		return mvpmethod::ao_adc_2;
 	} else {
-		return mvpmethod::invalid;
+		throw std::runtime_error("Invalid MVP method");
 	}
 }
 	
@@ -64,6 +63,13 @@ class create_MVP_AOADC1_base;
 
 class MVP_AOADC1 : public MVP {
 private:
+	
+	fock::jmethod m_jmethod;
+	fock::kmethod m_kmethod;
+	
+	sbtensor3 m_eri3c2e_batched;
+	sbtensor3 m_fitting_batched;
+	smat m_v_xx;
 	
 	std::shared_ptr<fock::J> m_jbuilder;
 	std::shared_ptr<fock::K> m_kbuilder;
@@ -108,8 +114,11 @@ MAKE_STRUCT(
 		(c_bv, (dbcsr::shared_matrix<double>), required, val),
 		(eps_occ, (std::shared_ptr<std::vector<double>>), required, val),
 		(eps_vir, (std::shared_ptr<std::vector<double>>), required, val),
-		(kbuilder, (std::shared_ptr<fock::K>), required, val),
-		(jbuilder, (std::shared_ptr<fock::J>), required, val)
+		(eri3c2e_batched, (dbcsr::sbtensor<3,double>), required, val),
+		(fitting_batched, (dbcsr::sbtensor<3,double>), optional, val, nullptr),
+		(v_xx, (dbcsr::shared_matrix<double>), required, val),
+		(kmethod, (fock::kmethod), required, val),
+		(jmethod, (fock::jmethod), required, val)
 	)
 )
 
@@ -190,9 +199,9 @@ MAKE_STRUCT(
 		(jmethod, (fock::jmethod), required, val),
 		(zmethod, (mp::zmethod), required, val),
 		(btype, (dbcsr::btype), required, val),
-		(nlap, (int), optional, val, ADC_NLAP),
-		(c_os, (double), optional, val, ADC_C_OS),
-		(c_os_coupling, (double), optional, val, ADC_C_OS_COUPLING)
+		(nlap, (int), optional, val, ADC_ADC2_NLAP),
+		(c_os, (double), optional, val, ADC_ADC2_C_OS),
+		(c_os_coupling, (double), optional, val, ADC_ADC2_C_OS_COUPLING)
 	)
 )
 

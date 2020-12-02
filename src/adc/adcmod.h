@@ -26,21 +26,8 @@ private:
 	util::mpi_time TIME;
 	util::mpi_log LOG;
 	
-	int m_order;
-	int m_diag_order;
+	ints::aoloader m_ao;
 	
-	int m_nroots; 
-	
-	mvpmethod m_mvpmethod;
-	ints::metric m_metric;
-	fock::kmethod m_kmethod;
-	fock::jmethod m_jmethod;
-	
-	std::shared_ptr<MVP> m_adc1_mvp;
-	
-	double m_c_os;
-	double m_c_osc;
-		
 	dbcsr::shared_pgrid<2> m_spgrid2;
 	dbcsr::shared_pgrid<2> m_spgrid2_bo;
 	dbcsr::shared_pgrid<2> m_spgrid2_bv;
@@ -48,18 +35,15 @@ private:
 
 	dbcsr::shared_matrix<double> m_d_ov;
 		
-	std::vector<int> get_significant_blocks(dbcsr::shared_matrix<double> u_bb, 
-		double theta, dbcsr::shared_matrix<double> metric_bb, double gamma);
-	
-	void init();
 	void init_ao_tensors();
-	void init_mo_tensors();
+	std::shared_ptr<MVP> create_adc1();
 	
 	void compute_diag();
 	dbcsr::shared_matrix<double> compute_diag_0();
 	dbcsr::shared_matrix<double> compute_diag_1();
-	
-	dbcsr::shared_matrix<double> m_s_bb;
+		
+	std::vector<int> get_significant_blocks(dbcsr::shared_matrix<double> u_bb, 
+		double theta, dbcsr::shared_matrix<double> metric_bb, double gamma);
 	
 public:	
 
