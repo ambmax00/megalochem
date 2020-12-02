@@ -3,7 +3,7 @@
 
 namespace adc {
 
-void MVPAOADC1::init() {
+void MVP_AOADC1::init() {
 	
 	LOG.os<>("Initializing AO-ADC(1)\n");
 	
@@ -21,7 +21,7 @@ void MVPAOADC1::init() {
 	
 }
 
-smat MVPAOADC1::compute(smat u_ia, double omega) {
+smat MVP_AOADC1::compute(smat u_ia, double omega) {
 	
 	TIME.start();
 	

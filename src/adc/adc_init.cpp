@@ -119,7 +119,7 @@ void adcmod::init_ao_tensors() {
 		.print(nprint)
 		.get();
 	
-	m_adc1_mvp = create_MVPAOADC1(
+	m_adc1_mvp = create_MVP_AOADC1(
 			m_world, m_hfwfn->mol(), LOG.global_plev())
 			.c_bo(m_hfwfn->c_bo_A())
 			.c_bv(m_hfwfn->c_bv_A())

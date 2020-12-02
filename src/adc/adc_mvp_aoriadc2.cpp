@@ -3,7 +3,220 @@
 #include "math/linalg/piv_cd.h"
 #include "adc/adc_defaults.h"
 
+#define _DLOG
+
 namespace adc {
+	
+/* =====================================================================
+ *                         AUXILIARY FUNCTIONS
+ * ====================================================================*/
+	
+smat MVP_AOADC2::get_scaled_coeff(char dim, int ilap, double factor) {
+	
+	auto c_bm = (dim == 'O') ? m_c_bo : m_c_bv;
+	auto eps_m = (dim == 'O') ? m_eps_occ : m_eps_vir;
+	int sign = (dim == 'O') ? 1 : -1;
+	
+	auto c_bm_scaled = dbcsr::copy(c_bm).get();
+	auto eps_scaled = *eps_m;
+	
+	double w = m_weights[ilap];
+	double xpt = m_xpoints[ilap];
+	
+	std::for_each(eps_scaled.begin(),eps_scaled.end(),
+		[xpt,w,factor,sign](double& eps) {
+			eps = exp(0.25 * log(w) + sign * factor * eps * xpt);
+	});
+			
+	c_bm_scaled->scale(eps_scaled, "right");
+	
+	return c_bm_scaled;
+	
+}
+
+smat MVP_AOADC2::get_density(smat coeff) {
+	
+	auto b = m_mol->dims().b();
+	
+	auto p_bb = dbcsr::create<double>()
+		.set_world(m_world)
+		.name("density matrix")
+		.row_blk_sizes(b)
+		.col_blk_sizes(b)
+		.matrix_type(dbcsr::type::symmetric)
+		.get();
+		
+	dbcsr::multiply('N', 'T', *coeff, *coeff, *p_bb).perform();
+	
+	return p_bb;
+	
+}
+
+/* =====================================================================
+ *                         INITIALIZING FUNCTIONS
+ * ====================================================================*/
+	
+void MVP_AOADC2::init() {
+	
+	LOG.os<>("Initializing AO-ADC(2)\n");
+	
+	// laplace
+	LOG.os<>("Computing laplace points.\n");
+		
+	double emin = m_eps_occ->front();
+	double ehomo = m_eps_occ->back();
+	double elumo = m_eps_vir->front();
+	double emax = m_eps_vir->back();
+	
+	double ymin = 2*(elumo - ehomo);
+	double ymax = 2*(emax - emin);
+	
+	LOG.os<>("eps_min/eps_homo/eps_lumo/eps_max ", emin, " ", ehomo, " ", elumo, " ", emax, '\n');
+	LOG.os<>("ymin/ymax ", ymin, " ", ymax, '\n');
+	
+	math::laplace lp(m_world.comm(), LOG.global_plev());
+	
+	lp.compute(m_nlap, ymin, ymax);
+		
+	m_weights = lp.omega();
+	m_xpoints = lp.alpha();
+	
+	LOG.os<>("Setting up J,K,Z builders.\n");
+	
+	int nprint = LOG.global_plev();
+	
+	// J builder
+	switch (m_jmethod) {
+		case fock::jmethod::dfao:
+		{
+			m_jbuilder = fock::create_DF_J(m_world, m_mol, nprint)
+				.eri3c2e_batched(m_eri3c2e_batched)
+				.v_inv(m_v_xx)
+				.get();
+			break;
+		}
+		default:
+		{
+			throw std::runtime_error("Invalid J method in AO-ADC2.");
+		}
+	}
+	
+	// K builder
+	switch (m_kmethod) {
+		case fock::kmethod::dfao:
+		{
+			
+			m_kbuilder = fock::create_DFAO_K(m_world, m_mol, nprint)
+				.eri3c2e_batched(m_eri3c2e_batched)
+				.fitting_batched(m_fitting_batched)
+				.get();
+			break;
+		}
+		case fock::kmethod::dfmem:
+		{
+			m_kbuilder = fock::create_DFMEM_K(m_world, m_mol, nprint)
+				.eri3c2e_batched(m_eri3c2e_batched)
+				.v_xx(m_v_xx)
+				.get();
+			break;
+		}
+		default:
+		{
+			throw std::runtime_error("Invalid K method in AO-ADC2.");
+		}
+	}
+	
+	// Z builder
+	// ....
+	
+	m_jbuilder->set_sym(false);
+	m_jbuilder->init();
+	
+	m_kbuilder->set_sym(false);
+	m_kbuilder->init();
+	
+	// Intermeds
+	// .....
+	
+	LOG.os<>("Done with setting up.\n");
+	
+}
+
+/* =====================================================================
+ *                          MVP FUNCTIONS (ADC1)
+ * ====================================================================*/
+
+// Computes the pseudo J and K matrices with the excited state density
+std::pair<smat,smat> MVP_AOADC2::compute_jk(smat& u_ao) {
+	
+	m_jbuilder->set_density_alpha(u_ao);
+	m_kbuilder->set_density_alpha(u_ao);
+	
+	m_jbuilder->compute_J();
+	m_kbuilder->compute_K();
+	
+	auto jmat = m_jbuilder->get_J();
+	auto kmat = m_kbuilder->get_K_A();
+	
+	std::pair<smat,smat> out = {jmat, kmat};
+	
+	return out;
+	
+}
+
+// computes the ADC(1) MVP part using the pseudo J,K matrices
+smat MVP_AOADC2::compute_sigma_1(smat& jmat, smat& kmat) {
+	
+	auto j = u_transform(jmat, 'T', m_c_bo, 'N', m_c_bv);
+	auto k = u_transform(kmat, 'T', m_c_bo, 'N', m_c_bv);
+	
+	smat sig_ao = dbcsr::create_template<double>(jmat)
+		.name("sig_ao")
+		.matrix_type(dbcsr::type::no_symmetry)
+		.get();
+	
+	sig_ao->add(0.0, 1.0, *jmat);
+	sig_ao->add(1.0, 1.0, *kmat);
+	
+	// transform back
+	smat sig_1 = u_transform(sig_ao, 'T', m_c_bo, 'N', m_c_bv);
+	
+	sig_1->setname("sigma_1");
+	
+	return sig_1;
+	
+} 
+
+smat MVP_AOADC2::compute(smat u_ia, double omega) {
+	
+	LOG.os<>("Computing AO-ADC(2) MVP product... \n");
+	
+	LOG.os<>("Computing sigma_0 of AO-ADC(2) ... \n");
+	
+	auto sigma_0 = compute_sigma_0(u_ia, *m_eps_occ, *m_eps_vir);
+	
+#ifdef _DLOG
+	LOG.os<>("SIGMA 0");
+	dbcsr::print(*sigma_0);
+#endif
+
+	LOG.os<>("Computing sigma_1 of AO-ADC(2) ... \n");
+
+	auto u_ao = u_transform(u_ia, 'N', m_c_bo, 'T', m_c_bv); 
+	auto jkpair = compute_jk(u_ao);
+	auto sigma_1 = compute_sigma_1(jkpair.first, jkpair.second);
+	
+#ifdef _DLOG
+	LOG.os<>("SIGMA 1");
+	dbcsr::print(*sigma_1);
+#endif
+	
+	return nullptr;
+	
+}
+	
+	
+	
 #if 0
 void MVP_ao_ri_adc2::compute_intermeds() {
 	

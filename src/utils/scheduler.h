@@ -9,6 +9,8 @@
 #include <random>
 #include <unistd.h>
 
+//#define _DLOG
+
 namespace util {
 
 class scheduler {
@@ -90,16 +92,19 @@ private:
 		//std::cout << m_mpirank << " : " << "ACQUIRE" << std::endl;
 		while (!terminate()) {
 			
-			// transfer[i] = NO_RESP
 			m_transfer[m_mpirank] = NO_RESP;
 			
+			#ifdef _DLOG
 			std::cout << m_mpirank << " : " << "STATUS " << m_status[m_mpirank] << std::endl;
 			std::cout << m_mpirank << " : " << "QSIZE " << m_local_tasks.size() << std::endl;
+			#endif
 			
 			int victim = get_rand();
 			int v_work = NO_WORK;
 			
+			#ifdef _DLOG
 			std::cout << m_mpirank << " : " << "STEALING FROM " << victim << std::endl;
+			#endif
 			
 			// get status of victim
 			MPI_Get(&v_work, 1, MPI_INT, victim, victim, 1, MPI_INT, m_status_win);
@@ -112,7 +117,6 @@ private:
 			}
 			
 			// make victim aware that task can be stolen
-			//std::cout << "PROC: " << m_mpirank << " WRITING" << std::endl;
 			int result = NO_REQU;
 			
 			MPI_Compare_and_swap(&m_mpirank, &NO_REQU, &result, MPI_INT,
@@ -125,26 +129,24 @@ private:
 				continue;
 			}
 			
+			#ifdef _DLOG
 			std::cout << m_mpirank << " : " << "CAS SUCCEEDED, NOW WAITING" << std::endl;
+			#endif
 			
 			// loop and check if request accepted
 			while (m_transfer[m_mpirank] == NO_RESP && !terminate()) {
 				communicate();
-				//usleep(1000000);
 			}
 			
+			#ifdef _DLOG
 			std::cout << m_mpirank << " : " << "GOT RESPONSE FROM VICTIM: " 
 				<< m_transfer[m_mpirank] << std::endl;
+			#endif
 			
 			if (m_transfer[m_mpirank] != NO_TASK) {
-				//std::cout << m_mpirank << " : " << "ADDING TASK " << 
-					//m_transfer[m_mpirank] << " FROM VICTIM" << std::endl;
-				
 				m_request[m_mpirank] = NO_REQU;
 				add_task(m_transfer[m_mpirank]);
-				
 				return;
-				//usleep(1000000);
 			}
 			
 			communicate();
@@ -152,14 +154,11 @@ private:
 		}
 	}
 	
-	void communicate() {
-		
-		std::cout << m_mpirank << " : " << "COMM" << std::endl;
-		
-		// check for token
-		
+	void transfer_token() {
+				
 		int mytoken = NO_TOKEN;
 		
+		// fetch my token (atomically)
 		MPI_Fetch_and_op(&NO_TOKEN, &mytoken, MPI_INT, m_mpirank, m_mpirank,
 			MPI_REPLACE, m_token_win);
 		MPI_Win_flush(m_mpirank, m_token_win);
@@ -168,9 +167,15 @@ private:
 			throw std::runtime_error("Scheduler: something went wrong.");
 		}
 		
+		#ifdef _DLOG
 		std::cout << m_mpirank << " : " << "TOKEN " << mytoken << std::endl;
+		#endif
 		
-		if (mytoken != NO_TOKEN && mytoken != TERMINATE) {
+		// no token -> nothing to do
+		if (mytoken == NO_TOKEN) return;
+		
+		// update my token
+		if (mytoken != TERMINATE) {
 			
 			if (m_mpirank == 0 && mytoken == 0) {
 				mytoken = TERMINATE;
@@ -182,15 +187,23 @@ private:
 						
 		}
 		
-		if (mytoken != NO_TOKEN && !terminate()) {
-			// give neighbour token
+		// give neighbour token
+		if (!terminate()) {
+			
 			int neigh = (m_mpirank + 1) % m_mpisize;
 			
+			#ifdef _DLOG
 			std::cout << m_mpirank << " : " << "GIVING TOKEN " << mytoken 
 				<< " to " << neigh << std::endl;
+			#endif
 			
-			MPI_Put(&mytoken, 1, MPI_INT, neigh, neigh, 1, MPI_INT, m_token_win);
-			MPI_Win_flush(neigh, m_token_win);
+			int result = 1;
+			
+			while (result != NO_TOKEN) {
+				MPI_Fetch_and_op(&mytoken, &result, MPI_INT, neigh, neigh,
+					MPI_REPLACE, m_token_win);
+				MPI_Win_flush(neigh, m_token_win);
+			}		
 			
 		}
 		
@@ -198,15 +211,24 @@ private:
 			m_terminate_flag = true;
 		}
 		
+	}
+	
+	void communicate() {
+		
+		#ifdef _DLOG
+		std::cout << m_mpirank << " : " << "COMM" << std::endl;
+		#endif
+		
+		// token
+		transfer_token();
+		
 		// check if there is a processor request
 		int thief = NO_REQU;
 		
 		MPI_Fetch_and_op(&NO_REQU, &thief, MPI_INT, m_mpirank, m_mpirank,
 			MPI_REPLACE, m_request_win);
 		MPI_Win_flush(m_mpirank, m_request_win);
-		
-		//usleep(500000);
-		
+				
 		if (thief == NO_REQU) return;
 		
 		int64_t t = NO_TASK;
@@ -217,8 +239,10 @@ private:
 			update_status();
 		}
 		
+		#ifdef _DLOG
 		std::cout << m_mpirank << " : " << "PUTTING task " << t << " on THIEF " 
 			<< thief << std::endl;
+		#endif
 		
 		MPI_Put(&t, 1, MPI_LONG_LONG, thief, thief, 1, MPI_LONG_LONG,
 			m_transfer_win);
@@ -227,7 +251,9 @@ private:
 	}
 	
 	void execute(int64_t task) {
+		#ifdef _DLOG
 		std::cout << m_mpirank << " : " << "EXECUTE" << std::endl;
+		#endif
 		m_executer(task);
 	}
 			
@@ -237,9 +263,7 @@ public:
 	scheduler(MPI_Comm comm, int64_t ntasks, std::function<void(int64_t)>& executer) 
 		: m_comm(comm), m_executer(executer), m_ntasks(ntasks)
 	{
-		
-		//std::cout << "NTASKS: " << m_ntasks << std::endl;
-		
+				
 		MPI_Comm_size(comm, &m_mpisize);
 		MPI_Comm_rank(comm, &m_mpirank);
 		init_deque();
@@ -283,7 +307,6 @@ public:
 			if (m_local_tasks.empty()) {
 				acquire();
 			} else {
-				std::cout << "WORKER ON PROC " << m_mpirank << std::endl;
 				int64_t task = m_local_tasks.back();
 				m_local_tasks.pop_back();
 				update_status();
@@ -293,7 +316,9 @@ public:
 			
 		}
 		
+		#ifdef _DLOG
 		std::cout << m_mpirank << " : EXIT" << std::endl;
+		#endif
 		
 		MPI_Request barrier_request;
 		int flag = 0;

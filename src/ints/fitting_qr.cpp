@@ -603,6 +603,7 @@ dbcsr::sbtensor<3,double> dfitting::compute_qr_new(dbcsr::shared_matrix<double> 
 				
 				dgels_time.start();
 				
+				/*
 				int info = 0;
 				int MN = std::min(nq,np);
 				int lwork = std::max(1, MN + std::max(MN, nb)) * 2;
@@ -612,6 +613,10 @@ dbcsr::sbtensor<3,double> dfitting::compute_qr_new(dbcsr::shared_matrix<double> 
 					nq, work, lwork, &info);
 				
 				delete[] work;
+				
+				*/
+				
+				Eigen::MatrixXd c_eigen = m_qp_eigen.householderQr().solve(eris_eigen);
 				
 				dgels_time.finish();
 				
@@ -649,7 +654,7 @@ dbcsr::sbtensor<3,double> dfitting::compute_qr_new(dbcsr::shared_matrix<double> 
 							for (int pp = 0; pp != size[0]; ++pp) {
 								for (int mm = 0; mm != size[1]; ++mm) {
 									for (int nn = 0; nn != size[2]; ++nn) {
-										blk(pp,mm,nn) = eris_eigen(pp + poff, 
+										blk(pp,mm,nn) = c_eigen(pp + poff, 
 											mm + moff + (nn+noff)*mstride);
 							}}}
 							c_xbb_local->put_block(idx, blk);

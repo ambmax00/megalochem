@@ -253,7 +253,7 @@ dbcsr::sbtensor<3,double> dfitting::compute_pari(dbcsr::shared_matrix<double> s_
 			// get (alpha|beta) matrix 
 			Eigen::MatrixXd alphaBeta = Eigen::MatrixXd::Zero(m,m);
 
-#if 1
+#if 0
 			auto met = dbcsr::tensor_create_template<2,double>(inv_local)
 				.name("metric").get();
 				
@@ -273,7 +273,7 @@ dbcsr::sbtensor<3,double> dfitting::compute_pari(dbcsr::shared_matrix<double> s_
 						
 						std::array<int,2> sizes = {xsize,ysize};
 						
-#if 1		
+#if 0		
 						std::array<int,2> idx = {ix,iy};
 						met->put_block(idx, ptr, sizes);
 #endif
@@ -290,7 +290,7 @@ dbcsr::sbtensor<3,double> dfitting::compute_pari(dbcsr::shared_matrix<double> s_
 				}
 			}
 
-#if 1	
+#if 0
 			std::cout << "Problem size: " << m << " x " << m << std::endl;
 #endif
 
@@ -319,7 +319,7 @@ dbcsr::sbtensor<3,double> dfitting::compute_pari(dbcsr::shared_matrix<double> s_
 			Eigen::MatrixXd Inv = Eigen::MatrixXd::Zero(m,m);
 			Inv = Vt.transpose() * s.asDiagonal() * U.transpose();
 			
-#if 1
+#if 0
 			Eigen::MatrixXd E = Eigen::MatrixXd::Identity(m,m);
 			
 			E -= Inv * alphaBeta_c;
@@ -376,7 +376,7 @@ dbcsr::sbtensor<3,double> dfitting::compute_pari(dbcsr::shared_matrix<double> s_
 				.filter(dbcsr::global::filter_eps)
 				.perform("XY, YMN -> XMN");
 		
-#if 1		
+#if 0	
 			dbcsr::contract(*met, *c_xbb_AB, *eri_local)
 				.alpha(-1.0).beta(1.0)
 				.filter(dbcsr::global::filter_eps)

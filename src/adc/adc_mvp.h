@@ -60,9 +60,9 @@ public:
 	
 };
 
-class create_MVPAOADC1_base;
+class create_MVP_AOADC1_base;
 
-class MVPAOADC1 : public MVP {
+class MVP_AOADC1 : public MVP {
 private:
 	
 	std::shared_ptr<fock::J> m_jbuilder;
@@ -74,12 +74,12 @@ private:
 	smat m_c_bo;
 	smat m_c_bv;
 
-	friend class create_MVPAOADC1_base;
+	friend class create_MVP_AOADC1_base;
 
 public:
 
-	MVPAOADC1(dbcsr::world w, desc::smolecule smol, int nprint) : 
-		MVP(w,smol,nprint,"MVPAOADC1") {}
+	MVP_AOADC1(dbcsr::world w, desc::smolecule smol, int nprint) : 
+		MVP(w,smol,nprint,"MVP_AOADC1") {}
 		
 	void init() override;
 	
@@ -92,12 +92,12 @@ public:
 		m_kbuilder->print_info();
 	}
 	
-	~MVPAOADC1() override {}
+	~MVP_AOADC1() override {}
 	
 };
 
 MAKE_STRUCT(
-	MVPAOADC1, MVP,
+	MVP_AOADC1, MVP,
 	(
 		(world, (dbcsr::world)),
 		(mol, (desc::smolecule)),
@@ -110,6 +110,89 @@ MAKE_STRUCT(
 		(eps_vir, (std::shared_ptr<std::vector<double>>), required, val),
 		(kbuilder, (std::shared_ptr<fock::K>), required, val),
 		(jbuilder, (std::shared_ptr<fock::J>), required, val)
+	)
+)
+
+class create_MVP_AOADC2_base;
+
+class MVP_AOADC2 : public MVP {
+private:
+	
+	// input:
+	svector<double> m_eps_occ;
+	svector<double> m_eps_vir;
+
+	smat m_s_bb;
+	smat m_c_bo;
+	smat m_c_bv;
+	smat m_v_xx;
+	
+	sbtensor3 m_eri3c2e_batched;
+	sbtensor3 m_fitting_batched;
+	
+	fock::jmethod m_jmethod;
+	fock::kmethod m_kmethod;
+	mp::zmethod m_zmethod;
+	
+	int m_nlap;
+	double m_c_os;
+	double m_c_os_coupling;
+	
+	dbcsr::btype m_btype;
+	
+	// created with init()
+	std::vector<double> m_weights, m_xpoints;
+	std::shared_ptr<fock::J> m_jbuilder;
+	std::shared_ptr<fock::K> m_kbuilder;
+	std::shared_ptr<fock::K> m_kbuilder2;
+	
+	smat get_scaled_coeff(char dim, int ilap, double factor);
+	smat get_density(smat coeff);
+	
+	// private functions
+	std::pair<smat,smat> compute_jk(smat& u_ao);
+	smat compute_sigma_1(smat& jmat, smat& kmat);
+	
+	friend class create_MVP_AOADC2_base;
+
+public:
+
+	MVP_AOADC2(dbcsr::world w, desc::smolecule smol, int nprint) : 
+		MVP(w,smol,nprint,"MVP_AOADC2") {}
+		
+	void init() override;
+	
+	smat compute(smat u_ia, double omega) override;
+	
+	void print_info() override {}
+	
+	~MVP_AOADC2() override {}
+	
+};
+
+MAKE_STRUCT(
+	MVP_AOADC2, MVP,
+	(
+		(world, (dbcsr::world)),
+		(mol, (desc::smolecule)),
+		(print, (int))
+	),
+	(
+		(c_bo, (dbcsr::shared_matrix<double>), required, val),
+		(c_bv, (dbcsr::shared_matrix<double>), required, val),
+		(s_bb, (dbcsr::shared_matrix<double>), required, val),
+		(v_xx, (dbcsr::shared_matrix<double>), required, val),
+		(eri3c2e_batched, (dbcsr::sbtensor<3,double>), required, val),
+		(fitting_batched, (dbcsr::sbtensor<3,double>), optional, val, nullptr),
+		(eps_occ, (std::shared_ptr<std::vector<double>>), required, val),
+		(eps_vir, (std::shared_ptr<std::vector<double>>), required, val),
+		(kmethod, (fock::kmethod), required, val),
+		(jmethod, (fock::jmethod), required, val),
+		(zmethod, (mp::zmethod), required, val),
+		(btype, (dbcsr::btype), required, val),
+		(nlap, (int), optional, val, ADC_NLAP),
+		(c_os, (double), optional, val, ADC_C_OS),
+		(c_os_coupling, (double), optional, val, ADC_C_OS_COUPLING)
 	)
 )
 
