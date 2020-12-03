@@ -41,6 +41,9 @@ void aoloader::compute() {
 	
 	TIME.start();
 	
+	std::shared_ptr<ints::aofactory> m_aofac 
+		= std::make_shared<ints::aofactory>(m_mol, m_world);
+	
 	ints::dfitting dfit(m_world, m_mol, LOG.global_plev());
 	
 	// setup all pgrids

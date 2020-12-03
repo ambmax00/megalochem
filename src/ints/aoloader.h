@@ -48,7 +48,6 @@ private:
 	util::mpi_log LOG;
 	util::mpi_time TIME;
 	desc::smolecule m_mol;
-	std::shared_ptr<ints::aofactory> m_aofac;
 
 	util::key_registry<key> m_reg;
 
@@ -65,7 +64,6 @@ private:
 public:
 
 	aoloader(dbcsr::world w, desc::smolecule smol, desc::options opt) :
-		m_aofac(std::make_shared<ints::aofactory>(smol,w)),
 		m_world(w), m_opt(opt), m_mol(smol),
 		LOG(w.comm(), opt.get<int>("print",0)),
 		TIME(w.comm(), "AO-loader") 
