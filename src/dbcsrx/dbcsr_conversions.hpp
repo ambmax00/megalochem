@@ -21,12 +21,12 @@ MatrixX<T> matrix_to_eigen(shared_matrix<T>& mat_in) {
 	int row = mat_in->nfullrows_total();
 	int col = mat_in->nfullcols_total();
 	
-	dbcsr::shared_matrix<T> mat_desym;
+	auto mat_desym = dbcsr::copy(mat_in)
+		.name("Copy of " + mat_in->name())
+		.get();
 	
-	if (mat_in->has_symmetry()) {
-		mat_desym = mat_in->desymmetrize();
-	} else {
-		mat_desym = mat_in;
+	if (mat_desym->has_symmetry()) {
+		mat_desym->desymmetrize();
 	}
 	
 	mat_desym->replicate_all();
@@ -57,11 +57,7 @@ MatrixX<T> matrix_to_eigen(shared_matrix<T>& mat_in) {
 	
 }
 
-	if (mat_in->has_symmetry()) {
-		mat_desym->release();
-	} else {
-		mat_in->distribute();
-	}
+	mat_desym->release();
 	
 	return eigenmat;
 	
