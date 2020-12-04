@@ -26,6 +26,7 @@ private:
 	
 	bool m_pseudo; //whether this is a pseudo-eval problem
 	bool m_converged; //wether procedure has converged
+	bool m_block; //wether we optimize all roots at once
 	
 	std::vector<double> m_eigvals; // eignvalues
 	std::vector<double> m_errs; // errors of the roots
@@ -64,9 +65,19 @@ public:
 		return *this;
 	}
 	
+	davidson& block(bool is_block) {
+		m_block = is_block;
+		return *this;
+	}
+	
 	davidson(MPI_Comm comm, int nprint) : 
 		LOG(comm, nprint),
-		m_converged(false) {}
+		m_converged(false),
+		m_pseudo(false),
+		m_conv(1e-5),
+		m_maxiter(100),
+		m_block(false) 
+	{}
 
 	void compute(std::vector<smat>& guess, int nroots, std::optional<double> omega = std::nullopt) {
 		
@@ -107,20 +118,22 @@ public:
 			m_subspace = m_vecs.size();
 			int prev_subspace = m_sigmas.size();
 			
+			LOG.os<1>("SUBSPACE: ", m_subspace, " PREV: ", prev_subspace, '\n');
+			
 			// compute sigma vectors
 			std::cout << m_vecs.size() << std::endl;
 			
 			LOG.os<1>("Computing MV products.\n");
 			for (int i = prev_subspace; i != m_subspace; ++i) {
 				
-				//std::cout << "GUESS VECTOR: " << i << std::endl;
-				//dbcsr::print(*m_vecs[i]);
+				std::cout << "GUESS VECTOR: " << i << std::endl;
+				dbcsr::print(*m_vecs[i]);
 				
 				auto Av_i = (m_pseudo) ? m_fac->compute(m_vecs[i],*omega) : m_fac->compute(m_vecs[i]);
 				m_sigmas.push_back(Av_i);
 				
-				//std::cout << "SIGMA VECTOR: " << i << std::endl;
-				//dbcsr::print(*Av_i); 
+				std::cout << "SIGMA VECTOR: " << i << std::endl;
+				dbcsr::print(*Av_i); 
 				
 			}
 			
@@ -129,12 +142,13 @@ public:
 			
 			for (int i = prev_subspace; i != m_subspace; ++i) {
 				for (int j = 0; j != i+1; ++j) {
+					
 					double val = m_vecs[i]->dot(*m_sigmas[j]);
 					Asub(i,j) = val;
 					Asub(j,i) = val;
 				}
 			}
-			
+		
 			LOG.os<2>("SUBSPACE MATRIX:\n");
 			LOG.os<2>(Asub, '\n');
 			
@@ -145,8 +159,7 @@ public:
 			
 			evals = es.eigenvalues();
 			evecs = es.eigenvectors();
-			
-			
+		
 			for (int i = 0; i != m_subspace; ++i) {
 				// get min and max coeff
 				double minc = evecs.col(i).minCoeff();
@@ -156,6 +169,10 @@ public:
 				if (maxabs < 0) evecs.col(i) *= -1;
 				
 			}
+			
+			/* if zero eigenvalues, collapse subspace
+			bool has_zero = false;
+			for (int i = 0; i != */
 			
 			if (LOG.global_plev() >= 1) {
 				LOG.os<1>("EIGENVALUES: \n");
@@ -176,12 +193,15 @@ public:
 			
 			// ======= Compute all residuals r_k ========
 			
-			std::vector<smat> residuals;
+			std::vector<smat> residuals(m_nroots);
 			smat temp = dbcsr::create_template<double>(m_vecs[0]).name("temp").get();
 			double max_err = 0;
 			
-			for (int iroot = 0; iroot != m_nroots; ++iroot) {
-				
+			int start_root = 0; //(m_block) ? 0 : m_nroots - 1;
+			
+			for (int iroot = start_root; iroot != m_nroots; ++iroot) {
+			//int iroot = m_nroots - 1;
+			
 				smat r_k = dbcsr::create_template<double>(m_vecs[0]).name("temp").get();
 				
 				for (int i = 0; i != m_subspace; ++i) {
@@ -201,10 +221,20 @@ public:
 					temp->clear();
 				}
 				
-				m_errs[iroot] = r_k->norm(dbcsr_norm_frobenius);
+				// because we are probably dealing with an approximation to
+				// the real diagonal of the matrix, we are checking both the 
+				// residual and the eigenvectors of the subspace matrix
+				double alpha_ki = (ITER == 0) ? std::numeric_limits<double>::max() 
+						: fabs(evecs(m_subspace-1,iroot));
+				
+				m_errs[iroot] = //std::min(
+					r_k->norm(dbcsr_norm_frobenius);//,
+					//alpha_ki
+				//);
+				
 				max_err = std::max(max_err, m_errs[iroot]);
 				
-				residuals.push_back(r_k);
+				residuals[iroot] = r_k;
 				
 			}
 			
@@ -215,7 +245,7 @@ public:
 			//}
 			
 			LOG.os<>("Root errors: \n");
-			for (int iroot = 0; iroot != m_nroots; ++iroot) {
+			for (int iroot = start_root; iroot != m_nroots; ++iroot) {
 				LOG.os<>("Root ", iroot, ": ", m_errs[iroot], '\n');
 			}
 			LOG.os<>("Max Error: ", max_err, '\n');
@@ -235,8 +265,10 @@ public:
 			// D_ia = (lamda_k - A_iaia)^-1
 			
 			LOG.os<1>("Computing correction vectors.\n");
+			int nvecs_prev = m_vecs.size();			
 			
-			for (int iroot = 0; iroot != m_nroots; ++iroot) {
+			for (int iroot = start_root; iroot != m_nroots; ++iroot) {
+			//int iroot = m_nroots - 1;
 				
 				LOG.os<1>("Computing for root ", iroot, '\n');
 				LOG.os<1>("Computing preconditioner.\n");
@@ -246,6 +278,7 @@ public:
 				D->reserve_all();
 				
 				D->set(evals(iroot));
+				
 				D->add(1.0,-1.0,*m_diag);
 				
 				D->apply(dbcsr::func::inverse);
@@ -261,7 +294,11 @@ public:
 				// d(k)_ia = D(k)_ia * q(k)_ia
 								
 				d_k->hadamard_product(*residuals[iroot], *D);
-							
+				
+				double dnorm = sqrt(d_k->dot(*d_k));
+				
+				d_k->scale(1.0/dnorm);
+				
 				residuals[iroot]->release();
 				D->release();
 								
@@ -294,19 +331,22 @@ public:
 				// normalize
 				double bnorm = sqrt(bnew->dot(*bnew));
 				
+				std::cout << "D/B norm: " << dnorm << " " << bnorm << " "
+					<< bnorm/dnorm << std::endl;
+				
 				bnew->scale(1.0/bnorm);
 				
 				if (LOG.global_plev() >= 2) {
 					dbcsr::print(*bnew);
 				}
 							
-				m_vecs.push_back(bnew);
+				if (bnorm/dnorm > 1e-3) m_vecs.push_back(bnew);
 				
 			}
 			
-			/* collapsing
-			if (m_subspace >= 30) {
-				LOG.os<1>("Collapsing subspace.\n");
+			if (m_vecs.size() == nvecs_prev) {
+				
+				LOG.os<1>("No new vectors were added, collapsing subspace...\n");
 				
 				std::vector<smat> new_vecs;
 				smat tempx = dbcsr::create_template<double>(m_vecs[0])
@@ -334,7 +374,7 @@ public:
 				m_vecs = new_vecs;
 				m_sigmas.clear();
 			
-			}*/
+			}
 							
 		}
 		
@@ -383,88 +423,85 @@ public:
 
 }; // end class 
 
-/*
 template <class MVFactory>
 class modified_davidson {
 private:
 
-	stensor<2> m_diag; // diagonal of matrix
+	util::mpi_log LOG;
 	
-	davidson<MVFactory> m_solver;
-
-	bool m_converged; //wether procedure has converged
+	int m_macro_maxiter;	
+	davidson<MVFactory> m_dav;
 	
-	double m_eigval; // targeted eigenvalue
-	
-	vtensor m_ritzvecs; // ritz vectors at end of computation
-	
-	int m_maxiter;
-	double m_conv;
 		
 public:
 
-	struct create {
-		make_param(create,factory,MVFactory,required,ref)
-		make_param(create,diag,stensor<2>,required,ref)
-		make_param(create,conv,double,optional,val)
-		make_param(create,maxiter,int,optional,val)
-		make_param(create,micro_maxiter,int,optional,val)
-		
-		public:
-		
-		create() {}
-		friend class modified_davidson;
-		
-	};
+	modified_davidson& set_factory(std::shared_ptr<MVFactory>& fac) {
+		m_dav.set_factory(fac);
+		return *this;
+	}
 	
-	modified_davidson(create& p) :
-		m_eigval(0.0),
-		m_converged(false),
-		m_maxiter((p.c_maxiter) ? *p.c_maxiter : 10),
-		m_conv((p.c_conv) ? *p.c_conv : 1e-7),
-		m_solver(typename davidson<MVFactory>::create()
-			.factory(p.c_factory).diag(p.c_diag).pseudo(true)
-			.maxiter(p.c_micro_maxiter))
-	{}	
+	modified_davidson& set_diag(smat& in) {
+		m_dav.set_diag(in);
+		return *this;
+	}
+	
+	modified_davidson& conv(double c) {
+		m_dav.conv(c);
+		return *this;
+	}
+	
+	modified_davidson& macro_maxiter(int maxi) {
+		m_macro_maxiter = maxi;
+		return *this;
+	}
+	
+	modified_davidson& micro_maxiter(int maxi) {
+		m_dav.maxiter = maxi;
+		return *this;
+	}
+	
+	modified_davidson(MPI_Comm comm, int nprint) : 
+		LOG(comm, nprint),
+		m_dav(comm, nprint)
+	{}
+	
+	void compute(std::vector<smat>& guess, int nroots, double omega) {
 
-	void compute(vtensor& guess, int nroots, double omega) {
-		
-		vtensor current_guess = guess;
+		std::vector<smat> current_guess = guess;
 		double current_omega = omega;
 		
-		for (int i = 0; i != 5; ++i) {
+		for (int i = 0; i != m_macro_maxiter; ++i) {
 			
-			std::cout << " == MACROITERATION: == " << i << std::endl;
+			LOG.os<>(" == MACROITERATION: ==\n");
 			
 			double old_omega = current_omega;
 			
-			m_solver.compute(current_guess,nroots,current_omega);
+			m_dav.compute(current_guess,nroots,current_omega);
 			
-			current_guess = m_solver.ritz_vectors();
-			current_omega = m_solver.eigval();
+			current_guess = m_dav.ritz_vectors();
+			current_omega = m_dav.eigvals()[nroots-1];
 			
-			std::cout << "MACRO ITERATION ERROR: " << fabs(current_omega - old_omega) << std::endl;
-			std::cout << "EIGENVALUE: " << current_omega << std::endl;
+			LOG.os<>("MACRO ITERATION ERROR: ", fabs(current_omega - old_omega), '\n');
+			LOG.os<>("EIGENVALUE: ", current_omega, '\n');
 			
 		}
 		
-		m_eigval = current_omega;
-		m_ritzvecs = current_guess;
+		LOG.os<>("Modified davidson finished\n");
 		
 	}
 	
-	vtensor ritz_vectors() {
+	std::vector<smat> ritz_vectors() {
 		
-		return m_ritzvecs;
+		return m_dav.ritz_vectors();
 		
 	}
 	
-	double eigval() {
-		return m_eigval;
+	std::vector<double> eigval() {
+		return m_dav.eigvals();
 	}
 
 }; // end class
-*/
+
 
 } // end namespace
 
