@@ -26,10 +26,12 @@ private:
 	
 	bool m_pseudo; //whether this is a pseudo-eval problem
 	bool m_converged; //wether procedure has converged
-	bool m_block; //wether we optimize all roots at once
+	bool m_block; //wether we optimize all roots at once (Liu)
+	bool m_balancing; //use modified davidson by Parrish et al.
 	
 	std::vector<double> m_eigvals; // eignvalues
 	std::vector<double> m_errs; // errors of the roots
+	std::vector<double> m_vnorms; // norms of trial vectors
 	
 	std::vector<smat> m_vecs; // b vectors
 	std::vector<smat> m_sigmas; // Ab vectors
@@ -37,6 +39,7 @@ private:
 	
 	double m_conv;
 	int m_maxiter;
+	int m_maxsubspace;
 		
 public:
 
@@ -70,16 +73,25 @@ public:
 		return *this;
 	}
 	
+	davidson& balancing(bool do_balancing) {
+		m_balancing = do_balancing;
+		return *this;
+	}
+	
 	davidson(MPI_Comm comm, int nprint) : 
 		LOG(comm, nprint),
 		m_converged(false),
 		m_pseudo(false),
 		m_conv(1e-5),
 		m_maxiter(100),
-		m_block(false) 
+		m_block(true),
+		m_balancing(true),
+		m_maxsubspace(7)
 	{}
 
 	void compute(std::vector<smat>& guess, int nroots, std::optional<double> omega = std::nullopt) {
+		
+		if (m_balancing) throw std::runtime_error("BALANCING not yet completed. -> NOrmalization!!");
 		
 		LOG.os<>("Launching davidson diagonalization.\n");
 		LOG.os<>("Convergence: ", m_conv, '\n');
@@ -92,6 +104,9 @@ public:
 		LOG.os<1>("GUESS SIZE: ", m_vecs.size(), '\n');
 		
 		m_nroots = nroots;
+		int nvecs_max = m_maxsubspace * m_nroots;
+		
+		LOG.os<1>("Max subspace: ", nvecs_max, '\n');
 		
 		if (m_nroots > m_vecs.size()) {
 			std::string msg = std::to_string(m_nroots) + " roots requested, but only "
@@ -103,6 +118,7 @@ public:
 		m_errs.resize(m_nroots);
 		
 		Eigen::MatrixXd Asub;
+		Eigen::VectorXd Svec;
 		Eigen::VectorXd evals;
 		Eigen::MatrixXd evecs;
 		Eigen::VectorXd prev_evals(0);
@@ -112,53 +128,92 @@ public:
 		
 		for (int ITER = 0; ITER != m_maxiter; ++ITER) {
 			
-			LOG.os<1>("DAVIDSON ITERATION: ", ITER, '\n');
+			LOG.os<>("DAVIDSON ITERATION: ", ITER, '\n');
 			
 			// current subspace size
 			m_subspace = m_vecs.size();
 			int prev_subspace = m_sigmas.size();
 			
-			LOG.os<1>("SUBSPACE: ", m_subspace, " PREV: ", prev_subspace, '\n');
-			
-			// compute sigma vectors
-			std::cout << m_vecs.size() << std::endl;
-			
-			LOG.os<1>("Computing MV products.\n");
+			LOG.os<>("SUBSPACE: ", m_subspace, " PREV: ", prev_subspace, '\n');
+					
+			LOG.os<>("Computing MV products.\n");
 			for (int i = prev_subspace; i != m_subspace; ++i) {
 				
-				std::cout << "GUESS VECTOR: " << i << std::endl;
-				dbcsr::print(*m_vecs[i]);
+				//std::cout << "GUESS VECTOR: " << i << std::endl;
+				if (LOG.global_plev() > 2) dbcsr::print(*m_vecs[i]);
 				
 				auto Av_i = (m_pseudo) ? m_fac->compute(m_vecs[i],*omega) : m_fac->compute(m_vecs[i]);
 				m_sigmas.push_back(Av_i);
 				
-				std::cout << "SIGMA VECTOR: " << i << std::endl;
-				dbcsr::print(*Av_i); 
+				//std::cout << "SIGMA VECTOR: " << i << std::endl;
+				if (LOG.global_plev() > 2) dbcsr::print(*Av_i); 
+				
+				double vnorm = sqrt(m_vecs[i]->dot(*m_vecs[i]));
+				m_vnorms.push_back(vnorm);
 				
 			}
 			
-			// form subspace matrix
+			// form subspace matrix and overlap matrix
 			Asub.conservativeResize(m_subspace,m_subspace);
+			Svec.conservativeResize(m_subspace);
 			
 			for (int i = prev_subspace; i != m_subspace; ++i) {
 				for (int j = 0; j != i+1; ++j) {
 					
-					double val = m_vecs[i]->dot(*m_sigmas[j]);
-					Asub(i,j) = val;
-					Asub(j,i) = val;
+					double vsig;
+					
+					if (m_balancing) {
+						vsig = (m_vnorms[j] > m_vnorms[i]) ?
+							m_vecs[i]->dot(*m_sigmas[j]) :
+							m_vecs[j]->dot(*m_sigmas[i]);
+					} else {
+						vsig =  m_vecs[i]->dot(*m_sigmas[j]);
+					}
+					
+					if (i == j) Svec(i) = m_vecs[i]->dot(*m_vecs[j]);
+					
+					Asub(i,j) = vsig;
+					Asub(j,i) = vsig;
+					
 				}
 			}
 		
 			LOG.os<2>("SUBSPACE MATRIX:\n");
 			LOG.os<2>(Asub, '\n');
 			
+			LOG.os<2>("OVERLAP MATRIX DIAGONAL:\n");
+			LOG.os<2>(Svec, '\n');
+			
 			// diagonalize it
 			Eigen::SelfAdjointEigenSolver<Eigen::MatrixXd> es;
 			
-			es.compute(Asub);
+			if (m_balancing) {
 			
-			evals = es.eigenvalues();
-			evecs = es.eigenvectors();
+				// compute sqrt inv of overlap
+				Eigen::VectorXd Svec_invsqrt = Svec;
+				
+				for (int i = 0; i != m_subspace; ++i) {
+					Svec_invsqrt(i) = 1.0/sqrt(Svec(i));
+				}
+				
+				Eigen::MatrixXd A_prime = Svec_invsqrt.asDiagonal() * Asub 
+					* Svec_invsqrt.asDiagonal();
+				
+				LOG.os<1>("SUBSPACE MATRIX TRANSFORMED: \n", A_prime, '\n');
+				
+				es.compute(A_prime);
+				Eigen::MatrixXd evecs_prime = es.eigenvectors();
+				
+				evecs = Svec_invsqrt.asDiagonal() * evecs_prime;
+				evals = es.eigenvalues();
+				
+			} else {
+					
+				es.compute(Asub);
+				evals = es.eigenvalues();
+				evecs = es.eigenvectors();
+				
+			}
 		
 			for (int i = 0; i != m_subspace; ++i) {
 				// get min and max coeff
@@ -197,7 +252,7 @@ public:
 			smat temp = dbcsr::create_template<double>(m_vecs[0]).name("temp").get();
 			double max_err = 0;
 			
-			int start_root = 0; //(m_block) ? 0 : m_nroots - 1;
+			int start_root = (m_block) ? 0 : m_nroots - 1;
 			
 			for (int iroot = start_root; iroot != m_nroots; ++iroot) {
 			//int iroot = m_nroots - 1;
@@ -283,7 +338,7 @@ public:
 				
 				D->apply(dbcsr::func::inverse);
 				
-				if (LOG.global_plev() >= 2) {			
+				if (LOG.global_plev() > 2) {			
 					dbcsr::print(*D);
 				}
 				
@@ -297,7 +352,7 @@ public:
 				
 				double dnorm = sqrt(d_k->dot(*d_k));
 				
-				d_k->scale(1.0/dnorm);
+				if (!m_balancing) d_k->scale(1.0/dnorm);
 				
 				residuals[iroot]->release();
 				D->release();
@@ -331,12 +386,11 @@ public:
 				// normalize
 				double bnorm = sqrt(bnew->dot(*bnew));
 				
-				std::cout << "D/B norm: " << dnorm << " " << bnorm << " "
-					<< bnorm/dnorm << std::endl;
+				LOG.os<1>("Norm quotient: ", bnorm/dnorm, '\n');
 				
-				bnew->scale(1.0/bnorm);
+				if (!m_balancing) bnew->scale(1.0/bnorm);
 				
-				if (LOG.global_plev() >= 2) {
+				if (LOG.global_plev() > 2) {
 					dbcsr::print(*bnew);
 				}
 							
@@ -345,35 +399,13 @@ public:
 			}
 			
 			if (m_vecs.size() == nvecs_prev) {
-				
-				LOG.os<1>("No new vectors were added, collapsing subspace...\n");
-				
-				std::vector<smat> new_vecs;
-				smat tempx = dbcsr::create_template<double>(m_vecs[0])
-					.name("tempx").get();
-				
-				for (int k = 0; k != m_nroots; ++k) {
-				
-					smat x_k = dbcsr::create_template(m_vecs[0])
-						.name("new_guess_"+std::to_string(k))
-						.get(); 
-					
-					for (int i = 0; i != m_vecs.size(); ++i) {
-												
-						tempx->copy_in(*m_vecs[i]);
-						tempx->scale(evecs(i,k));
-											
-						x_k->add(1.0,1.0,*tempx);
-						
-					}
-					
-					new_vecs.push_back(x_k);
-					
-				}
-				
-				m_vecs = new_vecs;
-				m_sigmas.clear();
+				throw std::runtime_error(
+					"Davidson: linear dependence in trial vector space");
+			}
 			
+			if (m_vecs.size() > nvecs_max) {
+				LOG.os<1>("Subspace too large. \n");
+				collapse(evecs);
 			}
 							
 		}
@@ -387,27 +419,44 @@ public:
 		
 		LOG.os<1>("Forming Ritz vectors.\n");
 		// x_k = sum_i ^M U_ik * b_i
+		collapse(evecs);
+		m_ritzvecs = m_vecs;
+		
+		//std::cout << "FINISHED COMPUTATION" << std::endl;
+		LOG.os<>("Finished computation.\n");
+		
+	}
+	
+	void collapse(Eigen::MatrixXd& evecs) {
+		
+		LOG.os<1>("Collapsing subspace...\n");
+				
+		std::vector<smat> new_vecs;
+		smat tempx = dbcsr::create_template<double>(m_vecs[0])
+			.name("tempx").get();
+		
 		for (int k = 0; k != m_nroots; ++k) {
-			
+		
 			smat x_k = dbcsr::create_template(m_vecs[0])
 				.name("new_guess_"+std::to_string(k))
 				.get(); 
 			
-			for (int i = 0; i != m_vecs.size(); ++i) {
-				
-				temp3->copy_in(*m_vecs[i]);
-				temp3->scale(evecs(i,k));
-								
-				x_k->add(1.0,1.0,*temp3);
+			for (int i = 0; i < m_subspace; ++i) {
+											
+				tempx->copy_in(*m_vecs[i]);
+				tempx->scale(evecs(i,k));
+									
+				x_k->add(1.0,1.0,*tempx);
 				
 			}
-				
-			m_ritzvecs.push_back(x_k);
+			
+			new_vecs.push_back(x_k);
 			
 		}
 		
-		//std::cout << "FINISHED COMPUTATION" << std::endl;
-		LOG.os<>("Finished computation.\n");
+		m_vecs = new_vecs;
+		m_sigmas.clear();
+		m_vnorms.clear();
 		
 	}
 	
@@ -429,34 +478,18 @@ private:
 
 	util::mpi_log LOG;
 	
-	int m_macro_maxiter;	
+	int m_macro_maxiter = 10;	
 	davidson<MVFactory> m_dav;
 	
 		
 public:
 
-	modified_davidson& set_factory(std::shared_ptr<MVFactory>& fac) {
-		m_dav.set_factory(fac);
-		return *this;
-	}
-	
-	modified_davidson& set_diag(smat& in) {
-		m_dav.set_diag(in);
-		return *this;
-	}
-	
-	modified_davidson& conv(double c) {
-		m_dav.conv(c);
-		return *this;
+	davidson<MVFactory>& sub() {
+		return m_dav;
 	}
 	
 	modified_davidson& macro_maxiter(int maxi) {
 		m_macro_maxiter = maxi;
-		return *this;
-	}
-	
-	modified_davidson& micro_maxiter(int maxi) {
-		m_dav.maxiter = maxi;
 		return *this;
 	}
 	
@@ -483,6 +516,8 @@ public:
 			
 			LOG.os<>("MACRO ITERATION ERROR: ", fabs(current_omega - old_omega), '\n');
 			LOG.os<>("EIGENVALUE: ", current_omega, '\n');
+			
+			exit(0);
 			
 		}
 		

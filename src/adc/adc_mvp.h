@@ -7,7 +7,6 @@
 #include "desc/options.h"
 #include "fock/jkbuilder.h"
 #include "mp/z_builder.h"
-#include "ints/fitting.h"
 #include "adc/adc_defaults.h"
 
 namespace adc {
@@ -153,14 +152,35 @@ private:
 	std::vector<double> m_weights, m_xpoints;
 	std::shared_ptr<fock::J> m_jbuilder;
 	std::shared_ptr<fock::K> m_kbuilder;
-	std::shared_ptr<fock::K> m_kbuilder2;
+	std::shared_ptr<mp::Z> m_zbuilder;
+	std::vector<smat> m_pseudo_occs, m_pseudo_virs;
+	dbcsr::shared_pgrid<2> m_spgrid2;
+	std::shared_ptr<Eigen::MatrixXi> m_shellpairs;
 	
+	// private functions
 	smat get_scaled_coeff(char dim, int ilap, double factor);
 	smat get_density(smat coeff);
 	
-	// private functions
+	// adc 1
 	std::pair<smat,smat> compute_jk(smat& u_ao);
 	smat compute_sigma_1(smat& jmat, smat& kmat);
+	
+	// adc 2
+	void compute_intermeds();
+	smat compute_sigma_2a(smat& u_ia);
+	smat compute_sigma_2b(smat& u_ia);
+	smat compute_sigma_2c(smat& jmat, smat& kmat);
+	smat compute_sigma_2d(smat& u_ia);
+	sbtensor3 compute_J(smat& u_ao);
+	std::pair<smat,smat> compute_sigma_2e_ilap(
+		dbcsr::sbtensor<3,double>& J_xbb_batched, 
+		smat& FA, smat& FB, smat& pseudo_o, smat& pseudo_v,
+		bool mem = false);
+	smat compute_sigma_2e(smat& u_ao, double omega);
+	
+	// intermediates
+	smat m_i_oo;
+	smat m_i_vv;
 	
 	friend class create_MVP_AOADC2_base;
 

@@ -36,7 +36,9 @@ private:
 	dbcsr::shared_matrix<double> m_d_ov;
 		
 	void init_ao_tensors();
+	
 	std::shared_ptr<MVP> create_adc1();
+	std::shared_ptr<MVP> create_adc2();
 	
 	void compute_diag();
 	dbcsr::shared_matrix<double> compute_diag_0();

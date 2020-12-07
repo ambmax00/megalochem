@@ -31,10 +31,10 @@ public:
 	{}
 	
 	dbcsr::sbtensor<3,double> compute(dbcsr::sbtensor<3,double> eris, 
-		dbcsr::shared_matrix<double> s_inv, std::string cfit_btype);
+		dbcsr::shared_matrix<double> s_inv, dbcsr::btype mytype);
 
 	dbcsr::sbtensor<3,double> compute(dbcsr::sbtensor<3,double> eris, 
-		dbcsr::shared_tensor<2,double> s_inv, std::string cfit_btype);
+		dbcsr::shared_tensor<2,double> s_inv, dbcsr::btype mytype);
 		
 	dbcsr::sbtensor<3,double> compute_pari(dbcsr::shared_matrix<double> s_xx, 
 		shared_screener scr_s, std::array<int,3> bdims, dbcsr::btype mytype);

@@ -17,7 +17,7 @@ inline const std::string ADC_ADC1_DF_METRIC = "coulomb";
 inline const std::string ADC_ADC1_JMETHOD = "dfao";
 inline const std::string ADC_ADC1_KMETHOD = "dfao";
 inline const std::string ADC_ADC1_ERIS = "core";
-inline const std::string ADC_ADC1_INTERMEDS = "intermeds";
+inline const std::string ADC_ADC1_INTERMEDS = "core";
 
 inline const double ADC_ADC1_DAV_CONV = 1e-5;
 
@@ -31,7 +31,7 @@ inline const std::string ADC_ADC2_JMETHOD = "dfao";
 inline const std::string ADC_ADC2_KMETHOD = "dfao";
 inline const std::string ADC_ADC2_ZMETHOD = "llmpfull";
 inline const std::string ADC_ADC2_ERIS = "core";
-inline const std::string ADC_ADC2_INTERMEDS = "intermeds";
+inline const std::string ADC_ADC2_INTERMEDS = "core";
 
 inline const double ADC_ADC2_C_OS = 1.3;
 inline const double ADC_ADC2_C_OS_COUPLING = 1.17;

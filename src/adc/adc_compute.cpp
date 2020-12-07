@@ -64,12 +64,15 @@ void adcmod::compute() {
 		
 		// set up ADC(1) and davidson 
 		
+		/*
 		auto adc1_mvp = create_adc1();
 		math::davidson<MVP> dav(m_world.comm(), LOG.global_plev());
 		
 		dav.set_factory(adc1_mvp);
 		dav.set_diag(m_d_ov);
 		dav.pseudo(false);
+		dav.balancing(false);
+		dav.block(false);
 		dav.conv(m_opt.get<double>("adc1/dav_conv", ADC_ADC1_DAV_CONV));
 		dav.maxiter(100);	
 		
@@ -87,7 +90,28 @@ void adcmod::compute() {
 		
 		auto rvecs = dav.ritz_vectors();
 		auto vec_k = rvecs[nroots-1];
+	*/	
+	
+		auto adc2_mvp = create_adc2();
+		adc2_mvp->compute(dav_guess[0], 0.3);
 		
+	/*
+		math::modified_davidson<MVP> mdav(m_world.comm(), LOG.global_plev());
+		
+		mdav.macro_maxiter(10);
+		
+		mdav.sub().set_factory(adc2_mvp);
+		mdav.sub().set_diag(m_d_ov);
+		mdav.sub().pseudo(true);
+		mdav.sub().block(false);
+		mdav.sub().balancing(false);
+		mdav.sub().conv(m_opt.get<double>("adc2/dav_conv", ADC_ADC2_DAV_CONV));
+		mdav.sub().maxiter(100);
+			
+		mdav.compute(rvecs, nroots, dav.eigvals()[nroots-1]);
+		
+		exit(0);
+			
 		auto c_bo = m_hfwfn->c_bo_A();
 		auto c_bv = m_hfwfn->c_bv_A();
 		
@@ -168,6 +192,9 @@ void adcmod::compute() {
 		//auto v3 = get_significant_blocks(v_bb,0.999975,nullptr,0);
 		//auto v4 = get_significant_blocks(v_bb,0.9999975,nullptr,0);
 		//auto v5 = get_significant_blocks(v_bb,0.9975,m_s_bb,1e-4);
+	*/
+	
+	exit(0);
 
 		TIME.print_info();
 		

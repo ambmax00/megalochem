@@ -13,7 +13,6 @@
 namespace mp {
 
 enum class zmethod {
-	invalid,
 	llmp_full,
 	llmp_mem,
 	llmp_asym
@@ -27,7 +26,7 @@ inline zmethod str_to_zmethod(std::string str) {
 	} else if (str == "llmp_asym") {
 		return zmethod::llmp_asym;
 	} else {
-		return zmethod::invalid;
+		throw std::runtime_error("Invalid zbuilder mathod.");
 	}
 }
 

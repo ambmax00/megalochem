@@ -14,7 +14,6 @@
 namespace dbcsr {
 	
 enum class btype {
-	invalid,
 	core,
 	disk,
 	direct
@@ -24,7 +23,7 @@ inline btype get_btype(std::string str) {
 	if (str == "core") return btype::core;
 	if (str == "disk") return btype::disk;
 	if (str == "direct") return btype::direct;
-	return btype::invalid;
+	throw std::runtime_error("Invalid btensor type.");
 };
 
 inline vec<vec<int>> make_blk_bounds(std::vector<int> blksizes, 
@@ -179,10 +178,6 @@ public:
 		m_type(mytype)
 	{
 		
-		if (m_type == btype::invalid) {
-			throw std::runtime_error("Invalid mode for batchtensor.\n");
-		}
-		
 		MPI_Comm_rank(m_comm, &m_mpirank);
 		MPI_Comm_size(m_comm, &m_mpisize);
 		
@@ -265,6 +260,35 @@ public:
 	}
 	
 	btensor(const btensor& in) = delete;
+	
+	btensor(const btensor& in, std::string name, btype mytype, int nprint) :
+		m_comm(in.m_comm),
+		m_name(name),
+		m_spgrid_N(in.m_spgrid_N),
+		m_blk_sizes(in.m_blk_sizes),
+		m_filename(),
+		m_mpirank(in.m_mpirank),
+		m_mpisize(in.m_mpisize),
+		LOG(in.m_comm,nprint),
+		m_type(mytype)
+	{
+		m_path = in.m_path;
+		m_filename = in.m_filename;
+		m_blk_bounds = in.m_blk_bounds;
+		m_bounds = in.m_bounds;
+		m_full_blk_bounds = in.m_full_blk_bounds;
+		m_full_bounds = in.m_full_bounds;
+		m_nbatches_dim = in.m_nbatches_dim;
+			
+		if (m_type == btype::disk) {
+			create_file();
+		}
+		
+		LOG.os<1>("Finished setting up batchtensor.\n");
+		
+		reset_var();
+		
+	}
 		
 	void set_generator(generator_type& func) {
 		m_generator = func;
@@ -1713,6 +1737,45 @@ public:
 template <int N, typename T = double>
 btensor_create_base<N,T> btensor_create() {
 	return btensor_create_base<N,T>();
+}
+
+template <int N, typename T>
+class btensor_create_template_base {
+private:
+
+	std::shared_ptr<btensor<N,T>> c_in;
+	std::string c_name;
+	dbcsr::btype c_btype;
+	int c_print;
+	
+public:
+
+	btensor_create_template_base(std::shared_ptr<btensor<N,T>>& in) :
+		c_in(in) {}
+	
+	btensor_create_template_base& name(std::string t_name) {
+		c_name = t_name; return *this;
+	}
+	
+	btensor_create_template_base& btensor_type(btype t_btype) {
+		c_btype = t_btype; return *this;
+	}
+	
+	btensor_create_template_base& print(int n) {
+		c_print = n; return *this;
+	}
+	
+	sbtensor<N,T> get() {
+		auto out = std::make_shared<btensor<N,T>>(*c_in,c_name,c_btype,c_print);
+		return out;
+	}
+
+};
+
+template <int N, typename T = double>
+btensor_create_template_base<N,T> btensor_create_template
+	(std::shared_ptr<btensor<N,T>>& in) {
+	return btensor_create_template_base<N,T>(in);
 }
 
 } //end namespace

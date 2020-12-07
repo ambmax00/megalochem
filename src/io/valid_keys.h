@@ -84,7 +84,10 @@ static const json valid_keys =
 		{"dfbasis", "basis"},
 		{"df_augmentation", true},
 		{"nroots", 1u},
+		{"block", true},
+		{"balanced", true},
 		{"nguesses", 1},
+		{"do_adc2", true},
 		// first go through adc1 (required)
 		{"adc1", {
 			{"df_metric", "string"},

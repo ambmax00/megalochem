@@ -4,7 +4,7 @@
 namespace ints {
 
 dbcsr::sbtensor<3,double> dfitting::compute(dbcsr::sbtensor<3,double> eri_batched, 
-	dbcsr::shared_matrix<double> inv, std::string cfit_btype) {
+	dbcsr::shared_matrix<double> inv, dbcsr::btype mytype) {
 		
 	auto spgrid2 = dbcsr::create_pgrid<2>(m_world.comm()).get();
 	auto x = m_mol->dims().x();
@@ -21,7 +21,7 @@ dbcsr::sbtensor<3,double> dfitting::compute(dbcsr::sbtensor<3,double> eri_batche
 	dbcsr::copy_matrix_to_tensor(*inv, *s_xx_inv);
 	inv->clear();
 	
-	auto cfit = this->compute(eri_batched, s_xx_inv, cfit_btype);
+	auto cfit = this->compute(eri_batched, s_xx_inv, mytype);
 	dbcsr::copy_tensor_to_matrix(*s_xx_inv, *inv);
 	
 	return cfit;
@@ -29,7 +29,7 @@ dbcsr::sbtensor<3,double> dfitting::compute(dbcsr::sbtensor<3,double> eri_batche
 }
 	
 dbcsr::sbtensor<3,double> dfitting::compute(dbcsr::sbtensor<3,double> eri_batched, 
-	dbcsr::shared_tensor<2,double> inv, std::string cfit_btype) {
+	dbcsr::shared_tensor<2,double> inv, dbcsr::btype mytype) {
 	
 	auto spgrid3_xbb = eri_batched->spgrid();
 		
@@ -57,10 +57,7 @@ dbcsr::sbtensor<3,double> dfitting::compute(dbcsr::sbtensor<3,double> eri_batche
 		.name("c_xbb_1_02")
 		.map1({1}).map2({0,2})
 		.get();
-		
 			
-	auto mytype = dbcsr::get_btype(cfit_btype);
-	
 	int nbatches_x = eri_batched->nbatches(0);
 	int nbatches_b = eri_batched->nbatches(2);
 

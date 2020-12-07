@@ -19,6 +19,44 @@
 #include <chrono>
 #include <thread>
 
+#include "math/solvers/davidson.h"
+#include <Eigen/Eigenvalues>
+#include <Eigen/Core>
+
+class testmvp {
+public:
+	Eigen::MatrixXd m_mat;
+
+	testmvp(Eigen::MatrixXd& A) : m_mat(A) {}
+	
+	dbcsr::shared_matrix<double> compute(dbcsr::shared_matrix<double> u_ia,
+		double omega = 0.0) {
+			
+		auto u_eigen = dbcsr::matrix_to_eigen(u_ia);
+		int r = u_eigen.rows();
+		int c = u_eigen.cols();
+				
+		Eigen::VectorXd u_vec(r*c);
+		std::copy(u_eigen.data(), u_eigen.data() + r*c, u_vec.data());
+		
+		Eigen::VectorXd sig_vec = m_mat * u_vec;
+		
+		Eigen::MatrixXd sig(r,c);
+		std::copy(sig_vec.data(), sig_vec.data() + r*c, sig.data());
+		
+		auto world = u_ia->get_world();
+		auto rblk = u_ia->row_blk_sizes();
+		auto cblk = u_ia->col_blk_sizes();
+		
+		auto out = dbcsr::eigen_to_matrix(sig, world, "test", rblk, cblk, 
+			dbcsr::type::no_symmetry);
+						
+		return out;
+		
+	}
+	
+};
+
 int main(int argc, char** argv) {
 
 	MPI_Init(&argc, &argv);
@@ -94,53 +132,57 @@ int main(int argc, char** argv) {
 	}
 	
 	/*
-	auto atoms = mol->atoms();
-	auto xbas = std::make_shared<desc::cluster_basis>("cc-pvdz-ri", atoms, "atomic", 1);
-	mol->set_cluster_dfbasis(xbas);
+	int no = 6;
+	int nv = 12;
+	int nroots = 8;
+	double sparsity = 0.01;
 	
-	ints::aofactory aofac(mol,wrd);
-	auto s = aofac.ao_overlap();
-	auto t = aofac.ao_kinetic();
-	auto v = aofac.ao_nuclear();
+	std::vector<int> rblk = {no};
+	std::vector<int> cblk = {nv};
 	
-	dbcsr::print(*s);
-	dbcsr::print(*t);
-	dbcsr::print(*v);
+	std::vector<dbcsr::shared_matrix<double>> guesses(nroots);
+	for (int i = 0; i != nroots; ++i) {
+		Eigen::MatrixXd guess_eigen = Eigen::MatrixXd::Zero(no,nv);
+		guess_eigen.data()[i] = 1.0;
+		guesses[i] = dbcsr::eigen_to_matrix(guess_eigen, wrd, "test", rblk, cblk, 
+			dbcsr::type::no_symmetry);
+	}
 	
-	auto grid3 = dbcsr::create_pgrid<3>(wrd.comm()).get();
-	
-	arrvec<int,3> xbb = {mol->dims().x(), mol->dims().b(), mol->dims().b()};
-	
-	auto ten = dbcsr::tensor_create<3>()
-		.name("3c")
-		.pgrid(grid3)
-		.blk_sizes(xbb)
-		.map1({0}).map2({1,2})
-		.get();
-		
-	vec<vec<int>> bds = {
-		vec<int>{0,2},
-		vec<int>{0,2},
-		vec<int>{0,2}
-	};
+	auto diagm = dbcsr::copy(guesses[0]).get();
+	diagm->set(2.0);	
 
-	aofac.ao_3c2e_setup("coulomb");
-	aofac.ao_3c2e_fill(ten, bds, nullptr);
+	Eigen::MatrixXd M = Eigen::MatrixXd::Random(no*nv, no*nv);
 	
-	//dbcsr::print(*ten);
+	Eigen::MatrixXd Mt = M.transpose();
+	M = 0.5 * M + 0.5 * Mt;
 	
-	auto ov = aofac.ao_2c2e("coulomb");
+	M = sparsity * M;
+	for (int i = 0; i != M.rows(); ++i) {
+		M(i,i) = i+1.2;
+	}
 	
-	auto scr = aofac.ao_schwarz();
-	auto xscr = aofac.ao_3cschwarz();
+	std::cout << M << std::endl;
 	
-	dbcsr::print(*ov);
-	dbcsr::print(*scr);
-	dbcsr::print(*xscr);
+	std::shared_ptr<testmvp> test = std::make_shared<testmvp>(M);
+	
+	math::davidson<testmvp> dav(MPI_COMM_WORLD, 3);
+	dav.set_factory(test);
+	dav.set_diag(diagm);
+	dav.compute(guesses, nroots);
+	
+	Eigen::SelfAdjointEigenSolver<Eigen::MatrixXd> es;
+	es.compute(M);
+			
+	auto evals = es.eigenvalues();
+	auto evecs = es.eigenvectors();
+	
+	for (int i = 0; i != nroots; ++i) {
+		std::cout << evals(i) << " ";
+	} std::cout << std::endl;
 	
 	exit(0);
-*/	
-
+	*/
+	
 	auto hfopt = opt.subtext("hf");
 	
 	hf::shared_hf_wfn myhfwfn = std::make_shared<hf::hf_wfn>();

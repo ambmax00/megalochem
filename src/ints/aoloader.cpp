@@ -422,8 +422,10 @@ void aoloader::compute() {
 		auto eri_batched = m_reg.get<sbt3>(k_eri);
 		auto inv = m_reg.get<smatd>(k_inv);
 		
-		auto c_xbb_batched = dfit.compute(eri_batched, inv, 
+		auto intermedtype = dbcsr::get_btype(
 			m_opt.get<std::string>("intermeds", "core"));
+		
+		auto c_xbb_batched = dfit.compute(eri_batched, inv, intermedtype);
 						
 		if (comp(key::dfit_coul_xbb)) m_reg.insert(key::dfit_coul_xbb, c_xbb_batched);
 		if (comp(key::dfit_erfc_xbb)) m_reg.insert(key::dfit_erfc_xbb, c_xbb_batched);
@@ -496,8 +498,10 @@ void aoloader::compute() {
 		auto qr_batched = m_reg.get<sbt3>(ints::key::qr_xbb);
 		auto v = m_reg.get<smatd>(ints::key::coul_xx);
 		
-		auto c_xbb_batched = dfit.compute(qr_batched, v, 
+		auto intermedtype = dbcsr::get_btype(
 			m_opt.get<std::string>("intermeds", "core"));
+		
+		auto c_xbb_batched = dfit.compute(qr_batched, v, intermedtype);
 						
 		m_reg.insert(key::dfit_qr_xbb, c_xbb_batched);
 		
@@ -517,8 +521,10 @@ void aoloader::compute() {
 		auto pari_batched = m_reg.get<sbt3>(ints::key::pari_xbb);
 		auto v = m_reg.get<smatd>(ints::key::coul_xx);
 		
-		auto c_xbb_batched = dfit.compute(pari_batched, v, 
+		auto intermedtype = dbcsr::get_btype(
 			m_opt.get<std::string>("intermeds", "core"));
+		
+		auto c_xbb_batched = dfit.compute(pari_batched, v, intermedtype);
 						
 		m_reg.insert(key::dfit_pari_xbb, c_xbb_batched);
 		

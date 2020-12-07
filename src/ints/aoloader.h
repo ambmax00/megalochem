@@ -69,6 +69,7 @@ public:
 		TIME(w.comm(), "AO-loader") 
 	{
 		for (auto& a : m_to_compute) a = false;		
+		for (auto& a : m_to_keep) a = false;
 	}
 		
 	aoloader& request(key k, bool keep) {
