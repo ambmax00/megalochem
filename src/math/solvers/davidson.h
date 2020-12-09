@@ -516,9 +516,7 @@ public:
 			
 			LOG.os<>("MACRO ITERATION ERROR: ", fabs(current_omega - old_omega), '\n');
 			LOG.os<>("EIGENVALUE: ", current_omega, '\n');
-			
-			exit(0);
-			
+						
 		}
 		
 		LOG.os<>("Modified davidson finished\n");

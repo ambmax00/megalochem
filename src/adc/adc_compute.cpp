@@ -91,9 +91,16 @@ void adcmod::compute() {
 		auto rvecs = dav.ritz_vectors();
 		auto vec_k = rvecs[nroots-1];
 	*/	
-	
+		
+		auto adc1_mvp = create_adc1();
 		auto adc2_mvp = create_adc2();
-		adc2_mvp->compute(dav_guess[0], 0.3);
+		
+		adc1_mvp->compute(dav_guess[0], 0.3);
+		auto sig = adc2_mvp->compute(dav_guess[0], 0.3);
+		
+		double m = dav_guess[0]->dot(*sig);
+		
+		std::cout << "DOT " << m << std::endl;
 		
 	/*
 		math::modified_davidson<MVP> mdav(m_world.comm(), LOG.global_plev());

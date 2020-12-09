@@ -132,6 +132,8 @@ protected:
 	int m_read_current_batch;
 	vec<int> m_read_current_dims;
 	bool m_read_current_is_contiguous;
+	
+	bool m_is_compress_initialized, m_is_decompress_initialized;
 
 	arrvec<vec<int>,N> m_blk_bounds;
 	arrvec<vec<int>,N> m_bounds;
@@ -175,6 +177,8 @@ public:
 		m_filename(),
 		m_mpirank(-1), m_mpisize(-1),
 		LOG(spgrid->comm(),print),
+		m_is_compress_initialized(false),
+		m_is_decompress_initialized(false),
 		m_type(mytype)
 	{
 		
@@ -270,10 +274,12 @@ public:
 		m_mpirank(in.m_mpirank),
 		m_mpisize(in.m_mpisize),
 		LOG(in.m_comm,nprint),
+		m_is_compress_initialized(false),
+		m_is_decompress_initialized(false),
 		m_type(mytype)
 	{
 		m_path = in.m_path;
-		m_filename = in.m_filename;
+		m_filename = m_path + name + ".dat";
 		m_blk_bounds = in.m_blk_bounds;
 		m_bounds = in.m_bounds;
 		m_full_blk_bounds = in.m_full_blk_bounds;
@@ -421,6 +427,8 @@ public:
 				
 		}
 		
+		m_is_compress_initialized = true;
+		
 	}
 	
 	vec<vec<int>> get_bounds(vec<int> idx, vec<int> dims) {
@@ -464,6 +472,14 @@ public:
 	
 	/* ... */
 	void compress(std::initializer_list<int> idx_list, stensor<N,T> tensor_in) {
+	
+		if (!m_is_compress_initialized) {
+			throw std::runtime_error("Compression not initialized.\n");
+		}
+		
+		if (m_is_decompress_initialized) {
+			throw std::runtime_error("Compressing, but decompression is initailized\n");
+		}
 	
 		vec<int> idx = idx_list;
 	
@@ -701,6 +717,8 @@ public:
 		
 		LOG.os<1>("Finalizing compression...\n");
 		if (m_type == dbcsr::btype::core) m_work_tensor->batched_contract_finalize();
+		
+		m_is_compress_initialized = false;
 				
 	}
 	
@@ -1170,12 +1188,23 @@ public:
 		}
 		
 		m_work_tensor->batched_contract_init();
+		
+		m_is_decompress_initialized = true;
+		
 		//std::cout << "NATCHED." << std::endl;
 		
 	}
 	
 	// if tensor_in nullptr, then gives back m_stensor
 	void decompress(std::initializer_list<int> idx_list) {
+		
+		if (!m_is_decompress_initialized) {
+			throw std::runtime_error("Decompression not initialized.\n");
+		}
+		
+		if (m_is_compress_initialized) {
+			throw std::runtime_error("Decompressing, but compression is initailized\n");
+		}
 		
 		vec<int> idx = idx_list;
 		
@@ -1187,7 +1216,7 @@ public:
 			case btype::core : decompress_core(idx);
 			break;
 		}
-		
+				
 	}
 	
 	void decompress_direct(vec<int> idx) {
@@ -1558,6 +1587,7 @@ public:
 			m_work_tensor->clear();
 			m_read_tensor->clear();
 		}
+		m_is_decompress_initialized = false;
 	}
 		
 	dbcsr::stensor<N,T> get_work_tensor() { return m_work_tensor; }

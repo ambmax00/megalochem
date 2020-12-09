@@ -149,7 +149,8 @@ private:
 	dbcsr::btype m_btype;
 	
 	// created with init()
-	std::vector<double> m_weights, m_xpoints;
+	std::vector<double> m_weights, m_xpoints, 
+		m_weights_dd, m_xpoints_dd;
 	std::shared_ptr<fock::J> m_jbuilder;
 	std::shared_ptr<fock::K> m_kbuilder;
 	std::shared_ptr<mp::Z> m_zbuilder;
@@ -158,7 +159,8 @@ private:
 	std::shared_ptr<Eigen::MatrixXi> m_shellpairs;
 	
 	// private functions
-	smat get_scaled_coeff(char dim, int ilap, double factor);
+	smat get_scaled_coeff(char dim, double wght, double xpt, 
+		double wfactor, double xfactor);
 	smat get_density(smat coeff);
 	
 	// adc 1

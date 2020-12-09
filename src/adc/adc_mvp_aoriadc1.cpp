@@ -2,6 +2,8 @@
 #include "ints/aoloader.h"
 
 namespace adc {
+	
+#define _DLOG
 
 void MVP_AOADC1::init() {
 	
@@ -95,6 +97,10 @@ smat MVP_AOADC1::compute(smat u_ia, double omega) {
 	
 	// transform back
 	smat sig_1 = u_transform(u_ao, 'T', m_c_bo, 'N', m_c_bv);
+	
+#ifdef _DLOG
+	dbcsr::print(*sig_1);
+#endif
 	
 	//LOG.os<>("Sigma adc1 mo:\n");
 	//dbcsr::print(*sig_1);
