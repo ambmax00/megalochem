@@ -81,6 +81,18 @@ public:
 		
 	}
 	
+	/* inserts another time object into this time
+	 * Overwrites if inserted time obj. has the same name as another
+	 * subprocess of the time object it is inserted into.
+	 */
+	void insert(mpi_time& time_in) {
+		
+		auto name = time_in.proc_name;
+		
+		this->subprocs[name] = time_in;
+		
+	}
+			
 	void print_info() {
 		
 		//++lev;

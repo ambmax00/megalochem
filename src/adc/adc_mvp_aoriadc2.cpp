@@ -4,7 +4,7 @@
 #include "adc/adc_defaults.h"
 #include "ints/fitting.h"
 
-#define _DLOG
+//#define _DLOG
 
 namespace adc {
 	
@@ -57,10 +57,12 @@ smat MVP_AOADC2::get_density(smat coeff) {
 	
 void MVP_AOADC2::init() {
 	
-	LOG.os<>("Initializing AO-ADC(2)\n");
+	LOG.os<1>("Initializing AO-ADC(2)\n");
+	
+	TIME.start();
 	
 	// laplace
-	LOG.os<>("Computing laplace points.\n");
+	LOG.os<1>("Computing laplace points.\n");
 		
 	double emin = m_eps_occ->front();
 	double ehomo = m_eps_occ->back();
@@ -70,8 +72,8 @@ void MVP_AOADC2::init() {
 	double ymin = 2*(elumo - ehomo);
 	double ymax = 2*(emax - emin);
 	
-	LOG.os<>("eps_min/eps_homo/eps_lumo/eps_max ", emin, " ", ehomo, " ", elumo, " ", emax, '\n');
-	LOG.os<>("ymin/ymax ", ymin, " ", ymax, '\n');
+	LOG.os<1>("eps_min/eps_homo/eps_lumo/eps_max ", emin, " ", ehomo, " ", elumo, " ", emax, '\n');
+	LOG.os<1>("ymin/ymax ", ymin, " ", ymax, '\n');
 	
 	math::laplace lp(m_world.comm(), LOG.global_plev());
 	
@@ -98,14 +100,12 @@ void MVP_AOADC2::init() {
 		
 		Do_pseudo->scale(wfac);
 		Dv_pseudo->scale(wfac);
-		
-		dbcsr::print(*Do_pseudo);
-		
+				
 		m_pseudo_occs[ilap] = Do_pseudo;
 		m_pseudo_virs[ilap] = Dv_pseudo;
 	}
 	
-	LOG.os<>("Setting up J,K,Z builders.\n");
+	LOG.os<1>("Setting up J,K,Z builders.\n");
 	
 	int nprint = LOG.global_plev();
 	
@@ -184,12 +184,14 @@ void MVP_AOADC2::init() {
 	m_zbuilder->init();
 	
 	// Intermeds
-	LOG.os<>("Computing intermediates.\n");
+	LOG.os<1>("Computing intermediates.\n");
 	compute_intermeds();
 	
 	m_spgrid2 = dbcsr::create_pgrid<2>(m_world.comm()).get();
 	
-	LOG.os<>("Done with setting up.\n");
+	TIME.finish();
+	
+	LOG.os<1>("Done with setting up.\n");
 	
 }
 
@@ -267,7 +269,7 @@ void MVP_AOADC2::compute_intermeds() {
 	 * 
 	 */
 	 
-	LOG.os<>("==== Computing ADC(2) intermediates ====\n");
+	LOG.os<1>("==== Computing ADC(2) intermediates ====\n");
 	
 	auto b = m_mol->dims().b();
 	auto x = m_mol->dims().x();
@@ -316,7 +318,7 @@ void MVP_AOADC2::compute_intermeds() {
 	
 	for (int ilap = 0; ilap != m_nlap; ++ilap) {
 		
-		LOG.os<>("ADC(2) intermediates, laplace point nr. ", ilap, '\n');
+		LOG.os<1>("ADC(2) intermediates, laplace point nr. ", ilap, '\n');
 		
 		auto po = m_pseudo_occs[ilap];
 		auto pv = m_pseudo_virs[ilap];
@@ -329,7 +331,7 @@ void MVP_AOADC2::compute_intermeds() {
 		
 		auto u = dbcsr::split_range(rank, m_mol->mo_split());
 		
-		LOG.os<>("Cholesky decomposition rank: ", rank, '\n');
+		LOG.os<1>("Cholesky decomposition rank: ", rank, '\n');
 	
 		auto L_bu = chol.L(b, u);
 		
@@ -340,7 +342,7 @@ void MVP_AOADC2::compute_intermeds() {
 		m_zbuilder->set_occ_coeff(L_bu);
 		m_zbuilder->set_vir_density(pv);
 	
-		LOG.os<>("Computing Z.\n");
+		LOG.os<1>("Computing Z.\n");
 	
 		m_zbuilder->compute();
 		auto z_xx_ilap = m_zbuilder->zmat();
@@ -348,7 +350,7 @@ void MVP_AOADC2::compute_intermeds() {
 		auto f_xx_ilap = u_transform(z_xx_ilap, 'N', m_v_xx, 'N', m_v_xx);
 		f_xx_ilap->setname("f_xx_ilap");
 		
-		LOG.os<>("Setting up K_ilap.\n");
+		LOG.os<1>("Setting up K_ilap.\n");
 		std::shared_ptr<fock::K> k_inter;
 		
 		int nprint = LOG.global_plev();
@@ -378,7 +380,7 @@ void MVP_AOADC2::compute_intermeds() {
 		k_inter->init();
 		k_inter->set_density_alpha(pv);
 		
-		LOG.os<>("Computing K_ilap.\n");
+		LOG.os<1>("Computing K_ilap.\n");
 		
 		k_inter->compute_K();
 		auto ko_ilap = k_inter->get_K_A();
@@ -389,7 +391,7 @@ void MVP_AOADC2::compute_intermeds() {
 		auto c_bo_scaled = get_scaled_coeff('O', wght, xpt, 0.25, 1.0);
 		auto c_bv_scaled = get_scaled_coeff('V', wght, xpt, 0.25, 1.0);
 		
-		LOG.os<>("Forming partly-transformed intermediates.\n");
+		LOG.os<1>("Forming partly-transformed intermediates.\n");
 		
 		dbcsr::multiply('T', 'N', *c_bo_scaled, *ko_ilap, *i_ob)
 			.beta(1.0)
@@ -430,7 +432,7 @@ void MVP_AOADC2::compute_intermeds() {
 
 smat MVP_AOADC2::compute_sigma_2a(smat& u_ia) {
 	
-	LOG.os<>("==== Computing ADC(2) SIGMA 2A ====\n");
+	LOG.os<1>("==== Computing ADC(2) SIGMA 2A ====\n");
 	
 	// sig_2a = i_vv_ab * u_ib
 	auto sig_2a = dbcsr::create_template<double>(u_ia)
@@ -445,7 +447,7 @@ smat MVP_AOADC2::compute_sigma_2a(smat& u_ia) {
 
 smat MVP_AOADC2::compute_sigma_2b(smat& u_ia) {
 	
-	LOG.os<>("==== Computing ADC(2) SIGMA 2B ====\n");
+	LOG.os<1>("==== Computing ADC(2) SIGMA 2B ====\n");
 	
 	// sig_2b = i_oo_ij * u_ja
 	auto sig_2b = dbcsr::create_template<double>(u_ia)
@@ -470,7 +472,7 @@ smat MVP_AOADC2::compute_sigma_2c(smat& jmat, smat& kmat) {
 	 * I_mk = jmat + transpose(K)
 	 */
 	
-	LOG.os<>("==== Computing ADC(2) SIGMA 2C ====\n");
+	LOG.os<1>("==== Computing ADC(2) SIGMA 2C ====\n");
 	 		
 	auto I_ao = dbcsr::create_template<double>(jmat).name("I_ao").get();
 	auto jmat_t = dbcsr::transpose(jmat).get();
@@ -493,7 +495,7 @@ smat MVP_AOADC2::compute_sigma_2c(smat& jmat, smat& kmat) {
 		.matrix_type(dbcsr::type::no_symmetry)
 		.get();
 		
-	LOG.os<>("-- Contracting over laplace points...\n");
+	LOG.os<1>("-- Contracting over laplace points...\n");
 	
 	for (int ilap = 0; ilap != m_nlap; ++ilap) {
 		
@@ -536,7 +538,7 @@ smat MVP_AOADC2::compute_sigma_2d(smat& u_ia) {
 	 * I_nr = sum_t c_os Po(t) * J(u_pseudo_ao(t)) * Pv(t)
 	 */
 	 
-	LOG.os<>("==== Computing ADC(2) SIGMA 2D ====\n");
+	LOG.os<1>("==== Computing ADC(2) SIGMA 2D ====\n");
 	 
 	auto I_ao = dbcsr::create_template<double>(m_pseudo_occs[0])
 		.name("I_ao")
@@ -599,35 +601,38 @@ smat MVP_AOADC2::compute_sigma_2d(smat& u_ia) {
  *                  ADC(2) 2H-P, H-2P 2P-2H CONTRIBUTIONS
  * ====================================================================*/
  
-dbcsr::sbtensor<3,double> MVP_AOADC2::compute_J(smat& u_ao) {
+dbcsr::sbtensor<3,double> MVP_AOADC2::compute_R(smat& u_ao) {
 	
-	LOG.os<>("Forming J_xbb\n");
-	// form J
+	LOG.os<1>("Forming R_xbb\n");
+	// form R
+	
+	auto& time_R = TIME.sub("Computing R");
+	time_R.start();
 	
 	auto spgrid3_xbb = m_eri3c2e_batched->spgrid();
 	
 	arrvec<int,3> xbb = {m_mol->dims().x(), m_mol->dims().b(), m_mol->dims().b()};
 	
-	auto J_xbb_0_12 = dbcsr::tensor_create<3,double>()
-		.name("J_xbb_0_12")
+	auto R_xbb_0_12 = dbcsr::tensor_create<3,double>()
+		.name("R_xbb_0_12")
 		.pgrid(spgrid3_xbb)
 		.map1({0}).map2({1,2})
 		.blk_sizes(xbb)
 		.get();
 		
-	auto J_xbb_2_01_t = dbcsr::tensor_create_template<3,double>(J_xbb_0_12)
-		.name("J_xbb_2_01_t")
+	auto R_xbb_2_01_t = dbcsr::tensor_create_template<3,double>(R_xbb_0_12)
+		.name("R_xbb_2_01_t")
 		.map1({2}).map2({0,1})
 		.get();
 		
-	auto J_xbb_2_01 = dbcsr::tensor_create_template<3,double>(J_xbb_0_12)
-		.name("J_xbb_2_01")
+	auto R_xbb_2_01 = dbcsr::tensor_create_template<3,double>(R_xbb_0_12)
+		.name("R_xbb_2_01")
 		.map1({2}).map2({0,1})
 		.get();	
 	
-	auto J_xbb_batched = dbcsr::btensor_create_template<3>
+	auto R_xbb_batched = dbcsr::btensor_create_template<3>
 		(m_eri3c2e_batched)
-		.name(m_mol->name() + "_j_xbb_batched")
+		.name(m_mol->name() + "_R_xbb_batched")
 		.btensor_type(m_btype)
 		.print(LOG.global_plev())
 		.get();
@@ -666,7 +671,7 @@ dbcsr::sbtensor<3,double> MVP_AOADC2::compute_J(smat& u_ao) {
 	u_htv->release();
 
 	m_eri3c2e_batched->decompress_init({0}, vec<int>{2}, vec<int>{0,1});
-	J_xbb_batched->compress_init({0}, vec<int>{0}, vec<int>{1,2});
+	R_xbb_batched->compress_init({0}, vec<int>{0}, vec<int>{1,2});
 	
 	auto nxbatches = m_eri3c2e_batched->nbatches(0);
 	auto nbbatches = m_eri3c2e_batched->nbatches(2);
@@ -676,8 +681,6 @@ dbcsr::sbtensor<3,double> MVP_AOADC2::compute_J(smat& u_ao) {
 		
 		m_eri3c2e_batched->decompress({ix});
 		auto eri_2_01 = m_eri3c2e_batched->get_work_tensor();
-		
-		dbcsr::print(*eri_2_01);
 		
 		auto xbounds = m_eri3c2e_batched->bounds(0,ix);
 		
@@ -699,48 +702,46 @@ dbcsr::sbtensor<3,double> MVP_AOADC2::compute_J(smat& u_ao) {
 				bbounds
 			};
 			
-			dbcsr::contract(*u_hto_01, *eri_2_01, *J_xbb_2_01_t)
+			dbcsr::contract(*u_hto_01, *eri_2_01, *R_xbb_2_01_t)
 				.alpha(-1.0)
 				.bounds3(xnu_bounds)
 				.filter(dbcsr::global::filter_eps / nxbatches)
 				.perform("mg, Yag -> Yam");
 			
-			dbcsr::print(*J_xbb_2_01_t);
-			
-			dbcsr::copy(*J_xbb_2_01_t, *J_xbb_2_01)
+			dbcsr::copy(*R_xbb_2_01_t, *R_xbb_2_01)
 				.move_data(true)
 				.order(vec<int>{0,2,1})
 				.perform();
 			
-			dbcsr::contract(*u_htv_01, *eri_2_01, *J_xbb_2_01)
+			dbcsr::contract(*u_htv_01, *eri_2_01, *R_xbb_2_01)
 				.bounds2(nu_bounds)
 				.bounds3(xmu_bounds)
 				.filter(dbcsr::global::filter_eps / nxbatches)
 				.beta(1.0)
 				.perform("ka, Ymk -> Yma");
-				
-			dbcsr::print(*J_xbb_2_01);
-				
-			dbcsr::copy(*J_xbb_2_01, *J_xbb_0_12)
+								
+			dbcsr::copy(*R_xbb_2_01, *R_xbb_0_12)
 				.move_data(true)
 				.sum(true)
 				.perform();
 			
 		}
 		
-		J_xbb_batched->compress({ix}, J_xbb_0_12);
+		R_xbb_batched->compress({ix}, R_xbb_0_12);
 		
 	}
 	
 	m_eri3c2e_batched->decompress_finalize();
-	J_xbb_batched->compress_finalize();
+	R_xbb_batched->compress_finalize();
 	
-	return J_xbb_batched;
+	time_R.finish();
+	
+	return R_xbb_batched;
 	
 }
 
 std::pair<smat,smat> MVP_AOADC2::compute_sigma_2e_ilap(
-	dbcsr::sbtensor<3,double>& J_xbb_batched, 
+	dbcsr::sbtensor<3,double>& R_xbb_batched, 
 	smat& FA, smat& FB, smat& pseudo_o, smat& pseudo_v,
 	bool mem) {
 
@@ -752,9 +753,12 @@ std::pair<smat,smat> MVP_AOADC2::compute_sigma_2e_ilap(
 	};
 
 	
-	auto JJ = J_xbb_batched->get_work_tensor();
-	std::cout << "J LONG SUM " << std::setprecision(16) << get_sum(JJ) << '\n';
+	auto RR = R_xbb_batched->get_work_tensor();
+	std::cout << "R LONG SUM " << std::setprecision(16) << get_sum(RR) << '\n';
 #endif
+		
+	auto& ltime = TIME.sub("Computing sigma ilap");
+	ltime.start();
 		
 	auto x = m_mol->dims().x();
 	arrvec<int,2> xx = {x,x};
@@ -779,9 +783,6 @@ std::pair<smat,smat> MVP_AOADC2::compute_sigma_2e_ilap(
 
 	FA->clear();
 	FB->clear();
-	
-	dbcsr::print(*pseudo_o);
-	dbcsr::print(*pseudo_v);
 	
 	auto sigma_ilap_A = dbcsr::create_template<double>(pseudo_o)
 		.name("sigma_ilap_A")
@@ -812,7 +813,7 @@ std::pair<smat,smat> MVP_AOADC2::compute_sigma_2e_ilap(
 		// Form I
 	
 		I_xbb_batched->compress_init({2}, vec<int>{0}, vec<int>{1,2});
-		J_xbb_batched->decompress_init({2}, vec<int>{0}, vec<int>{1,2});
+		R_xbb_batched->decompress_init({2}, vec<int>{0}, vec<int>{1,2});
 		m_eri3c2e_batched->decompress_init({2}, vec<int>{0}, vec<int>{1,2});
 		
 		int nxbatches = m_eri3c2e_batched->nbatches(0);
@@ -821,8 +822,8 @@ std::pair<smat,smat> MVP_AOADC2::compute_sigma_2e_ilap(
 		
 		for (int inu = 0; inu != nbbatches; ++inu) {
 			
-			J_xbb_batched->decompress({inu});
-			auto J_xbb_0_12 = J_xbb_batched->get_work_tensor();
+			R_xbb_batched->decompress({inu});
+			auto R_xbb_0_12 = R_xbb_batched->get_work_tensor();
 			
 			m_eri3c2e_batched->decompress({inu});
 			auto eri_0_12 = m_eri3c2e_batched->get_work_tensor();
@@ -842,7 +843,7 @@ std::pair<smat,smat> MVP_AOADC2::compute_sigma_2e_ilap(
 					bbds
 				};
 				
-				dbcsr::contract(*FA_01, *J_xbb_0_12, *I_xbb_0_12)
+				dbcsr::contract(*FA_01, *R_xbb_0_12, *I_xbb_0_12)
 					.bounds2(xbounds)
 					.bounds3(kabounds)
 					.filter(dbcsr::global::filter_eps)
@@ -878,7 +879,7 @@ std::pair<smat,smat> MVP_AOADC2::compute_sigma_2e_ilap(
 		}
 		
 		m_eri3c2e_batched->decompress_finalize();				
-		J_xbb_batched->decompress_finalize();
+		R_xbb_batched->decompress_finalize();
 		I_xbb_batched->compress_finalize();
 		
 		// form sigma
@@ -950,9 +951,7 @@ std::pair<smat,smat> MVP_AOADC2::compute_sigma_2e_ilap(
 					.filter(dbcsr::global::filter_eps 
 						/ m_eri3c2e_batched->nbatches(0))
 					.perform("Xlm, lk -> Xkm");
-					
-				dbcsr::print(*cbar_1_02);
-					
+										
 				dbcsr::copy(*cbar_1_02, *cbar_01_2).move_data(true).perform();
 				
 				vec<vec<int>> xnubounds = {
@@ -979,7 +978,6 @@ std::pair<smat,smat> MVP_AOADC2::compute_sigma_2e_ilap(
 		}
 		
 		dbcsr::copy_tensor_to_matrix(*sigma_ilap_01, *sigma_ilap_A);
-		dbcsr::print(*sigma_ilap_01);
 		
 		sigma_ilap_01->clear();
 		
@@ -1061,6 +1059,8 @@ std::pair<smat,smat> MVP_AOADC2::compute_sigma_2e_ilap(
 #endif
 
 	std::pair<smat,smat> out = {sigma_ilap_A, sigma_ilap_B};
+
+	ltime.finish();
 	
 	return out;
 	
@@ -1075,16 +1075,19 @@ smat MVP_AOADC2::compute_sigma_2e(smat& u_ao, double omega) {
 	 * 
 	 * with
 	 * 
-	 * I_{Xκα}(t) = J_{Yκα} * F_{YX}(t) + (Y|κα) Ftilde_{XY}(t)
+	 * I_{Xκα}(t) = R_{Yκα} * F_{YX}(t) + (Y|κα) Ftilde_{XY}(t)
 	 * 
-	 * Ftilde_{X'Y'}(t) = (X'|X) (X|μν) * J_{Xμ'ν'} * Po(t)_{μμ'} * Pv(t)_{νν'} (YY')
+	 * Ftilde_{X'Y'}(t) = (X'|X) (X|μν) * R_{Xμ'ν'} * Po(t)_{μμ'} * Pv(t)_{νν'} (YY')
 	 * 
-	 * J_{Χκα} = [ wv_κα (X|μκ) - wo_μγ (X|γα)]
+	 * R_{Χκα} = [ wv_κα (X|μκ) - wo_μγ (X|γα)]
 	 * wv_κα = co_κi * S_αα' cv_α'a u_ia
 	 * wo_μγ = S_μμ' * co_μ'i * cv_γa * u_ia
 	 */
 	
-	LOG.os<>("==== Computing ADC(2) SIGMA 2E ====\n");
+	LOG.os<1>("==== Computing ADC(2) SIGMA 2E ====\n");
+	
+	auto time_2e = TIME.sub("Computing sigma(2e)");
+	time_2e.start();
 	
 	double emin = m_eps_occ->front();
 	double ehomo = m_eps_occ->back();
@@ -1094,8 +1097,8 @@ smat MVP_AOADC2::compute_sigma_2e(smat& u_ao, double omega) {
 	double ymin = 2*(elumo - ehomo) + omega;
 	double ymax = 2*(emax - emin) + omega;
 	
-	LOG.os<>("eps_min/eps_homo/eps_lumo/eps_max ", emin, " ", ehomo, " ", elumo, " ", emax, '\n');
-	LOG.os<>("ymin/ymax ", ymin, " ", ymax, '\n');
+	LOG.os<1>("eps_min/eps_homo/eps_lumo/eps_max ", emin, " ", ehomo, " ", elumo, " ", emax, '\n');
+	LOG.os<1>("ymin/ymax ", ymin, " ", ymax, '\n');
 	
 	math::laplace lp_dd(m_world.comm(), LOG.global_plev());
 	
@@ -1119,12 +1122,12 @@ smat MVP_AOADC2::compute_sigma_2e(smat& u_ao, double omega) {
 		.name("sigma_2e_B").get();
 	
 	// Form J
-	auto J_xbb_batched = compute_J(u_ao);
+	auto R_xbb_batched = compute_R(u_ao);
 	
 	// Prepare asym zbuilder
 	std::shared_ptr<mp::Z> zbuilder_asym = 
 		mp::create_LLMP_ASYM_Z(m_world, m_mol, LOG.global_plev())
-		.t3c2e_right_batched(J_xbb_batched)
+		.t3c2e_right_batched(R_xbb_batched)
 		.t3c2e_left_batched(m_eri3c2e_batched)
 		.get();
 		
@@ -1189,7 +1192,7 @@ smat MVP_AOADC2::compute_sigma_2e(smat& u_ao, double omega) {
 		if (LOG.global_plev() > 2) dbcsr::print(*F_xx_A);
 		if (LOG.global_plev() > 2) dbcsr::print(*F_xx_B);
 		
-		auto sig_pair = compute_sigma_2e_ilap(J_xbb_batched, F_xx_A, F_xx_B, 
+		auto sig_pair = compute_sigma_2e_ilap(R_xbb_batched, F_xx_A, F_xx_B, 
 			pseudo_o, pseudo_v, false);
 			
 		auto sig_ilap_A = sig_pair.first;
@@ -1225,6 +1228,8 @@ smat MVP_AOADC2::compute_sigma_2e(smat& u_ao, double omega) {
 	sigma_2e_A->setname("sigma_2e");
 	sigma_2e_A->add(1.0, 1.0, *sigma_2e_B);
 	
+	time_2e.finish();
+	
 	return sigma_2e_A;
 	
 }
@@ -1235,9 +1240,13 @@ smat MVP_AOADC2::compute_sigma_2e(smat& u_ao, double omega) {
 
 smat MVP_AOADC2::compute(smat u_ia, double omega) {
 	
-	LOG.os<>("Computing AO-ADC(2) MVP product... \n");
+	auto& time_com = TIME.sub("Computing sigma ADC(2)");
 	
-	LOG.os<>("Computing sigma_0 of AO-ADC(2) ... \n");
+	TIME.start();
+	time_com.start();
+	
+	LOG.os<1>("Computing AO-ADC(2) MVP product... \n");
+	LOG.os<1>("Computing sigma_0 of AO-ADC(2) ... \n");
 	
 	auto sigma_0 = compute_sigma_0(u_ia, *m_eps_occ, *m_eps_vir);
 	
@@ -1246,7 +1255,7 @@ smat MVP_AOADC2::compute(smat u_ia, double omega) {
 	dbcsr::print(*sigma_0);
 #endif
 
-	LOG.os<>("Computing sigma_1 of AO-ADC(2) ... \n");
+	LOG.os<1>("Computing sigma_1 of AO-ADC(2) ... \n");
 
 	auto u_ao = u_transform(u_ia, 'N', m_c_bo, 'T', m_c_bv); 
 	auto jkpair = compute_jk(u_ao);
@@ -1257,21 +1266,16 @@ smat MVP_AOADC2::compute(smat u_ia, double omega) {
 	dbcsr::print(*sigma_1);
 #endif
 
-	LOG.os<>("Computing sigma_2 of AO-ADC(2) ... \n");
+	LOG.os<1>("Computing sigma_2 of AO-ADC(2) ... \n");
 	
-	LOG.os<>("Computing sigma_2 (A).\n");
 	auto sigma_2a = compute_sigma_2a(u_ia);
 
-	LOG.os<>("Computing sigma_2 (B).\n");
 	auto sigma_2b = compute_sigma_2b(u_ia);
 	
-	LOG.os<>("Computing sigma_2 (C). \n");
 	auto sigma_2c = compute_sigma_2c(jkpair.first, jkpair.second);
 	
-	LOG.os<>("Computing sigma_2 (D). \n");
 	auto sigma_2d = compute_sigma_2d(u_ia);
 	
-	LOG.os<>("Computing sigma_2 (E). \n");
 	auto sigma_2e = compute_sigma_2e(u_ao, omega);
 	
 #ifdef _DLOG
@@ -1304,6 +1308,9 @@ smat MVP_AOADC2::compute(smat u_ia, double omega) {
 	LOG.os<>("SIGMA 2 FULL");
 	dbcsr::print(*sigma_0);
 #endif
+
+	time_com.finish();
+	TIME.finish();
 	
 	return sigma_0;
 	

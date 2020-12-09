@@ -87,6 +87,10 @@ public:
 	
 	virtual ~JK_common() {}
 	
+	util::mpi_time get_time() {
+		return TIME;
+	}
+	
 	void print_info() { TIME.print_info(); }
 	
 };

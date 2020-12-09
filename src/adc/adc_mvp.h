@@ -173,7 +173,7 @@ private:
 	smat compute_sigma_2b(smat& u_ia);
 	smat compute_sigma_2c(smat& jmat, smat& kmat);
 	smat compute_sigma_2d(smat& u_ia);
-	sbtensor3 compute_J(smat& u_ao);
+	sbtensor3 compute_R(smat& u_ao);
 	std::pair<smat,smat> compute_sigma_2e_ilap(
 		dbcsr::sbtensor<3,double>& J_xbb_batched, 
 		smat& FA, smat& FB, smat& pseudo_o, smat& pseudo_v,
