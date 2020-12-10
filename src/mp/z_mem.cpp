@@ -4,7 +4,7 @@ namespace mp {
 
 void LLMP_MEM_Z::init() {
 	
-	LOG.os<>("Setting up tensors in LLMP_MEM.\n");
+	LOG.os<1>("Setting up tensors in LLMP_MEM.\n");
 	
 	auto x = m_mol->dims().x();
 	
@@ -120,7 +120,7 @@ void LLMP_MEM_Z::compute() {
 	m_eri3c2e_batched->decompress_init({0}, vec<int>{0}, vec<int>{1,2});
 	time_reo_int1.finish();
 	
-	LOG.os<>("Starting batching over auxiliary functions.\n");
+	LOG.os<1>("Starting batching over auxiliary functions.\n");
 	
 	int nxbatches = m_eri3c2e_batched->nbatches(0);
 	int nnbatches = m_eri3c2e_batched->nbatches(2);
@@ -302,7 +302,7 @@ void LLMP_MEM_Z::compute() {
 	
 	m_eri3c2e_batched->decompress_finalize();
 	
-	LOG.os<>("Finished batching.\n");
+	LOG.os<1>("Finished batching.\n");
 	
 	// copy
 	dbcsr::copy_tensor_to_matrix(*m_zmat_01, *m_zmat);
@@ -315,7 +315,7 @@ void LLMP_MEM_Z::compute() {
 
 void LLMP_ASYM_Z::init() {
 	
-	LOG.os<>("Setting up tensors in LLMP_ASYM.\n");
+	LOG.os<1>("Setting up tensors in LLMP_ASYM.\n");
 	
 	auto x = m_mol->dims().x();
 	
@@ -420,7 +420,7 @@ void LLMP_ASYM_Z::compute() {
 	m_t3c2e_right_batched->decompress_init({0}, vec<int>{1}, vec<int>{0,2});
 	time_reo_tensor.finish();
 	
-	LOG.os<>("Starting batching over auxiliary functions.\n");
+	LOG.os<1>("Starting batching over auxiliary functions.\n");
 	
 	int nxbatches = m_t3c2e_left_batched->nbatches(0);
 	int nnbatches = m_t3c2e_left_batched->nbatches(2);
@@ -597,7 +597,7 @@ void LLMP_ASYM_Z::compute() {
 	m_t3c2e_left_batched->decompress_finalize();
 	m_t3c2e_right_batched->decompress_finalize();
 	
-	LOG.os<>("Finished batching.\n");
+	LOG.os<1>("Finished batching.\n");
 	
 	// copy
 	dbcsr::copy_tensor_to_matrix(*m_zmat_01, *m_zmat);

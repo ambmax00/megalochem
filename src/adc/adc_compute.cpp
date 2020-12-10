@@ -64,61 +64,93 @@ void adcmod::compute() {
 		
 		// set up ADC(1) and davidson 
 		
-		/*
+		bool do_balancing = m_opt.get<bool>("balanacing", ADC_BALANCING);
+		bool do_block = m_opt.get<bool>("block", ADC_BLOCK);
+		double conv_adc1 = m_opt.get<double>("adc1/dav_conv", ADC_ADC1_DAV_CONV);
+		int maxiter_adc1 = m_opt.get<double>("adc1/maxiter", ADC_ADC1_MAXITER);
+		
 		auto adc1_mvp = create_adc1();
 		math::davidson<MVP> dav(m_world.comm(), LOG.global_plev());
 		
 		dav.set_factory(adc1_mvp);
 		dav.set_diag(m_d_ov);
 		dav.pseudo(false);
-		dav.balancing(false);
-		dav.block(false);
-		dav.conv(m_opt.get<double>("adc1/dav_conv", ADC_ADC1_DAV_CONV));
-		dav.maxiter(100);	
+		dav.balancing(do_balancing);
+		dav.block(do_block);
+		dav.conv(conv_adc1);
+		dav.maxiter(maxiter_adc1);	
 		
 		int nroots = m_opt.get<int>("nroots", ADC_NROOTS);
 		
 		auto& t_davidson = TIME.sub("Davidson diagonalization");
+		
+		LOG.os<>("==== Starting ADC(1) Computation ====\n\n"); 
 		
 		t_davidson.start();
 		dav.compute(dav_guess, nroots);
 		t_davidson.finish();
 		
 		adc1_mvp->print_info();
-		
-		LOG.os<>("Excitation energy of state nr. ", nroots, ": ", dav.eigvals()[nroots-1], '\n');
-		
+				
 		auto rvecs = dav.ritz_vectors();
-		auto vec_k = rvecs[nroots-1];
-	*/	
+		auto ex = dav.eigvals();
 		
-		auto adc1_mvp = create_adc1();
+		LOG.os<>("==== Finished ADC(1) Computation ====\n\n"); 
+		
+		int nstart = do_block ? 0 : nroots-1;
+		
+		LOG.os<>("ADC(1) Excitation energies:\n");
+		for (int iroot = nstart; iroot != nroots; ++iroot) {
+			LOG.os<>("Excitation nr. ", iroot+1, " : ", ex[iroot], '\n');
+		}
+		
+		bool do_adc2 = m_opt.get<bool>("do_adc2", ADC_DO_ADC2);
+		
+		if (!do_adc2) return; 
+		
+		LOG.os<>("==== Starting ADC(2) Computation ====\n\n"); 
+		
 		auto adc2_mvp = create_adc2();
 		
-		adc1_mvp->compute(dav_guess[0], 0.3);
-		auto sig = adc2_mvp->compute(dav_guess[0], 0.3);
-		
-		double m = dav_guess[0]->dot(*sig);
-		
-		std::cout << "DOT " << m << std::endl;
-		
-	/*
 		math::modified_davidson<MVP> mdav(m_world.comm(), LOG.global_plev());
 		
-		mdav.macro_maxiter(10);
+		double conv_micro_adc2 = m_opt.get<double>("adc2/micro_conv", ADC_ADC2_MICRO_CONV);
+		double conv_macro_adc2 = m_opt.get<double>("adc2(macro_conv", ADC_ADC2_MACRO_CONV);
+		int micro_maxiter_adc2 = m_opt.get<int>("adc2/micro_maxiter", ADC_ADC2_MICRO_MAXITER);
+		int macro_maxiter_adc2 = m_opt.get<int>("adc2/macro_maxiter", ADC_ADC2_MACRO_MAXITER);
+		
+		mdav.macro_maxiter(macro_maxiter_adc2);
+		mdav.macro_conv(conv_macro_adc2);
 		
 		mdav.sub().set_factory(adc2_mvp);
 		mdav.sub().set_diag(m_d_ov);
 		mdav.sub().pseudo(true);
 		mdav.sub().block(false);
-		mdav.sub().balancing(false);
-		mdav.sub().conv(m_opt.get<double>("adc2/dav_conv", ADC_ADC2_DAV_CONV));
-		mdav.sub().maxiter(100);
-			
-		mdav.compute(rvecs, nroots, dav.eigvals()[nroots-1]);
+		mdav.sub().balancing(do_balancing);
+		mdav.sub().conv(conv_micro_adc2);
+		mdav.sub().maxiter(micro_maxiter_adc2);
 		
-		exit(0);
+		int istart = (do_block) ? 0 : nroots-1;
+		std::vector<double> ex_adc2(nroots,0.0);
+		
+		for (int iroot = istart; iroot != nroots; ++iroot) {
 			
+			LOG.os<>("Addressing excited state nr. ", iroot+1, '\n');
+			mdav.compute(rvecs, iroot+1, ex[iroot]);
+			
+			double en = mdav.eigval()[iroot];
+			ex_adc2[iroot] = en;
+			
+		}
+		
+		LOG.os<>("==== Finished ADC(2) Computation ====\n\n"); 
+				
+		LOG.os<>("ADC(2) Excitation energies:\n");
+		for (int iroot = nstart; iroot != nroots; ++iroot) {
+			LOG.os<>("Excitation nr. ", iroot+1, " : ", ex_adc2[iroot], '\n');
+		}
+				
+				/*	
 		auto c_bo = m_hfwfn->c_bo_A();
 		auto c_bv = m_hfwfn->c_bv_A();
 		
@@ -201,9 +233,7 @@ void adcmod::compute() {
 		//auto v5 = get_significant_blocks(v_bb,0.9975,m_s_bb,1e-4);
 	*/
 	
-	exit(0);
-
-		TIME.print_info();
+	TIME.print_info();
 		
 }
 

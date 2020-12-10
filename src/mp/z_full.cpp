@@ -4,7 +4,7 @@ namespace mp {
 
 void LLMP_FULL_Z::init() {
 	
-	LOG.os<>("Setting up tensors in LLMP_FULL.\n");
+	LOG.os<1>("Setting up tensors in LLMP_FULL.\n");
 	
 	auto x = m_mol->dims().x();
 	auto b = m_mol->dims().b();
@@ -144,7 +144,7 @@ void LLMP_FULL_Z::compute() {
 	
 	m_FT3c2e_batched->compress_init({0,2}, vec<int>{0}, vec<int>{1,2});
 	
-	LOG.os<>("Starting batching over auxiliary functions.\n");
+	LOG.os<1>("Starting batching over auxiliary functions.\n");
 		
 	// ===== LOOP OVER BATCHES OF AUXILIARY FUNCTIONS ==================
 	for (int ix = 0; ix != m_eri3c2e_batched->nbatches(0); ++ix) {
@@ -299,23 +299,23 @@ void LLMP_FULL_Z::compute() {
 	m_eri3c2e_batched->decompress_finalize();
 	m_FT3c2e_batched->compress_finalize();
 	
-	LOG.os<>("Occupation of FT3c2e: ", m_FT3c2e_batched->occupation()*100, "%\n"); 
+	LOG.os<1>("Occupation of FT3c2e: ", m_FT3c2e_batched->occupation()*100, "%\n"); 
 	
-	LOG.os<>("Finished batching.\n");
+	LOG.os<1>("Finished batching.\n");
 	
-	LOG.os<>("Reordering ints 1|02 -> 0|12 \n");
+	LOG.os<1>("Reordering ints 1|02 -> 0|12 \n");
 	
 	time_reo_int2.start();
 	m_eri3c2e_batched->decompress_init({2}, vec<int>{0}, vec<int>{1,2});
 	time_reo_int2.finish();
 	
-	LOG.os<>("Setting up decompression.\n");
+	LOG.os<1>("Setting up decompression.\n");
 	
 	time_setview.start();
 	m_FT3c2e_batched->decompress_init({0,2}, vec<int>{0}, vec<int>{1,2});
 	time_setview.finish();
 	
-	LOG.os<>("Computing Z_XY.\n");
+	LOG.os<1>("Computing Z_XY.\n");
 	
 	m_zmat_01->batched_contract_init();
 	
@@ -352,7 +352,7 @@ void LLMP_FULL_Z::compute() {
 			};
 			
 			// form Z
-			LOG.os<>("-- Forming Z.\n");
+			LOG.os<1>("-- Forming Z.\n");
 			
 			time_formz.start();
 			dbcsr::contract(*z_xbb_0_12, *eri_0_12, *m_zmat_01)

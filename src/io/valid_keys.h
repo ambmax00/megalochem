@@ -96,6 +96,7 @@ static const json valid_keys =
 			{"kmethod", "dfao"},
 			{"eris", "core"},
 			{"intermeds", "core"},
+			{"max_iter", 100},
 			{"_required", {"none"}}
 		}},
 		// then go through adc2 (optional)

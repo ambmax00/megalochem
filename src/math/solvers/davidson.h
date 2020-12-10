@@ -99,7 +99,15 @@ public:
 		if (!omega && m_pseudo) 
 			throw std::runtime_error("Davidson solver initialized as pseudo-eigenvalue problem, but no omega given.");
 		
-		m_vecs = guess;
+		// copy guesses
+		m_vecs.clear();
+		
+		for (auto ptr : guess) {
+			
+			auto copy = dbcsr::copy(ptr).get();
+			m_vecs.push_back(copy);
+			
+		}
 		
 		LOG.os<1>("GUESS SIZE: ", m_vecs.size(), '\n');
 		
@@ -478,7 +486,9 @@ private:
 
 	util::mpi_log LOG;
 	
-	int m_macro_maxiter = 10;	
+	int m_macro_maxiter = 30;
+	double m_macro_conv = 1e-5;
+		
 	davidson<MVFactory> m_dav;
 	
 		
@@ -493,29 +503,38 @@ public:
 		return *this;
 	}
 	
+	modified_davidson& macro_conv(double macro) {
+		m_macro_conv = macro;
+		return *this;
+	}
+	
 	modified_davidson(MPI_Comm comm, int nprint) : 
 		LOG(comm, nprint),
 		m_dav(comm, nprint)
 	{}
 	
-	void compute(std::vector<smat>& guess, int nroots, double omega) {
+	void compute(std::vector<smat>& guess, int nroot, double omega) {
 
 		std::vector<smat> current_guess = guess;
 		double current_omega = omega;
 		
 		for (int i = 0; i != m_macro_maxiter; ++i) {
 			
-			LOG.os<>(" == MACROITERATION: ==\n");
+			LOG.os<>(" == MACROITERATION: ", i, " ==\n");
 			
 			double old_omega = current_omega;
 			
-			m_dav.compute(current_guess,nroots,current_omega);
+			m_dav.compute(current_guess,nroot,current_omega);
 			
 			current_guess = m_dav.ritz_vectors();
-			current_omega = m_dav.eigvals()[nroots-1];
+			current_omega = m_dav.eigvals()[nroot-1];
 			
-			LOG.os<>("MACRO ITERATION ERROR: ", fabs(current_omega - old_omega), '\n');
+			double err = fabs(current_omega - old_omega);
+			
+			LOG.os<>("MACRO ITERATION ERROR: ", err, '\n');
 			LOG.os<>("EIGENVALUE: ", current_omega, '\n');
+			
+			if (err < m_macro_conv) break;			
 						
 		}
 		

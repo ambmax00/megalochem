@@ -57,7 +57,9 @@ void adcmod::init_ao_tensors() {
 	fock::load_jints(jmet_adc1, metr_adc1, m_ao);
 	fock::load_kints(kmet_adc1, metr_adc1, m_ao);
 	
-	if (m_opt.get<bool>("do_adc2",true)) {
+	bool do_adc2 = m_opt.get<bool>("do_adc2",ADC_DO_ADC2);
+	
+	if (do_adc2) {
 		
 		auto adc2_opt = m_opt.subtext("adc2");
 		bool local = adc2_opt.get<bool>("local", ADC_ADC2_LOCAL);

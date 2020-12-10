@@ -21,7 +21,7 @@ void pivinc_cd::reorder_and_reduce(scalapack::distmat<double>& L) {
 	
 	if (false) {//if (m_reorder_method) {
 		
-		LOG.os<>("-- Reordering cholesky orbitals according to method \"", *m_reorder_method, "\"\n");
+		LOG.os<1>("-- Reordering cholesky orbitals according to method \"", *m_reorder_method, "\"\n");
 		
 		if (m_reorder_method == "value" || m_reorder_method == "v") {
 			
@@ -72,7 +72,7 @@ void pivinc_cd::reorder_and_reduce(scalapack::distmat<double>& L) {
 			}	
 		}
 		
-		LOG.os<>("-- Finished reordering.\n");
+		LOG.os<1>("-- Finished reordering.\n");
 				
 	}
 	
@@ -82,7 +82,7 @@ void pivinc_cd::reorder_and_reduce(scalapack::distmat<double>& L) {
 		m_L = std::make_shared<scalapack::distmat<double>>(N,N,nb,nb,0,0);
 	}
 	
-	LOG.os<>("-- Reducing and reordering L.\n");
+	LOG.os<1>("-- Reducing and reordering L.\n");
 	
 	for (int i = 0; i != m_rank; ++i) {
 		
@@ -97,9 +97,9 @@ void pivinc_cd::compute() {
 	
 	// convert input mat to scalapack format
 	
-	LOG.os<>("Starting pivoted incomplete cholesky decomposition.\n");
+	LOG.os<1>("Starting pivoted incomplete cholesky decomposition.\n");
 	
-	LOG.os<>("-- Setting up scalapack environment and matrices.\n"); 
+	LOG.os<1>("-- Setting up scalapack environment and matrices.\n"); 
 	
 	int N = m_mat_in->nfullrows_total();
 	int iter = 0;
@@ -276,7 +276,7 @@ void pivinc_cd::compute() {
 		double U_II = U.get('A', ' ', I, I);
 		
 		if (U_II < 0.0 && fabs(U_II) > thresh) {
-			LOG.os<>("fabs(U_II): ", fabs(U_II), '\n');
+			LOG.os<1>("fabs(U_II): ", fabs(U_II), '\n');
 			throw std::runtime_error("Negative Pivot element. CD not possible.");
 		}
 		
@@ -372,10 +372,10 @@ void pivinc_cd::compute() {
 	
 	double err = c_pdlange('F', N, N, Ucopy.data(), 0, 0, Ucopy.desc().data(), nullptr);
 	
-	LOG.os<>("-- CD error: ", err, '\n');
+	LOG.os<1>("-- CD error: ", err, '\n');
 	
 	
-	LOG.os<>("Finished decomposition.\n");
+	LOG.os<1>("Finished decomposition.\n");
 	
 	delete [] iwork;
 	delete [] ipiv_r;
