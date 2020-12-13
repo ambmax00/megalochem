@@ -164,7 +164,10 @@ smatrix hermitian_eigen_solver::inverse() {
 	
 	std::vector<double> eigval_copy = m_eigval;
 	
-	std::for_each(eigval_copy.begin(),eigval_copy.end(),[](double& d) { d = 1.0/d; });
+	std::for_each(eigval_copy.begin(),eigval_copy.end(),
+		[](double& d) { 
+			d = (fabs(d) < 1e-12) ? 0 : 1.0/d; 
+		});
 	
 	eigvec_copy->scale(eigval_copy, "right");
 	

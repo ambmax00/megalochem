@@ -94,9 +94,10 @@ private:
 					if (iblk[dim2] < blkbounds[dim2][0] || iblk[dim2] > blkbounds[dim2][1]) continue;
 					
 					if (scr && scr->skip_block_xbb(iblk[0],iblk[1],iblk[2])) {
-						++totblk;
 						continue;
 					}
+					
+					++totblk;
 					
 					res[0].push_back(iblk[0]);
 					res[1].push_back(iblk[1]);
@@ -118,7 +119,10 @@ private:
 		}
 		
 		for (int ip = 0; ip != m_world.size(); ++ip) {
-			if (ip == m_world.rank()) std::cout << "RANK: " << mem/1e+9 << " GB will be reserved." << std::endl;
+			if (ip == m_world.rank()) {
+				std::cout << "RANK: " << mem/1e+9 << " GB will be reserved. Total number of blocks: "
+				<< totblk << std::endl;
+			}
 			MPI_Barrier(m_world.comm());
 		}
 		

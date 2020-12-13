@@ -53,6 +53,7 @@ void aoloader::compute() {
 	
 	spgrid2 = dbcsr::create_pgrid<2>(m_world.comm()).get();
 	m_reg.insert(key::pgrid2, spgrid2);
+	m_to_keep[static_cast<int>(key::pgrid2)] = true;
 	
 	int nbf = m_mol->c_basis()->nbf();
 	
@@ -62,12 +63,14 @@ void aoloader::compute() {
 		spgrid3 = dbcsr::create_pgrid<3>(m_world.comm())
 			.tensor_dims(pdims3).get();
 		m_reg.insert(key::pgrid3,spgrid3);
+		m_to_keep[static_cast<int>(key::pgrid3)] = true;
 	}
 	
 	std::array<int,4> pdims4 = {nbf,nbf,nbf,nbf};
 	spgrid4 = dbcsr::create_pgrid<4>(m_world.comm())
 		.tensor_dims(pdims4).get();
 	m_reg.insert(key::pgrid4,spgrid4);
+	m_to_keep[static_cast<int>(key::pgrid4)] = true;
 	
 	// compute s
 	if (comp(key::ovlp_bb)) {

@@ -4,7 +4,7 @@
 #include "adc/adc_defaults.h"
 #include "ints/fitting.h"
 
-//#define _DLOG
+#define _DLOG
 
 namespace adc {
 	
@@ -128,7 +128,7 @@ void MVP_AOADC2::init() {
 	// K builder
 	switch (m_kmethod) {
 		case fock::kmethod::dfao:
-		{
+		{			
 			m_kbuilder = fock::create_DFAO_K(m_world, m_mol, nprint)
 				.eri3c2e_batched(m_eri3c2e_batched)
 				.fitting_batched(m_fitting_batched)

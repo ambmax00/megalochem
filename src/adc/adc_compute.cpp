@@ -10,241 +10,177 @@ namespace adc {
 
 void adcmod::compute() {
 	
-		// Generate guesses
+	// Generate guesses
+	
+	compute_diag();
+	
+	LOG.os<>("--- Starting Computation ---\n\n");
+			
+	int nocc = m_hfwfn->mol()->nocc_alpha();
+	int nvir = m_hfwfn->mol()->nvir_alpha();
+	auto epso = m_hfwfn->eps_occ_A();
+	auto epsv = m_hfwfn->eps_vir_A();
+	
+	LOG.os<>("Computing guess vectors...\n");
+	// now order it : there is probably a better way to do it
+	auto eigen_ia = dbcsr::matrix_to_eigen(m_d_ov);
+	
+	std::vector<int> index(eigen_ia.size(), 0);
+	for (int i = 0; i!= index.size(); ++i) {
+		index[i] = i;
+	}
+	
+	std::sort(index.begin(), index.end(), 
+		[&](const int& a, const int& b) {
+			return (eigen_ia.data()[a] < eigen_ia.data()[b]);
+	});
 		
-		compute_diag();
+	// generate the guesses
+	
+	auto o = m_hfwfn->mol()->dims().oa();
+	auto v = m_hfwfn->mol()->dims().va();
+	auto b = m_hfwfn->mol()->dims().b();
+	
+	int nguesses = m_opt.get<int>("nguesses", ADC_NGUESSES);
+	std::vector<dbcsr::shared_matrix<double>> dav_guess(nguesses);
+	
+	for (int i = 0; i != nguesses; ++i) {
 		
-		LOG.os<>("--- Starting Computation ---\n\n");
-				
-		int nocc = m_hfwfn->mol()->nocc_alpha();
-		int nvir = m_hfwfn->mol()->nvir_alpha();
-		auto epso = m_hfwfn->eps_occ_A();
-		auto epsv = m_hfwfn->eps_vir_A();
+		LOG.os<>("Guess ", i, '\n');
 		
-		LOG.os<>("Computing guess vectors...\n");
-		// now order it : there is probably a better way to do it
-		auto eigen_ia = dbcsr::matrix_to_eigen(m_d_ov);
+		Eigen::MatrixXd mat = Eigen::MatrixXd::Zero(nocc,nvir);
+		mat.data()[index[i]] = 1.0;
 		
-		std::vector<int> index(eigen_ia.size(), 0);
-		for (int i = 0; i!= index.size(); ++i) {
-			index[i] = i;
+		std::string name = "guess_" + std::to_string(i);
+		
+		auto guessmat = dbcsr::eigen_to_matrix(mat, m_world, name,
+			o, v, dbcsr::type::no_symmetry);
+		
+		dav_guess[i] = guessmat;
+		
+		//dbcsr::print(*guessmat);
+		
+	}
+	
+	// set up ADC(1) and davidson 
+	
+	bool do_balancing = m_opt.get<bool>("balanced", ADC_BALANCING);
+	bool do_block = m_opt.get<bool>("block", ADC_BLOCK);
+	double conv_adc1 = m_opt.get<double>("adc1/dav_conv", ADC_ADC1_DAV_CONV);
+	int maxiter_adc1 = m_opt.get<double>("adc1/maxiter", ADC_ADC1_MAXITER);
+	
+	auto adc1_mvp = create_adc1();
+	math::davidson<MVP> dav(m_world.comm(), LOG.global_plev());
+	
+	dav.set_factory(adc1_mvp);
+	dav.set_diag(m_d_ov);
+	dav.pseudo(false);
+	dav.balancing(do_balancing);
+	dav.block(do_block);
+	dav.conv(conv_adc1);
+	dav.maxiter(maxiter_adc1);	
+	
+	int nroots = m_opt.get<int>("nroots", ADC_NROOTS);
+	
+	auto& t_davidson = TIME.sub("Davidson diagonalization");
+	
+	LOG.os<>("==== Starting ADC(1) Computation ====\n\n"); 
+	
+	t_davidson.start();
+	dav.compute(dav_guess, nroots);
+	t_davidson.finish();
+	
+	adc1_mvp->print_info();
+			
+	auto rvecs = dav.ritz_vectors();
+	auto ex = dav.eigvals();
+	
+	LOG.os<>("==== Finished ADC(1) Computation ====\n\n"); 
+	
+	int nstart = do_block ? 0 : nroots-1;
+	
+	LOG.os<>("ADC(1) Excitation energies:\n");
+	for (int iroot = nstart; iroot != nroots; ++iroot) {
+		LOG.os<>("Excitation nr. ", iroot+1, " : ", ex[iroot], '\n');
+	}
+	
+	bool do_adc2 = m_opt.get<bool>("do_adc2", ADC_DO_ADC2);
+	
+	if (!do_adc2) return; 
+	
+	LOG.os<>("==== Starting ADC(2) Computation ====\n\n"); 
+	
+	math::modified_davidson<MVP> mdav(m_world.comm(), LOG.global_plev());
+	
+	double conv_micro_adc2 = m_opt.get<double>("adc2/micro_conv", ADC_ADC2_MICRO_CONV);
+	double conv_macro_adc2 = m_opt.get<double>("adc2(macro_conv", ADC_ADC2_MACRO_CONV);
+	int micro_maxiter_adc2 = m_opt.get<int>("adc2/micro_maxiter", ADC_ADC2_MICRO_MAXITER);
+	int macro_maxiter_adc2 = m_opt.get<int>("adc2/macro_maxiter", ADC_ADC2_MACRO_MAXITER);
+	
+	mdav.macro_maxiter(macro_maxiter_adc2);
+	mdav.macro_conv(conv_macro_adc2);
+	
+	mdav.sub().set_diag(m_d_ov);
+	mdav.sub().pseudo(true);
+	mdav.sub().block(false);
+	mdav.sub().balancing(do_balancing);
+	mdav.sub().conv(conv_micro_adc2);
+	mdav.sub().maxiter(micro_maxiter_adc2);
+	
+	int istart = (do_block) ? 0 : nroots-1;
+	std::vector<double> ex_adc2(nroots,0.0);
+	
+	bool local = m_opt.get<bool>("adc2/local", ADC_ADC2_LOCAL);
+	bool is_init = false;
+	std::shared_ptr<MVP> adc2_mvp; 
+	
+	for (int iroot = istart; iroot != nroots; ++iroot) {
+		
+		LOG.os<>("============================================\n");
+		LOG.os<>("=== Computing excited state nr. ", iroot+1, '\n');
+		LOG.os<>("============================================\n\n");
+		
+		LOG.os<>("Setting up ADC(2) MVP builder.\n");
+		
+		if (local) {
+			auto atomlist = get_significant_blocks(rvecs[0], 0.9975, nullptr, 0.0);
+			adc2_mvp = create_adc2(atomlist);
+		} else if (!is_init) {
+			adc2_mvp = create_adc2();
 		}
-		
-		std::sort(index.begin(), index.end(), 
-			[&](const int& a, const int& b) {
-				return (eigen_ia.data()[a] < eigen_ia.data()[b]);
-		});
-			
-		// generate the guesses
-		
-		auto o = m_hfwfn->mol()->dims().oa();
-		auto v = m_hfwfn->mol()->dims().va();
-		auto b = m_hfwfn->mol()->dims().b();
-		
-		int nguesses = m_opt.get<int>("nguesses", ADC_NGUESSES);
-		std::vector<dbcsr::shared_matrix<double>> dav_guess(nguesses);
-		
-		for (int i = 0; i != nguesses; ++i) {
-			
-			LOG.os<>("Guess ", i, '\n');
-			
-			Eigen::MatrixXd mat = Eigen::MatrixXd::Zero(nocc,nvir);
-			mat.data()[index[i]] = 1.0;
-			
-			std::string name = "guess_" + std::to_string(i);
-			
-			auto guessmat = dbcsr::eigen_to_matrix(mat, m_world, name,
-				o, v, dbcsr::type::no_symmetry);
-			
-			dav_guess[i] = guessmat;
-			
-			//dbcsr::print(*guessmat);
-			
-		}
-		
-		// set up ADC(1) and davidson 
-		
-		bool do_balancing = m_opt.get<bool>("balanacing", ADC_BALANCING);
-		bool do_block = m_opt.get<bool>("block", ADC_BLOCK);
-		double conv_adc1 = m_opt.get<double>("adc1/dav_conv", ADC_ADC1_DAV_CONV);
-		int maxiter_adc1 = m_opt.get<double>("adc1/maxiter", ADC_ADC1_MAXITER);
-		
-		auto adc1_mvp = create_adc1();
-		math::davidson<MVP> dav(m_world.comm(), LOG.global_plev());
-		
-		dav.set_factory(adc1_mvp);
-		dav.set_diag(m_d_ov);
-		dav.pseudo(false);
-		dav.balancing(do_balancing);
-		dav.block(do_block);
-		dav.conv(conv_adc1);
-		dav.maxiter(maxiter_adc1);	
-		
-		int nroots = m_opt.get<int>("nroots", ADC_NROOTS);
-		
-		auto& t_davidson = TIME.sub("Davidson diagonalization");
-		
-		LOG.os<>("==== Starting ADC(1) Computation ====\n\n"); 
-		
-		t_davidson.start();
-		dav.compute(dav_guess, nroots);
-		t_davidson.finish();
-		
-		adc1_mvp->print_info();
-				
-		auto rvecs = dav.ritz_vectors();
-		auto ex = dav.eigvals();
-		
-		LOG.os<>("==== Finished ADC(1) Computation ====\n\n"); 
-		
-		int nstart = do_block ? 0 : nroots-1;
-		
-		LOG.os<>("ADC(1) Excitation energies:\n");
-		for (int iroot = nstart; iroot != nroots; ++iroot) {
-			LOG.os<>("Excitation nr. ", iroot+1, " : ", ex[iroot], '\n');
-		}
-		
-		bool do_adc2 = m_opt.get<bool>("do_adc2", ADC_DO_ADC2);
-		
-		if (!do_adc2) return; 
-		
-		LOG.os<>("==== Starting ADC(2) Computation ====\n\n"); 
-		
-		auto adc2_mvp = create_adc2();
-		
-		math::modified_davidson<MVP> mdav(m_world.comm(), LOG.global_plev());
-		
-		double conv_micro_adc2 = m_opt.get<double>("adc2/micro_conv", ADC_ADC2_MICRO_CONV);
-		double conv_macro_adc2 = m_opt.get<double>("adc2(macro_conv", ADC_ADC2_MACRO_CONV);
-		int micro_maxiter_adc2 = m_opt.get<int>("adc2/micro_maxiter", ADC_ADC2_MICRO_MAXITER);
-		int macro_maxiter_adc2 = m_opt.get<int>("adc2/macro_maxiter", ADC_ADC2_MACRO_MAXITER);
-		
-		mdav.macro_maxiter(macro_maxiter_adc2);
-		mdav.macro_conv(conv_macro_adc2);
 		
 		mdav.sub().set_factory(adc2_mvp);
-		mdav.sub().set_diag(m_d_ov);
-		mdav.sub().pseudo(true);
-		mdav.sub().block(false);
-		mdav.sub().balancing(do_balancing);
-		mdav.sub().conv(conv_micro_adc2);
-		mdav.sub().maxiter(micro_maxiter_adc2);
+		mdav.compute(rvecs, iroot+1, ex[iroot]);
 		
-		int istart = (do_block) ? 0 : nroots-1;
-		std::vector<double> ex_adc2(nroots,0.0);
+		double en = mdav.eigval()[iroot];
+		ex_adc2[iroot] = en;
 		
-		for (int iroot = istart; iroot != nroots; ++iroot) {
-			
-			LOG.os<>("Addressing excited state nr. ", iroot+1, '\n');
-			mdav.compute(rvecs, iroot+1, ex[iroot]);
-			
-			double en = mdav.eigval()[iroot];
-			ex_adc2[iroot] = en;
-			
+		if (local) {
+			adc2_mvp.reset();
 		}
 		
-		LOG.os<>("==== Finished ADC(2) Computation ====\n\n"); 
-				
-		LOG.os<>("ADC(2) Excitation energies:\n");
-		for (int iroot = nstart; iroot != nroots; ++iroot) {
-			LOG.os<>("Excitation nr. ", iroot+1, " : ", ex_adc2[iroot], '\n');
-		}
-				
-				/*	
-		auto c_bo = m_hfwfn->c_bo_A();
-		auto c_bv = m_hfwfn->c_bv_A();
-		
-		LOG.os<>("AOs\n");
-		
-		auto v_ht = dbcsr::create<double>()
-			.name("ht")
-			.set_world(m_world)
-			.row_blk_sizes(o)
-			.col_blk_sizes(b)
-			.matrix_type(dbcsr::type::no_symmetry)
-			.get();
+	}
+	
+	LOG.os<>("==== Finished ADC(2) Computation ====\n\n"); 
 			
-		auto v_bb = dbcsr::create<double>()
-			.name("v_bb")
-			.set_world(m_world)
-			.row_blk_sizes(b)
-			.col_blk_sizes(b)
-			.matrix_type(dbcsr::type::no_symmetry)
-			.get();
-		
-		
-		dbcsr::multiply('N', 'T', *vec_k, *c_bv, *v_ht).perform();
-		dbcsr::multiply('N', 'N', *c_bo, *v_ht, *v_bb).perform();
-		
-		auto p = m_hfwfn->po_bb_A();
-		
-		//dbcsr::print(*v_bb);
-		
-		LOG.os<>("Occupation: ", v_bb->occupation() * 100, "%\n");
-		LOG.os<>("Compared to ", p->occupation()*100, "% for density matrix.\n");
-		
-		// list of exitations
-		
-		// Which blocks are absent?
-		vec<std::vector<int>> blk_list(10, std::vector<int>(b.size(),0));
-		
-		dbcsr::iterator<double> iter(*v_bb);
-		iter.start();
-				
-		while (iter.blocks_left()) {
-			
-			iter.next_block();
-			
-			for (int i = 0; i != iter.row_size(); ++i) {
-				for (int j = 0; j != iter.col_size(); ++j) {
-					
-					for (int e = 0; e != 10; ++e) {
-						if (fabs(iter(i,j)) > pow(10.0,-e)) {
-							blk_list[e][iter.row()] += 1;
-							blk_list[e][iter.col()] += 1;
-						}
-					}
-				}
-			} 
-			
-		}
-		
-		iter.stop();
-			
-		int nblk = 0;
-		
-		for (int i = 0; i != 10; ++i) {
-			MPI_Allreduce(MPI_IN_PLACE, blk_list[i].data(), blk_list[i].size(), 
-				MPI_INT, MPI_SUM, m_world.comm());
-		}
-		
-		for (int i = 0; i != 10; ++i) {
-			int nblk = 0;
-			for (auto& e : blk_list[i]) {
-				if (e != 0) nblk++;
-			}
-			LOG.os<>("Basis blocks (", pow(10.0,-i), "): ", nblk, " out of ", b.size(), '\n'); 
-		}
-		
-		auto v1 = get_significant_blocks(v_bb,0.9975,nullptr,0);
-		//auto v2 = get_significant_blocks(v_bb,0.99975,nullptr,0);
-		//auto v3 = get_significant_blocks(v_bb,0.999975,nullptr,0);
-		//auto v4 = get_significant_blocks(v_bb,0.9999975,nullptr,0);
-		//auto v5 = get_significant_blocks(v_bb,0.9975,m_s_bb,1e-4);
-	*/
+	LOG.os<>("ADC(2) Excitation energies:\n");
+	for (int iroot = nstart; iroot != nroots; ++iroot) {
+		LOG.os<>("Excitation nr. ", iroot+1, " : ", ex_adc2[iroot], '\n');
+	}
 	
 	TIME.print_info();
 		
 }
 
-std::vector<int> adcmod::get_significant_blocks(dbcsr::shared_matrix<double> u_bb, 
+std::vector<int> adcmod::get_significant_blocks(dbcsr::shared_matrix<double> u_ia, 
 	double theta, dbcsr::shared_matrix<double> metric_bb, double gamma) 
 {
 	
-	//dbcsr::print(*u_bb);
-	//dbcsr::print(*metric_bb);
+	auto c_bo = m_hfwfn->c_bo_A();
+	auto c_bv = m_hfwfn->c_bv_A(); 
 	
-	auto u_bb_a = dbcsr::copy<double>(u_bb).get();
+	auto u_bb_a = u_transform(u_ia, 'N', c_bo, 'T', c_bv);
+	
 	auto b = m_hfwfn->mol()->dims().b();
 	
 	auto dims = m_world.dims();
@@ -324,15 +260,15 @@ std::vector<int> adcmod::get_significant_blocks(dbcsr::shared_matrix<double> u_b
 	MPI_Allreduce(MPI_IN_PLACE, vir_norms.data(), b.size(), MPI_DOUBLE,
 		MPI_SUM, m_world.comm());
 	
-	LOG.os<>("NORMS ALL (OCC): \n");
+	LOG.os<2>("NORMS ALL (OCC): \n");
 	for (auto v : occ_norms) {
-		LOG.os<>(v, " ");
-	} LOG.os<>('\n');
+		LOG.os<2>(v, " ");
+	} LOG.os<2>('\n');
 	
-	LOG.os<>("NORMS ALL (VIR): \n");
+	LOG.os<2>("NORMS ALL (VIR): \n");
 	for (auto v : vir_norms) {
-		LOG.os<>(v, " ");
-	} LOG.os<>('\n');
+		LOG.os<2>(v, " ");
+	} LOG.os<2>('\n');
 	
 	std::sort(idx_occ.begin(), idx_occ.end(), 
 		[&occ_norms](const int a, const int b) {
@@ -371,10 +307,10 @@ std::vector<int> adcmod::get_significant_blocks(dbcsr::shared_matrix<double> u_b
 		}
 	}
 	
-	LOG.os<>("ATOM CHECK: \n");
+	LOG.os<1>("ATOM CHECK: \n");
 	for (auto v : atoms_check) {
-		LOG.os<>(v, " ");
-	} LOG.os<>('\n');
+		LOG.os<1>(v, " ");
+	} LOG.os<1>('\n');
 	
 	u_bb_a->distribute();
 	u_bb_a->clear();
@@ -390,10 +326,10 @@ std::vector<int> adcmod::get_significant_blocks(dbcsr::shared_matrix<double> u_b
 		}
 	}
 	
-	LOG.os<>("IDX CHECK: \n");
+	LOG.os<1>("IDX CHECK: \n");
 	for (auto v : idx_check) {
-		LOG.os<>(v, " ");
-	} LOG.os<>('\n');
+		LOG.os<1>(v, " ");
+	} LOG.os<1>('\n');
 	
 	int idx = 0;
 	for (auto b : idx_check) {
@@ -402,10 +338,17 @@ std::vector<int> adcmod::get_significant_blocks(dbcsr::shared_matrix<double> u_b
 	}
 		
 	LOG.os<>("IDX ALL: \n");
-	for (auto v : idx_all) {
-		LOG.os<>(v, " ");
-	} LOG.os<>('\n');
 	
+	MPI_Barrier(m_world.comm());
+	for (int ip = 0; ip != m_world.size(); ++ip) {
+		if (ip == m_world.rank()) {
+			for (auto v : idx_all) {
+				std::cout << v << " ";
+			} std::cout << std::endl;
+		}
+		MPI_Barrier(m_world.comm());
+	}
+		
 	if (metric_bb == nullptr) return idx_all;
 	
 	// now add blocks connected to indices by metric
@@ -433,10 +376,10 @@ std::vector<int> adcmod::get_significant_blocks(dbcsr::shared_matrix<double> u_b
 	MPI_Allreduce(MPI_IN_PLACE, idx_check_aug.data(), idx_check_aug.size(), 
 		MPI_INT, MPI_LOR, comm);
 			
-	LOG.os<>("IDX CHECK NEW: \n");
+	LOG.os<1>("IDX CHECK NEW: \n");
 	for (auto v : idx_check_aug) {
-		LOG.os<>(v, " ");
-	} LOG.os<>('\n');
+		LOG.os<1>(v, " ");
+	} LOG.os<1>('\n');
 	
 	vec<int> idx_all_aug;
 	idx = 0;
@@ -445,12 +388,11 @@ std::vector<int> adcmod::get_significant_blocks(dbcsr::shared_matrix<double> u_b
 		++idx;
 	}
 	
-	LOG.os<>("IDX ALL (AUG): \n");
+	LOG.os<1>("IDX ALL (AUG): \n");
 	for (auto v : idx_all_aug) {
-		LOG.os<>(v, " ");
-	} LOG.os<>('\n');
+		LOG.os<1>(v, " ");
+	} LOG.os<1>('\n');
 	
-	exit(0);
 	return idx_all_aug;	
 	
 }

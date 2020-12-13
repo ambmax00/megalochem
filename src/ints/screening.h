@@ -64,6 +64,37 @@ public:
 	
 };
 
+class atomic_screener : public screener {
+protected:
+
+	std::vector<int> m_atom_list;
+	
+	std::vector<bool> m_blklist_b;
+	std::vector<bool> m_blklist_x; 
+	
+	schwarz_screener m_schwarz;
+	
+public:
+
+	atomic_screener(dbcsr::world w, desc::smolecule mol, std::vector<int> alist) :
+		m_atom_list(alist), m_schwarz(w,mol), screener(w, mol, "atomic") {}
+		
+	void compute() override;
+		
+	bool skip_block_xbb(int i, int j, int k) override;
+	bool skip_xbb(int i, int j, int k) override;
+	
+	bool skip_block_bbbb(int i, int j, int k, int l) override;
+	bool skip_bbbb(int i, int j, int k, int l) override;
+	
+	std::vector<bool> blklist_b() { return m_blklist_b; }
+	std::vector<bool> blklist_x() { return m_blklist_x; }
+	
+	~atomic_screener() {}
+	
+	
+};
+
 using shared_screener = std::shared_ptr<screener>;
 
 } // end namespace

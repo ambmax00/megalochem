@@ -91,7 +91,7 @@ public:
 
 	void compute(std::vector<smat>& guess, int nroots, std::optional<double> omega = std::nullopt) {
 		
-		if (m_balancing) throw std::runtime_error("BALANCING not yet completed. -> NOrmalization!!");
+		//if (m_balancing) throw std::runtime_error("BALANCING not yet completed. -> NOrmalization!!");
 		
 		LOG.os<>("Launching davidson diagonalization.\n");
 		LOG.os<>("Convergence: ", m_conv, '\n');
@@ -148,13 +148,19 @@ public:
 			for (int i = prev_subspace; i != m_subspace; ++i) {
 				
 				//std::cout << "GUESS VECTOR: " << i << std::endl;
-				if (LOG.global_plev() > 2) dbcsr::print(*m_vecs[i]);
+				if (LOG.global_plev() > 2) {
+					LOG.os<>("GUESS VECTOR: \n");
+					dbcsr::print(*m_vecs[i]);
+				}
 				
 				auto Av_i = (m_pseudo) ? m_fac->compute(m_vecs[i],*omega) : m_fac->compute(m_vecs[i]);
 				m_sigmas.push_back(Av_i);
 				
 				//std::cout << "SIGMA VECTOR: " << i << std::endl;
-				if (LOG.global_plev() > 2) dbcsr::print(*Av_i); 
+				if (LOG.global_plev() > 2) {
+					LOG.os<>("SIGMA VECTOR: \n");
+					dbcsr::print(*Av_i);
+				} 
 				
 				double vnorm = sqrt(m_vecs[i]->dot(*m_vecs[i]));
 				m_vnorms.push_back(vnorm);
@@ -242,6 +248,11 @@ public:
 				for (int i = 0; i != evals.size(); ++i) {
 					LOG.os<1>(evals[i], " ");
 				} LOG.os<1>('\n');
+			}
+			
+			for (int i = 0; i != evals.size(); ++i) {
+				if (evals[i] < 1e-12) throw std::runtime_error(
+					"EIGENVALUE ZERO OR NEGATIVE.\n");
 			}
 			
 			LOG.os<2>("EIGENVECTORS: \n", evecs, '\n');

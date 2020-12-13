@@ -32,7 +32,7 @@ inline const int ADC_ADC2_NLAP = 5;
 inline const int ADC_ADC2_MICRO_MAXITER = 50;
 inline const int ADC_ADC2_MACRO_MAXITER = 30;
 
-inline const bool ADC_ADC2_LOCAL = true;
+inline const bool ADC_ADC2_LOCAL = false;
 
 inline const std::string ADC_ADC2_DF_METRIC = "coulomb";
 inline const std::string ADC_ADC2_JMETHOD = "dfao";
