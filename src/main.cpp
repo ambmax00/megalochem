@@ -114,6 +114,8 @@ int main(int argc, char** argv) {
 	
 	time.start();
 	
+	char* emergency_buffer = new char[1000];
+
 	try { // BEGIN MAIN CONTEXT
 	
 	int sysctxt = -1;
@@ -232,7 +234,8 @@ int main(int argc, char** argv) {
 	scalapack::global_grid.free();
 
    } catch (std::exception& e) {
-
+	
+	   	delete [] emergency_buffer;
 		if (wrd.rank() == 0) {
 			std::cout << "ERROR: ";
 			std::cout << e.what() << std::endl;

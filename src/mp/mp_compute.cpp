@@ -288,7 +288,7 @@ void mpmod::compute() {
 		//=============== CHOLESKY DECOMPOSITION =======================
 		pcholtime.start();
 		math::pivinc_cd chol(pseudo_occ, LOG.global_plev());
-		chol.reorder("value");
+		//chol.reorder("value");
 		
 		chol.compute();
 		

@@ -18,69 +18,58 @@ void pivinc_cd::reorder_and_reduce(scalapack::distmat<double>& L) {
 	
 	std::vector<int> new_col_perms(m_rank);
 	std::iota(new_col_perms.begin(),new_col_perms.end(),0);
+			
+	LOG.os<1>("-- Reordering cholesky orbitals according to method: old", "\n");
+					
+	double reorder_thresh = 1e-10;
 	
-	if (false) {//if (m_reorder_method) {
+	// reorder it according to matrix values
+	std::vector<double> lmo_pos(m_rank,0);
+	
+	for (int j = 0; j != m_rank; ++j) {
 		
-		LOG.os<1>("-- Reordering cholesky orbitals according to method \"", *m_reorder_method, "\"\n");
+		int first_mu = -1;
+		int last_mu = N-1;
 		
-		if (m_reorder_method == "value" || m_reorder_method == "v") {
+		for (int i = 0; i != N; ++i) {
 			
-			double reorder_thresh = 1e-12;
+			double L_ij = L.get('A', ' ', i, j);
 			
-			// reorder it according to matrix values
-			std::vector<double> lmo_pos(m_rank,0);
-			
-			for (int j = 0; j != m_rank; ++j) {
-				
-				int first_mu = -1;
-				int last_mu = N-1;
-				
-				for (int i = 0; i != N; ++i) {
-					
-					double L_ij = L.get('A', ' ', i, j);
-					
-					if (fabs(L_ij) > reorder_thresh && first_mu == -1) {
-						first_mu = i;
-						last_mu = i;
-					} else if (fabs(L_ij) > reorder_thresh && first_mu != -1) {
-						last_mu = i;
-					}
-					
-				}
-				
-				if (first_mu == -1) throw std::runtime_error("Piv. Cholesky decomposition: Reorder failed.");
-				
-				lmo_pos[j] = (double)(first_mu + last_mu) / 2;
-				
+			if (fabs(L_ij) > reorder_thresh && first_mu == -1) {
+				first_mu = i;
+				last_mu = i;
+			} else if (fabs(L_ij) > reorder_thresh && first_mu != -1) {
+				last_mu = i;
 			}
 			
-			if (LOG.global_plev() >= 2) {
-				LOG.os<2>("-- Orbital weights: \n");	
-				for (auto x : lmo_pos) { 
-					LOG.os<2>(x, " "); 
-				} LOG.os<2>('\n');
-			}		
-			
-			std::stable_sort(new_col_perms.begin(), new_col_perms.end(), 
-				[&lmo_pos](int i1, int i2) { return lmo_pos[i1] < lmo_pos[i2]; });
-			
-			if (LOG.global_plev() >= 2) {
-				LOG.os<2>("-- Reordered indices: \n");	
-				for (auto x : new_col_perms) { 
-					LOG.os<2>(x, " "); 
-				} LOG.os<2>("\n");
-			}	
 		}
 		
-		LOG.os<1>("-- Finished reordering.\n");
-				
+		if (first_mu == -1) throw std::runtime_error("Piv. Cholesky decomposition: Reorder failed.");
+		
+		lmo_pos[j] = (double)(first_mu + last_mu) / 2;
+		
 	}
 	
-	if (m_reduce && *m_reduce) {
-		m_L = std::make_shared<scalapack::distmat<double>>(N,N,nb,nb,0,0);
-	} else {
-		m_L = std::make_shared<scalapack::distmat<double>>(N,N,nb,nb,0,0);
-	}
+	if (LOG.global_plev() >= 2) {
+		LOG.os<2>("-- Orbital weights: \n");	
+		for (auto x : lmo_pos) { 
+			LOG.os<2>(x, " "); 
+		} LOG.os<2>('\n');
+	}		
+	
+	std::stable_sort(new_col_perms.begin(), new_col_perms.end(), 
+		[&lmo_pos](int i1, int i2) { return lmo_pos[i1] < lmo_pos[i2]; });
+	
+	if (LOG.global_plev() >= 2) {
+		LOG.os<2>("-- Reordered indices: \n");	
+		for (auto x : new_col_perms) { 
+			LOG.os<2>(x, " "); 
+		} LOG.os<2>("\n");
+	}	
+	
+	LOG.os<1>("-- Finished reordering.\n");
+					
+	m_L = std::make_shared<scalapack::distmat<double>>(N,N,nb,nb,0,0);
 	
 	LOG.os<1>("-- Reducing and reordering L.\n");
 	
