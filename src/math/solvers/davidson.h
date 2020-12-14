@@ -86,7 +86,7 @@ public:
 		m_maxiter(100),
 		m_block(true),
 		m_balancing(true),
-		m_maxsubspace(7)
+		m_maxsubspace(8)
 	{}
 
 	void compute(std::vector<smat>& guess, int nroots, std::optional<double> omega = std::nullopt) {

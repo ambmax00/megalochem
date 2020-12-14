@@ -4,7 +4,7 @@
 #include "adc/adc_defaults.h"
 #include "ints/fitting.h"
 
-#define _DLOG
+//#define _DLOG
 
 namespace adc {
 	
@@ -59,7 +59,10 @@ void MVP_AOADC2::init() {
 	
 	LOG.os<1>("Initializing AO-ADC(2)\n");
 	
+	auto& t_init = TIME.sub("Initializing ADC(2)");
+	
 	TIME.start();
+	t_init.start();
 	
 	// laplace
 	LOG.os<1>("Computing laplace points.\n");
@@ -189,6 +192,7 @@ void MVP_AOADC2::init() {
 	
 	m_spgrid2 = dbcsr::create_pgrid<2>(m_world.comm()).get();
 	
+	t_init.finish();
 	TIME.finish();
 	
 	LOG.os<1>("Done with setting up.\n");
@@ -202,6 +206,9 @@ void MVP_AOADC2::init() {
 // Computes the pseudo J and K matrices with the excited state density
 std::pair<smat,smat> MVP_AOADC2::compute_jk(smat& u_ao) {
 	
+	auto& t_jk = TIME.sub("Computing pseudo-JK");
+	t_jk.start();
+	
 	m_jbuilder->set_density_alpha(u_ao);
 	m_kbuilder->set_density_alpha(u_ao);
 	
@@ -212,6 +219,8 @@ std::pair<smat,smat> MVP_AOADC2::compute_jk(smat& u_ao) {
 	auto kmat = m_kbuilder->get_K_A();
 	
 	std::pair<smat,smat> out = {jmat, kmat};
+	
+	t_jk.finish();
 	
 	return out;
 	
@@ -271,6 +280,13 @@ void MVP_AOADC2::compute_intermeds() {
 	 
 	LOG.os<1>("==== Computing ADC(2) intermediates ====\n");
 	
+	auto& t_intermeds = TIME.sub("Computing Intermediates");
+	
+	auto& t_intermeds_1 = t_intermeds.sub("Part1");
+	auto& t_intermeds_2 = t_intermeds.sub("Part2");
+	
+	t_intermeds.start();
+	
 	auto b = m_mol->dims().b();
 	auto x = m_mol->dims().x();
 	auto o = m_mol->dims().oa();
@@ -320,6 +336,8 @@ void MVP_AOADC2::compute_intermeds() {
 		
 		LOG.os<1>("ADC(2) intermediates, laplace point nr. ", ilap, '\n');
 		
+		t_intermeds_1.start();
+		
 		auto po = m_pseudo_occs[ilap];
 		auto pv = m_pseudo_virs[ilap];
 		
@@ -349,6 +367,9 @@ void MVP_AOADC2::compute_intermeds() {
 				
 		auto f_xx_ilap = u_transform(z_xx_ilap, 'N', m_v_xx, 'N', m_v_xx);
 		f_xx_ilap->setname("f_xx_ilap");
+		
+		t_intermeds_1.finish();
+		t_intermeds_2.start();
 		
 		LOG.os<1>("Setting up K_ilap.\n");
 		std::shared_ptr<fock::K> k_inter;
@@ -405,6 +426,8 @@ void MVP_AOADC2::compute_intermeds() {
 		dbcsr::multiply('T', 'N', *c_bv_scaled, *kv_ilap, *i_vb)
 			.beta(1.0)
 			.perform();
+			
+		t_intermeds_2.finish();
 								
 	}
 	
@@ -423,6 +446,8 @@ void MVP_AOADC2::compute_intermeds() {
 	
 	m_i_oo->scale(-0.5 * m_c_os);
 	m_i_vv->scale(-0.5 * m_c_os);
+	
+	t_intermeds.finish();
 			
 }
 
@@ -431,6 +456,9 @@ void MVP_AOADC2::compute_intermeds() {
  * ====================================================================*/
 
 smat MVP_AOADC2::compute_sigma_2a(smat& u_ia) {
+	
+	auto& t_sig = TIME.sub("Computing sigma (A)");
+	t_sig.start();
 	
 	LOG.os<1>("==== Computing ADC(2) SIGMA 2A ====\n");
 	
@@ -441,11 +469,16 @@ smat MVP_AOADC2::compute_sigma_2a(smat& u_ia) {
 		
 	dbcsr::multiply('N', 'T', *u_ia, *m_i_vv, *sig_2a).perform();
 	
+	t_sig.finish();
+	
 	return sig_2a;
 	
 }
 
 smat MVP_AOADC2::compute_sigma_2b(smat& u_ia) {
+	
+	auto& t_sig = TIME.sub("Computing sigma (B)");
+	t_sig.start();
 	
 	LOG.os<1>("==== Computing ADC(2) SIGMA 2B ====\n");
 	
@@ -455,6 +488,8 @@ smat MVP_AOADC2::compute_sigma_2b(smat& u_ia) {
 		.get();
 		
 	dbcsr::multiply('N', 'N', *m_i_oo, *u_ia, *sig_2b).perform();
+	
+	t_sig.finish();
 	
 	return sig_2b;
 	
@@ -471,6 +506,9 @@ smat MVP_AOADC2::compute_sigma_2c(smat& jmat, smat& kmat) {
 	 * d_X(t) = (nk|X) * I_n'k' * Po_nn'(t) * Pv_kk'(t)
 	 * I_mk = jmat + transpose(K)
 	 */
+	 
+	auto& t_sig = TIME.sub("Computing sigma (C)");
+	t_sig.start();
 	
 	LOG.os<1>("==== Computing ADC(2) SIGMA 2C ====\n");
 	 		
@@ -524,6 +562,8 @@ smat MVP_AOADC2::compute_sigma_2c(smat& jmat, smat& kmat) {
 				
 	sig_2c->scale(-0.25 * m_c_os);
 	
+	t_sig.finish();
+	
 	return sig_2c;
 }
 
@@ -537,6 +577,9 @@ smat MVP_AOADC2::compute_sigma_2d(smat& u_ia) {
 	 * sig_2a = + 2 * J(I_nr)_transpose - K(I_nr)_transpose 
 	 * I_nr = sum_t c_os Po(t) * J(u_pseudo_ao(t)) * Pv(t)
 	 */
+	 
+	auto& t_sig = TIME.sub("Computing sigma (D)");
+	t_sig.start();
 	 
 	LOG.os<1>("==== Computing ADC(2) SIGMA 2D ====\n");
 	 
@@ -592,6 +635,8 @@ smat MVP_AOADC2::compute_sigma_2d(smat& u_ia) {
 	sig_2d->setname("sig_2d");
 	
 	sig_2d->scale(-0.5);
+	
+	t_sig.finish();
 	
 	return sig_2d;
 		
@@ -758,6 +803,9 @@ std::pair<smat,smat> MVP_AOADC2::compute_sigma_2e_ilap(
 #endif
 		
 	auto& ltime = TIME.sub("Computing sigma ilap");
+	auto& ltime_1 = ltime.sub("Part1");
+	auto& ltime_2 = ltime.sub("Part2");
+	
 	ltime.start();
 		
 	auto x = m_mol->dims().x();
@@ -797,6 +845,7 @@ std::pair<smat,smat> MVP_AOADC2::compute_sigma_2e_ilap(
 	if (!mem) {
 		
 		// Intermediate is held in-core/on-disk
+		ltime_1.start();
 		
 		auto spgrid3_xbb = m_eri3c2e_batched->spgrid();
 		
@@ -881,6 +930,9 @@ std::pair<smat,smat> MVP_AOADC2::compute_sigma_2e_ilap(
 		m_eri3c2e_batched->decompress_finalize();				
 		R_xbb_batched->decompress_finalize();
 		I_xbb_batched->compress_finalize();
+		
+		ltime_1.finish();
+		ltime_2.start();
 		
 		// form sigma
 		auto b = m_mol->dims().b();
@@ -1041,6 +1093,8 @@ std::pair<smat,smat> MVP_AOADC2::compute_sigma_2e_ilap(
 		dbcsr::copy_tensor_to_matrix(*sigma_ilap_01, *sigma_ilap_B);
 		
 		I_xbb_batched->reset();		
+		
+		ltime_2.finish();
 				
 	} else {
 		
@@ -1086,7 +1140,7 @@ smat MVP_AOADC2::compute_sigma_2e(smat& u_ao, double omega) {
 	
 	LOG.os<1>("==== Computing ADC(2) SIGMA 2E ====\n");
 	
-	auto time_2e = TIME.sub("Computing sigma(2e)");
+	auto& time_2e = TIME.sub("Computing sigma(2e)");
 	time_2e.start();
 	
 	double emin = m_eps_occ->front();
@@ -1311,6 +1365,9 @@ smat MVP_AOADC2::compute(smat u_ia, double omega) {
 
 	time_com.finish();
 	TIME.finish();
+	
+	TIME.print_info();
+	exit(0);
 	
 	return sigma_0;
 	
