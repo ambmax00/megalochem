@@ -9,7 +9,7 @@
 #include <random>
 #include <unistd.h>
 
-//#define _DLOG
+#define _DLOG
 
 namespace util {
 
@@ -156,12 +156,14 @@ private:
 	
 	void transfer_token() {
 				
-		int mytoken = NO_TOKEN;
+		//int mytoken = NO_TOKEN;
 		
 		// fetch my token (atomically)
-		MPI_Fetch_and_op(&NO_TOKEN, &mytoken, MPI_INT, m_mpirank, m_mpirank,
-			MPI_REPLACE, m_token_win);
-		MPI_Win_flush(m_mpirank, m_token_win);
+		int mytoken = m_token[m_mpirank];
+		
+		//MPI_Fetch_and_op(&NO_TOKEN, &mytoken, MPI_INT, m_mpirank, m_mpirank,
+		//	MPI_REPLACE, m_token_win);
+		//MPI_Win_flush(m_mpirank, m_token_win);
 		
 		if (mytoken < -2 || mytoken > m_mpisize) {
 			throw std::runtime_error("Scheduler: something went wrong.");
@@ -197,15 +199,11 @@ private:
 				<< " to " << neigh << std::endl;
 			#endif
 			
-			int result = 1;
+			m_token[m_mpirank] = NO_TOKEN;
+			MPI_Put(&mytoken, 1, MPI_INT, neigh, neigh, 1, MPI_INT, m_token_win);
+			MPI_Win_flush_local(neigh, m_token_win);
 			
-			while (result != NO_TOKEN) {
-				MPI_Fetch_and_op(&mytoken, &result, MPI_INT, neigh, neigh,
-					MPI_REPLACE, m_token_win);
-				MPI_Win_flush(neigh, m_token_win);
-			}		
-			
-		}
+		}	
 		
 		if (mytoken == TERMINATE) {
 			m_terminate_flag = true;
@@ -223,11 +221,11 @@ private:
 		transfer_token();
 		
 		// check if there is a processor request
-		int thief = NO_REQU;
+		int thief = m_request[m_mpirank]; // NO_REQU;
 		
-		MPI_Fetch_and_op(&NO_REQU, &thief, MPI_INT, m_mpirank, m_mpirank,
-			MPI_REPLACE, m_request_win);
-		MPI_Win_flush(m_mpirank, m_request_win);
+		//MPI_Fetch_and_op(&NO_REQU, &thief, MPI_INT, m_mpirank, m_mpirank,
+		//	MPI_REPLACE, m_request_win);
+		//MPI_Win_flush(m_mpirank, m_request_win);
 				
 		if (thief == NO_REQU) return;
 		
@@ -247,6 +245,8 @@ private:
 		MPI_Put(&t, 1, MPI_LONG_LONG, thief, thief, 1, MPI_LONG_LONG,
 			m_transfer_win);
 		MPI_Win_flush(thief, m_transfer_win);
+		
+		m_request[m_mpirank] == NO_REQU;
 						
 	}
 	
