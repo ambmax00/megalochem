@@ -195,7 +195,8 @@ public:
 	
 	std::vector<double> min_alpha() const;
 	
-	std::vector<double> radii() const;
+	std::vector<double> radii(double cutoff = 1e-8, double step = 0.2, 
+		int maxiter = 1000) const;
 	
 	std::vector<bool> diffuse() const;
 	

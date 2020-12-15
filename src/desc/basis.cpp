@@ -250,13 +250,12 @@ vshell make_basis(std::string basname, std::vector<desc::Atom>& atoms_in) {
 		
 }
 	
-double exp_radius(int l, double alpha, double threshold, double prefactor) {
+double exp_radius(int l, double alpha, double threshold, double prefactor,
+	double step, int maxiter) {
 	
 	// g(r) = prefactor * r^l * exp(-alpha*r**2) - threshold = 0
-	double step = cluster_basis::global::step;
-	int maxiter = cluster_basis::global::maxiter;
 	
-	double radius = 0.5;
+	double radius = step;
 	double g = 0.0;
 	
 	for (int i = 0; i != maxiter; ++i) {
@@ -412,19 +411,6 @@ cluster_basis::cluster_basis(vshell basis, std::string method, int nsplit,
 		off += m_clusters[i].size();
 	}
 	
-	// radii
-	for (auto& cluster : m_clusters) {
-		double max_radius = 0.0;
-		for (auto& shell : cluster) {
-			for (int i = 0; i != shell.nprim(); ++i) {
-				max_radius = std::max(max_radius,
-					exp_radius(shell.l, shell.alpha[i], 
-					cluster_basis::global::cutoff, shell.coeff[i]));
-			}
-		}
-		m_cluster_radii.push_back(max_radius);
-	}
-	
 	// shelltypes
 	for (auto& cluster : m_clusters) {
 		std::vector<bool> stypes(MAX_L + 1);
@@ -503,8 +489,24 @@ std::vector<double> cluster_basis::min_alpha() const {
 	return out;
 }
 	
-std::vector<double> cluster_basis::radii() const {
-	return m_cluster_radii;
+std::vector<double> cluster_basis::radii(double cutoff, double step, int maxiter) const
+{
+	// radii
+	std::vector<double> cluster_radii;
+	
+	for (auto& cluster : m_clusters) {
+		double max_radius = 0.0;
+		for (auto& shell : cluster) {
+			for (int i = 0; i != shell.nprim(); ++i) {
+				max_radius = std::max(max_radius,
+					exp_radius(shell.l, shell.alpha[i], 
+					cutoff, shell.coeff[i], step, maxiter));
+			}
+		}
+		cluster_radii.push_back(max_radius);
+	}
+	return cluster_radii;
+	
 }
 
 std::vector<bool> cluster_basis::diffuse() const {

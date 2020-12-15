@@ -18,7 +18,7 @@ struct block_info {
 std::vector<block_info> get_block_info(desc::cluster_basis& cbas) {
 	
 	std::vector<block_info> blkinfo(cbas.size());
-	auto radii = cbas.radii();
+	auto radii = cbas.radii(1e-8, 0.2, 1000);
 	auto min_alphas = cbas.min_alpha();
 	
 	for (int ic = 0; ic != cbas.size(); ++ic) {
@@ -94,7 +94,7 @@ dbcsr::sbtensor<3,double> dfitting::compute_qr_new(dbcsr::shared_matrix<double> 
 		.blk_sizes(xbb)
 		.map1({0}).map2({1,2})
 		.get();
-		
+	
 	auto eri_local = dbcsr::tensor_create<3,double>()
 		.name("eri_local")
 		.pgrid(spgrid3_local)
@@ -134,6 +134,7 @@ dbcsr::sbtensor<3,double> dfitting::compute_qr_new(dbcsr::shared_matrix<double> 
 	auto s_xx_local_mat = dbcsr::eigen_to_matrix(s_xx_inv_eigen, single_world, 
 		"temp", x, x, dbcsr::type::symmetric);
 	dbcsr::copy_matrix_to_tensor(*s_xx_local_mat, *s_xx_inv_local);
+	s_xx_inv_local->filter(T/10.0);
 	
 	s_xx_inv_eigen.resize(0,0);
 	s_xx_local_mat->release();
@@ -243,10 +244,6 @@ dbcsr::sbtensor<3,double> dfitting::compute_qr_new(dbcsr::shared_matrix<double> 
 				pow(p1[2] - p2[2],2.0));
 	};		
 	
-	Eigen::HouseholderQR<Eigen::MatrixXd> full_qr, blk_qr;
-	bool full_is_computed = false;
-	
-		
 	// ================== LOOP OVER NU BATCHES ==============
 	
 	c_xbb_batched->compress_init({2}, vec<int>{0}, vec<int>{1,2});
@@ -372,6 +369,7 @@ dbcsr::sbtensor<3,double> dfitting::compute_qr_new(dbcsr::shared_matrix<double> 
 			ovlp_xbb_local->reserve(blkidx);
 			aofac->ao_3c1e_ovlp_setup();
 			aofac->ao_3c_fill(ovlp_xbb_local);
+			ovlp_xbb_local->filter(T/10.0);
 		
 			vec<vec<int>> mn_bounds = {
 				c_xbb_batched->full_bounds(1),
