@@ -96,66 +96,6 @@ void hermitian_eigen_solver::compute() {
 	return;
 }
 
-//#else 
-
-/*
-void hermitian_eigen_solver::compute(int scalapack_blksize) {
-	
-	LOG.os<>("Running SelfAdjointEigenSolver from EIGEN.\n");
-	
-	Eigen::SelfAdjointEigenSolver<Eigen::MatrixXd> solver;
-	
-	LOG.os<>("-- Converting dbcsr matrix to eigen matrix.\n");
-	
-	auto eigenmat_in = dbcsr::matrix_to_eigen<double>(*m_mat_in);
-	
-	//std::cout << "THIS " << std::endl;
-	//for (size_t i = 0; i != eigenmat_in.size(); ++i) {
-	//	std::cout << eigenmat_in.data()[i] << " ";
-	//}
-	
-	LOG.os<>("-- Starting solver.\n");
-	
-	solver.compute(eigenmat_in);
-	
-	if (solver.info() != Eigen::Success) throw std::runtime_error("Eigen hermitian eigensolver failed.");
-	
-	LOG.os<>("-- Solver suceeded.\n");
-	auto eigval = solver.eigenvalues();
-	
-	m_eigval.resize(eigval.size());
-	for (int i = 0; i != eigval.size(); ++i) {
-		m_eigval[i] = eigval(i);
-	}
-	
-	if (m_jobz == 'V') {
-		
-		LOG.os<>("-- Fetching eigenvectors.\n");
-	
-		auto eigvec = solver.eigenvectors();
-	
-		std::vector<int> rowblksizes = (m_rowblksizes_out) 
-			? *m_rowblksizes_out : m_mat_in->row_blk_sizes();
-			
-		std::vector<int> colblksizes = (m_colblksizes_out) 
-			? *m_colblksizes_out : m_mat_in->col_blk_sizes();
-			
-		dbcsr::world w = m_mat_in->get_world();
-			
-		auto dbcsr_eigvec = dbcsr::eigen_to_matrix<double>(eigvec, w,
-			"eigenvectors", rowblksizes, colblksizes, dbcsr_type_no_symmetry);
-			
-		m_eigvec = dbcsr_eigvec.get_smatrix();
-		
-	}
-	
-	return;
-	
-}
-
-#endif // SCALAPACK
-*/
-
 smatrix hermitian_eigen_solver::inverse() {
 	
 	auto eigvec_copy = dbcsr::copy<double>(m_eigvec).get();
