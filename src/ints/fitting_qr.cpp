@@ -464,7 +464,7 @@ dbcsr::sbtensor<3,double> dfitting::compute_qr_new(dbcsr::shared_matrix<double> 
 						double alpha_p = blkinfo_x[ip].alpha;
 						
 						double f = (alpha_x * alpha_p) / (alpha_x + alpha_p)
-							* dist(pos_x, pos_p);
+							* pow(dist(pos_x, pos_p),2);
 							
 						if (f < R2) blk_Q_bool[ix] = true;
 		
