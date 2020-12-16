@@ -2,6 +2,14 @@
 #include "utils/constants.h"
 
 namespace ints {
+	
+auto get_sum = [](auto& in, auto comm) {
+	long long int datasize;
+	double* ptr = in->data(datasize);
+	double sum = std::accumulate(ptr, ptr + datasize, 0.0);
+	MPI_Allreduce(MPI_IN_PLACE, &sum, 1, MPI_DOUBLE, MPI_SUM, comm);
+	return sum;
+};
 
 dbcsr::sbtensor<3,double> dfitting::compute(dbcsr::sbtensor<3,double> eri_batched, 
 	dbcsr::shared_matrix<double> inv, dbcsr::btype mytype) {
@@ -19,6 +27,7 @@ dbcsr::sbtensor<3,double> dfitting::compute(dbcsr::sbtensor<3,double> eri_batche
 		.get();
 		
 	dbcsr::copy_matrix_to_tensor(*inv, *s_xx_inv);
+	
 	inv->clear();
 	
 	auto cfit = this->compute(eri_batched, s_xx_inv, mytype);

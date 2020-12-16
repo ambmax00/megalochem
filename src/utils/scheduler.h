@@ -32,7 +32,7 @@ private:
 	const int TOKEN_TERMINATE = -2;
 	
 	// mpi assertions
-	int MPI_MODE = 0; //MPI_MODE_NOCHECK;
+	int MPI_MODE = 0; // MPI_MODE_NOCHECK;
 
 	MPI_Comm m_comm;
 	int m_mpisize;
@@ -41,10 +41,10 @@ private:
 	
 	bool m_terminate_flag;
 	
-	std::vector<int64_t> m_transfer;
-	std::vector<int> m_request;
-	std::vector<int> m_status;
-	std::vector<int> m_token;
+	int64_t* m_transfer;
+	int* m_request;
+	int* m_status;
+	int* m_token;
 	
 	MPI_Win m_transfer_win = MPI_WIN_NULL;
 	MPI_Win m_request_win = MPI_WIN_NULL;
@@ -169,10 +169,6 @@ private:
 			throw std::runtime_error("Scheduler: something went wrong.");
 		}
 		
-		#ifdef _DLOG
-		std::cout << m_mpirank << " : " << "TOKEN " << mytoken << std::endl;
-		#endif
-		
 		// no token -> nothing to do
 		if (mytoken == TOKEN_NONE) return;
 		
@@ -215,10 +211,6 @@ private:
 	}
 	
 	void communicate() {
-		
-		#ifdef _DLOG
-		std::cout << m_mpirank << " : " << "COMM" << std::endl;
-		#endif
 		
 		// token
 		transfer_token();
@@ -274,35 +266,32 @@ public:
 		MPI_Comm_rank(comm, &m_mpirank);
 		init_deque();
 		
-		m_transfer.resize(m_mpisize, TRANSFER_NO_RESP);
-		m_request.resize(m_mpisize, REQUEST_NONE);
-		m_status.resize(m_mpisize, STATUS_HAS_WORK);
-		m_token.resize(m_mpisize, TOKEN_NONE);
-		
 	}
 	
 	void run() {
 				
-		MPI_Win_create(m_transfer.data(), m_mpisize * sizeof(int64_t),
-			sizeof(int64_t), MPI_INFO_NULL, m_comm, &m_transfer_win);
+		MPI_Win_allocate(m_mpisize * sizeof(int64_t), sizeof(int64_t), 
+			MPI_INFO_NULL, m_comm, &m_transfer, &m_transfer_win);
 			
-		MPI_Win_create(m_request.data(), m_mpisize * sizeof(int),
-			sizeof(int), MPI_INFO_NULL, m_comm, &m_request_win);
+		MPI_Win_allocate(m_mpisize * sizeof(int), sizeof(int), 
+			MPI_INFO_NULL, m_comm, &m_request, &m_request_win);
 			
-		MPI_Win_create(m_status.data(), m_mpisize * sizeof(int),
-			sizeof(int), MPI_INFO_NULL, m_comm, &m_status_win);
+		MPI_Win_allocate(m_mpisize * sizeof(int), sizeof(int), 
+			MPI_INFO_NULL, m_comm, &m_status, &m_status_win);
 			
-		MPI_Win_create(m_token.data(), m_mpisize * sizeof(int),
-			sizeof(int), MPI_INFO_NULL, m_comm, &m_token_win);	
+		MPI_Win_allocate(m_mpisize * sizeof(int), sizeof(int), 
+			MPI_INFO_NULL, m_comm, &m_token, &m_token_win);
 		
-		std::fill(m_transfer.begin(), m_transfer.end(), TRANSFER_NO_RESP);
-		std::fill(m_request.begin(), m_request.end(), REQUEST_NONE);
-		std::fill(m_status.begin(), m_status.end(), STATUS_HAS_WORK); 
+		std::fill(m_transfer, m_transfer + m_mpisize, TRANSFER_NO_RESP);
+		std::fill(m_request, m_request + m_mpisize, REQUEST_NONE);
+		std::fill(m_status, m_status + m_mpisize, STATUS_HAS_WORK); 
 		    // ^ maybe change this in case more procs than tasks
-		std::fill(m_token.begin(), m_token.end(), TOKEN_NONE);
+		std::fill(m_token, m_token + m_mpisize, TOKEN_NONE);
 		
 		m_terminate_flag = false;
 		if (m_mpirank == 0) m_token[0] = 1;
+		
+		MPI_Barrier(m_comm);
 		
 		while (!terminate()) {
 			

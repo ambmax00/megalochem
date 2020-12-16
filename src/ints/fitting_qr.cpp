@@ -141,8 +141,6 @@ dbcsr::sbtensor<3,double> dfitting::compute_qr_new(dbcsr::shared_matrix<double> 
 	
 	auto m_xx_eigen = dbcsr::matrix_to_eigen(m_xx);
 	
-	
-	
 	// =============== CREATE FRAGMENT BLOCKS ==========================
 	
 	auto is_diff = m_mol->c_basis()->diffuse();
