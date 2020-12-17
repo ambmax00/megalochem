@@ -62,8 +62,10 @@ private:
 	}
 	
 	void update_status() {
+		MPI_Win_lock(MPI_LOCK_EXCLUSIVE, m_mpirank, MPI_MODE, m_status_win);
 		m_status[m_mpirank] = (m_local_tasks.empty()) ? 
 			STATUS_NO_WORK : STATUS_HAS_WORK;
+		MPI_Win_unlock(m_mpirank, m_status_win);
 	}
 	
 	void add_task(int64_t t) {
@@ -96,19 +98,12 @@ private:
 		//std::cout << m_mpirank << " : " << "ACQUIRE" << std::endl;
 		while (!terminate()) {
 			
+			MPI_Win_lock(MPI_LOCK_EXCLUSIVE, m_mpirank, MPI_MODE, m_transfer_win);
 			m_transfer[m_mpirank] = TRANSFER_NO_RESP;
-			
-			#ifdef _DLOG
-			std::cout << m_mpirank << " : " << "STATUS " << m_status[m_mpirank] << std::endl;
-			std::cout << m_mpirank << " : " << "QSIZE " << m_local_tasks.size() << std::endl;
-			#endif
+			MPI_Win_unlock(m_mpirank, m_transfer_win);
 			
 			int victim = get_rand();
 			int v_work = STATUS_NO_WORK;
-			
-			#ifdef _DLOG
-			std::cout << m_mpirank << " : " << "STEALING FROM " << victim << std::endl;
-			#endif
 			
 			// get status of victim
 			MPI_Win_lock(MPI_LOCK_SHARED, victim, MPI_MODE, m_status_win);  
@@ -140,18 +135,25 @@ private:
 			#endif
 			
 			// loop and check if request accepted
-			while (m_transfer[m_mpirank] == TRANSFER_NO_RESP && !terminate()) {
+			int64_t newtask = TRANSFER_NO_RESP;
+			
+			while (newtask == TRANSFER_NO_RESP && !terminate()) {
+				
+				MPI_Win_lock(MPI_LOCK_SHARED, m_mpirank, MPI_MODE, m_transfer_win);
+				newtask = m_transfer[m_mpirank];
+				MPI_Win_unlock(m_mpirank, m_transfer_win);
+				
 				communicate();
 			}
 			
 			#ifdef _DLOG
 			std::cout << m_mpirank << " : " << "GOT RESPONSE FROM VICTIM: " 
-				<< m_transfer[m_mpirank] << std::endl;
+				<< newtask << std::endl;
 			#endif
 			
-			if (m_transfer[m_mpirank] != TRANSFER_NO_TASK) {
+			if (newtask != TRANSFER_NO_TASK) {
 				
-				add_task(m_transfer[m_mpirank]);
+				add_task(newtask);
 				
 				return;
 			}
@@ -163,7 +165,9 @@ private:
 	
 	void transfer_token() {
 						
+		MPI_Win_lock(MPI_LOCK_EXCLUSIVE, m_mpirank, MPI_MODE, m_token_win);
 		int mytoken = m_token[m_mpirank];
+		MPI_Win_unlock(m_mpirank, m_token_win);
 		
 		if (mytoken < -2 || mytoken > m_mpisize) {
 			throw std::runtime_error("Scheduler: something went wrong.");
@@ -195,11 +199,9 @@ private:
 				<< " to " << neigh << std::endl;
 			#endif
 			
-			// this process has the token, so we can just modify the buffer
-			m_token[m_mpirank] = TOKEN_NONE;
-			
 			MPI_Win_lock(MPI_LOCK_EXCLUSIVE, neigh, MPI_MODE, m_token_win);
 			MPI_Put(&mytoken, 1, MPI_INT, neigh, neigh, 1, MPI_INT, m_token_win);
+			m_token[m_mpirank] = TOKEN_NONE;
 			MPI_Win_unlock(neigh, m_token_win);
 			
 		}	
@@ -244,7 +246,9 @@ private:
 			m_transfer_win);
 		MPI_Win_unlock(thief, m_transfer_win);
 		
-		m_request[m_mpirank] == REQUEST_NONE;
+		MPI_Win_lock(MPI_LOCK_EXCLUSIVE, m_mpirank, MPI_MODE, m_request_win);
+		m_request[m_mpirank] = REQUEST_NONE;
+		MPI_Win_unlock(m_mpirank, m_request_win);
 						
 	}
 	
@@ -269,18 +273,11 @@ public:
 	}
 	
 	void run() {
-				
-		MPI_Win_allocate(m_mpisize * sizeof(int64_t), sizeof(int64_t), 
-			MPI_INFO_NULL, m_comm, &m_transfer, &m_transfer_win);
-			
-		MPI_Win_allocate(m_mpisize * sizeof(int), sizeof(int), 
-			MPI_INFO_NULL, m_comm, &m_request, &m_request_win);
-			
-		MPI_Win_allocate(m_mpisize * sizeof(int), sizeof(int), 
-			MPI_INFO_NULL, m_comm, &m_status, &m_status_win);
-			
-		MPI_Win_allocate(m_mpisize * sizeof(int), sizeof(int), 
-			MPI_INFO_NULL, m_comm, &m_token, &m_token_win);
+		
+		MPI_Alloc_mem(m_mpisize * sizeof(int64_t), MPI_INFO_NULL, &m_transfer);
+		MPI_Alloc_mem(m_mpisize * sizeof(int), MPI_INFO_NULL, &m_status);
+		MPI_Alloc_mem(m_mpisize * sizeof(int), MPI_INFO_NULL, &m_request);
+		MPI_Alloc_mem(m_mpisize * sizeof(int), MPI_INFO_NULL, &m_token);
 		
 		std::fill(m_transfer, m_transfer + m_mpisize, TRANSFER_NO_RESP);
 		std::fill(m_request, m_request + m_mpisize, REQUEST_NONE);
@@ -292,7 +289,19 @@ public:
 		if (m_mpirank == 0) m_token[0] = 1;
 		
 		MPI_Barrier(m_comm);
-		
+
+		MPI_Win_create(m_transfer, m_mpisize * sizeof(int64_t), sizeof(int64_t), 
+			MPI_INFO_NULL, m_comm, &m_transfer_win);
+			
+		MPI_Win_create(m_request, m_mpisize * sizeof(int), sizeof(int), 
+			MPI_INFO_NULL, m_comm, &m_request_win);
+			
+		MPI_Win_create(m_status, m_mpisize * sizeof(int), sizeof(int), 
+			MPI_INFO_NULL, m_comm, &m_status_win);
+			
+		MPI_Win_create(m_token, m_mpisize * sizeof(int), sizeof(int), 
+			MPI_INFO_NULL, m_comm, &m_token_win);
+				
 		while (!terminate()) {
 			
 			if (m_local_tasks.empty()) {
@@ -325,6 +334,11 @@ public:
 		MPI_Win_free(&m_request_win);
 		MPI_Win_free(&m_status_win);
 		MPI_Win_free(&m_token_win);
+		
+		MPI_Free_mem(m_transfer);
+		MPI_Free_mem(m_status);
+		MPI_Free_mem(m_token);
+		MPI_Free_mem(m_request);
 				
 	}
 	

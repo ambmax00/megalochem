@@ -45,7 +45,7 @@ dbcsr::sbtensor<3,double> dfitting::compute_qr_new(dbcsr::shared_matrix<double> 
 	
 	auto aofac = std::make_shared<aofactory>(m_mol, m_world);
 	
-	double T = 1e-5;
+	double T = 1e-4;
 	double R2 = 40;
 	
 	prep_time.start();
@@ -134,7 +134,7 @@ dbcsr::sbtensor<3,double> dfitting::compute_qr_new(dbcsr::shared_matrix<double> 
 	auto s_xx_local_mat = dbcsr::eigen_to_matrix(s_xx_inv_eigen, single_world, 
 		"temp", x, x, dbcsr::type::symmetric);
 	dbcsr::copy_matrix_to_tensor(*s_xx_local_mat, *s_xx_inv_local);
-	s_xx_inv_local->filter(T/10.0);
+	s_xx_inv_local->filter(T);
 	
 	s_xx_inv_eigen.resize(0,0);
 	s_xx_local_mat->release();
@@ -367,7 +367,7 @@ dbcsr::sbtensor<3,double> dfitting::compute_qr_new(dbcsr::shared_matrix<double> 
 			ovlp_xbb_local->reserve(blkidx);
 			aofac->ao_3c1e_ovlp_setup();
 			aofac->ao_3c_fill(ovlp_xbb_local);
-			ovlp_xbb_local->filter(T/10.0);
+			ovlp_xbb_local->filter(T);
 		
 			vec<vec<int>> mn_bounds = {
 				c_xbb_batched->full_bounds(1),
@@ -464,7 +464,7 @@ dbcsr::sbtensor<3,double> dfitting::compute_qr_new(dbcsr::shared_matrix<double> 
 						double alpha_p = blkinfo_x[ip].alpha;
 						
 						double f = (alpha_x * alpha_p) / (alpha_x + alpha_p)
-							* pow(dist(pos_x, pos_p),2);
+							* pow(dist(pos_x, pos_p),2.0);
 							
 						if (f < R2) blk_Q_bool[ix] = true;
 		
