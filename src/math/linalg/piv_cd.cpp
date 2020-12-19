@@ -21,7 +21,7 @@ void pivinc_cd::reorder_and_reduce(scalapack::distmat<double>& L) {
 			
 	LOG.os<1>("-- Reordering cholesky orbitals according to method: old", "\n");
 					
-	double reorder_thresh = 1e-10;
+	double reorder_thresh = 1e-4;
 	
 	// reorder it according to matrix values
 	std::vector<double> lmo_pos(m_rank,0);
@@ -47,6 +47,11 @@ void pivinc_cd::reorder_and_reduce(scalapack::distmat<double>& L) {
 		if (first_mu == -1) throw std::runtime_error("Piv. Cholesky decomposition: Reorder failed.");
 		
 		lmo_pos[j] = (double)(first_mu + last_mu) / 2;
+		
+		ORTHOGONALIZATION DO IT BETTER
+		1. MAKE REORDERING INDEPENDENT
+		2. MAKE MODULES USE LOC FUNCTIONS
+		3. USE ORTHOGONALIZATION (CHOLESKY)
 		
 	}
 	

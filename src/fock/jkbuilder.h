@@ -23,7 +23,8 @@ enum class kmethod {
 	dfao,
 	dfmo,
 	dfmem,
-	dfrobust
+	dfrobust,
+	dflmo
 };
 
 inline jmethod str_to_jmethod(std::string s) {
@@ -47,6 +48,8 @@ inline kmethod str_to_kmethod(std::string s) {
 		return kmethod::dfmem;
 	} else if (s == "dfrobust") {
 		return kmethod::dfrobust;
+	} else if (s == "dflmo") {
+		return kmethod::dflmo;
 	} else {
 		throw std::runtime_error("Invalid kmethod");
 	}
@@ -425,6 +428,46 @@ MAKE_STRUCT(
 	)
 )
 
+class create_DFLMO_K_base;
+class DFLMO_K : public K {
+private:
+
+	dbcsr::sbtensor<3,double> m_eri3c2e_batched;
+	dbcsr::shared_matrix<double> m_v_xx;
+	
+	dbcsr::shared_tensor<2,double> m_K_01;
+	dbcsr::shared_tensor<2,double> m_v_xx_01;
+	
+	dbcsr::shared_pgrid<2> m_spgrid2;
+
+	friend class create_DFLMO_K_base;
+	
+	int m_occ_nbatches;
+	
+public:
+
+	DFLMO_K(dbcsr::world w, desc::smolecule smol, int print);
+	void compute_K() override;
+	void init() override;
+	
+	~DFLMO_K() {}
+	
+};
+
+MAKE_STRUCT(
+	DFLMO_K, K,
+	(
+		(world, (dbcsr::world)),
+		(mol, (desc::smolecule)),
+		(print, (int))
+	),
+	(
+		(eri3c2e_batched, (dbcsr::sbtensor<3,double>), required, val),
+		(v_xx, (dbcsr::shared_matrix<double>), required, val),
+		(occ_nbatches, (int), optional, val, 1)
+	)
+)
+
 inline void load_jints(jmethod jmet, ints::metric metr, ints::aoloader& ao) {
 	
 	// set J
@@ -502,7 +545,7 @@ inline void load_kints(kmethod kmet, ints::metric metr, ints::aoloader& ao) {
 			throw std::runtime_error("DFMO with non coulomb metric disabled.");
 		}
 		
-	} else if (kmet == kmethod::dfmem) {
+	} else if (kmet == kmethod::dfmem || kmet == kmethod::dflmo) {
 		
 		ao.request(ints::key::scr_xbb,true);
 		
@@ -681,7 +724,7 @@ public:
 				.occ_nbatches(nobatches)
 				.get();
 		
-		} else if (*c_method == kmethod::dfmem) {
+		} else if (*c_method == kmethod::dfmem || *c_method == kmethod::dflmo) {
 			
 			dbcsr::sbtensor<3,double> eris;
 			dbcsr::shared_matrix<double> v_xx;
@@ -705,10 +748,18 @@ public:
 					break;
 			}
 			
-			kbuilder = create_DFMEM_K(*c_world, *c_mol, nprint)
-				.eri3c2e_batched(eris)
-				.v_xx(v_xx)
-				.get();
+			if (*c_method == kmethod::dfmem) {
+				kbuilder = create_DFMEM_K(*c_world, *c_mol, nprint)
+					.eri3c2e_batched(eris)
+					.v_xx(v_xx)
+					.get();
+			} else {
+				kbuilder = create_DFLMO_K(*c_world, *c_mol, nprint)
+					.eri3c2e_batched(eris)
+					.v_xx(v_xx)
+					.occ_nbatches(nobatches)
+					.get();
+			}
 			
 		} else if (*c_method == kmethod::dfrobust) {
 			

@@ -28,10 +28,10 @@ dbcsr::sbtensor<3,double> dfitting::compute(dbcsr::sbtensor<3,double> eri_batche
 		
 	dbcsr::copy_matrix_to_tensor(*inv, *s_xx_inv);
 	
-	inv->clear();
+	//inv->clear();
 	
 	auto cfit = this->compute(eri_batched, s_xx_inv, mytype);
-	dbcsr::copy_tensor_to_matrix(*s_xx_inv, *inv);
+	//dbcsr::copy_tensor_to_matrix(*s_xx_inv, *inv);
 	
 	return cfit;
 	
@@ -41,6 +41,7 @@ dbcsr::sbtensor<3,double> dfitting::compute(dbcsr::sbtensor<3,double> eri_batche
 	dbcsr::shared_tensor<2,double> inv, dbcsr::btype mytype) {
 	
 	auto spgrid3_xbb = eri_batched->spgrid();
+	inv->filter(dbcsr::global::filter_eps);
 		
 	auto b = m_mol->dims().b();
 	auto x = m_mol->dims().x();
