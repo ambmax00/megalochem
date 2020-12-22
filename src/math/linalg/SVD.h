@@ -18,6 +18,8 @@ private:
 	std::shared_ptr<std::vector<double>> m_s;
 	 
 	util::mpi_log LOG;
+	
+	int m_rank;
 	 
 public:
 
@@ -29,6 +31,12 @@ public:
 	void compute();
 	
 	dbcsr::shared_matrix<double> inverse();
+	
+	dbcsr::smat_d U(std::vector<int> rowblksizes, std::vector<int> colblksizes);
+	dbcsr::smat_d Vt(std::vector<int> rowblksizes, std::vector<int> colblksizes);
+	std::vector<double> s();
+	
+	int rank() { return m_rank; }
 	
 };
 

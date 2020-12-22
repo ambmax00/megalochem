@@ -1,6 +1,9 @@
 #include "math/linalg/SVD.h"
 #include <dbcsr_conversions.hpp>
 
+#include "utils/matrix_plot.h"
+
+
 namespace math {
 
 void SVD::compute() {
@@ -80,10 +83,15 @@ void SVD::compute() {
 	c_pdgesvd(m_jobu, m_jobvt, m, n, a, 0, 0, desca.data(), s, u, 0, 0,
 		descu.data(), vt, 0, 0, descvt.data(), work, lwork, &info);
 	
+	m_rank = 0;
+	
 	LOG.os<>("Eigenvalues: \n");
 	for (int i = 0; i != size; ++i) {
 		LOG.os<>(s[i], " ");
+		if (fabs(s[i]) > 1e-10) m_rank++;
 	} LOG.os<>('\n');
+	
+	LOG.os<>("RANK: ", m_rank, '\n');	
 	
 	LOG.os<>("-- Exited with info = ", info, '\n');
 
@@ -165,6 +173,40 @@ dbcsr::shared_matrix<double> SVD::inverse() {
 	LOG.os<>("Error: ", ide1->norm(dbcsr_norm_frobenius), '\n');
 	
 		
+	return out;
+	
+}
+
+dbcsr::smat_d SVD::U(std::vector<int> rowblksizes, std::vector<int> colblksizes) {
+	
+	auto w = m_mat_in->get_world();
+	
+	auto out = dbcsr::scalapack_to_matrix(*m_U, "SVD U matrix of " + m_mat_in->name(), 
+		w, rowblksizes, colblksizes);
+			
+	//util::plot(out, 1e-4);
+	
+	return out;
+	
+}
+
+dbcsr::smat_d SVD::Vt(std::vector<int> rowblksizes, std::vector<int> colblksizes) {
+	
+	auto w = m_mat_in->get_world();
+	
+	auto out = dbcsr::scalapack_to_matrix(*m_Vt, "SVD Vt matrix of " + m_mat_in->name(), 
+		w, rowblksizes, colblksizes);
+			
+	//util::plot(out, 1e-4);
+	
+	return out;
+	
+}
+
+std::vector<double> SVD::s() {
+	
+	std::vector<double> out(m_rank);
+	std::copy(m_s->begin(), m_s->begin() + m_rank, out.begin());
 	return out;
 	
 }

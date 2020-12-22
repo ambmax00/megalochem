@@ -7,6 +7,8 @@
  
 #include "extern/scalapack.h"
 
+#include "utils/matrix_plot.h"
+
 namespace math {
 	 
 void pivinc_cd::reorder_and_reduce(scalapack::distmat<double>& L) {
@@ -48,10 +50,10 @@ void pivinc_cd::reorder_and_reduce(scalapack::distmat<double>& L) {
 		
 		lmo_pos[j] = (double)(first_mu + last_mu) / 2;
 		
-		ORTHOGONALIZATION DO IT BETTER
+		/*ORTHOGONALIZATION DO IT BETTER
 		1. MAKE REORDERING INDEPENDENT
 		2. MAKE MODULES USE LOC FUNCTIONS
-		3. USE ORTHOGONALIZATION (CHOLESKY)
+		3. USE ORTHOGONALIZATION (CHOLESKY)*/
 		
 	}
 	
@@ -119,6 +121,8 @@ void pivinc_cd::compute() {
 	}
 	
 	MPI_Bcast(&ori_coord[0],2,MPI_INT,ori_proc,comm);
+	
+	util::plot(m_mat_in, 1e-4);
 		
 	scalapack::distmat<double> U = dbcsr::matrix_to_scalapack(m_mat_in, 
 		m_mat_in->name() + "_scalapack", nb, nb, ori_coord[0], ori_coord[1]);
@@ -385,6 +389,8 @@ dbcsr::smat_d pivinc_cd::L(std::vector<int> rowblksizes, std::vector<int> colblk
 		w, rowblksizes, colblksizes);
 		
 	m_L->release();
+	
+	util::plot(out, 1e-4);
 	
 	return out;
 	

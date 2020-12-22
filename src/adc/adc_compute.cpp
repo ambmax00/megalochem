@@ -2,6 +2,7 @@
 #include "adc/adc_mvp.h"
 #include "math/solvers/davidson.h"
 #include "math/linalg/piv_cd.h"
+#include "math/linalg/SVD.h"
 #include "locorb/locorb.h"
 
 #include <dbcsr_conversions.hpp>
@@ -103,6 +104,24 @@ void adcmod::compute() {
 	for (int iroot = nstart; iroot != nroots; ++iroot) {
 		LOG.os<>("Excitation nr. ", iroot+1, " : ", ex[iroot], '\n');
 	}
+	
+	auto r1 = rvecs[0];
+	
+	auto c_bo = m_hfwfn->c_bo_A();
+	auto c_bv = m_hfwfn->c_bv_A(); 
+	
+	auto u_bb_a = u_transform(r1, 'N', c_bo, 'T', c_bv);
+	
+	math::SVD solver(u_bb_a, 'V', 'V', 9999);
+	solver.compute();
+	
+	int rank = solver.rank();
+	auto r = dbcsr::split_range(rank, 5);
+	
+	auto U = solver.U(b,r);
+	auto Vt = solver.Vt(r,b);
+	
+	exit(0);
 	
 	bool do_adc2 = m_opt.get<bool>("do_adc2", ADC_DO_ADC2);
 	

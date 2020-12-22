@@ -15,4 +15,5 @@ target_link_libraries(
 	chem_math_solvers
         chem_dbcsrx
         ${SCALAPACK_LIBRARIES}	
+	${PYTHON_LIBRARIES}
 )

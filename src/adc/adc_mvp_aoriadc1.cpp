@@ -45,6 +45,13 @@ void MVP_AOADC1::init() {
 				.get();
 			break;
 		}
+		case fock::kmethod::dflmo:
+			m_kbuilder = fock::create_DFLMO_K(m_world, m_mol, nprint)
+				.eri3c2e_batched(m_eri3c2e_batched)
+				.v_xx(m_v_xx)
+				.occ_nbatches(1)
+				.get();
+			break;
 		default:
 		{
 			throw std::runtime_error("Invalid kmethod for AO-ADC(1)");

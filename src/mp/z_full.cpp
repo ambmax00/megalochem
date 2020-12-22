@@ -317,7 +317,7 @@ void LLMP_FULL_Z::compute() {
 	
 	LOG.os<1>("Computing Z_XY.\n");
 	
-	m_zmat_01->batched_contract_init();
+	//m_zmat_01->batched_contract_init();
 	
 	for (int inu = 0; inu != m_eri3c2e_batched->nbatches(2); ++inu) {
 		
@@ -371,7 +371,7 @@ void LLMP_FULL_Z::compute() {
 	
 	m_FT3c2e_batched->reset();
 
-	m_zmat_01->batched_contract_finalize();	
+	//m_zmat_01->batched_contract_finalize();	
 	
 	LOG.os<1>("Finished batching.\n");
 

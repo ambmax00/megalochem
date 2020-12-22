@@ -423,7 +423,7 @@ public:
 				.blk_sizes(m_blk_sizes)
 				.get();
 			
-			m_work_tensor->batched_contract_init();	
+			//m_work_tensor->batched_contract_init();	
 				
 		}
 		
@@ -716,7 +716,7 @@ public:
 	void compress_finalize() {
 		
 		LOG.os<1>("Finalizing compression...\n");
-		if (m_type == dbcsr::btype::core) m_work_tensor->batched_contract_finalize();
+		//if (m_type == dbcsr::btype::core) m_work_tensor->batched_contract_finalize();
 		
 		m_is_compress_initialized = false;
 				
@@ -1187,7 +1187,7 @@ public:
 			
 		}
 		
-		m_work_tensor->batched_contract_init();
+		//m_work_tensor->batched_contract_init();
 		
 		m_is_decompress_initialized = true;
 		
@@ -1582,7 +1582,7 @@ public:
 	}
 	
 	void decompress_finalize() {
-		m_work_tensor->batched_contract_finalize();
+		//m_work_tensor->batched_contract_finalize();
 		if (m_type != btype::core) {
 			m_work_tensor->clear();
 			m_read_tensor->clear();

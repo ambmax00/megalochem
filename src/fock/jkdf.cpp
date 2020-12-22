@@ -3,6 +3,7 @@
 #include "ints/fitting.h"
 #include "math/linalg/LLT.h"
 #include "math/linalg/piv_cd.h"
+#include "math/linalg/SVD.h"
 #include <dbcsr_tensor_ops.hpp>
 
 namespace fock {
@@ -88,8 +89,8 @@ void DF_J::compute_J() {
 	
 	m_ptot_bbd->filter(dbcsr::global::filter_eps);
 	
-	m_gp_xd->batched_contract_init();
-	m_ptot_bbd->batched_contract_init();
+	//m_gp_xd->batched_contract_init();
+	//m_ptot_bbd->batched_contract_init();
 		
 	reoint.start();
 	m_eri3c2e_batched->decompress_init({2}, vec<int>{0}, vec<int>{1,2});
@@ -122,8 +123,8 @@ void DF_J::compute_J() {
 	
 	m_eri3c2e_batched->decompress_finalize();
 	
-	m_gp_xd->batched_contract_finalize();
-	m_ptot_bbd->batched_contract_finalize();
+	//m_gp_xd->batched_contract_finalize();
+	//m_ptot_bbd->batched_contract_finalize();
 			
 	LOG.os<1>("X_, XY -> Y_\n");
 	
@@ -137,8 +138,8 @@ void DF_J::compute_J() {
 	
 	//dbcsr::print(*m_inv);
 	
-	m_J_bbd->batched_contract_init();
-	m_gq_xd->batched_contract_init();
+	//m_J_bbd->batched_contract_init();
+	//m_gq_xd->batched_contract_init();
 	
 	m_eri3c2e_batched->decompress_init({2},vec<int>{0},vec<int>{1,2});
 	
@@ -167,8 +168,8 @@ void DF_J::compute_J() {
 	
 	m_eri3c2e_batched->decompress_finalize();
 	
-	m_J_bbd->batched_contract_finalize();
-	m_gq_xd->batched_contract_finalize();
+	//m_J_bbd->batched_contract_finalize();
+	//m_gq_xd->batched_contract_finalize();
 	
 	LOG.os<1>("Copy over...\n");
 	
@@ -318,7 +319,7 @@ void DFMO_K::compute_K() {
 			reo0.finish();
 			
 			//m_c_bm->batched_contract_init();
-			m_HT1_xmb_02_1->batched_contract_init();
+			//m_HT1_xmb_02_1->batched_contract_init();
 			
 			for (int inu = 0; inu != m_eri3c2e_batched->nbatches(2); ++inu) {
 				
@@ -346,7 +347,7 @@ void DFMO_K::compute_K() {
 			nze_HTI += m_HT1_xmb_02_1->num_nze_total();
 			
 			//m_c_bm->batched_contract_finalize();
-			m_HT1_xmb_02_1->batched_contract_finalize();
+			//m_HT1_xmb_02_1->batched_contract_finalize();
 			m_eri3c2e_batched->decompress_finalize();
 			
 			// end for M
@@ -382,9 +383,9 @@ void DFMO_K::compute_K() {
 			
 			LOG.os<1>("Computing K_mn = HT_xim * HT_xin\n");
 			
-			m_K_01->batched_contract_init();
-			m_HT2_xmb_01_2->batched_contract_init();
-			HT2_xmb_01_2_copy->batched_contract_init();
+			//m_K_01->batched_contract_init();
+			//m_HT2_xmb_01_2->batched_contract_init();
+			//HT2_xmb_01_2_copy->batched_contract_init();
 			
 			for (int ix = 0; ix != m_eri3c2e_batched->nbatches(0); ++ix) {
 			
@@ -403,9 +404,9 @@ void DFMO_K::compute_K() {
 				
 			}
 			
-			m_K_01->batched_contract_finalize();
-			m_HT2_xmb_01_2->batched_contract_finalize();
-			HT2_xmb_01_2_copy->batched_contract_finalize();
+			//m_K_01->batched_contract_finalize();
+			//m_HT2_xmb_01_2->batched_contract_finalize();
+			//HT2_xmb_01_2_copy->batched_contract_finalize();
 			
 			m_HT2_xmb_01_2->clear();
 			HT2_xmb_01_2_copy->clear();
@@ -507,9 +508,9 @@ void DFAO_K::compute_K() {
 	
 		m_fitting_batched->decompress_init({2,0}, vec<int>{1}, vec<int>{0,2});
 		
-		m_K_01->batched_contract_init();
-		m_cbar_xbb_01_2->batched_contract_init();
-		m_cbar_xbb_1_02->batched_contract_init();
+		//m_K_01->batched_contract_init();
+		//m_cbar_xbb_01_2->batched_contract_init();
+		//m_cbar_xbb_1_02->batched_contract_init();
 		
 		int64_t nze_cbar = 0;
 		//auto full = eri_01_2->nfull_total();
@@ -598,13 +599,13 @@ void DFAO_K::compute_K() {
 		m_eri3c2e_batched->decompress_finalize();
 		m_fitting_batched->decompress_finalize();
 		
-		m_cbar_xbb_01_2->batched_contract_finalize();
-		m_cbar_xbb_1_02->batched_contract_finalize();
+		//m_cbar_xbb_01_2->batched_contract_finalize();
+		//m_cbar_xbb_1_02->batched_contract_finalize();
 		
 		//double occ_cbar = (double) nze_cbar / (double) nze_cbar_tot;
 		//LOG.os<1>("Occupancy of cbar: ", occ_cbar, "%\n");
 		
-		m_K_01->batched_contract_finalize();
+		//m_K_01->batched_contract_finalize();
 		
 		dbcsr::copy_tensor_to_matrix(*m_K_01,*k_bb);
 		m_K_01->clear();
@@ -833,7 +834,7 @@ void DFMEM_K::compute_K() {
 		
 		m_eri3c2e_batched->decompress_finalize();
 			
-		m_K_01->batched_contract_finalize();
+		//m_K_01->batched_contract_finalize();
 		
 		dbcsr::copy_tensor_to_matrix(*m_K_01,*k_bb);
 		m_K_01->clear();
@@ -896,14 +897,25 @@ void DFLMO_K::compute_K() {
 	dbcsr::copy_matrix_to_tensor(*m_v_xx, *m_v_xx_01);
 	m_v_xx_01->filter(dbcsr::global::filter_eps);
 		
-	auto compute_K_single = 
+	auto compute_K_single_sym = 
 	[&] (dbcsr::smat_d& p_bb, dbcsr::smat_d& k_bb, std::string X) {
 		
 		LOG.os<1>("Computing exchange part (", X, ")\n");
 		
+		auto& time_chol = TIME.sub("Pivoted Cholesky decomposition");
+		auto& time_reo1 = TIME.sub("First reordering");
+		auto& time_reo2 = TIME.sub("Second reordering");
+		auto& time_reo3 = TIME.sub("Third reordering");
+		auto& time_htint = TIME.sub("Forming half-transformed integrals");
+		auto& time_htfit = TIME.sub("Contracting with v_xx");
+		auto& time_formk = TIME.sub("Final contraction");
+		auto& time_ints = TIME.sub("Fetching ints");
+		
 		LOG.os<1>("Computing cholesky decomposition\n");
+		time_chol.start();
 		math::pivinc_cd chol(p_bb, LOG.global_plev());
 		chol.compute();
+		time_chol.finish();
 		
 		LOG.os<1>("Setting up tensors\n");
 		
@@ -1008,9 +1020,13 @@ void DFLMO_K::compute_K() {
 			
 			auto obds = o_bounds[iocc];
 			
+			time_ints.start();
 			m_eri3c2e_batched->decompress_init({2}, vec<int>{0,1}, vec<int>{2});
+			time_ints.finish();
 			
 			LOG.os<1>("Forming HT integrals...\n");
+			time_htint.start();
+			
 			for (int inu = 0; inu != nbbatches; ++inu) {
 				
 				LOG.os<1>("-- Batch ", inu, '\n');
@@ -1035,9 +1051,13 @@ void DFLMO_K::compute_K() {
 					
 			}
 			
+			time_htint.finish();
+			
+			time_reo1.start();
 			dbcsr::copy(*ht_xbm_01_2, *ht_xbm_0_12)
 				.move_data(true)
 				.perform();
+			time_reo1.finish();
 			
 			m_eri3c2e_batched->decompress_finalize();
 			
@@ -1055,40 +1075,48 @@ void DFLMO_K::compute_K() {
 					obds
 				};
 				
+				time_htfit.start();
 				dbcsr::contract(*m_v_xx_01, *ht_xbm_0_12, *htfit_xbm_0_12)
 					.bounds2(x_bounds)
 					.bounds3(mi_bounds)
 					.filter(dbcsr::global::filter_eps)
 					.beta(1.0)
 					.perform("XY, Ymi -> Xmi");
-					
+				time_htfit.finish();
+				
 				vec<vec<int>> xni_bounds = {
 					m_eri3c2e_batched->bounds(0,ix),
 					m_eri3c2e_batched->full_bounds(1),
 					obds
 				};
 				
+				time_reo2.start();
 				dbcsr::copy(*htfit_xbm_0_12, *htfit_xbm_02_1)
 					.bounds(xni_bounds)
 					.move_data(true)
 					.perform();
-					
+				time_reo2.finish();
+				
+				time_reo3.start();
 				dbcsr::copy(*ht_xbm_0_12, *ht_xbm_02_1)
 					.bounds(xni_bounds)
 					.perform();
+				time_reo3.finish();
 					
 				vec<vec<int>> xi_bounds = {
 					m_eri3c2e_batched->bounds(0,ix),
 					obds
 				};
-					
+				
+				time_formk.start();
 				dbcsr::contract(*ht_xbm_02_1, *htfit_xbm_02_1, *m_K_01)
 					.bounds1(xi_bounds)
 					.move(true)
 					.filter(dbcsr::global::filter_eps/nxbatches)
 					.beta(1.0)
 					.perform("Xmi, Xni -> nm");
-					
+				time_formk.finish();
+				
 			}
 			
 			ht_xbm_0_12->clear();
@@ -1101,11 +1129,314 @@ void DFLMO_K::compute_K() {
 		
 		LOG.os<1>("Done with exchange.\n");
 		
-	}; // end lambda function
+	}; // end lambda function sym
 	
-	compute_K_single(m_p_A, m_K_A, "A");
+	auto compute_K_single = 
+	[&] (dbcsr::smat_d& p_bb, dbcsr::smat_d& k_bb, std::string X) {
+		
+		auto& time_svd = TIME.sub("Singular value decomposition");
+		auto& time_reo1 = TIME.sub("First reordering");
+		auto& time_reo2 = TIME.sub("Second reordering");
+		auto& time_reo3 = TIME.sub("Third reordering");
+		auto& time_htuint = TIME.sub("Forming half-transformed u integrals");
+		auto& time_htvint = TIME.sub("Forming half-transformed v integrals");
+		auto& time_htvfit = TIME.sub("Contracting with v_xx");
+		auto& time_formk = TIME.sub("Final contraction");
+		auto& time_ints = TIME.sub("Fetching ints");
+		
+		LOG.os<1>("Computing exchange part (", X, "), NON SYMMETRIC\n");
+		
+		LOG.os<1>("Computing singular value decomposition\n");
+		
+		time_svd.start();
+		math::SVD solver(p_bb, 'V', 'V', LOG.global_plev());
+		solver.compute();
+		time_svd.finish();
+		
+		LOG.os<1>("Setting up tensors\n");
+		
+		int nocc = solver.rank();
+		int nbas = m_mol->c_basis()->nbf();
+		int nxbas = m_mol->c_basis()->nbf();
+		
+		auto x = m_mol->dims().x();
+		auto b = m_mol->dims().b();
+		auto o = dbcsr::split_range(nocc, 8);
+		
+		LOG.os<1>("OCCS:\n");
+		for (auto i : o) {
+			LOG.os<1>(i, '\n');
+		}
+		
+		auto o_bounds = dbcsr::make_blk_bounds(o, m_occ_nbatches);
+		int nobatches = o_bounds.size();
+				
+		vec<int> o_offsets(o.size());
+		int off = 0;	
 	
-	if (m_K_B) compute_K_single(m_p_B, m_K_B, "B");
+		for (int i = 0; i != o.size(); ++i) {
+			o_offsets[i] = off;
+			off += o[i];
+		}
+			
+		for (int i = 0; i != o_bounds.size(); ++i) { 
+			o_bounds[i][0] = o_offsets[o_bounds[i][0]];
+			o_bounds[i][1] = o_offsets[o_bounds[i][1]]
+				+ o[o_bounds[i][1]] - 1;
+		}
+		
+		std::array<int,2> dims2 = {nbas, nocc};
+		std::array<int,2> dims2t = {nocc, nbas};
+		std::array<int,3> dims3 = {nxbas, nbas, nocc};
+		
+		arrvec<int,3> xbm = {x,b,o};
+		arrvec<int,2> bm = {b,o};
+		arrvec<int,2> mb = {o,b};
+		
+		auto spgrid2_bm = dbcsr::create_pgrid<2>(m_world.comm())
+			.tensor_dims(dims2)
+			.get();
+		
+		auto spgrid2_mb = dbcsr::create_pgrid<2>(m_world.comm())
+			.tensor_dims(dims2t)
+			.get();
+		
+		auto spgrid3_xbm = dbcsr::create_pgrid<3>(m_world.comm())
+			.tensor_dims(dims3)
+			.get();
+			
+		auto u_bm_01 = dbcsr::tensor_create<2,double>()
+			.name("u_bm_01")
+			.pgrid(spgrid2_bm)
+			.blk_sizes(bm)
+			.map1({0})
+			.map2({1})
+			.get();
+			
+		auto vt_mb_01 = dbcsr::tensor_create<2,double>()
+			.name("vt_mb_01")
+			.pgrid(spgrid2_mb)
+			.blk_sizes(mb)
+			.map1({0})
+			.map2({1})
+			.get();
+			
+		auto htu_xbm_01_2 = dbcsr::tensor_create<3,double>()
+			.name("htu_xbm_01_2")
+			.pgrid(spgrid3_xbm)
+			.blk_sizes(xbm)
+			.map1({0,1})
+			.map2({2})
+			.get();
+			
+		auto htu_xbm_02_1 = dbcsr::tensor_create<3,double>()
+			.name("htu_xbm_02_1")
+			.pgrid(spgrid3_xbm)
+			.blk_sizes(xbm)
+			.map1({0,2})
+			.map2({1})
+			.get();
+			
+		auto htv_xbm_0_12 = dbcsr::tensor_create<3,double>()
+			.name("htv_xbm_0_12")
+			.pgrid(spgrid3_xbm)
+			.blk_sizes(xbm)
+			.map1({0})
+			.map2({1,2})
+			.get();
+			
+		auto htv_xbm_01_2 = dbcsr::tensor_create<3,double>()
+			.name("htv_xbm_01_2")
+			.pgrid(spgrid3_xbm)
+			.blk_sizes(xbm)
+			.map1({0,1})
+			.map2({2})
+			.get();
+			
+		auto htvfit_xbm_02_1 = dbcsr::tensor_create<3,double>()
+			.name("htvfit_xbm_02_1")
+			.pgrid(spgrid3_xbm)
+			.blk_sizes(xbm)
+			.map1({0,2})
+			.map2({1})
+			.get();
+			
+		auto htvfit_xbm_0_12 = dbcsr::tensor_create<3,double>()
+			.name("htvfit_xbm_0_12")
+			.pgrid(spgrid3_xbm)
+			.blk_sizes(xbm)
+			.map1({0})
+			.map2({1,2})
+			.get();
+		
+		auto U_bm = solver.U(b,o);
+		auto Vt_mb = solver.Vt(o,b);
+		auto sval = solver.s();
+		
+		/*std::for_each(sval.begin(), sval.end(), 
+			[](double& d) {
+				d = sqrt(d);
+			}
+		);
+		
+		U_bm->scale(sval, "right");*/
+		Vt_mb->scale(sval, "left");
+		
+		U_bm->filter(dbcsr::global::filter_eps);
+		Vt_mb->filter(dbcsr::global::filter_eps);
+		
+		dbcsr::copy_matrix_to_tensor(*U_bm, *u_bm_01);
+		dbcsr::copy_matrix_to_tensor(*Vt_mb, *vt_mb_01);
+		
+		U_bm->release();
+		Vt_mb->release();
+		
+		//u_bm_01->filter(dbcsr::global::filter_eps);				
+		//vt_mb_01->filter(dbcsr::global::filter_eps);						
+		
+		int nxbatches = m_eri3c2e_batched->nbatches(0);
+		int nbbatches = m_eri3c2e_batched->nbatches(2);
+		
+		for (int iocc = 0; iocc != nobatches; ++iocc) {
+			
+			LOG.os<1>("Occ batch ", iocc, '\n');
+			
+			auto obds = o_bounds[iocc];
+			
+			m_eri3c2e_batched->decompress_init({2}, vec<int>{0,1}, vec<int>{2});
+			
+			//htv_xbm_01_2->batched_contract_init();
+			//htu_xbm_01_2->batched_contract_init();
+			
+			LOG.os<1>("Forming HT integrals...\n");
+			for (int inu = 0; inu != nbbatches; ++inu) {
+				
+				LOG.os<1>("-- Batch ", inu, '\n');
+				
+				time_ints.start();
+				m_eri3c2e_batched->decompress({inu});
+				auto eri3c2e_01_2 = m_eri3c2e_batched->get_work_tensor();
+				time_ints.finish();
+				
+				vec<vec<int>> nu_bounds = {
+					m_eri3c2e_batched->bounds(2,inu)
+				};
+				
+				vec<vec<int>> i_bounds = {
+					obds
+				};
+				
+				time_htuint.start();
+				dbcsr::contract(*eri3c2e_01_2, *vt_mb_01, *htv_xbm_01_2)
+					.bounds1(nu_bounds)
+					.bounds3(i_bounds)
+					.filter(dbcsr::global::filter_eps/nbbatches)
+					.beta(1.0)
+					.perform("Xmn, in -> Xmi");
+				time_htuint.finish();
+				
+				time_htvint.start();
+				dbcsr::contract(*eri3c2e_01_2, *u_bm_01, *htu_xbm_01_2)
+					.bounds1(nu_bounds)
+					.bounds3(i_bounds)
+					.filter(dbcsr::global::filter_eps/nbbatches)
+					.beta(1.0)
+					.perform("Xmn, ni -> Xmi");
+				time_htvint.finish();
+				
+			}
+			
+			m_eri3c2e_batched->decompress_finalize();
+			//htv_xbm_01_2->batched_contract_finalize();
+			//htu_xbm_01_2->batched_contract_finalize();
+			
+			time_reo1.start();
+			dbcsr::copy(*htv_xbm_01_2, *htv_xbm_0_12)
+				.move_data(true)
+				.perform();
+			time_reo1.finish();
+				
+			time_reo2.start();
+			dbcsr::copy(*htu_xbm_01_2, *htu_xbm_02_1)
+				.move_data(true)
+				.perform();
+			time_reo2.finish();
+			
+			LOG.os<1>("Forming K...\n");
+			for (int ix = 0; ix != nxbatches; ++ix) {
+				
+				LOG.os<1>("-- Batch ", ix, '\n');
+				
+				LOG.os<1>("Forming HTV fit\n");
+				vec<vec<int>> x_bounds = {
+					m_eri3c2e_batched->bounds(0, ix)
+				};
+				
+				vec<vec<int>> mi_bounds = {
+					m_eri3c2e_batched->full_bounds(1),
+					obds
+				};
+				
+				time_htvfit.start();
+				dbcsr::contract(*m_v_xx_01, *htv_xbm_0_12, *htvfit_xbm_0_12)
+					.bounds2(x_bounds)
+					.bounds3(mi_bounds)
+					.filter(dbcsr::global::filter_eps)
+					.perform("XY, Ymi -> Xmi");
+				time_htvfit.finish();
+				
+				vec<vec<int>> xni_bounds = {
+					m_eri3c2e_batched->bounds(0,ix),
+					m_eri3c2e_batched->full_bounds(1),
+					obds
+				};
+				
+				time_reo3.start();
+				dbcsr::copy(*htvfit_xbm_0_12, *htvfit_xbm_02_1)
+					.bounds(xni_bounds)
+					.move_data(true)
+					.perform();
+				time_reo3.finish();
+					
+				vec<vec<int>> xi_bounds = {
+					m_eri3c2e_batched->bounds(0,ix),
+					obds
+				};
+					
+				dbcsr::contract(*htu_xbm_02_1, *htvfit_xbm_02_1, *m_K_01)
+					.bounds1(xi_bounds)
+					.filter(dbcsr::global::filter_eps/nxbatches)
+					.beta(1.0)
+					.perform("Xmi, Xni -> mn");
+					
+				htvfit_xbm_02_1->clear();
+					
+			}
+			
+			htv_xbm_0_12->clear();
+			htu_xbm_02_1->clear();
+						
+		}	
+		
+		dbcsr::copy_tensor_to_matrix(*m_K_01,*k_bb);
+		m_K_01->clear();
+		k_bb->scale(-1.0);
+		
+		LOG.os<1>("Done with exchange.\n");
+		
+	}; // end lambda function asym
+	
+	if (m_sym) {
+		
+		compute_K_single_sym(m_p_A, m_K_A, "A");
+		if (m_K_B) compute_K_single_sym(m_p_B, m_K_B, "B");
+		
+	} else {
+		
+		compute_K_single(m_p_A, m_K_A, "A");
+		if (m_K_B) compute_K_single(m_p_B, m_K_B, "B");
+	
+	}
 	
 	if (LOG.global_plev() >= 2) {
 		dbcsr::print(*m_K_A);

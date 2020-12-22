@@ -5,6 +5,7 @@
 #include "ints/fitting.h"
 
 //#define _DLOG
+//SYM!!
 
 namespace adc {
 	
