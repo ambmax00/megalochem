@@ -192,6 +192,13 @@ shared_matrix<T> scalapack_to_matrix(scalapack::distmat<T>& sca_mat_in, std::str
 	int nfullrow = std::accumulate(rowblksizes.begin(),rowblksizes.end(),0,std::plus<int>());
 	int nfullcol = std::accumulate(colblksizes.begin(),colblksizes.end(),0,std::plus<int>());
 	
+	int nrows = sca_mat_in.nrowstot();
+	int ncols = sca_mat_in.ncolstot();
+	
+	if (nfullrow != nrows || nfullcol != ncols) {
+		throw std::runtime_error("Number of rows/cols of distmat != rows/cols of dbcsr matrix!");
+	}
+	
 	// make distvecs
 	vec<int> rowcycsizes = split_range(nfullrow, sca_mat_in.rowblk_size());
 	vec<int> colcycsizes = split_range(nfullcol, sca_mat_in.colblk_size());

@@ -17,12 +17,12 @@ void SVD::compute() {
 	int size = std::min(m,n);
 	auto& _grid = scalapack::global_grid;
 	
-	LOG.os<>("Running SCALAPACK pdgesvd calculation\n");
+	LOG.os<1>("Running SCALAPACK pdgesvd calculation\n");
 	
 	// convert array
 	
-	LOG.os<>("-- Converting input matrix to SCALAPACK format.\n");
-	LOG.os<>("Problem size: ", m, " ", n, '\n');
+	LOG.os<1>("-- Converting input matrix to SCALAPACK format.\n");
+	LOG.os<1>("Problem size: ", m, " ", n, '\n');
 		
 	int ori_proc = m_mat_in->proc(0,0);
 	int ori_coord[2];
@@ -43,7 +43,7 @@ void SVD::compute() {
 	sca_mat_in->print();
 	MPI_Barrier(wrd.comm());
 	
-	LOG.os<>("-- Setting up other arrays.\n");
+	LOG.os<1>("-- Setting up other arrays.\n");
 	
 	m_U = std::make_shared<scalapack::distmat<double>>(
 		m,size,nb,nb,ori_coord[0],ori_coord[1]);
@@ -53,7 +53,7 @@ void SVD::compute() {
 	
 	m_s = std::make_shared<std::vector<double>>(size,0.0);
 	
-	LOG.os<>("-- Computing size of work space.");
+	LOG.os<1>("-- Computing size of work space.");
 	
 	double wsize = 0;
 	int info = 0;
@@ -74,26 +74,55 @@ void SVD::compute() {
 	
 	int lwork = (int)wsize;
 	
-	LOG.os<>("-- LWORK: ", lwork, '\n');
+	LOG.os<1>("-- LWORK: ", lwork, '\n');
 	
 	double* work = new double[lwork];
 	
-	LOG.os<>("-- Computing SVD.\n");
+	LOG.os<1>("-- Computing SVD.\n");
 	
 	c_pdgesvd(m_jobu, m_jobvt, m, n, a, 0, 0, desca.data(), s, u, 0, 0,
 		descu.data(), vt, 0, 0, descvt.data(), work, lwork, &info);
 	
 	m_rank = 0;
 	
-	LOG.os<>("Eigenvalues: \n");
+	LOG.os<1>("Eigenvalues: \n");
 	for (int i = 0; i != size; ++i) {
-		LOG.os<>(s[i], " ");
+		LOG.os<1>(s[i], " ");
 		if (fabs(s[i]) > 1e-10) m_rank++;
-	} LOG.os<>('\n');
+	} LOG.os<1>('\n');
 	
-	LOG.os<>("RANK: ", m_rank, '\n');	
+	LOG.os<1>("RANK: ", m_rank, '\n');	
 	
-	LOG.os<>("-- Exited with info = ", info, '\n');
+	LOG.os<1>("-- Exited with info = ", info, '\n');
+	
+	if (m_jobu == 'V') {
+		
+		LOG.os<1>("Truncating U\n");
+		
+		auto newU = std::make_shared<scalapack::distmat<double>>(
+			m,m_rank,nb,nb,ori_coord[0],ori_coord[1]);
+			
+		c_pdgeadd('N', m, m_rank, 1.0, m_U->data(), 0, 0,
+			m_U->desc().data(), 0.0, newU->data(), 0, 0, newU->desc().data());
+			
+		m_U = newU;
+		
+	}
+	
+	if (m_jobvt == 'V') {
+		
+		LOG.os<1>("Truncating Vt\n");
+		
+		auto newVt = std::make_shared<scalapack::distmat<double>>(
+			m_rank,n,nb,nb,ori_coord[0],ori_coord[1]);
+			
+		c_pdgeadd('N', m_rank, n, 1.0, m_Vt->data(), 0, 0,
+			m_Vt->desc().data(), 0.0, newVt->data(), 0, 0, newVt->desc().data());
+			
+		m_Vt = newVt;
+		
+	}
+
 
 	delete [] work;
 	
