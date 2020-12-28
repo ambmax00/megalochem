@@ -21,7 +21,7 @@ foreach (file ${FYPP_SOURCES})
 		set(of "${CMAKE_CURRENT_BINARY_DIR}/${rootname}${new_extension}")
 		add_custom_command(
           	  OUTPUT ${of}
-          	  COMMAND fypp -F "${file}" "${of}"
+		  COMMAND "${Python_EXECUTABLE}" -m fypp -F "${file}" "${of}"
         	  DEPENDS "${file}"
 	        )
 	elseif(${extension} STREQUAL ".F")
@@ -29,7 +29,7 @@ foreach (file ${FYPP_SOURCES})
 		set(of "${CMAKE_CURRENT_BINARY_DIR}/${rootname}${new_extension}")
 		add_custom_command(
                   OUTPUT ${of}
-                  COMMAND fypp "${file}" "${of}"
+                  COMMAND "${Python_EXECUTABLE}" -m fypp "${file}" "${of}"
                   DEPENDS "${file}"
                 )
 	else()
