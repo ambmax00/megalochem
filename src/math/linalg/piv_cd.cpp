@@ -76,7 +76,7 @@ void pivinc_cd::reorder_and_reduce(scalapack::distmat<double>& L) {
 	
 	LOG.os<1>("-- Finished reordering.\n");
 					
-	m_L = std::make_shared<scalapack::distmat<double>>(N,N,nb,nb,0,0);
+	m_L = std::make_shared<scalapack::distmat<double>>(N,m_rank,nb,nb,0,0);
 	
 	LOG.os<1>("-- Reducing and reordering L.\n");
 	
@@ -365,7 +365,7 @@ void pivinc_cd::compute() {
 
 	reorder_and_reduce(L);
 	
-	c_pdgemm('N', 'T', N, N, N, 1.0, m_L->data(), 0, 0, m_L->desc().data(), 
+	c_pdgemm('N', 'T', N, N, m_rank, 1.0, m_L->data(), 0, 0, m_L->desc().data(), 
 		m_L->data(), 0, 0, m_L->desc().data(), -1.0, Ucopy.data(), 0, 0, Ucopy.desc().data());
 	
 	double err = c_pdlange('F', N, N, Ucopy.data(), 0, 0, Ucopy.desc().data(), nullptr);
