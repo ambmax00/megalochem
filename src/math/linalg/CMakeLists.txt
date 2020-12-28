@@ -10,10 +10,13 @@ set (sources
 )
 
 add_library(chem_math_linalg ${sources})
+
 target_link_libraries(
 	chem_math_linalg
 	chem_math_solvers
         chem_dbcsrx
         ${SCALAPACK_LIBRARIES}	
-	${PYTHON_LIBRARIES}
+	Python::Python
+	Python::Module
+	Python::NumPy
 )

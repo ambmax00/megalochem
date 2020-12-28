@@ -122,7 +122,7 @@ void pivinc_cd::compute() {
 	
 	MPI_Bcast(&ori_coord[0],2,MPI_INT,ori_proc,comm);
 	
-	util::plot(m_mat_in, 1e-4);
+	//util::plot(m_mat_in, 1e-4);
 		
 	scalapack::distmat<double> U = dbcsr::matrix_to_scalapack(m_mat_in, 
 		m_mat_in->name() + "_scalapack", nb, nb, ori_coord[0], ori_coord[1]);
@@ -390,7 +390,7 @@ dbcsr::smat_d pivinc_cd::L(std::vector<int> rowblksizes, std::vector<int> colblk
 		
 	m_L->release();
 	
-	util::plot(out, 1e-4);
+	//util::plot(out, 1e-4);
 	
 	return out;
 	

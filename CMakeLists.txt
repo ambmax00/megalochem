@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.13 FATAL_ERROR)
+cmake_minimum_required(VERSION 3.14 FATAL_ERROR)
 
 project(chem)
 enable_language(Fortran CXX)
@@ -17,7 +17,7 @@ include_directories(${dir})
 find_package(OpenMP REQUIRED)
 find_package(MPI REQUIRED)
 find_package(DBCSR 2.0.0 CONFIG REQUIRED)
-find_package(PythonLibs REQUIRED)
+find_package(Python REQUIRED COMPONENTS Interpreter Development NumPy)
 find_package(PkgConfig)
 pkg_check_modules(deps REQUIRED IMPORTED_TARGET GLOBAL libxsmmf)
 find_package(SCALAPACK REQUIRED)
@@ -41,7 +41,6 @@ get_target_property(DBCSR_INCLUDE_DIRS DBCSR::dbcsr INTERFACE_INCLUDE_DIRECTORIE
 include_directories(
 	${DBCSR_INCLUDE_DIRS} 
 	${MPI_CXX_HEADER_DIR} 
-	${PYTHON_INCLUDE_DIRS}
 	#${CMAKE_CURRENT_BINARY_DIR} 
 	#${CMAKE_CURRENT_SOURCE_DIR}
 )
