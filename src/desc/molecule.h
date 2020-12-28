@@ -7,7 +7,6 @@
 #include "desc/basis.h"
 
 #include <vector>
-#include <libint2/atom.h>
 #include <mpi.h>
 #include <memory>
 
@@ -196,6 +195,14 @@ public:
 	
 	int mo_split() {
 		return m_mo_split;
+	}
+
+	int charge() {
+		return m_charge;
+	}
+	
+	int mult() {
+		return m_mult;
 	}
 
 	std::optional<std::vector<double>> frac_occ_alpha() {
