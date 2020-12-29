@@ -514,7 +514,9 @@ public:
 		int color = _global_rank % 2;
 		int split = _global_rank / 2;
 		
-		MPI_Comm_split(_global_comm, color, split, &_local_comm);
+		//MPI_Comm_split(_global_comm, color, split, &_local_comm);
+		MPI_Comm_split_type(_global_comm, MPI_COMM_TYPE_SHARED, _global_rank, 
+			MPI_INFO_NULL, &_local_comm);
 		
 		MPI_Comm_size(_local_comm, &_local_size);
 		MPI_Comm_rank(_local_comm, &_local_rank);
