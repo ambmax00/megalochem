@@ -13,6 +13,7 @@
 
 namespace util {
 
+// BROKEN ON SOME CLUSTERS. ONE-SIDED MPI KINDA BLOWS :(
 class scheduler {
 private:
 
@@ -365,6 +366,235 @@ public:
 	}
 	
 	~scheduler() {}
+	
+};
+
+/* new dynamic scheduler
+ * uses shared memory for processes on same node
+ * each node has a master, which distributes tasks to slaves
+ * masters communicate between nodes for work sharing
+ * 
+ * Hopefully more transferrable than the other scheduler...
+ */
+
+class dynamic_scheduler {
+private:
+
+	const int64_t NO_TASK = -1;
+	const int64_t TERMINATE = -2;
+
+	MPI_Comm _global_comm;
+	int _global_rank;
+	int _global_size;
+	
+	MPI_Comm _local_comm;
+	int _local_rank;
+	int _local_size;
+	
+	MPI_Comm _king_comm;
+	int _king_rank;
+	int _king_size;
+	bool _is_king;
+	
+	MPI_Win _task_window;
+	int64_t* _task_data;
+
+	MPI_Win _king_window;
+	int64_t* _king_data;
+	
+	std::function<void(int64_t)>& _executer;
+	int64_t _ntasks;
+	
+	int64_t _ntasks_completed;
+
+	std::deque<int64_t> _task_queue;
+	
+	void knight_run() {
+		
+		int64_t* task0 = &_task_data[-_local_size];
+		int64_t* taskp = &_task_data[-_local_size + _local_rank];
+		
+		while (true) {
+			
+			//std::cout << "RANK: " << _global_rank << " TASK: " <<
+			//	*taskp << std::endl;
+			
+			MPI_Win_sync(_task_window);
+			if (*taskp >= 0) {
+				std::cout << _global_rank << " : " << " EXECUTING: " << *taskp << std::endl;
+				_executer(*taskp);
+				++_ntasks_completed;
+				*taskp = NO_TASK;
+			}
+
+			//sleep(1);
+			
+			if (*taskp == NO_TASK && *task0 == TERMINATE) break;
+			
+		}
+	}
+	
+	// gets tasks from global queue
+	void king_get_tasks() {
+		
+		//std::cout << _global_rank << ": " << "AQCUIRING TASKS" << std::endl;
+		if (_task_queue.empty()) {
+			
+			int64_t nrequests = _local_size - 1;
+			int64_t ncounter = -1;
+			
+			std::cout << _global_rank << ": " << "REQUESTING: " 
+				<< nrequests << std::endl;
+			MPI_Win_lock(MPI_LOCK_EXCLUSIVE, 0, 0, _king_window);
+			MPI_Fetch_and_op(&nrequests, &ncounter, MPI_LONG_LONG, 0, 0,
+				MPI_SUM, _king_window);
+			MPI_Win_unlock(0, _king_window);
+			
+			std::cout << _global_rank << ": " << "NCOUNTER " << ncounter << std::endl;
+			int64_t last_task = (ncounter + nrequests <= _ntasks) ? 
+				ncounter + nrequests : _ntasks;
+			
+			// add to queue
+			for (int64_t itask = ncounter; itask < last_task; ++itask) 
+			{
+				_task_queue.push_back(itask);
+			}
+			
+			std::cout << "GOT TASKS: ";
+			for (auto q : _task_queue) { std::cout << q << " " << std::endl; }
+			
+			if (_task_queue.empty()) {
+				_task_data[0] = TERMINATE;
+			}
+			
+		}
+			
+	}
+	
+	void king_run() {
+		
+		while (_task_data[0] != TERMINATE) {
+				
+			//std::cout << "RANK: " << _global_rank << " SIZE: " <<
+			//	_task_queue.size() << std::endl;
+			
+			MPI_Win_sync(_task_window);
+			for (int iknight = 1; iknight != _local_size; ++iknight) {
+				
+				if (_task_queue.empty()) continue;
+				
+				//std::cout << "RANK: " << _global_rank << " KNIGHT: " << iknight << " " << _task_data[iknight] << std::endl;
+				if (_task_data[iknight] < 0) {
+					_task_data[iknight] = _task_queue.front();
+					_task_queue.pop_front();
+				}
+			}
+			
+			king_get_tasks();
+			//sleep(1);
+			
+		}
+		
+	}
+
+public:
+
+	dynamic_scheduler(MPI_Comm comm, int64_t ntasks, std::function<void(int64_t)>& executer) 
+		: _global_comm(comm), _executer(executer), _ntasks(ntasks),
+		_global_size(0), _global_rank(-1),
+		_local_size(0), _local_rank(-1),
+		_king_size(0), _king_rank(-1)
+	{
+		
+		// create communicators
+		
+		MPI_Comm_size(_global_comm, &_global_size);
+		MPI_Comm_rank(_global_comm, &_global_rank);
+				
+		int color = _global_rank % 2;
+		int split = _global_rank / 2;
+		
+		MPI_Comm_split(_global_comm, color, split, &_local_comm);
+		
+		MPI_Comm_size(_local_comm, &_local_size);
+		MPI_Comm_rank(_local_comm, &_local_rank);
+		
+		//std::cout << "RANK: " << _local_rank << std::endl;
+		
+		if (_local_size < 2) 
+			throw std::runtime_error("More than 2 processes per node required.");
+		
+		int king_color = (_local_rank == 0) ? 0 : MPI_UNDEFINED;
+		MPI_Comm_split(_global_comm, king_color, _global_rank, &_king_comm);
+		_is_king = false;
+		
+		if (_king_comm != MPI_COMM_NULL) {
+			//std::cout << "We are the kings!!" << std::endl;
+			_is_king = true;
+			MPI_Comm_size(_king_comm, &_king_size);
+			MPI_Comm_rank(_king_comm, &_king_rank);
+		}
+		
+	}
+	
+	void run() {
+		
+		_ntasks_completed = 0;
+		
+		// create windows
+		if (_is_king) {
+			MPI_Win_allocate(sizeof(int64_t), sizeof(int64_t), MPI_INFO_NULL,
+				_king_comm, &_king_data, &_king_window);
+			
+			if (_king_rank == 0) {
+				MPI_Win_lock(MPI_LOCK_EXCLUSIVE, 0, 0, _king_window);
+				_king_data[0] = 0;
+				MPI_Win_unlock(0, _king_window);
+			}
+			
+			MPI_Barrier(_king_comm);
+			king_get_tasks();
+		}
+		
+		int nele = (_is_king) ? _local_size : 0;
+		MPI_Win_allocate_shared(nele * sizeof(int64_t), sizeof(int64_t),
+			MPI_INFO_NULL, _local_comm, &_task_data, &_task_window);
+		
+		MPI_Win_lock_all(MPI_MODE_NOCHECK, _task_window);
+		
+		if (_is_king) {
+			std::fill(_task_data, _task_data + _local_size, NO_TASK);
+		}
+		
+		MPI_Win_sync(_task_window);
+		
+		if (_is_king) {
+			king_run();
+		} else {
+			knight_run();
+		}
+		
+		std::cout << "RANK: " << _global_rank << " : DONE" << std::endl;
+
+		// check for consistency
+		MPI_Allreduce(MPI_IN_PLACE, &_ntasks_completed, 1, MPI_LONG_LONG,
+			MPI_SUM, _global_comm);
+			
+		MPI_Win_unlock_all(_task_window);
+		MPI_Win_free(&_task_window);
+		if (_is_king) MPI_Win_free(&_king_window);
+			
+		if (_global_rank == 0 && _ntasks_completed != _ntasks) {
+			throw std::runtime_error("Scheduler: Not all tasks were executed!!");
+		}
+
+	}
+		
+	
+	~dynamic_scheduler() {
+		MPI_Comm_free(&_local_comm);
+		if (_is_king) MPI_Comm_free(&_king_comm);
+	}
 	
 };
 

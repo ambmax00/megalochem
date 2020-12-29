@@ -676,7 +676,7 @@ dbcsr::sbtensor<3,double> dfitting::compute_qr_new(dbcsr::shared_matrix<double> 
 		
 		// ============== RUN SCHEDULER ================================
 		
-		util::scheduler tasks(m_world.comm(), global_tasks.size(), task_func);
+		util::dynamic_scheduler tasks(m_world.comm(), global_tasks.size(), task_func);
 		tasks.run();
 		
 		
