@@ -115,8 +115,6 @@ private:
 	std::vector<vshell> m_clusters;
 	std::vector<int> m_cluster_sizes;
 	std::vector<bool> m_cluster_diff; // false: not diffuse | true : diffuse
-	std::vector<std::string> m_cluster_types; // s, p, d, ... sp, spdf, ...
-	std::vector<double> m_cluster_radii;
 	std::vector<int> m_shell_offsets;
 	int m_nsplit;
 	std::string m_split_method;
@@ -131,6 +129,8 @@ public:
 
 	cluster_basis() {}
 	
+	cluster_basis(std::vector<vshell>& clusters);
+	
 	cluster_basis(std::string basname, std::vector<desc::Atom>& atoms, 
 		std::string method, int nsplit, bool augmented = false);
 	
@@ -143,9 +143,7 @@ public:
 		m_shell_offsets(cbasis.m_shell_offsets),
 		m_nsplit(cbasis.m_nsplit),
 		m_split_method(cbasis.m_split_method),
-		m_cluster_diff(cbasis.m_cluster_diff),
-		m_cluster_types(cbasis.m_cluster_types),
-		m_cluster_radii(cbasis.m_cluster_radii) {}
+		m_cluster_diff(cbasis.m_cluster_diff) {}
 		
 	cluster_basis& operator =(const cluster_basis& cbasis) {
 		if (this != &cbasis) {
@@ -155,8 +153,6 @@ public:
 			m_nsplit = cbasis.m_nsplit;
 			m_split_method = cbasis.m_split_method;
 			m_cluster_diff = cbasis.m_cluster_diff;
-			m_cluster_types = cbasis.m_cluster_types;
-			m_cluster_radii = cbasis.m_cluster_radii;
 		}
 		
 		return *this;

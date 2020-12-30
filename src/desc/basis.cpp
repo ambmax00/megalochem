@@ -411,20 +411,26 @@ cluster_basis::cluster_basis(vshell basis, std::string method, int nsplit,
 		off += m_clusters[i].size();
 	}
 	
-	// shelltypes
-	for (auto& cluster : m_clusters) {
-		std::vector<bool> stypes(MAX_L + 1);
-		for (auto& shell : cluster) {
-			stypes[shell.l] = true;
-		}
-		std::string id = "";
-		for (int i = 0; i != MAX_L+1; ++i) {
-			if (stypes[i]) id += ANGMOMS[i];
-		}
-		m_cluster_types.push_back(id);
+}
+
+cluster_basis::cluster_basis(std::vector<vshell>& clusters) : 
+	m_nsplit(0), m_split_method("read"), m_clusters(clusters) 
+{
+	
+	m_cluster_sizes.clear();
+	for (auto& c : m_clusters) {
+		m_cluster_sizes.push_back(desc::nbf(c));
 	}
 	
+	int off = 0;
+	m_shell_offsets.resize(m_clusters.size());
+	
+	for (int i = 0; i != m_shell_offsets.size(); ++i) {
+		m_shell_offsets[i] = off;
+		off += m_clusters[i].size();
+	}
 }
+	
 
 size_t cluster_basis::max_nprim() const {
 	
@@ -514,7 +520,24 @@ std::vector<bool> cluster_basis::diffuse() const {
 }
 	
 std::vector<std::string> cluster_basis::types() const {
-	return m_cluster_types;
+	
+	// shelltypes
+	
+	std::vector<std::string> cluster_types;
+	
+	for (auto& cluster : m_clusters) {
+		std::vector<bool> stypes(MAX_L + 1);
+		for (auto& shell : cluster) {
+			stypes[shell.l] = true;
+		}
+		std::string id = "";
+		for (int i = 0; i != MAX_L+1; ++i) {
+			if (stypes[i]) id += ANGMOMS[i];
+		}
+		cluster_types.push_back(id);
+	}
+	
+	return cluster_types;
 }
 
 void cluster_basis::print_info() const {
@@ -523,9 +546,9 @@ void cluster_basis::print_info() const {
 		std::cout << "Cluster: " << icluster << '\n'
 				<< "{" << '\n'
 				<< '\t' << "size: " << m_cluster_sizes[icluster] << '\n'
-				<< '\t' << "radius: " << m_cluster_radii[icluster] << '\n'
-				<< '\t' << "diffuse: " << m_cluster_diff[icluster] << '\n'
-				<< '\t' << "type: " << m_cluster_types[icluster] << '\n'
+				//<< '\t' << "radius: " << m_cluster_radii[icluster] << '\n'
+				//<< '\t' << "diffuse: " << m_cluster_diff[icluster] << '\n'
+				//<< '\t' << "type: " << m_cluster_types[icluster] << '\n'
 				<< "}" << std::endl;
 	}
 	

@@ -22,13 +22,14 @@ adcmod::adcmod(dbcsr::world w, hf::shared_hf_wfn hfref, desc::options& opt) :
 	LOG.banner("ADC MODULE",50,'*');
 	
 	std::string dfbasname = m_opt.get<std::string>("dfbasis");
-	int nsplit = m_hfwfn->mol()->c_basis()->nsplit();
-	std::string splitmethod = m_hfwfn->mol()->c_basis()->split_method();
+	
+	int nsplit =  m_opt.get<int>("df_ao_split"); //m_mol->c_basis()->nsplit();
+	std::string smethod = m_opt.get<std::string>("df_ao_split_method");
 	auto atoms = m_hfwfn->mol()->atoms();
 	
 	bool augmented = m_opt.get<bool>("df_augmentation", false);
 	auto dfbasis = std::make_shared<desc::cluster_basis>(
-		dfbasname, atoms, splitmethod, nsplit, augmented);
+		dfbasname, atoms, smethod, nsplit, augmented);
 	m_hfwfn->mol()->set_cluster_dfbasis(dfbasis);
 	
 	init_ao_tensors();

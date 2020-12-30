@@ -23,6 +23,8 @@
 #include <Eigen/Eigenvalues>
 #include <Eigen/Core>
 
+#include "io/data_handler.h"
+
 class testmvp {
 public:
 	Eigen::MatrixXd m_mat;
@@ -106,10 +108,17 @@ int main(int argc, char** argv) {
 	std::filesystem::create_directory(filename + "_data");
 	std::filesystem::create_directory("batching");
 	
+	if (std::filesystem::exists(filename + ".h5")) {
+		std::filesystem::rename(filename + ".h5", filename + "_back.h5");
+	}
+	
 	dbcsr::init();
 	
 	dbcsr::world wrd(MPI_COMM_WORLD);
 	
+	filio::data_handler dhandler_write(wrd, filename + ".h5", filio::create_mode::create);
+	filio::data_handler dhandler_read(wrd, filename + "_back.h5", filio::create_mode::no_create);
+		
 	LOG.os<>("Running ", wrd.size(), " MPI processes with ", omp_get_max_threads(), " threads each.\n\n");
 	
 	time.start();
@@ -128,6 +137,10 @@ int main(int argc, char** argv) {
 	
 	auto mol = filereader.get_mol();
 	auto opt = filereader.get_opt();
+	
+	dhandler_write.open(filio::access_mode::rdwr);
+	dhandler_write.write_molecule(mol);
+	dhandler_write.close();
 	
 	if (wrd.rank() == 0) {
 		opt.print();
@@ -197,14 +210,23 @@ int main(int argc, char** argv) {
 	
 		myhf.compute();
 		myhfwfn = myhf.wfn();
-		myhfwfn->write_to_file(filename);
-		myhfwfn->write_results(filename + "_data/out.json");
+		
+		dhandler_write.open(filio::access_mode::rdwr);
+		dhandler_write.write_hf_wfn(myhfwfn);
+		dhandler_write.close();
 		
 	} else {
 		
 		LOG.os<>("Reading HF info from files...\n");
-		myhfwfn->read_from_file(filename,mol,wrd);
-		myhfwfn->read_results(filename + "_data/out.json");
+		
+		dhandler_read.open(filio::access_mode::read_only);
+		myhfwfn = dhandler_read.read_hf_wfn(mol);
+		dhandler_read.close();
+		
+		dhandler_write.open(filio::access_mode::rdwr);
+		dhandler_write.write_hf_wfn(myhfwfn);
+		dhandler_write.close();
+		
 		LOG.os<>("Done.\n");
 		
 	}

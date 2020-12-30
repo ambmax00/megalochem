@@ -1,0 +1,26 @@
+IMPORTANT
+finish data handler
+
+DO THIS FIRST:
+CHECK numerical accuracy of LMO-K. There seem to be some problems
+BENCHMARKING, BENCHMARKING, AND MORE BENCHMARKING!!!
+!benchmark AO, MEMAO, LMO, MO HF for acid series
+benchmark AO, MEMAO, LMO ADC(1) for acid series (balanced and non balanced)
+do it for cc-pvdz and aug-cc-pvdz
+try different clustering methods
+
+reordering method for chol
+use sparse operations for chol
+use sparse matrix inverter
+
+when reserving space for integrals, too much is reserved at once!!! Fix that!
+
+OTHER
+(Ortho)normalize matrix before doing SVD, CHOLESKY ETC...
+save adc trial vectors to disk when not used
+save other matrices in adc2 MVP if not used
+libcint optimizer
+new basis set clustering (group by exponent fitted to STO)
+give SCALAPACK its own communicator (MPI duplicate)
+memory estimator for each module
+batched contrcation for tensors

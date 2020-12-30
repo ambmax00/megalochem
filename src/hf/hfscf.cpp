@@ -100,8 +100,8 @@ hfmod::hfmod(dbcsr::world w, desc::smolecule mol, desc::options opt)
 		std::string basname = m_opt.get<std::string>("dfbasis");
 		bool augmented = m_opt.get<bool>("df_augmentation", false);
 		
-		int nsplit = m_mol->c_basis()->nsplit();
-		auto smethod = m_mol->c_basis()->split_method();
+		int nsplit =  m_opt.get<int>("df_ao_split"); //m_mol->c_basis()->nsplit();
+		std::string smethod = m_opt.get<std::string>("df_ao_split_method");
 		auto atoms = m_mol->atoms();
 		
 		LOG.os<>("Setting df basis: ", basname, "\n\n");

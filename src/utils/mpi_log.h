@@ -10,7 +10,7 @@
 #include <iomanip>
 #include <stdexcept>
 	
-#define ALL -1
+#define LOG_ALL -1
 
 namespace util {
 

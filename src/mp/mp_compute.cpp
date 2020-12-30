@@ -20,13 +20,14 @@ mpmod::mpmod(dbcsr::world w, hf::shared_hf_wfn wfn_in, desc::options& opt_in) :
 {
 	std::string dfbasname = m_opt.get<std::string>("dfbasis");
 	
-	int nsplit = m_hfwfn->mol()->c_basis()->nsplit();
-	std::string splitmethod = m_hfwfn->mol()->c_basis()->split_method();
+	int nsplit =  m_opt.get<int>("df_ao_split"); //m_mol->c_basis()->nsplit();
+	std::string smethod = m_opt.get<std::string>("df_ao_split_method");
+	
 	auto atoms = m_hfwfn->mol()->atoms(); 
 	
 	bool augmented = m_opt.get<bool>("df_augmentation", false);
 	auto dfbasis = std::make_shared<desc::cluster_basis>(
-		dfbasname, atoms, splitmethod, nsplit, augmented);
+		dfbasname, atoms, smethod, nsplit, augmented);
 	
 	m_hfwfn->mol()->set_cluster_dfbasis(dfbasis);
 	
@@ -180,11 +181,11 @@ void mpmod::compute() {
 	//                         SETUP OTHER TENSORS
 	//==================================================================
 	
-	auto p_occ = m_hfwfn->po_bb_A();
-	auto p_vir = m_hfwfn->pv_bb_A();
-	
 	auto c_occ = m_hfwfn->c_bo_A();
 	auto c_vir = m_hfwfn->c_bv_A();
+	
+	auto p_occ = m_hfwfn->form_density(c_occ);
+	auto p_vir = m_hfwfn->form_density(c_vir);
 	
 	// matrices and tensors
 	

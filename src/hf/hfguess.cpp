@@ -257,11 +257,11 @@ void hfmod::compute_guess() {
 			
 			auto at_wfn = atomic_hf.wfn();
 			
-			auto pA = at_wfn->po_bb_A();
-			auto pB = at_wfn->po_bb_B();
+			auto cA = at_wfn->c_bo_A();
+			auto cB = at_wfn->c_bv_A();
 			
-			//std::cout << "PA on rank: " << myrank << std::endl;
-			//dbcsr::print(*pA);
+			auto pA = at_wfn->form_density(cA);
+			auto pB = at_wfn->form_density(cB);
 			
 			if (pB) {
 			
