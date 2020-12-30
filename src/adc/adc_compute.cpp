@@ -105,6 +105,7 @@ void adcmod::compute() {
 		LOG.os<>("Excitation nr. ", iroot+1, " : ", ex[iroot], '\n');
 	}
 	
+	/*
 	auto r1 = rvecs[0];
 	
 	auto c_bo = m_hfwfn->c_bo_A();
@@ -121,7 +122,7 @@ void adcmod::compute() {
 	auto U = solver.U(b,r);
 	auto Vt = solver.Vt(r,b);
 	
-	exit(0);
+	exit(0);*/
 	
 	bool do_adc2 = m_opt.get<bool>("do_adc2", ADC_DO_ADC2);
 	
