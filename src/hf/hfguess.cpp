@@ -419,7 +419,7 @@ void hfmod::compute_guess() {
 			
 			math::pivinc_cd cd(m_p_bb_A, LOG.global_plev());
 			
-			cd.compute();
+			cd.compute_sparse();
 			
 			m_SAD_rank = cd.rank();
 			

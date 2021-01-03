@@ -216,7 +216,7 @@ void pivinc_cd::compute() {
 		
 		for (int ix = I; ix != N; ++ix) {
 			double ele = U.get('A', ' ', ix, ix);
-			if (ele >= max_U_diag) {
+			if (ele > max_U_diag) {
 				max_U_diag = ele;
 				max_U_idx = ix;
 			}
@@ -265,7 +265,7 @@ void pivinc_cd::compute() {
 		c_pdlapiv('F', 'R', 'C', N-I, N-I, U.data(), I, I, U.desc().data(), ipiv_r, I, 0, desc_r, iwork);
 		c_pdlapiv('F', 'C', 'R', N-I, N-I, U.data(), I, I, U.desc().data(), ipiv_c, 0, I, desc_c, iwork);
 		
-		//U.print();
+		U.print();
 		
 		// STEP 3.0: Convergence criterion
 		
@@ -318,12 +318,12 @@ void pivinc_cd::compute() {
 		
 		//printp(ipiv_r,LOCr);
 		
-		//LOG.os<>("LITTLE U\n");
-		//u_i.print();
+		LOG.os<>("LITTLE U\n");
+		u_i.print();
 		
 		c_pdlapiv('F', 'R', 'C', N-I-1, 1, u_i.data(), I+1, 0, u_i.desc().data(), ipiv_r, I+1, 0, desc_r, iwork);
 		
-		//u_i.print();
+		u_i.print();
 		
 		// (c) add u_i to L
 		
@@ -352,7 +352,9 @@ void pivinc_cd::compute() {
 	
 	LOG.os<1>("-- Permuting L.\n");
 	
-	//L.print();
+	L.print();
+	
+	exit(0);
 	
 	c_pdlapiv('B', 'R', 'C', N, N, L.data(), 0, 0, L.desc().data(), ipiv_r, 0, 0, desc_r, iwork);
 	
@@ -394,6 +396,628 @@ dbcsr::smat_d pivinc_cd::L(std::vector<int> rowblksizes, std::vector<int> colblk
 	
 	return out;
 	
+}
+
+int find_pos(std::vector<int>& blksizes, int pos) {
+	
+	int off = 0;
+	int iblk = 0;
+	
+	while (off <= pos) {
+		off += blksizes[iblk++];
+	}
+	
+	return iblk-1;
+	
+}
+
+void get_row(dbcsr::shared_matrix<double> mat,
+	dbcsr::shared_matrix<double> vec, int i) {
+	
+	int rank = mat->get_world().rank();
+	
+	auto nblkr = vec->nblkrows_total();
+	auto nblkc = vec->nblkcols_local();
+	
+	vec->clear();
+	vec->reserve_all();
+	
+	vec->replicate_all();
+	
+	int N = mat->nfullrows_total();
+	int M = mat->nfullcols_total();
+	
+	int ncblk = mat->nblkcols_total();
+	
+	auto rblksizes = mat->row_blk_sizes();
+	auto cblksizes = mat->col_blk_sizes();
+	auto rblkoffs = mat->row_blk_offsets();
+	auto cblkoffs = mat->col_blk_offsets();
+		
+	// find block index for this row
+	int irblk = find_pos(rblksizes, i);
+		
+	for (int icblk = 0; icblk != ncblk; ++icblk) {		
+		
+		if (rank == mat->proc(irblk,icblk)) {
+			
+			bool found = false;
+			
+			auto blk_mat = mat->get_block_p(irblk,icblk,found);
+			
+			if (!found) continue;
+			
+			auto blk_vec = vec->get_block_p(0,icblk,found);
+			
+			int roff = rblkoffs[irblk];
+			int coff = cblkoffs[icblk];
+			
+			for (int ic = 0; ic != cblksizes[icblk]; ++ic) {
+				blk_vec(0, ic) = blk_mat(i - roff, ic);
+			}
+		}
+	}
+	
+	vec->sum_replicated();
+	vec->distribute();
+	vec->filter(dbcsr::global::filter_eps);
+	
+	return;
+	
+}
+
+void get_col(dbcsr::shared_matrix<double> mat,
+	dbcsr::shared_matrix<double> vec, int i) {
+	
+	vec->clear();
+	vec->reserve_all();
+	vec->replicate_all();
+	
+	int rank = mat->get_world().rank();
+	
+	int N = mat->nfullrows_total();
+	int M = mat->nfullcols_total();
+	
+	int nrblk = mat->nblkrows_total();
+	
+	auto rblksizes = mat->row_blk_sizes();
+	auto cblksizes = mat->col_blk_sizes();
+	auto rblkoffs = mat->row_blk_offsets();
+	auto cblkoffs = mat->col_blk_offsets();
+		
+	// find block index for this row
+	int icblk = find_pos(cblksizes, i);
+	
+	for (int irblk = 0; irblk != nrblk; ++irblk) {		
+		
+		if (rank == mat->proc(irblk,icblk)) {
+			
+			bool found = false;
+			
+			auto blk_mat = mat->get_block_p(irblk,icblk,found);
+			
+			if (!found) continue;
+			
+			auto blk_vec = vec->get_block_p(irblk,0,found);
+			
+			int roff = rblkoffs[irblk];
+			int coff = cblkoffs[icblk];
+			
+			for (int ir = 0; ir != rblksizes[irblk]; ++ir) {
+				blk_vec(ir, 0) = blk_mat(ir, i - coff);
+			}
+		}
+	}
+	
+	vec->sum_replicated();
+	vec->distribute();
+	vec->filter(dbcsr::global::filter_eps);
+	
+	return;
+	
+}
+
+void transfer_rowvec(dbcsr::shared_matrix<double> vec, 
+	dbcsr::shared_matrix<double> mat, int i) 
+{
+	
+	int rank = mat->get_world().rank();
+	
+	mat->clear();
+	vec->replicate_all();
+	
+	auto rblksizes = mat->row_blk_sizes();
+	auto cblksizes = mat->col_blk_sizes();
+	auto rblkoffs = mat->row_blk_offsets();
+	auto cblkoffs = mat->col_blk_offsets();
+	
+	int ncblk = mat->nblkcols_total();
+	int irblk = find_pos(rblksizes, i);
+	
+	std::vector<int> resrow, rescol;
+	
+	for (int icblk = 0; icblk != ncblk; ++icblk) {
+		if (rank == mat->proc(irblk,icblk)) {
+			bool found = false;
+			auto blkvec = vec->get_block_p(0,icblk,found);
+			if (!found) continue;
+			resrow.push_back(irblk);
+			rescol.push_back(icblk);
+		}
+	}
+	
+	mat->reserve_blocks(resrow, rescol);
+	int roff = rblkoffs[irblk];
+	
+	for (auto icblk : rescol) {
+		bool found = true;
+		auto blkmat = mat->get_block_p(irblk,icblk,found);
+		auto blkvec = vec->get_block_p(0,icblk,found);
+			
+		for (int ic = 0; ic != cblksizes[icblk]; ++ic) {
+			blkmat(i - roff, ic) = blkvec(0,ic);
+		}
+	}
+	
+	vec->distribute();
+	
+}
+
+void transfer_colvec(dbcsr::shared_matrix<double> vec, 
+	dbcsr::shared_matrix<double> mat, int i) 
+{
+	
+	int rank = mat->get_world().rank();
+	
+	mat->clear();
+	vec->replicate_all();
+	
+	auto rblksizes = mat->row_blk_sizes();
+	auto cblksizes = mat->col_blk_sizes();
+	auto rblkoffs = mat->row_blk_offsets();
+	auto cblkoffs = mat->col_blk_offsets();
+	
+	int nrblk = mat->nblkrows_total();
+	int icblk = find_pos(cblksizes, i);
+	
+	std::vector<int> resrow, rescol;
+	
+	for (int irblk = 0; irblk != nrblk; ++irblk) {
+		if (rank == mat->proc(irblk,icblk)) {
+			bool found = false;
+			auto blkvec = vec->get_block_p(irblk,0,found);
+			if (!found) continue;
+			resrow.push_back(irblk);
+			rescol.push_back(icblk);
+		}
+	}
+	
+	mat->reserve_blocks(resrow, rescol);
+	int coff = cblkoffs[icblk];
+	
+	for (auto irblk : resrow) {
+		bool found = true;
+		auto blkmat = mat->get_block_p(irblk,icblk,found);
+		auto blkvec = vec->get_block_p(irblk,0,found);
+			
+		for (int ir = 0; ir != rblksizes[irblk]; ++ir) {
+			blkmat(ir, i - coff) = blkvec(ir,0);
+		}
+	}
+	
+	vec->distribute();
+	
+}
+
+void permute_rows(dbcsr::shared_matrix<double> mat, 
+	dbcsr::shared_matrix<double> rowvec0,
+	dbcsr::shared_matrix<double> rowvec1,
+	dbcsr::shared_matrix<double> temp0,
+	dbcsr::shared_matrix<double> temp1,
+	int i, int j)
+{
+	
+	rowvec0->clear();
+	rowvec1->clear();
+	temp0->clear();
+	temp1->clear();
+	
+	get_row(mat, rowvec0, i);
+	get_row(mat, rowvec1, j);
+	
+	transfer_rowvec(rowvec0, temp0, i);
+	temp1->add(1.0, -1.0, *temp0);
+	transfer_rowvec(rowvec0, temp0, j);
+	temp1->add(1.0, 1.0, *temp0);
+	
+	transfer_rowvec(rowvec1, temp0, j);
+	temp1->add(1.0, -1.0, *temp0);
+	transfer_rowvec(rowvec1, temp0, i);
+	temp1->add(1.0, 1.0, *temp0);
+	
+	mat->add(1.0, 1.0, *temp1);
+	
+	rowvec0->clear();
+	rowvec1->clear();
+	temp0->clear();
+	temp1->clear();
+	
+}
+
+void permute_cols(dbcsr::shared_matrix<double> mat, 
+	dbcsr::shared_matrix<double> colvec0,
+	dbcsr::shared_matrix<double> colvec1,
+	dbcsr::shared_matrix<double> temp0,
+	dbcsr::shared_matrix<double> temp1,
+	int i, int j)
+{
+	
+	colvec0->clear();
+	colvec1->clear();
+	temp0->clear();
+	temp1->clear();
+	
+	get_col(mat, colvec0, i);
+	get_col(mat, colvec1, j);
+	
+	transfer_colvec(colvec0, temp0, i);
+	temp1->add(1.0, -1.0, *temp0);
+	transfer_colvec(colvec0, temp0, j);
+	temp1->add(1.0, 1.0, *temp0);
+	
+	transfer_colvec(colvec1, temp0, j);
+	temp1->add(1.0, -1.0, *temp0);
+	transfer_colvec(colvec1, temp0, i);
+	temp1->add(1.0, 1.0, *temp0);
+	
+	mat->add(1.0, 1.0, *temp1);
+	
+	colvec0->clear();
+	colvec1->clear();
+	temp0->clear();
+	temp1->clear();
+	
+}
+
+void permute_vec(Eigen::MatrixXd& vec, std::vector<int> perm, int istart) {
+	
+	auto vecperm = vec;
+	
+	for (int i = istart; i != vec.size(); ++i) {
+		vecperm(i,0) = vec(perm[i],0);
+	}
+	
+}
+	
+
+void set(dbcsr::shared_matrix<double> mat, int i, int j, double val) {
+	
+	auto rblksizes = mat->row_blk_sizes();
+	auto cblksizes = mat->col_blk_sizes();
+	auto rblkoffs = mat->row_blk_offsets();
+	auto cblkoffs = mat->col_blk_offsets();
+	
+	int irblk = find_pos(rblksizes,i);
+	int icblk = find_pos(cblksizes,j);
+	
+	if (mat->proc(irblk,icblk) == mat->get_world().rank()) {
+		bool found = false;
+		auto blk = mat->get_block_p(irblk,icblk,found);
+		int roff = rblkoffs[irblk];
+		int coff = cblkoffs[icblk];
+		
+		blk(i-roff,j-coff) = val;
+		
+	}
+}
+
+struct alignas(alignof(double)) double_int {
+	double d;
+	int i;
+};
+		
+std::tuple<double,int> get_max_diag(dbcsr::matrix<double>& mat, int istart = 0) {
+	auto wrd = mat.get_world();
+	 
+	auto diag = mat.get_diag();
+	auto max = std::max_element(diag.begin() + istart,diag.end());
+	int pos = (int)(max - diag.begin());
+	
+	double_int buf = {*max, wrd.rank()};
+	
+	MPI_Allreduce(MPI_IN_PLACE, &buf, 1, MPI_DOUBLE_INT, 
+		MPI_MAXLOC, wrd.comm());
+				
+	MPI_Bcast(&pos, 1, MPI_INT, buf.i, wrd.comm());
+		
+	return std::make_tuple(buf.d, pos);
+	
+}
+	
+void pivinc_cd::compute_sparse() {
+	
+	// convert input mat to scalapack format
+	
+	LOG.os<1>("Starting pivoted incomplete cholesky decomposition.\n");
+	
+	LOG.os<1>("-- Setting up dbcsr environment and matrices.\n"); 
+	
+	auto wrd = m_mat_in->get_world();
+	
+	int nrows = m_mat_in->nfullrows_total();
+	int ncols = m_mat_in->nfullcols_total();
+	int N = nrows;
+	
+	auto splitrange = dbcsr::split_range(nrows, 4);
+	vec<int> single = {1};
+		
+	auto U = dbcsr::create<double>()
+		.name("U")
+		.set_world(wrd)
+		.row_blk_sizes(splitrange)
+		.col_blk_sizes(splitrange)
+		.matrix_type(dbcsr::type::no_symmetry)
+		.get();
+		
+	auto temp0 = dbcsr::create<double>()
+		.name("tmp0")
+		.set_world(wrd)
+		.row_blk_sizes(splitrange)
+		.col_blk_sizes(splitrange)
+		.matrix_type(dbcsr::type::no_symmetry)
+		.get();
+		
+	auto temp1 = dbcsr::create<double>()
+		.name("tmp1")
+		.set_world(wrd)
+		.row_blk_sizes(splitrange)
+		.col_blk_sizes(splitrange)
+		.matrix_type(dbcsr::type::no_symmetry)
+		.get();
+		
+	auto urowvec0 = dbcsr::create<double>()
+		.name("uvec")
+		.set_world(wrd)
+		.row_blk_sizes(single)
+		.col_blk_sizes(splitrange)
+		.matrix_type(dbcsr::type::no_symmetry)
+		.get();
+		
+	auto urowvec1 = dbcsr::create<double>()
+		.name("uvec")
+		.set_world(wrd)
+		.row_blk_sizes(single)
+		.col_blk_sizes(splitrange)
+		.matrix_type(dbcsr::type::no_symmetry)
+		.get();
+		
+	auto ucolvec0 = dbcsr::create<double>()
+		.name("uvec")
+		.set_world(wrd)
+		.row_blk_sizes(splitrange)
+		.col_blk_sizes(single)
+		.matrix_type(dbcsr::type::no_symmetry)
+		.get();
+		
+	auto ucolvec1 = dbcsr::create<double>()
+		.name("uvec")
+		.set_world(wrd)
+		.row_blk_sizes(splitrange)
+		.col_blk_sizes(single)
+		.matrix_type(dbcsr::type::no_symmetry)
+		.get();
+		
+	auto L = dbcsr::create<double>()
+		.name("L")
+		.set_world(wrd)
+		.row_blk_sizes(splitrange)
+		.col_blk_sizes(splitrange)
+		.matrix_type(dbcsr::type::no_symmetry)
+		.get();
+		
+	L->reserve_all();
+	
+	auto mat_sym = m_mat_in->desymmetrize();
+	U->complete_redistribute(*mat_sym);
+	mat_sym->release();
+	
+	U->filter(dbcsr::global::filter_eps);
+	
+	LOG.os<1>("-- Occupation of U: ", U->occupation(), '\n');
+	
+	int nblks = U->nblkrows_total();
+	
+	double thresh = 1e-14;
+			
+	std::vector<int> rowperm(N), colperm(N), backperm(N);
+	std::iota(rowperm.begin(), rowperm.end(), 0);
+	std::iota(colperm.begin(), colperm.end(), 0);
+	std::iota(backperm.begin(), backperm.end(), 0);
+	
+	std::function<void(int)> cholesky_step;
+	cholesky_step = [&](int I) {
+		
+		// STEP 1: If Dimension of U is one, then set L and return 
+		
+		LOG.os<1>("---- Level ", I, '\n');
+		
+		if (I == N-1) {
+			/*double U_II = U.get('A', ' ', I, I);
+			L.set(I,I,sqrt(U_II));
+			m_rank = I+1;
+			return;*/
+		}
+				
+		// STEP 2.0: Permutation
+		
+		// a) find maximum diagonal element
+		int i_max;
+		double diag_max;
+		
+		std::tie(diag_max, i_max) = get_max_diag(*U,I);
+				
+		LOG(-1).os<1>("---- Maximum element: ", diag_max, " on pos ", i_max, '\n');
+				
+		
+		// b) permute rows/cols
+		// U := P * U * P^t
+		
+		LOG.os<1>("---- Permuting ", I , " with ", i_max, '\n');
+		
+		if (I != i_max) {
+			permute_rows(U, urowvec0, urowvec1, temp0, temp1, I, i_max);
+			permute_cols(U, ucolvec0, ucolvec1, temp0, temp1, I, i_max);
+			std::swap(rowperm[I],rowperm[i_max]);
+			std::swap(colperm[I],colperm[i_max]);
+		}
+		
+		// STEP 3.0: Convergence criterion
+		
+		LOG.os<1>("---- Checking convergence.\n");
+		
+		double U_II = diag_max;
+		
+		if (U_II < 0.0 && fabs(U_II) > thresh) {
+			LOG.os<1>("fabs(U_II): ", fabs(U_II), '\n');
+			throw std::runtime_error("Negative Pivot element. CD not possible.");
+		}
+				
+		if (fabs(U_II) < thresh) {
+			
+			m_rank = I;
+			
+			std::swap(backperm[I],backperm[i_max]);
+			
+			return;
+		}
+				
+		// STEP 3.1: Form Utilde := sub(U) - u * ut
+		
+		LOG.os<1>("---- Forming Utilde ", '\n');
+	
+		// a) get u
+		// u_i
+		get_col(U, ucolvec0, I);
+				
+		auto ui = dbcsr::copy(ucolvec0).get();
+		
+		// b) form Utilde
+		dbcsr::multiply('N', 'T', *ui, *ui, *U)
+			.alpha(-1.0/U_II)
+			.beta(1.0)
+			.filter_eps(dbcsr::global::filter_eps)
+			.first_row(I+1)
+			.first_col(I+1)
+			.perform();
+		
+		// STEP 3.2: Solve P * Utilde * Pt = L * Lt
+		
+		LOG.os<1>("---- Start decomposition of submatrix of dimension ", N-I-1, '\n');
+		cholesky_step(I+1);
+		
+		// STEP 3.3: Form L
+		// (a) diagonal element
+		
+		set(L, I, I, sqrt(U_II));
+		
+		// (b) permute u_i
+		
+		LOG.os<1>("---- Permuting u_i", '\n');
+		
+		auto eigencol = dbcsr::matrix_to_eigen(ui);
+		auto eigencolperm = eigencol;
+		
+		for (int i = 0; i != I+1; ++i) {
+			eigencolperm(i,0) = 0;
+			eigencol(i,0) = 0;
+		}
+		
+		//std::cout << eigencolperm << '\n' << std::endl;
+		
+		for (int i = I+1; i != N; ++i) {
+			eigencolperm(backperm[i],0) = eigencol(i,0);
+		}
+		
+		//std::cout << eigencolperm << '\n' << std::endl;
+		
+		auto colvecperm = dbcsr::eigen_to_matrix(eigencolperm, wrd, "colperm", 
+			splitrange, single, dbcsr::type::no_symmetry);
+		colvecperm->filter(dbcsr::global::filter_eps);
+		
+		transfer_colvec(colvecperm, temp0, I);
+		
+		L->add(1.0, 1.0/sqrt(U_II), *temp0);
+		
+		std::swap(backperm[I],backperm[i_max]);
+		
+		//std::cout << "BACK: " << std::endl;
+		//for (auto a : backperm) {
+		//	std::cout << a << " ";
+		//} std::cout << '\n';
+		
+	};
+	
+	cholesky_step(0);
+	
+	LOG.os<1>("-- Returned from recursion.\n");
+	
+	LOG.os<1>("-- Permuting rows of L\n");
+	
+	//auto Leigen = dbcsr::matrix_to_eigen(L);
+	//if (wrd.rank() == 0) std::cout << Leigen << std::endl;
+	
+	auto L_reo = dbcsr::create_template<double>(L)
+		.name("L_reo")
+		.get();
+		
+	for (int irow = 0; irow != N; ++irow) {
+		
+		get_row(L, urowvec0, irow);
+		transfer_rowvec(urowvec0, temp0, rowperm[irow]);
+		L_reo->add(1.0, 1.0, *temp0);
+		
+		urowvec0->clear();
+		temp0->clear();
+		
+	}
+	
+	//auto Leigenreo = dbcsr::matrix_to_eigen(L_reo);
+	//if (wrd.rank() == 0) std::cout << Leigenreo << std::endl;
+	
+	auto matrowblksizes = m_mat_in->row_blk_sizes();
+	
+	auto rvec = dbcsr::split_range(nrows, 8);
+	
+	auto Lredist = dbcsr::create<double>()
+		.set_world(wrd)
+		.name("Cholesky decomposition")
+		.row_blk_sizes(matrowblksizes)
+		.col_blk_sizes(rvec)
+		.matrix_type(dbcsr::type::no_symmetry)
+		.get();
+		
+	LOG.os<1>("-- Redistributing L\n");
+		
+	Lredist->complete_redistribute(*L_reo);
+	Lredist->filter(dbcsr::global::filter_eps);
+	
+#if 1
+	
+	auto mat_copy = dbcsr::copy(m_mat_in).get();
+	dbcsr::multiply('N', 'T', *Lredist, *Lredist, *mat_copy)
+		.alpha(-1.0)
+		.beta(1.0)
+		.perform();
+		
+	LOG.os<1>("-- Cholesky error: ", mat_copy->norm(dbcsr_norm_frobenius), '\n');
+		
+#endif
+	
+	exit(0);
+
+	LOG.os<1>("Finished decomposition.\n");
+	
+		
 }
 	
 }

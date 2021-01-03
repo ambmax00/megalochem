@@ -31,6 +31,8 @@ public:
 	
 	void compute();
 	
+	void compute_sparse();
+	
 	int rank() { return m_rank; }
 	
 	dbcsr::smat_d L(std::vector<int> rowblksizes, std::vector<int> colblksizes);
