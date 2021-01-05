@@ -48,8 +48,8 @@ smat MVP::compute_sigma_0(smat& u_ia, std::vector<double> epso,
 	
 	// ADC0 : u_ia = - f_ij u_ja + f_ab u_ib
 	
-	smat s_ia_o = dbcsr::copy(u_ia).get();
-	smat s_ia_v = dbcsr::copy(u_ia).get();
+	smat s_ia_o = dbcsr::copy(*u_ia).get();
+	smat s_ia_v = dbcsr::copy(*u_ia).get();
 	
 	//dbcsr::print(*s_ia_o);
 	

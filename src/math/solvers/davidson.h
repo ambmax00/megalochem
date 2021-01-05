@@ -104,7 +104,7 @@ public:
 		
 		for (auto ptr : guess) {
 			
-			auto copy = dbcsr::copy(ptr).get();
+			auto copy = dbcsr::copy(*ptr).get();
 			m_vecs.push_back(copy);
 			
 		}
@@ -268,7 +268,7 @@ public:
 			// ======= Compute all residuals r_k ========
 			
 			std::vector<smat> residuals(m_nroots);
-			smat temp = dbcsr::create_template<double>(m_vecs[0]).name("temp").get();
+			smat temp = dbcsr::create_template<double>(*m_vecs[0]).name("temp").get();
 			double max_err = 0;
 			
 			int start_root = (m_block) ? 0 : m_nroots - 1;
@@ -276,7 +276,7 @@ public:
 			for (int iroot = start_root; iroot != m_nroots; ++iroot) {
 			//int iroot = m_nroots - 1;
 			
-				smat r_k = dbcsr::create_template<double>(m_vecs[0]).name("temp").get();
+				smat r_k = dbcsr::create_template<double>(*m_vecs[0]).name("temp").get();
 				
 				for (int i = 0; i != m_subspace; ++i) {
 					
@@ -347,7 +347,7 @@ public:
 				LOG.os<1>("Computing for root ", iroot, '\n');
 				LOG.os<1>("Computing preconditioner.\n");
 				
-				smat D = dbcsr::create_template(residuals[iroot]).name("D").get();
+				smat D = dbcsr::create_template(*residuals[iroot]).name("D").get();
 				
 				D->reserve_all();
 				
@@ -362,7 +362,7 @@ public:
 				}
 				
 				// form new vector
-				smat d_k = dbcsr::create_template(residuals[iroot])
+				smat d_k = dbcsr::create_template(*residuals[iroot])
 					.name("d_k").get();
 				
 				// d(k)_ia = D(k)_ia * q(k)_ia
@@ -380,8 +380,8 @@ public:
 				// b_new = d_k - sum_j proj_bi(d_k)
 				// where proj_b(v) = dot(b,v)/dot(b,b)
 				
-				smat bnew = dbcsr::create_template(d_k).name("b_" + std::to_string(m_subspace)).get();
-				smat temp2 = dbcsr::create_template(d_k).name("temp2").get();
+				smat bnew = dbcsr::create_template(*d_k).name("b_" + std::to_string(m_subspace)).get();
+				smat temp2 = dbcsr::create_template(*d_k).name("temp2").get();
 				
 				//dbcsr::copy(d_k, bnew).perform();
 				bnew->copy_in(*d_k);
@@ -432,7 +432,7 @@ public:
 		m_eigvals.resize(m_nroots);
 		std::copy(evals.data(), evals.data() + m_nroots, m_eigvals.data());
 				
-		smat temp3 = dbcsr::create_template<double>(m_vecs[0]).name("temp3").get();
+		smat temp3 = dbcsr::create_template<double>(*m_vecs[0]).name("temp3").get();
 		
 		m_ritzvecs.clear();
 		
@@ -451,12 +451,12 @@ public:
 		LOG.os<1>("Collapsing subspace...\n");
 				
 		std::vector<smat> new_vecs;
-		smat tempx = dbcsr::create_template<double>(m_vecs[0])
+		smat tempx = dbcsr::create_template<double>(*m_vecs[0])
 			.name("tempx").get();
 		
 		for (int k = 0; k != m_nroots; ++k) {
 		
-			smat x_k = dbcsr::create_template(m_vecs[0])
+			smat x_k = dbcsr::create_template(*m_vecs[0])
 				.name("new_guess_"+std::to_string(k))
 				.get(); 
 			

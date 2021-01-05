@@ -299,7 +299,7 @@ std::shared_ptr<MVP> adcmod::create_adc2(
 		dbcsr::shared_matrix<double> m_xx, m_xx_trunc;
 		
 		get(m_xx, ints::key::coul_xx);
-		m_xx_trunc = dbcsr::create_template<double>(m_xx)
+		m_xx_trunc = dbcsr::create_template<double>(*m_xx)
 			.name("metric truncated")
 			.get();
 		
@@ -333,7 +333,7 @@ std::shared_ptr<MVP> adcmod::create_adc2(
 		dbcsr::shared_matrix<double> s_bb_full, s_bb_trunc;		
 		get(s_bb_full, ints::key::ovlp_bb);
 		
-		s_bb_trunc = dbcsr::create_template<double>(s_bb_full)
+		s_bb_trunc = dbcsr::create_template<double>(*s_bb_full)
 			.name("overlap truncated")
 			.get();
 		
@@ -362,11 +362,11 @@ std::shared_ptr<MVP> adcmod::create_adc2(
 		auto c_bo_full = m_hfwfn->c_bo_A();
 		auto c_bv_full = m_hfwfn->c_bv_A();
 		
-		c_bo = dbcsr::create_template<double>(c_bo_full)
+		c_bo = dbcsr::create_template<double>(*c_bo_full)
 			.name("truncated c_bo")
 			.get();
 			
-		c_bv = dbcsr::create_template<double>(c_bv_full)
+		c_bv = dbcsr::create_template<double>(*c_bv_full)
 			.name("truncated c_bv")
 			.get();
 		

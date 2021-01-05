@@ -17,12 +17,13 @@ using MatrixX = Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic>;
 namespace dbcsr {
 
 template <typename T = double>
-MatrixX<T> matrix_to_eigen(shared_matrix<T>& mat_in) {
-	int row = mat_in->nfullrows_total();
-	int col = mat_in->nfullcols_total();
+MatrixX<T> matrix_to_eigen(matrix<T>& mat_in) {
+	
+	int row = mat_in.nfullrows_total();
+	int col = mat_in.nfullcols_total();
 	
 	auto mat_copy = dbcsr::copy(mat_in)
-		.name("Copy of " + mat_in->name())
+		.name("Copy of " + mat_in.name())
 		.get();
 	
 	decltype(mat_copy) mat_desym;

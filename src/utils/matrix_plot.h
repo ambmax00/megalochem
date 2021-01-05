@@ -11,7 +11,7 @@ namespace plt = matplotlibcpp;
 
 inline void plot(dbcsr::shared_matrix<double> mat_in, double thresh) {
 
-	auto eigen_colmaj = dbcsr::matrix_to_eigen(mat_in);
+	auto eigen_colmaj = dbcsr::matrix_to_eigen(*mat_in);
 	Eigen::Matrix<float, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor> eigen_rowmaj 
 		= eigen_colmaj.cast<float>();
 	

@@ -32,7 +32,7 @@ public:
 	dbcsr::shared_matrix<double> compute(dbcsr::shared_matrix<double> u_ia,
 		double omega = 0.0) {
 			
-		auto u_eigen = dbcsr::matrix_to_eigen(u_ia);
+		auto u_eigen = dbcsr::matrix_to_eigen(*u_ia);
 		int r = u_eigen.rows();
 		int c = u_eigen.cols();
 				

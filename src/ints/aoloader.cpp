@@ -155,7 +155,7 @@ void aoloader::compute() {
 		auto cinv = p.first;
 		
 		smatd temp = 
-			dbcsr::create_template<double>(c)
+			dbcsr::create_template<double>(*c)
 			.name("temp")
 			.matrix_type(dbcsr::type::no_symmetry).get();
 			

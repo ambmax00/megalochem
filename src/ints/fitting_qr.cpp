@@ -130,7 +130,7 @@ dbcsr::sbtensor<3,double> dfitting::compute_qr_new(dbcsr::shared_matrix<double> 
 	
 	dbcsr::world single_world(MPI_COMM_SELF);
 	
-	auto s_xx_inv_eigen = dbcsr::matrix_to_eigen(s_xx_inv);
+	auto s_xx_inv_eigen = dbcsr::matrix_to_eigen(*s_xx_inv);
 	auto s_xx_local_mat = dbcsr::eigen_to_matrix(s_xx_inv_eigen, single_world, 
 		"temp", x, x, dbcsr::type::symmetric);
 	dbcsr::copy_matrix_to_tensor(*s_xx_local_mat, *s_xx_inv_local);
@@ -139,7 +139,7 @@ dbcsr::sbtensor<3,double> dfitting::compute_qr_new(dbcsr::shared_matrix<double> 
 	s_xx_inv_eigen.resize(0,0);
 	s_xx_local_mat->release();
 	
-	auto m_xx_eigen = dbcsr::matrix_to_eigen(m_xx);
+	auto m_xx_eigen = dbcsr::matrix_to_eigen(*m_xx);
 	
 	// =============== CREATE FRAGMENT BLOCKS ==========================
 	

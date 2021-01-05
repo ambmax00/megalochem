@@ -4,12 +4,12 @@ namespace locorb {
 
 std::pair<smat_d,smat_d> mo_localizer::compute_pao(smat_d c_bm, smat_d s_bb) {
 	
-	auto l_bb = dbcsr::create_template<double>(s_bb)
+	auto l_bb = dbcsr::create_template<double>(*s_bb)
 		.name("u_bb")
 		.matrix_type(dbcsr::type::no_symmetry)
 		.get();
 		
-	auto u_bm = dbcsr::create_template<double>(c_bm)
+	auto u_bm = dbcsr::create_template<double>(*c_bm)
 		.name("u_bm")
 		.get();
 		

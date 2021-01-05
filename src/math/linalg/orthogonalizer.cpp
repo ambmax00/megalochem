@@ -27,11 +27,11 @@ void orthogonalizer::compute() {
 	
 	std::for_each(eigvals.begin(),eigvals.end(),[](double& d) { d = (d < threshold) ? 0 : 1/sqrt(d); });
 	
-	auto eigvec_copy = dbcsr::copy<double>(eigvecs).get();
+	auto eigvec_copy = dbcsr::copy<double>(*eigvecs).get();
 	
 	eigvec_copy->scale(eigvals, "right");
 	
-	m_mat_out = dbcsr::create_template(m_mat_in)
+	m_mat_out = dbcsr::create_template(*m_mat_in)
 		.name(m_mat_in->name() + " orthogonalized")
 		.matrix_type(dbcsr::type::symmetric)
 		.get();

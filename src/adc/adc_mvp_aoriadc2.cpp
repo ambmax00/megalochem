@@ -20,7 +20,7 @@ smat MVP_AOADC2::get_scaled_coeff(char dim, double wght, double xpt,
 	auto eps_m = (dim == 'O') ? m_eps_occ : m_eps_vir;
 	int sign = (dim == 'O') ? 1 : -1;
 	
-	auto c_bm_scaled = dbcsr::copy(c_bm).get();
+	auto c_bm_scaled = dbcsr::copy(*c_bm).get();
 	auto eps_scaled = *eps_m;
 	
 	std::for_each(eps_scaled.begin(),eps_scaled.end(),
@@ -233,7 +233,7 @@ smat MVP_AOADC2::compute_sigma_1(smat& jmat, smat& kmat) {
 	auto j = u_transform(jmat, 'T', m_c_bo, 'N', m_c_bv);
 	auto k = u_transform(kmat, 'T', m_c_bo, 'N', m_c_bv);
 	
-	smat sig_ao = dbcsr::create_template<double>(jmat)
+	smat sig_ao = dbcsr::create_template<double>(*jmat)
 		.name("sig_ao")
 		.matrix_type(dbcsr::type::no_symmetry)
 		.get();
@@ -327,10 +327,10 @@ void MVP_AOADC2::compute_intermeds() {
 		.matrix_type(dbcsr::type::no_symmetry)
 		.get();
 		
-	auto i_oo_tmp = dbcsr::create_template(m_i_oo)
+	auto i_oo_tmp = dbcsr::create_template(*m_i_oo)
 		.name("i_oo_temp").get();
 		
-	auto i_vv_tmp = dbcsr::create_template(m_i_vv)
+	auto i_vv_tmp = dbcsr::create_template(*m_i_vv)
 		.name("i_vv_temp").get();
 	
 	for (int ilap = 0; ilap != m_nlap; ++ilap) {
@@ -439,8 +439,8 @@ void MVP_AOADC2::compute_intermeds() {
 	dbcsr::multiply('N', 'N', *i_vb, *m_c_bv, *m_i_vv)
 			.perform();
 			
-	auto i_oo_tr = dbcsr::transpose(m_i_oo).get();
-	auto i_vv_tr = dbcsr::transpose(m_i_vv).get();
+	auto i_oo_tr = dbcsr::transpose(*m_i_oo).get();
+	auto i_vv_tr = dbcsr::transpose(*m_i_vv).get();
 	
 	m_i_oo->add(1.0, 1.0, *i_oo_tr);
 	m_i_vv->add(1.0, 1.0, *i_vv_tr);
@@ -464,7 +464,7 @@ smat MVP_AOADC2::compute_sigma_2a(smat& u_ia) {
 	LOG.os<1>("==== Computing ADC(2) SIGMA 2A ====\n");
 	
 	// sig_2a = i_vv_ab * u_ib
-	auto sig_2a = dbcsr::create_template<double>(u_ia)
+	auto sig_2a = dbcsr::create_template<double>(*u_ia)
 		.name("sig_2a")
 		.get();
 		
@@ -484,7 +484,7 @@ smat MVP_AOADC2::compute_sigma_2b(smat& u_ia) {
 	LOG.os<1>("==== Computing ADC(2) SIGMA 2B ====\n");
 	
 	// sig_2b = i_oo_ij * u_ja
-	auto sig_2b = dbcsr::create_template<double>(u_ia)
+	auto sig_2b = dbcsr::create_template<double>(*u_ia)
 		.name("sig_2b")
 		.get();
 		
@@ -513,9 +513,12 @@ smat MVP_AOADC2::compute_sigma_2c(smat& jmat, smat& kmat) {
 	
 	LOG.os<1>("==== Computing ADC(2) SIGMA 2C ====\n");
 	 		
-	auto I_ao = dbcsr::create_template<double>(jmat).name("I_ao").get();
-	auto jmat_t = dbcsr::transpose(jmat).get();
-	auto kmat_t = dbcsr::transpose(kmat).get();
+	auto I_ao = dbcsr::create_template<double>(*jmat)
+		.name("I_ao").get();
+	auto jmat_t = dbcsr::transpose(*jmat)
+		.get();
+	auto kmat_t = dbcsr::transpose(*kmat)
+		.get();
 	
 	I_ao->add(0.0, 1.0, *jmat_t);
 	I_ao->add(1.0, 1.0, *kmat_t);
@@ -584,7 +587,7 @@ smat MVP_AOADC2::compute_sigma_2d(smat& u_ia) {
 	 
 	LOG.os<1>("==== Computing ADC(2) SIGMA 2D ====\n");
 	 
-	auto I_ao = dbcsr::create_template<double>(m_pseudo_occs[0])
+	auto I_ao = dbcsr::create_template<double>(*m_pseudo_occs[0])
 		.name("I_ao")
 		.matrix_type(dbcsr::type::no_symmetry)
 		.get();
@@ -627,8 +630,8 @@ smat MVP_AOADC2::compute_sigma_2d(smat& u_ia) {
 	auto jmat = m_jbuilder->get_J();
 	auto kmat = m_kbuilder->get_K_A();
 	
-	auto jmat_trans = dbcsr::transpose(jmat).get();
-	auto kmat_trans = dbcsr::transpose(kmat).get();
+	auto jmat_trans = dbcsr::transpose(*jmat).get();
+	auto kmat_trans = dbcsr::transpose(*kmat).get();
 	
 	jmat_trans->add(1.0, 1.0, *kmat_trans);
 	
@@ -687,9 +690,9 @@ dbcsr::sbtensor<3,double> MVP_AOADC2::compute_R(smat& u_ao) {
 	// u_v_mu,nu = u_mu,nu' * S_nu',nu
 	// u_o_mu.nu = S_mu',mu * u_mu',nu
 		
-	auto u_hto = dbcsr::create_template<double>(u_ao)
+	auto u_hto = dbcsr::create_template<double>(*u_ao)
 		.name("u_hto").get();
-	auto u_htv = dbcsr::create_template<double>(u_ao)
+	auto u_htv = dbcsr::create_template<double>(*u_ao)
 		.name("u_htv").get();
 	
 	dbcsr::multiply('N', 'N', *m_s_bb, *u_ao, *u_hto).perform();
@@ -833,12 +836,12 @@ std::pair<smat,smat> MVP_AOADC2::compute_sigma_2e_ilap(
 	FA->clear();
 	FB->clear();
 	
-	auto sigma_ilap_A = dbcsr::create_template<double>(pseudo_o)
+	auto sigma_ilap_A = dbcsr::create_template<double>(*pseudo_o)
 		.name("sigma_ilap_A")
 		.matrix_type(dbcsr::type::no_symmetry)
 		.get();
 		
-	auto sigma_ilap_B = dbcsr::create_template<double>(pseudo_o)
+	auto sigma_ilap_B = dbcsr::create_template<double>(*pseudo_o)
 		.name("sigma_ilap_B")
 		.matrix_type(dbcsr::type::no_symmetry)
 		.get();
@@ -1173,7 +1176,7 @@ smat MVP_AOADC2::compute_sigma_2e(smat& u_ao, double omega) {
 		.matrix_type(dbcsr::type::no_symmetry)
 		.get();
 		
-	auto sigma_2e_B = dbcsr::create_template<double>(sigma_2e_A)
+	auto sigma_2e_B = dbcsr::create_template<double>(*sigma_2e_A)
 		.name("sigma_2e_B").get();
 	
 	// Form J

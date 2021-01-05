@@ -68,7 +68,7 @@ public:
 			if (reduce) m_delta.erase(to_erase);
 			
 			// make a copy, put it into trialvecs
-			auto m_in = dbcsr::create_template(T)
+			auto m_in = dbcsr::create_template(*T)
 				.name("Trial Vec " + iter).get();
 			m_in->copy_in(*T);
 			

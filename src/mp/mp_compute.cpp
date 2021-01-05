@@ -188,19 +188,19 @@ void mpmod::compute() {
 	
 	// matrices and tensors
 	
-	auto c_occ_exp = dbcsr::create_template(c_occ)
+	auto c_occ_exp = dbcsr::create_template(*c_occ)
 		.name("Scaled Occ Coeff").get();
 		
-	auto c_vir_exp = dbcsr::create_template(c_vir)
+	auto c_vir_exp = dbcsr::create_template(*c_vir)
 		.name("Scaled Vir Coeff").get();
 		
-	auto pseudo_occ = dbcsr::create_template(p_occ)
+	auto pseudo_occ = dbcsr::create_template(*p_occ)
 		.name("Pseudo Density (OCC)").get();
 		
-	auto pseudo_vir = dbcsr::create_template(p_vir)
+	auto pseudo_vir = dbcsr::create_template(*p_vir)
 		.name("Pseudo Density (VIR)").get();
 		
-	auto ztilde_XX = dbcsr::create_template(metric_matrix)
+	auto ztilde_XX = dbcsr::create_template(*metric_matrix)
 		.name("ztilde_xx")
 		.matrix_type(dbcsr::type::no_symmetry)
 		.get();
@@ -340,7 +340,7 @@ void mpmod::compute() {
 		
 		int nblks = x.size();
 		
-		auto ztilde_XX_t = dbcsr::transpose(ztilde_XX).get();
+		auto ztilde_XX_t = dbcsr::transpose(*ztilde_XX).get();
 			
 		//dbcsr::print(*Ztilde_XX);
 		//dbcsr::print(*Ztilde_XX_t);

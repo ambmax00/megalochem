@@ -28,7 +28,7 @@ fockmod::fockmod (dbcsr::world iworld, desc::smolecule imol, desc::options iopt)
 		.get();
 		
 	if (m_mol->nele_alpha() != m_mol->nele_beta() && m_mol->nele_beta() != 0) {
-		m_f_bb_B = dbcsr::create_template<double>(m_f_bb_A)
+		m_f_bb_B = dbcsr::create_template<double>(*m_f_bb_A)
 			.name("f_bb_B").get();
 	}
 	

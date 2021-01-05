@@ -398,6 +398,377 @@ dbcsr::smat_d pivinc_cd::L(std::vector<int> rowblksizes, std::vector<int> colblk
 	
 }
 
+template <typename T>
+class xmatrix : public dbcsr::matrix<T> {
+private:
+
+	int _nb, _mb, _nblk_row, _nblk_col;
+	int _N, _M;
+	int _nproc_row, _nproc_col;
+	int _rank, _prow, _pcol;
+	
+public:
+	
+	xmatrix(dbcsr::matrix<T>&& mat_in) :
+		dbcsr::matrix<T>(std::forward<dbcsr::matrix<T>>(mat_in))
+	{
+		_N = this->nfullrows_total();
+		_M = this->nfullcols_total();
+		
+		auto rblksizes = this->row_blk_sizes();
+		auto cblksizes = this->col_blk_sizes();
+		
+		_nb = rblksizes[0];
+		_mb = cblksizes[0];
+		
+		auto w = this->get_world();
+		
+		_rank =w.rank();
+		_nproc_row = w.dims()[0];
+		_nproc_col = w.dims()[1];
+		_prow = w.myprow();
+		_pcol = w.mypcol();
+		
+		_nblk_row = rblksizes.size();
+		_nblk_col = cblksizes.size();
+		
+	}
+
+	static std::shared_ptr<xmatrix> create(dbcsr::world wrd, int N, int M, int nb, int mb) 
+	{
+		
+		auto distrvec = dbcsr::split_range(N, nb);
+		auto distcvec = dbcsr::split_range(M, mb);
+		
+		auto rdist = dbcsr::cyclic_dist(distrvec.size(),wrd.dims()[0]);
+		auto cdist = dbcsr::cyclic_dist(distcvec.size(),wrd.dims()[1]);
+
+		dbcsr::dist mdist = dbcsr::dist::create()
+			.set_world(wrd)
+			.row_dist(rdist)
+			.col_dist(cdist);
+				
+		auto mat = dbcsr::create<T>()
+			.name("submatrix")
+			.set_dist(mdist)
+			.row_blk_sizes(distrvec)
+			.col_blk_sizes(distcvec)
+			.matrix_type(dbcsr::type::no_symmetry)
+			.get();
+				
+		auto out = std::make_shared<xmatrix<T>>(std::move(*mat));
+		return out;
+		
+	}
+	
+	inline int blkidx_row(int i) {
+		return i / _nb;
+	}
+	
+	inline int blkidx_col(int j) {
+		return j / _mb;
+	}
+	
+	inline int proc_row(int iblk) {
+		return iblk % _nproc_row;
+	}
+	
+	inline int proc_col(int iblk) {
+		return iblk % _nproc_col;
+	}
+	
+	inline int blksize_row(int iblk) {
+		return (iblk != _nblk_row-1) ? _nb : N % _nb;
+	} 
+	
+	inline int blksize_col(int iblk) {
+		return (iblk != _nblk_col-1) ? _mb : M % _mb;
+	}
+	
+	void get_row(xmatrix& vec, int i) {
+		
+		std::cout << "GET ROWS: " << std::endl;
+		
+		vec.clear();
+		vec.reserve_all();
+		vec.replicate_all();
+		
+		int irblk = blkidx_row(i);
+		
+		std::cout << "I/IRBLK: " << i << " " << irblk << std::endl;
+		
+		for (int icblk = 0; icblk != _nblk_col; ++icblk) {		
+			if (_prow == proc_row(irblk) && _pcol == proc_col(icblk)) {
+			
+				bool found = false;
+				auto blk_mat = this->get_block_p(irblk,icblk,found);
+				
+				if (!found) continue;
+				
+				auto blk_vec = vec.get_block_p(0,icblk,found);
+				
+				int roff = irblk * _nb;
+				
+				for (int ic = 0; ic != _mb; ++ic) {
+					blk_vec(0, ic) = blk_mat(i - roff, ic);
+				}
+			}
+		}
+		
+		vec.sum_replicated();
+		vec.distribute();
+		
+		dbcsr::print(vec);
+		
+	}
+	
+	void get_col(xmatrix& vec, int i) {
+		
+		std::cout << "GET COLS: " << std::endl;
+		
+		vec.clear();
+		vec.reserve_all();
+		vec.replicate_all();
+		
+		int icblk = blkidx_col(i);
+		
+		std::cout << "I/ICBLK: " << i << " " << icblk << std::endl;
+		
+		for (int irblk = 0; irblk != _nblk_row; ++irblk) {		
+			if (_prow == proc_row(irblk) && _pcol == proc_col(icblk)) {
+			
+				bool found = false;
+				auto blk_mat = this->get_block_p(irblk,icblk,found);
+				
+				if (!found) continue;
+				
+				auto blk_vec = vec.get_block_p(irblk,0,found);
+				
+				int coff = icblk * _mb;
+				
+				for (int ir = 0; ir != _nb; ++ir) {
+					blk_vec(ir,0) = blk_mat(ir,i-coff);
+				}
+			}
+		}
+		
+		
+		
+		vec.sum_replicated();
+		vec.distribute();
+		
+		dbcsr::print(vec);
+		
+	}
+	
+	void overwrite_rowvec(xmatrix& vec, int i) {
+		
+		std::cout << "OVERWRITE ROWS: " << std::endl;
+		
+		this->clear();
+		vec.replicate_all();
+		
+		int irblk = blkidx_row(i);
+		
+		std::vector<int> resrow, rescol;
+		
+		for (int icblk = 0; icblk != _nblk_col; ++icblk) {
+			if (_prow == proc_row(irblk) && _pcol == proc_col(icblk)) {
+				
+				bool found = false;
+				auto blkvec = vec.get_block_p(0,icblk,found);
+				
+				if (!found) continue;
+				
+				resrow.push_back(irblk);
+				rescol.push_back(icblk);
+				
+			}
+		}
+		
+		std::cout << "Reserve: " << std::endl;
+		
+		this->reserve_blocks(resrow, rescol);
+		int roff = irblk * _nb;
+		
+		std::cout << "loop: " << std::endl;
+		
+		for (auto icblk : rescol) {
+			
+			bool found = true;
+			auto blkmat = this->get_block_p(irblk,icblk,found);
+			auto blkvec = vec.get_block_p(0,icblk,found);
+				
+			for (int ic = 0; ic != _mb; ++ic) {
+				blkmat(i - roff, ic) = blkvec(0,ic);
+			}
+		}
+		
+		vec.distribute();
+		
+		std::cout << "ROWOVERWRITE:" << std::endl;
+		dbcsr::print(*this);
+		
+	}
+	
+	void overwrite_colvec(xmatrix& vec, int i) {
+		
+		std::cout << "OVERWRITE COLS: " << std::endl;
+	
+		this->clear();
+		vec.replicate_all();
+		
+		int icblk = blkidx_col(i);
+		
+		std::vector<int> resrow, rescol;
+		
+		std::cout << "Reserve: " << std::endl;
+		
+		for (int irblk = 0; irblk != _nblk_row; ++irblk) {
+			if (_prow == proc_row(irblk) && _pcol == proc_col(icblk)) {
+				
+				bool found = false;
+				auto blkvec = vec.get_block_p(irblk,0,found);
+				
+				if (!found) continue;
+				
+				resrow.push_back(irblk);
+				rescol.push_back(icblk);
+				
+			}
+		}
+		
+		this->reserve_blocks(resrow, rescol);
+		int coff = icblk * _mb;
+		
+		std::cout << "loop: " << std::endl;
+		
+		for (auto irblk : resrow) {
+			
+			bool found = true;
+			auto blkmat = this->get_block_p(irblk,icblk,found);
+			auto blkvec = vec.get_block_p(irblk,0,found);
+				
+			for (int ir = 0; ir != _nb; ++ir) {
+				blkmat(ir, i - coff) = blkvec(ir,0);
+			}
+		}
+		
+		vec.distribute();
+		
+	}
+	
+	void set(int i, int j, double val) {
+	
+		int irblk = blkidx_row(i);
+		int icblk = blkidx_col(j);
+		
+		if (_prow == proc_row(irblk) && _pcol == proc_col(icblk)) {
+			
+			bool found = false;
+			
+			auto blk = this->get_block_p(irblk,icblk,found);
+			
+			if (!found) {
+				std::vector<int> rres = {irblk};
+				std::vector<int> cres = {icblk};
+				this->reserve_blocks(rres,cres);
+				blk = this->get_block_p(irblk,icblk,found);
+			}
+			
+			int roff = irblk * _nb;
+			int coff = icblk * _mb;
+			
+			blk(i-roff,j-coff) = val;
+			
+		}
+		
+	}
+		
+};
+
+template <typename T> 
+using shared_xmatrix = std::shared_ptr<xmatrix<T>>;
+
+void permute_rows(xmatrix<double>& mat, 
+	xmatrix<double>& rowvec0, xmatrix<double>& rowvec1,
+	xmatrix<double>& temp0, xmatrix<double>& temp1,
+	int i, int j)
+{
+
+	std::cout << "PERMUTING ROWS: " << std::endl;
+	
+	rowvec0.clear();
+	rowvec1.clear();
+	temp0.clear();
+	temp1.clear();
+
+	mat.get_row(rowvec0, i);
+	mat.get_row(rowvec1, j);
+	
+	std::cout << "BEFORE: " << dbcsr::matrix_to_eigen(mat) << std::endl;
+	
+	temp0.overwrite_rowvec(rowvec0, i);
+	temp1.add(1.0, -1.0, temp0);
+	temp0.overwrite_rowvec(rowvec0, j);
+	temp1.add(1.0, 1.0, temp0);
+
+	temp0.overwrite_rowvec(rowvec1, j);
+	temp1.add(1.0, -1.0, temp0);
+	temp0.overwrite_rowvec(rowvec1, i);
+	temp1.add(1.0, 1.0, temp0);
+	
+	mat.add(1.0, 1.0, temp1);
+	
+	std::cout << "AFTER: " << dbcsr::matrix_to_eigen(mat) << std::endl;
+	
+	rowvec0.clear();
+	rowvec1.clear();
+	temp0.clear();
+	temp1.clear();
+}
+
+void permute_cols(xmatrix<double>& mat, 
+	xmatrix<double>& colvec0, xmatrix<double>& colvec1,
+	xmatrix<double>& temp0, xmatrix<double>& temp1,
+	int i, int j)
+{
+	
+	std::cout << "PERMUTING COLS: " << std::endl;
+	
+	colvec0.clear();
+	colvec1.clear();
+	temp0.clear();
+	temp1.clear();
+
+	mat.get_col(colvec0, i);
+	
+	std::cout << dbcsr::matrix_to_eigen(mat) << std::endl;
+	mat.get_col(colvec1, j);
+	
+	std::cout << dbcsr::matrix_to_eigen(colvec0) << std::endl;
+	std::cout << dbcsr::matrix_to_eigen(colvec1) << std::endl;
+	
+	temp0.overwrite_colvec(colvec0, i);
+	temp1.add(1.0, -1.0, temp0);
+	temp0.overwrite_colvec(colvec0, j);
+	temp1.add(1.0, 1.0, temp0);
+
+	temp0.overwrite_colvec(colvec1, j);
+	temp1.add(1.0, -1.0, temp0);
+	temp0.overwrite_colvec(colvec1, i);
+	temp1.add(1.0, 1.0, temp0);
+	
+	mat.add(1.0, 1.0, temp1);
+	
+	colvec0.clear();
+	colvec1.clear();
+	temp0.clear();
+	temp1.clear();
+	
+}
+
+
 int find_pos(std::vector<int>& blksizes, int pos) {
 	
 	int off = 0;
@@ -733,7 +1104,7 @@ std::tuple<double,int> get_max_diag(dbcsr::matrix<double>& mat, int istart = 0) 
 	return std::make_tuple(buf.d, pos);
 	
 }
-	
+
 void pivinc_cd::compute_sparse() {
 	
 	// convert input mat to scalapack format
@@ -747,73 +1118,22 @@ void pivinc_cd::compute_sparse() {
 	int nrows = m_mat_in->nfullrows_total();
 	int ncols = m_mat_in->nfullcols_total();
 	int N = nrows;
+	int nb = 4;
 	
 	auto splitrange = dbcsr::split_range(nrows, 4);
 	vec<int> single = {1};
 		
-	auto U = dbcsr::create<double>()
-		.name("U")
-		.set_world(wrd)
-		.row_blk_sizes(splitrange)
-		.col_blk_sizes(splitrange)
-		.matrix_type(dbcsr::type::no_symmetry)
-		.get();
-		
-	auto temp0 = dbcsr::create<double>()
-		.name("tmp0")
-		.set_world(wrd)
-		.row_blk_sizes(splitrange)
-		.col_blk_sizes(splitrange)
-		.matrix_type(dbcsr::type::no_symmetry)
-		.get();
-		
-	auto temp1 = dbcsr::create<double>()
-		.name("tmp1")
-		.set_world(wrd)
-		.row_blk_sizes(splitrange)
-		.col_blk_sizes(splitrange)
-		.matrix_type(dbcsr::type::no_symmetry)
-		.get();
-		
-	auto urowvec0 = dbcsr::create<double>()
-		.name("uvec")
-		.set_world(wrd)
-		.row_blk_sizes(single)
-		.col_blk_sizes(splitrange)
-		.matrix_type(dbcsr::type::no_symmetry)
-		.get();
-		
-	auto urowvec1 = dbcsr::create<double>()
-		.name("uvec")
-		.set_world(wrd)
-		.row_blk_sizes(single)
-		.col_blk_sizes(splitrange)
-		.matrix_type(dbcsr::type::no_symmetry)
-		.get();
-		
-	auto ucolvec0 = dbcsr::create<double>()
-		.name("uvec")
-		.set_world(wrd)
-		.row_blk_sizes(splitrange)
-		.col_blk_sizes(single)
-		.matrix_type(dbcsr::type::no_symmetry)
-		.get();
-		
-	auto ucolvec1 = dbcsr::create<double>()
-		.name("uvec")
-		.set_world(wrd)
-		.row_blk_sizes(splitrange)
-		.col_blk_sizes(single)
-		.matrix_type(dbcsr::type::no_symmetry)
-		.get();
-		
-	auto L = dbcsr::create<double>()
-		.name("L")
-		.set_world(wrd)
-		.row_blk_sizes(splitrange)
-		.col_blk_sizes(splitrange)
-		.matrix_type(dbcsr::type::no_symmetry)
-		.get();
+	auto U = xmatrix<double>::create(wrd, N, N, nb, nb);
+	auto L = xmatrix<double>::create(wrd, N, N, nb, nb);
+	
+	auto tmp0 = xmatrix<double>::create(wrd, N, N, nb, nb);
+	auto tmp1 = xmatrix<double>::create(wrd, N, N, nb, nb);
+	
+	auto rvec0 = xmatrix<double>::create(wrd, 1, N, 1, nb);
+	auto rvec1 = xmatrix<double>::create(wrd, 1, N, 1, nb);
+	
+	auto cvec0 = xmatrix<double>::create(wrd, N, 1, nb, 1);
+	auto cvec1 = xmatrix<double>::create(wrd, N, 1, nb, 1);
 		
 	L->reserve_all();
 	
@@ -825,13 +1145,14 @@ void pivinc_cd::compute_sparse() {
 	
 	LOG.os<1>("-- Occupation of U: ", U->occupation(), '\n');
 	
+	dbcsr::print(*U);
+	
 	int nblks = U->nblkrows_total();
 	
 	double thresh = 1e-14;
 			
-	std::vector<int> rowperm(N), colperm(N), backperm(N);
+	std::vector<int> rowperm(N), backperm(N);
 	std::iota(rowperm.begin(), rowperm.end(), 0);
-	std::iota(colperm.begin(), colperm.end(), 0);
 	std::iota(backperm.begin(), backperm.end(), 0);
 	
 	std::function<void(int)> cholesky_step;
@@ -862,14 +1183,17 @@ void pivinc_cd::compute_sparse() {
 		// b) permute rows/cols
 		// U := P * U * P^t
 		
+		std::cout << dbcsr::matrix_to_eigen(*U) << std::endl;
+		
 		LOG.os<1>("---- Permuting ", I , " with ", i_max, '\n');
 		
 		if (I != i_max) {
-			permute_rows(U, urowvec0, urowvec1, temp0, temp1, I, i_max);
-			permute_cols(U, ucolvec0, ucolvec1, temp0, temp1, I, i_max);
+			permute_rows(U, rvec0, rvec1, tmp0, tmp1, I, i_max);
+			permute_cols(U, cvec0, cvec1, tmp0, tmp1, I, i_max);
 			std::swap(rowperm[I],rowperm[i_max]);
-			std::swap(colperm[I],colperm[i_max]);
 		}
+		
+		std::cout << dbcsr::matrix_to_eigen(*U) << std::endl;
 		
 		// STEP 3.0: Convergence criterion
 		
@@ -897,9 +1221,10 @@ void pivinc_cd::compute_sparse() {
 	
 		// a) get u
 		// u_i
-		get_col(U, ucolvec0, I);
+		U->get_col(*cvec0, I);
 				
-		auto ui = dbcsr::copy(ucolvec0).get();
+		auto ui = xmatrix<double>::create(wrd, N, 1, nb, 1);
+		ui->copy_in(*cvec0);
 		
 		// b) form Utilde
 		dbcsr::multiply('N', 'T', *ui, *ui, *U)
@@ -918,13 +1243,13 @@ void pivinc_cd::compute_sparse() {
 		// STEP 3.3: Form L
 		// (a) diagonal element
 		
-		set(L, I, I, sqrt(U_II));
+		L->set(I,I,sqrt(U_II));
 		
 		// (b) permute u_i
 		
 		LOG.os<1>("---- Permuting u_i", '\n');
 		
-		auto eigencol = dbcsr::matrix_to_eigen(ui);
+		auto eigencol = dbcsr::matrix_to_eigen(*ui);
 		auto eigencolperm = eigencol;
 		
 		for (int i = 0; i != I+1; ++i) {
@@ -944,9 +1269,12 @@ void pivinc_cd::compute_sparse() {
 			splitrange, single, dbcsr::type::no_symmetry);
 		colvecperm->filter(dbcsr::global::filter_eps);
 		
-		transfer_colvec(colvecperm, temp0, I);
+		cvec0->clear();
+		cvec0->copy_in(*colvecperm);
 		
-		L->add(1.0, 1.0/sqrt(U_II), *temp0);
+		tmp0->overwrite_colvec(*cvec0, I);
+		
+		L->add(1.0, 1.0/sqrt(U_II), *tmp0);
 		
 		std::swap(backperm[I],backperm[i_max]);
 		
@@ -966,20 +1294,37 @@ void pivinc_cd::compute_sparse() {
 	//auto Leigen = dbcsr::matrix_to_eigen(L);
 	//if (wrd.rank() == 0) std::cout << Leigen << std::endl;
 	
-	auto L_reo = dbcsr::create_template<double>(L)
-		.name("L_reo")
-		.get();
-		
+	auto L_reo0 = xmatrix<T>::create(wrd, N, N, nb, nb);
+	auto L_reo1 = xmatrix<T>::create(wrd, N, N, nb, nb);
+	
+	// reorder rows to restore initial order
 	for (int irow = 0; irow != N; ++irow) {
 		
-		get_row(L, urowvec0, irow);
-		transfer_rowvec(urowvec0, temp0, rowperm[irow]);
-		L_reo->add(1.0, 1.0, *temp0);
+		L->get_row(*rvec0, irow);
+		tmp0->overwrite_rowvec(*rvec0, rowperm[irow]);
+		L_reo0->add(1.0, 1.0, *tmp0);
 		
-		urowvec0->clear();
-		temp0->clear();
+		rvec0->clear();
+		tmp0->clear();
 		
 	}
+	
+	// reorder columns to minimize matrix bandwidth 
+	
+	std::vector<double_int> startpos(N);
+	std::vector<double_int> stoppos(N);
+	
+	dbcsr::iterator<double> iter(*Lreo0);
+	iter.start();
+	
+	while (iter.blocks_left()) {
+		iter.next_block();
+		
+		int roff = iter.row_offset();
+		int coff = iter.col_offset();
+		
+		for (int ir = 0; ir != nb; ++ir) {
+			
 	
 	//auto Leigenreo = dbcsr::matrix_to_eigen(L_reo);
 	//if (wrd.rank() == 0) std::cout << Leigenreo << std::endl;
@@ -1003,7 +1348,7 @@ void pivinc_cd::compute_sparse() {
 	
 #if 1
 	
-	auto mat_copy = dbcsr::copy(m_mat_in).get();
+	auto mat_copy = dbcsr::copy(*m_mat_in).get();
 	dbcsr::multiply('N', 'T', *Lredist, *Lredist, *mat_copy)
 		.alpha(-1.0)
 		.beta(1.0)

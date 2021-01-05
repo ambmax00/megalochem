@@ -42,7 +42,7 @@ public:
 		dbcsr::shared_matrix<double> s_bb, dbcsr::shared_matrix<double> l_bm)
 	{
 		
-		auto temp = dbcsr::create_template<double>(c_bm)
+		auto temp = dbcsr::create_template<double>(*c_bm)
 			.name("temp").get();
 		
 		auto w = c_bm->get_world();

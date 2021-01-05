@@ -55,10 +55,10 @@ hfmod::hfmod(dbcsr::world w, desc::smolecule mol, desc::options opt)
 		.col_blk_sizes(b)
 		.matrix_type(dbcsr::type::symmetric).get();
 		
-	m_p_bb_A = dbcsr::create_template<double>(m_core_bb)
+	m_p_bb_A = dbcsr::create_template<double>(*m_core_bb)
 		.name("p_bb_A").get();
 		
-	m_f_bb_A = dbcsr::create_template<double>(m_core_bb)
+	m_f_bb_A = dbcsr::create_template<double>(*m_core_bb)
 		.name("f_bb_A").get();	
 	
 	m_c_bm_A = dbcsr::create<double>()
@@ -71,10 +71,10 @@ hfmod::hfmod(dbcsr::world w, desc::smolecule mol, desc::options opt)
 		
 	if (!m_restricted) {
 		
-		m_p_bb_B = dbcsr::create_template<double>(m_core_bb)
+		m_p_bb_B = dbcsr::create_template<double>(*m_core_bb)
 			.name("p_bb_B").get();
 		
-		m_f_bb_B = dbcsr::create_template<double>(m_core_bb)
+		m_f_bb_B = dbcsr::create_template<double>(*m_core_bb)
 			.name("f_bb_B").get();
 		
 	}
@@ -227,12 +227,12 @@ dbcsr::shared_matrix<double> hfmod::compute_errmat(
 	dbcsr::shared_matrix<double>& P_x, 
 	dbcsr::shared_matrix<double>& S, std::string x) {
 	
-	auto e_1 = dbcsr::create_template(F_x)
+	auto e_1 = dbcsr::create_template(*F_x)
 		.name("e_1_"+x)
 		.matrix_type(dbcsr::type::no_symmetry)
 		.get();
 		
-	auto e_2 = dbcsr::create_template(F_x)
+	auto e_2 = dbcsr::create_template(*F_x)
 		.name("e_2_"+x)
 		.matrix_type(dbcsr::type::no_symmetry)
 		.get();

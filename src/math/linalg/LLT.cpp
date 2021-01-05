@@ -103,7 +103,7 @@ dbcsr::shared_matrix<double> LLT::L_inv(vec<int> blksizes) {
 dbcsr::shared_matrix<double> LLT::inverse(vec<int> blksizes) {
 	
 	auto Linv = this->L_inv(blksizes);
-	auto out = dbcsr::create_template(Linv)
+	auto out = dbcsr::create_template(*Linv)
 		.name("Cholesky inverse of " + m_mat_in->name())
 		.matrix_type(dbcsr::type::symmetric).get();
 	

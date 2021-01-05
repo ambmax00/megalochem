@@ -602,11 +602,11 @@ public:
 			.matrix_type(dbcsr::type::symmetric)
 			.get();
 			
-		auto ints_y = dbcsr::create_template<double>(ints_x)
+		auto ints_y = dbcsr::create_template<double>(*ints_x)
 			.name(m_intname + "_y")
 			.get();
 			
-		auto ints_z = dbcsr::create_template<double>(ints_x)
+		auto ints_z = dbcsr::create_template<double>(*ints_x)
 			.name(m_intname + "_z")
 			.get();
 			

@@ -265,14 +265,14 @@ void hfmod::compute_guess() {
 			
 			if (pB) {
 			
-				auto pscaled = dbcsr::copy<double>(pA)
+				auto pscaled = dbcsr::copy<double>(*pA)
 					.name(at_smol->name() + "_density").get();
 				pscaled->add(0.5, 0.5, *pB);
-				locdensitymap[Z] = dbcsr::matrix_to_eigen(pscaled);
+				locdensitymap[Z] = dbcsr::matrix_to_eigen(*pscaled);
 				
 			} else {
 				
-				locdensitymap[Z] = dbcsr::matrix_to_eigen(pA);
+				locdensitymap[Z] = dbcsr::matrix_to_eigen(*pA);
 				
 			}
 			

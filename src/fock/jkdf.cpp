@@ -68,7 +68,7 @@ void DF_J::compute_J() {
 	
 	// copy over density
 	
-	auto ptot = dbcsr::create_template<double>(m_p_A)
+	auto ptot = dbcsr::create_template<double>(*m_p_A)
 		.name("ptot").get();
 	
 	if (m_p_A && !m_p_B) {

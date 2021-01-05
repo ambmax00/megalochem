@@ -15,7 +15,7 @@ void write_matrix(dbcsr::shared_matrix<double>& m_in, std::string filename) {
 		
 		if (fexists(file_name) && m_in->get_world().rank() == 0) std::remove(file_name.c_str());
 		
-		auto eigen_mat = dbcsr::matrix_to_eigen(m_in);
+		auto eigen_mat = dbcsr::matrix_to_eigen(*m_in);
 		
 		if (m_in->get_world().rank() == 0) write_binary_mat(file_name.c_str(), eigen_mat);
 		

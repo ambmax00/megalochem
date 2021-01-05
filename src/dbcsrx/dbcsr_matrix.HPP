@@ -559,24 +559,24 @@ class create_template_base {
 
 private:
 		
-	shared_matrix<T> c_template;
+	matrix<T>& c_template;
 	
 public:
 	
-	create_template_base(shared_matrix<T>& temp) : c_template(temp) {}
+	create_template_base(matrix<T>& temp) : c_template(temp) {}
 
 	shared_matrix<T> get() {
 		
 		shared_matrix<T> m_out = std::make_shared<matrix<T>>();
 		
 		m_out->m_matrix_ptr = nullptr;
-		m_out->m_world = c_template->m_world;
+		m_out->m_world = c_template.m_world;
 		
 		char mat_type = (c_matrix_type) ? static_cast<char>(*c_matrix_type) : '0';
 		char repl_type = (c_replication_type) ? static_cast<char>(*c_replication_type) : '0';
  
         c_dbcsr_create_template(&m_out->m_matrix_ptr, 
-			c_name->c_str(), c_template->m_matrix_ptr, 
+			c_name->c_str(), c_template.m_matrix_ptr, 
 			(c_set_dist) ? c_set_dist->m_dist_ptr : nullptr, 
 			(c_matrix_type) ? &mat_type : nullptr, 
 			(c_row_blk_sizes) ? c_row_blk_sizes->data() : nullptr,
@@ -596,7 +596,7 @@ public:
 
 template <typename T>
 inline create_template_base<T> 
-	create_template(shared_matrix<T>& m_in) {
+	create_template(matrix<T>& m_in) {
 		return create_template_base<T>(m_in);
 }
 
@@ -613,18 +613,18 @@ class transpose_base {
 
 private:
 	
-	shared_matrix<T> c_in;
+	matrix<T>& c_in;
 
 public:
     
-	transpose_base(shared_matrix<T>& m_in) : c_in(m_in) {}
+	transpose_base(matrix<T>& m_in) : c_in(m_in) {}
     
     shared_matrix<T> get() {
 		
 		shared_matrix<T> m_out = std::make_shared<matrix<T>>();
     
-        m_out->m_world = c_in->m_world;
-        c_dbcsr_transposed(&m_out->m_matrix_ptr, c_in->m_matrix_ptr, 
+        m_out->m_world = c_in.m_world;
+        c_dbcsr_transposed(&m_out->m_matrix_ptr, c_in.m_matrix_ptr, 
                             (c_shallow_copy) ? &*c_shallow_copy : nullptr,
                             (c_transpose_data) ? &*c_transpose_data : nullptr, 
                             (c_transpose_dist) ? &*c_transpose_dist : nullptr, 
@@ -637,7 +637,7 @@ public:
 };
 
 template <typename T>
-inline transpose_base<T> transpose(shared_matrix<T>& m_in) {
+inline transpose_base<T> transpose(matrix<T>& m_in) {
 	return transpose_base<T>(m_in);
 }
 
@@ -656,22 +656,22 @@ class matrix_copy_base {
 
 private:
     
-	shared_matrix<T> c_in;
+	matrix<T>& c_in;
 	
 public:
 	
-	matrix_copy_base(shared_matrix<T>& in) : c_in(in) {}
+	matrix_copy_base(matrix<T>& in) : c_in(in) {}
 	
 	shared_matrix<T> get() {
 		
 		shared_matrix<T> m_out = std::make_shared<matrix<T>>();
 		
 		m_out->m_matrix_ptr = nullptr;
-		m_out->m_world = c_in->m_world;
+		m_out->m_world = c_in.m_world;
 		
 		char mat_type = (c_matrix_type) ? static_cast<char>(*c_matrix_type) : '0';
 		
-		c_dbcsr_copy(&m_out->m_matrix_ptr, c_in->m_matrix_ptr, 
+		c_dbcsr_copy(&m_out->m_matrix_ptr, c_in.m_matrix_ptr, 
 			(c_name) ? c_name->c_str() : nullptr, 
 			(c_keep_sparsity) ? &*c_keep_sparsity : nullptr, 
 			(c_shallow_data) ? &*c_shallow_data : nullptr, 
@@ -685,7 +685,7 @@ public:
 };
 
 template <typename T>
-inline matrix_copy_base<T> copy(shared_matrix<T>& m_in) {
+inline matrix_copy_base<T> copy(matrix<T>& m_in) {
 	return matrix_copy_base<T>(m_in);
 }
 

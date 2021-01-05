@@ -19,9 +19,9 @@ void hfmod::diag_fock() {
 		
 		LOG.os<2>("Orthogonalizing Fock Matrix: ", x, '\n');
 		
-		auto FX = dbcsr::create_template(f_bb)
+		auto FX = dbcsr::create_template(*f_bb)
 			.name("FX").matrix_type(dbcsr::type::no_symmetry).get();
-		auto XFX = dbcsr::create_template(f_bb)
+		auto XFX = dbcsr::create_template(*f_bb)
 			.name("XFX").get();
 		
 		dbcsr::multiply('N','N',*f_bb,*m_x_bb,*FX).perform();
@@ -61,7 +61,7 @@ void hfmod::diag_fock() {
 			dbcsr::print(*c_bm_x);
 		}
 		
-		auto new_c_bm = dbcsr::create_template<double>(c_bm_x)
+		auto new_c_bm = dbcsr::create_template<double>(*c_bm_x)
 			.name(c_bm_x->name()).get();
 		*c_bm = std::move(*new_c_bm); 
 	
@@ -177,7 +177,7 @@ void hfmod::diag_fock() {
 		form_density(m_p_bb_B, m_c_bm_B, "B");
 	} else if (!m_restricted && m_nobetaorb) {
 		dbcsr::shared_matrix<double> p_bb_B = 
-			dbcsr::create_template<double>(m_p_bb_A)
+			dbcsr::create_template<double>(*m_p_bb_A)
 			.name("p_bb_B").get();
 		m_p_bb_B->set(0.0);
 		
@@ -215,7 +215,7 @@ void hfmod::compute_virtual_density() {
 		
 		int lobound, upbound;
 		
-		pv_bb = dbcsr::create_template<double>(m_p_bb_A)
+		pv_bb = dbcsr::create_template<double>(*m_p_bb_A)
 			.name("pv_bb_"+x).get();
 		
 		//std::cout << "HERE: " << x << std::endl;
@@ -249,7 +249,7 @@ void hfmod::compute_virtual_density() {
 		form_density(m_pv_bb_A, m_c_bm_A, "A");
 	} else {
 		
-		m_pv_bb_A = dbcsr::create_template<double>(m_p_bb_A)
+		m_pv_bb_A = dbcsr::create_template<double>(*m_p_bb_A)
 			.name("pv_bb_A").get();
 		m_pv_bb_A->reserve_all();
 		m_pv_bb_A->set(0.0);
@@ -260,7 +260,7 @@ void hfmod::compute_virtual_density() {
 		form_density(m_pv_bb_B, m_c_bm_B, "B");
 	} else {
 		
-		m_pv_bb_B = dbcsr::create_template<double>(m_p_bb_A)
+		m_pv_bb_B = dbcsr::create_template<double>(*m_p_bb_A)
 			.name("pv_bb_B").get();
 		
 		m_pv_bb_B->reserve_all();
