@@ -600,6 +600,338 @@ public:
 	
 };
 
+class shared_mutex {
+private:
+
+	MPI_Comm _comm;
+	int _rank, _size;
+	
+	MPI_Win _mutex_window;
+	
+	int* _mutex_data;
+	int* _mutex_var;
+	
+public:
+
+	shared_mutex(MPI_Comm comm) : _comm(comm) {
+		
+		MPI_Comm_rank(_comm, &_rank);
+		MPI_Comm_size(_comm, &_size);
+		
+		int nele = (_rank == 0) ? 1 : 0;
+		MPI_Win_allocate_shared(nele * sizeof(int), sizeof(int),
+			MPI_INFO_NULL, _comm, &_mutex_data, &_mutex_window);
+		
+		if (_rank == 0) {
+			*_mutex_data = 0;
+			_mutex_var = _mutex_data;
+		} else {
+			_mutex_var = _mutex_data - 1;
+		}
+		
+		MPI_Win_lock_all(MPI_MODE_NOCHECK, _mutex_window);
+		
+	}
+	
+	bool try_lock() {		
+		
+		MPI_Win_sync(_mutex_window);
+		
+		int expected = 0;
+		int desired = 1;
+				
+		bool success = __atomic_compare_exchange (_mutex_var, &expected, &desired, false, 
+			__ATOMIC_RELAXED, __ATOMIC_RELAXED);
+		
+		return success;
+		
+	}
+	
+	void lock() {		
+		
+		MPI_Win_sync(_mutex_window);
+		
+		int expected = 0;
+		int desired = 1;
+		
+		//std::cout << "Rank: " << _rank << " is requesting a lock " << std::endl;
+		
+		while (!__atomic_compare_exchange (_mutex_var, &expected, &desired, false, 
+			__ATOMIC_RELAXED, __ATOMIC_RELAXED)) 
+		{
+			expected = 0;
+		};
+		
+		//std::cout << "Rank: " << _rank << " request granted " << std::endl;
+		
+	}
+	
+	void unlock() {
+		
+		MPI_Win_sync(_mutex_window);
+		
+		int expected = 1;
+		int desired = 0;
+	
+		__atomic_compare_exchange (_mutex_var, &expected, &desired, false, 
+			__ATOMIC_RELAXED, __ATOMIC_RELAXED);
+	}
+	
+	~shared_mutex() {
+		MPI_Win_unlock_all(_mutex_window);
+		MPI_Win_free(&_mutex_window);
+	}
+		
+};
+
+class shared_queue {
+private: 
+
+	using iterator = int64_t*;
+
+	MPI_Comm _comm;
+	int _mpirank, _mpisize;
+	
+	MPI_Win _queue_window;
+	int64_t* _queue_data;
+	int64_t _queue_maxsize;
+	
+	int64_t* _queue_data_begin;
+	int64_t* _queue_data_end;
+	int64_t* _queue_pos_begin;
+	int64_t* _queue_pos_end;
+	
+	
+public:
+
+	shared_queue(MPI_Comm comm, const int64_t size) 
+		: _comm(comm), _queue_maxsize(size)
+	{
+		
+		MPI_Comm_rank(_comm, &_mpirank);
+		MPI_Comm_size(_comm, &_mpisize);
+		
+		int64_t extent = _queue_maxsize + 2;
+		int64_t nele = (_mpirank == 0) ? extent : 0;
+		
+		MPI_Win_allocate_shared(nele * sizeof(int64_t), sizeof(int64_t),
+			MPI_INFO_NULL, _comm, &_queue_data, &_queue_window);
+			
+		_queue_data_begin = &_queue_data[(_mpirank == 0) ? 0 : -extent];
+		_queue_data_end = _queue_data_begin + _queue_maxsize;
+		_queue_pos_begin = _queue_data_end + 0;
+		_queue_pos_end = _queue_data_end + 1;
+			
+		if (_mpirank == 0) {
+			std::fill(_queue_data, _queue_data + _queue_maxsize, 0);
+			*_queue_pos_begin = 0;
+			*_queue_pos_end = 0;
+		}
+		
+		MPI_Win_lock_all(MPI_MODE_NOCHECK, _queue_window);
+		
+	}
+	
+	iterator begin() {
+		MPI_Win_sync(_queue_window);
+		return _queue_data_begin + *_queue_pos_begin;
+	}
+	
+	iterator end() {
+		MPI_Win_sync(_queue_window);
+		return _queue_data_begin + *_queue_pos_end;
+	}
+	
+	int64_t size() {
+		return *_queue_pos_end - *_queue_pos_begin;
+	}
+	
+	int64_t& operator[](size_t i) {
+		return *(_queue_data_begin + *_queue_pos_begin + i);
+	}
+	
+	void push(int64_t t) {
+		MPI_Win_sync(_queue_window);
+		*(this->end()) = t;
+		(*_queue_pos_end)++;
+	}
+	
+	int64_t pop() {
+		MPI_Win_sync(_queue_window);
+		(*_queue_pos_end)--;
+		return *(this->end());
+	}
+	
+	bool empty() {
+		MPI_Win_sync(_queue_window);
+		return (*_queue_pos_end - *_queue_pos_begin == 0);
+	}
+	
+	~shared_queue() {
+		MPI_Win_unlock_all(_queue_window);
+		MPI_Win_free(&_queue_window);
+	}
+	
+};
+
+class dynamic_scheduler2 {
+private:
+
+	const int64_t NO_TASK = -1;
+	const int64_t TERMINATE = -2;
+
+	MPI_Comm _global_comm;
+	int _global_rank;
+	int _global_size;
+	
+	MPI_Comm _local_comm;
+	int _local_rank;
+	int _local_size;
+	
+	// window for global queue
+	MPI_Win _globQ_window;
+	int64_t* _globQ_data;
+	int64_t* _global_counter;
+	
+	std::function<void(int64_t)>& _executer;
+	int64_t _ntasks;
+	
+	int64_t _ntasks_completed;
+	
+	std::unique_ptr<shared_queue> _locQ;
+	std::unique_ptr<shared_mutex> _mtx;
+
+	void fetch_tasks() {
+		
+		if (_locQ->empty()) {
+			if (_mtx->try_lock()) {
+			
+				int64_t nrequests = _local_size;
+				int64_t ncounter = -1;
+				
+				//std::cout << _global_rank << ": " << "REQUESTING: " 
+				//	<< nrequests << std::endl;
+				MPI_Win_lock(MPI_LOCK_EXCLUSIVE, 0, 0, _globQ_window);
+				MPI_Fetch_and_op(&nrequests, &ncounter, MPI_LONG_LONG, 0, 0,
+					MPI_SUM, _globQ_window);
+				MPI_Win_unlock(0, _globQ_window);
+				
+				//std::cout << _global_rank << ": " << "NCOUNTER " << ncounter << std::endl;
+				int64_t last_task = (ncounter + nrequests <= _ntasks) ? 
+					ncounter + nrequests : _ntasks;
+				
+				// add to queue
+				for (int64_t itask = ncounter; itask < last_task; ++itask) 
+				{
+					_locQ->push(itask);
+				}
+				
+				//std::cout << "GOT TASKS: ";
+				for (auto q : *_locQ) { std::cout << q << " " << std::endl; }
+				
+				if (_locQ->empty()) {
+					for (int i = 0; i != _local_size; ++i) {
+						_locQ->push(TERMINATE);
+					}
+				}
+				
+				_mtx->unlock();
+			}
+		}
+		
+	}
+			
+
+public:
+
+	dynamic_scheduler2(MPI_Comm comm, int64_t ntasks, std::function<void(int64_t)>& executer) 
+		: _global_comm(comm), _executer(executer), _ntasks(ntasks),
+		_global_size(0), _global_rank(-1),
+		_local_size(0), _local_rank(-1)
+	{
+		
+		// create communicators
+		
+		MPI_Comm_size(_global_comm, &_global_size);
+		MPI_Comm_rank(_global_comm, &_global_rank);
+		
+		//MPI_Comm_split(_global_comm, color, split, &_local_comm);
+		MPI_Comm_split_type(_global_comm, MPI_COMM_TYPE_SHARED, _global_rank, 
+			MPI_INFO_NULL, &_local_comm);
+		
+		MPI_Comm_size(_local_comm, &_local_size);
+		MPI_Comm_rank(_local_comm, &_local_rank);
+		
+	}
+	
+	void run() {
+		
+		//std::cout << "STARTING RUN : " << _ntasks << std::endl;
+		
+		_ntasks_completed = 0;
+		int64_t qsize = std::max((int64_t)_local_size, _ntasks);
+		
+		MPI_Win_allocate(sizeof(int64_t), sizeof(int64_t),
+			MPI_INFO_NULL, _global_comm, &_globQ_data, &_globQ_window);
+
+		if (_global_rank == 0) {
+			MPI_Win_lock(MPI_LOCK_EXCLUSIVE, 0, MPI_MODE_NOCHECK, _globQ_window);
+			int64_t zero = 0;
+			MPI_Put(&zero, 1, MPI_LONG_LONG, 0, 0, 1, MPI_LONG_LONG, _globQ_window);
+			MPI_Win_unlock(0, _globQ_window);
+		}
+		
+		_locQ = std::make_unique<shared_queue>(_local_comm, qsize);
+		_mtx = std::make_unique<shared_mutex>(_local_comm);
+		
+		while (true) {
+						
+			fetch_tasks();
+			
+			_mtx->lock();
+			
+			if (_locQ->empty()) {
+				_mtx->unlock();
+				continue;
+			}
+				
+			int64_t task = _locQ->pop();
+			
+			_mtx->unlock();
+			
+			if (task == TERMINATE) break;
+						
+			//std::cout << _global_rank << " : EXECUTING " << task << std::endl;
+			_executer(task);
+			++_ntasks_completed;
+			
+			
+		}
+		
+		//std::cout << _global_rank << " : DONE " << std::endl;
+		
+		// check for consistency
+		MPI_Allreduce(MPI_IN_PLACE, &_ntasks_completed, 1, MPI_LONG_LONG,
+			MPI_SUM, _global_comm);
+			
+		MPI_Win_free(&_globQ_window);
+			
+		if (_global_rank == 0 && _ntasks_completed != _ntasks) {
+			throw std::runtime_error("Scheduler: Not all tasks were executed!!");
+		}
+		
+		//std::cout << "DONE WITH RUN" << std::endl;
+
+	}
+		
+	
+	~dynamic_scheduler2() {
+		MPI_Comm_free(&_local_comm);
+	}
+	
+};
+
+
 } // end namespace
 
 #endif

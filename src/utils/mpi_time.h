@@ -93,24 +93,24 @@ public:
 		
 	}
 			
-	void print_info() {
+	void print_info(int n = 0) {
 		
 		//++lev;
 		
 		std::string pad(4*lev + 2, '-');
-		LOG.os<0>(pad, " ");
+		LOG(n).os<0>(pad, " ");
 		
 		//MPI_Barrier(m_comm);
 		
-		LOG.os<0>(proc_name, " \t took \t ", tot, " s");
+		LOG(n).os<0>(proc_name, " \t took \t ", tot, " s");
 		
 		if (nproc > 1)
-			LOG.os<0>(" \t (Average: \t", tot/nproc, " s)");
+			LOG(n).os<0>(" \t (Average: \t", tot/nproc, " s)");
 			
-		LOG.os<0>('\n');
+		LOG(n).os<0>('\n');
 		
 		for (auto it : subprocs) {
-			it.second.print_info();
+			it.second.print_info(n);
 		}
 		
 		//MPI_Barrier(m_comm);
