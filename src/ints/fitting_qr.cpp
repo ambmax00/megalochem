@@ -6,6 +6,13 @@
 #include <Eigen/Core>
 #include <Eigen/SVD>
 #include <Eigen/Dense>
+#include <bitset>
+#include <Eigen/SparseCore>
+
+//#define _USE_FLOAT
+#define _USE_FASTSCHEDULER
+#define _USE_QR
+#define _CHUNK_SIZE 2
 
 namespace ints {
 	
@@ -29,7 +36,7 @@ std::vector<block_info> get_block_info(desc::cluster_basis& cbas) {
 	
 	return blkinfo;
 	
-}
+}		
 
 dbcsr::sbtensor<3,double> dfitting::compute_qr_new(dbcsr::shared_matrix<double> s_xx_inv, 
 		dbcsr::shared_matrix<double> m_xx, dbcsr::shared_pgrid<3> spgrid3_xbb,
@@ -248,6 +255,9 @@ dbcsr::sbtensor<3,double> dfitting::compute_qr_new(dbcsr::shared_matrix<double> 
 	
 	prep_time.finish();
 	
+	std::vector<int> blkprev;
+	int ncounter = 0;
+	
 	for (int ibatch_nu = 0; ibatch_nu != c_xbb_batched->nbatches(2); ++ibatch_nu) {
 		
 		LOG.os<>("BATCH: ", ibatch_nu, '\n');
@@ -256,14 +266,13 @@ dbcsr::sbtensor<3,double> dfitting::compute_qr_new(dbcsr::shared_matrix<double> 
 		auto nu_blkbounds = c_xbb_batched->blk_bounds(2,ibatch_nu);
 		auto frag_blkbounds = frag_bounds[ibatch_nu];
 		
-		
 		// =================== CREATE TASKS ============================
 		
 		using task_list = std::vector<std::vector<std::pair<int,int>>>;
 
 		task_list global_tasks;
 		
-		const int chunksize = 1;
+		const int chunksize = _CHUNK_SIZE;
 		
 		std::vector<std::pair<int,int>> chunk;
 		
@@ -309,6 +318,8 @@ dbcsr::sbtensor<3,double> dfitting::compute_qr_new(dbcsr::shared_matrix<double> 
 		/* =============================================================
 		 *            TASK FUNCTION FOR SCHEDULER 
 		 * ============================================================*/
+		
+		 
 		std::function<void(int64_t)> task_func = [&](int64_t itask) 
 		{
 			//std::cout << "PROC: " << m_world.rank() << " -> TASK ID: " << itask << std::endl;
@@ -444,6 +455,9 @@ dbcsr::sbtensor<3,double> dfitting::compute_qr_new(dbcsr::shared_matrix<double> 
 					if (blk_P_bool[ix]) blk_P.push_back(ix);
 				}
 			
+				if (blkprev == blk_P) ncounter++;
+				blkprev = blk_P;
+				
 				int nblkp = blk_P.size();
 				//std::cout << "FUNCS: " << nblkp << "/" << x.size() << std::endl;
 			
@@ -530,10 +544,15 @@ dbcsr::sbtensor<3,double> dfitting::compute_qr_new(dbcsr::shared_matrix<double> 
 				// ==== Prepare matrices for QR decomposition ====
 				
 				move_time.start();
-				
+
+				#ifdef _USE_FLOAT
+				Eigen::MatrixXf eris_eigen = Eigen::MatrixXf::Zero(nq,nb);
+				Eigen::MatrixXf m_qp_eigen = Eigen::MatrixXf::Zero(nq,np);
+				#else 	
 				Eigen::MatrixXd eris_eigen = Eigen::MatrixXd::Zero(nq,nb);
 				Eigen::MatrixXd m_qp_eigen = Eigen::MatrixXd::Zero(nq,np);
-			
+				#endif
+
 				int poff = 0;
 				int qoff = 0;
 				int moff = 0;
@@ -611,11 +630,21 @@ dbcsr::sbtensor<3,double> dfitting::compute_qr_new(dbcsr::shared_matrix<double> 
 				delete[] work;
 				
 				*/
+				#ifdef _USE_FLOAT
+				Eigen::MatrixXf c_eigen;
+				#else
+				Eigen::MatrixXd c_eigen;
+				#endif
 				
-				Eigen::MatrixXd c_eigen = m_qp_eigen.householderQr().solve(eris_eigen);
+				#ifdef _USE_QR
+				c_eigen = m_qp_eigen.householderQr().solve(eris_eigen);
+				#else
+				c_eigen = (m_qp_eigen.transpose() * m_qp_eigen).ldlt()
+					.solve(m_qp_eigen.transpose() * eris_eigen);
+				#endif
 				
 				dgels_time.finish();
-				
+								
 				move_time.start();
 				
 				// ==== Transfer fitting coefficients to tensor
@@ -672,16 +701,21 @@ dbcsr::sbtensor<3,double> dfitting::compute_qr_new(dbcsr::shared_matrix<double> 
 			work_time.finish();
 				
 		}; // end task function
-			
 		
+		#ifdef _USE_FASTSCHEDULER
+		util::dynamic_scheduler2 tasks(m_world.comm(), global_tasks.size(), task_func);
+		#else 
+		util::dynamic_scheduler tasks(m_world.comm(), global_tasks.size(), task_func);
+		#endif
+		
+		tasks.run();
+	
 		// ============== RUN SCHEDULER ================================
 		
-		util::dynamic_scheduler tasks(m_world.comm(), global_tasks.size(), task_func);
-		tasks.run();
-		
-		
+		//util::dynamic_scheduler tasks(m_world.comm(), global_tasks.size(), task_func);
+		//tasks.run();
+						
 		// =============== REDISTRIBUTE BLOCKS AND COMPRESS ============ 
-		
 		
 		//dbcsr::print(*c_xbb_local);
 	
@@ -709,7 +743,7 @@ dbcsr::sbtensor<3,double> dfitting::compute_qr_new(dbcsr::shared_matrix<double> 
 	
 	TIME.finish();
 	TIME.print_info();
-		
+			
 	return c_xbb_batched;
 	
 }
