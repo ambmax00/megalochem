@@ -39,9 +39,9 @@ void SVD::compute() {
 		nb, nb, ori_coord[0], ori_coord[1])
 	);
 	
-	MPI_Barrier(wrd.comm());
-	sca_mat_in->print();
-	MPI_Barrier(wrd.comm());
+	//MPI_Barrier(wrd.comm());
+	//sca_mat_in->print();
+	//MPI_Barrier(wrd.comm());
 	
 	LOG.os<1>("-- Setting up other arrays.\n");
 	
@@ -63,14 +63,14 @@ void SVD::compute() {
 	auto vt = m_Vt->data();
 	auto s = m_s->data();
 	
-	sca_mat_in->print();
+	//sca_mat_in->print();
 	
 	auto desca = sca_mat_in->desc();
 	auto descu = m_U->desc();
 	auto descvt = m_Vt->desc();
 	
 	c_pdgesvd(m_jobu, m_jobvt, m, n, a, 0, 0, desca.data(), s, u, 0, 0,
-		descu.data(), vt, 0, 0, descvt.data(), &wsize, 1, &info);
+		descu.data(), vt, 0, 0, descvt.data(), &wsize, -1, &info);
 	
 	int lwork = (int)wsize;
 	
@@ -85,7 +85,7 @@ void SVD::compute() {
 	
 	m_rank = 0;
 	
-	LOG.os<1>("Eigenvalues: \n");
+	LOG.os<2>("Eigenvalues: \n");
 	for (int i = 0; i != size; ++i) {
 		LOG.os<1>(s[i], " ");
 		if (fabs(s[i]) > 1e-10) m_rank++;
