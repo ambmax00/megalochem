@@ -87,9 +87,9 @@ void SVD::compute() {
 	
 	LOG.os<2>("Eigenvalues: \n");
 	for (int i = 0; i != size; ++i) {
-		LOG.os<1>(s[i], " ");
+		LOG.os<2>(s[i], " ");
 		if (fabs(s[i]) > 1e-10) m_rank++;
-	} LOG.os<1>('\n');
+	} LOG.os<2>('\n');
 	
 	LOG.os<1>("RANK: ", m_rank, '\n');	
 	
@@ -210,9 +210,13 @@ dbcsr::smat_d SVD::U(std::vector<int> rowblksizes, std::vector<int> colblksizes)
 	
 	auto w = m_mat_in->get_world();
 	
+	//m_U->print();
+	
 	auto out = dbcsr::scalapack_to_matrix(*m_U, "SVD U matrix of " + m_mat_in->name(), 
 		w, rowblksizes, colblksizes);
 			
+	//dbcsr::print(*out);
+	
 	//util::plot(out, 1e-4);
 	
 	return out;

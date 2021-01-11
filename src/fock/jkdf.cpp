@@ -1194,11 +1194,11 @@ void DFLMO_K::compute_K() {
 		arrvec<int,2> mb = {o,b};
 		
 		auto spgrid2_bm = dbcsr::create_pgrid<2>(m_world.comm())
-			.tensor_dims(dims2)
+			//.tensor_dims(dims2)
 			.get();
 		
 		auto spgrid2_mb = dbcsr::create_pgrid<2>(m_world.comm())
-			.tensor_dims(dims2t)
+			//.tensor_dims(dims2t)
 			.get();
 		
 		auto spgrid3_xbm = dbcsr::create_pgrid<3>(m_world.comm())
@@ -1277,9 +1277,9 @@ void DFLMO_K::compute_K() {
 			[](double& d) {
 				d = sqrt(d);
 			}
-		);
+		);*/
 		
-		U_bm->scale(sval, "right");*/
+		//U_bm->scale(sval, "right");
 		Vt_mb->scale(sval, "left");
 		
 		U_bm->filter(dbcsr::global::filter_eps);
@@ -1288,9 +1288,11 @@ void DFLMO_K::compute_K() {
 		dbcsr::copy_matrix_to_tensor(*U_bm, *u_bm_01);
 		dbcsr::copy_matrix_to_tensor(*Vt_mb, *vt_mb_01);
 		
+		//dbcsr::print(*u_bm_01);
+		
 		U_bm->release();
 		Vt_mb->release();
-		
+				
 		//u_bm_01->filter(dbcsr::global::filter_eps);				
 		//vt_mb_01->filter(dbcsr::global::filter_eps);						
 		
