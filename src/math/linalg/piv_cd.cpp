@@ -1063,7 +1063,7 @@ void pivinc_cd::compute() {
 		
 		for (int i = 0; i != m_rank; ++i) {
 			
-			if (startpos_red[i] == m_rank || stoppos_red[i] == -1) {
+			if (startpos_red[i] == N || stoppos_red[i] == -1) {
 				throw std::runtime_error("Cholesky-reoredering failed.");
 			}
 			

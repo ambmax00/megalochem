@@ -3,7 +3,7 @@
 
 namespace adc {
 	
-#define _DLOG
+//#define _DLOG
 
 void MVP_AOADC1::init() {
 	
