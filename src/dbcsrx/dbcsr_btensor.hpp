@@ -11,6 +11,8 @@
 #include <filesystem>
 #include <functional>
 
+//#define _CORE_VECTOR
+
 namespace dbcsr {
 	
 enum class btype {
@@ -100,6 +102,10 @@ protected:
 	
 	dbcsr::stensor<N,T> m_work_tensor;
 	// underlying shared tensor for contraction/copying
+	
+#ifdef _CORE_VECTOR
+	std::vector<dbcsr::stensor<N,T>> m_core_vector;
+#endif
 	
 	std::string m_name;
 	dbcsr::shared_pgrid<N> m_spgrid_N;
@@ -415,6 +421,20 @@ public:
 		reset_var();
 		
 		if (m_type == btype::core) {
+			
+			#ifdef _CORE_VECTOR
+			LOG.os<1>("Allocating core work tensors.\n");
+			m_core_vector.resize(m_wrview.nbatches);
+			for (auto& t : m_core_vector) {
+				t = tensor_create<N,T>()
+					.name(m_name + "_work")
+					.pgrid(m_spgrid_N)
+					.map1(map1).map2(map2)
+					.blk_sizes(m_blk_sizes)
+					.get();
+			}
+				
+			#else			
 			LOG.os<1>("Allocating core work tensor.\n");
 			m_work_tensor = tensor_create<N,T>()
 				.name(m_name + "_work")
@@ -422,7 +442,8 @@ public:
 				.map1(map1).map2(map2)
 				.blk_sizes(m_blk_sizes)
 				.get();
-			
+			#endif
+						
 			//m_work_tensor->batched_contract_init();	
 				
 		}
@@ -511,16 +532,25 @@ public:
 		LOG.os<1>("Compressing into core memory...\n");
 		
 		auto b = get_bounds(idx, m_wrview.dims);
+		int ibatch = flatten(idx, m_wrview.dims);
     
 		LOG.os<1>("Copying\n");
 		
 		m_nzetot += tensor_in->num_nze_total();
-    
+		
+		#ifdef _CORE_VECTOR
+		LOG.os<1>("Index: ", ibatch, '\n');
+		copy(*tensor_in, *m_core_vector[ibatch])
+			.bounds(b)
+			.move_data(true)
+			.perform();
+		#else
 		copy(*tensor_in, *m_work_tensor)
 			.bounds(b)
 			.move_data(true)
 			.sum(true)
 			.perform();
+		#endif
 		
 		LOG.os<1>("DONE.\n");
 		
@@ -1086,25 +1116,134 @@ public:
 		m_read_current_dims = dims;
 		
 		if (m_type == btype::core) {
-			/*
-			std::cout << "MAPS: " << std::endl;
-			for (auto i : map1) {
-				std::cout << i << " ";
-			} std::cout << std::endl;
-			for (auto i : map2) {
-				std::cout << i << " ";
-			} std::cout << std::endl;
 			
-			std::cout << "WMAPS: " << std::endl;
-			for (auto i : m_wrview.map1) {
-				std::cout << i << " ";
-			} std::cout << std::endl;
-			for (auto i : m_wrview.map2) {
-				std::cout << i << " ";
-			} std::cout << std::endl;*/
+			#ifdef _CORE_VECTOR
 			
-			if (m_wrview.map1 != map1 || m_wrview.map2 != map2) {
+			if (m_wrview.dims != dims) {
 				
+				LOG.os<1>("Reorganizing core tensors.\n");
+				
+				std::vector<dbcsr::shared_tensor<N,T>> newcorevec;
+				
+				newcorevec.resize(get_nbatches(dims));
+				
+				for (auto& t : newcorevec) {
+				
+					t = tensor_create_template<N,T>(m_core_vector[0])
+						.map1(map1).map2(map2)
+						.name(m_name + "_work_core")
+						.get();
+					
+					t->batched_contract_init();		
+				
+				}
+				
+				for (auto& oldt : m_core_vector) {
+					
+					if (dims.size() == 1) {
+						
+						const int d0 = dims[0];
+						
+						for (int ib0 = 0; ib0 != m_nbatches_dim[d0]; ++ib0) {
+							vec<vec<int>> bds(N);
+							for (int ii = 0; ii != N; ++ii) {
+								bds[ii] = (ii == d0) ? this->bounds(ii, ib0) :
+									bds[ii] = this->full_bounds(ii);
+							}
+							copy(*oldt, *newcorevec[ib0])
+								.bounds(bds)
+								.sum(true)
+								.perform();	
+						}
+						
+					} else if (dims.size() == 2) {
+						
+						const int d0 = dims[0];
+						const int d1 = dims[1];
+						
+						for (int ib0 = 0; ib0 != m_nbatches_dim[d0]; ++ib0) {
+							for (int ib1 = 0; ib1 != m_nbatches_dim[d1]; ++ib1) {
+																
+								vec<vec<int>> bds(N);
+								for (int ii = 0; ii != N; ++ii) {
+									if (ii == d0) {
+										bds[ii] = this->bounds(ii, ib0);
+									} else if (ii == d1) {
+										bds[ii] = this->bounds(ii, ib1);
+									} else {
+										bds[ii] = this->full_bounds(ii);
+									}
+								} // endfor ii
+								std::vector<int> idx = {ib0,ib1};
+								int idxflat = flatten(idx,dims);
+								copy(*oldt, *newcorevec[idxflat])
+									.bounds(bds)
+									.sum(true)
+									.perform();		
+															
+							} // endfor ib1
+						} // endfor ib0
+					
+					} else {
+						
+						throw std::runtime_error("Batchtensor: nbatchdims > 3 NYI.");
+						
+					} // end elseif
+					
+					oldt->clear();
+					oldt->destroy();
+					
+				} //endfor
+				
+				for (auto& t : newcorevec) {
+					t->batched_contract_finalize();
+				}
+				
+				m_core_vector = std::move(newcorevec);
+				
+				// update
+				m_wrview.dims = dims;
+				m_wrview.map1 = map1;
+				m_wrview.map2 = map2;
+				m_wrview.nbatches = get_nbatches(dims);	
+					
+			} else if (m_wrview.map1 != map1 || m_wrview.map2 != map2) {
+								
+				LOG.os<1>("Reordering core tensors.\n");
+				
+				std::vector<dbcsr::shared_tensor<N,T>> newcorevec;
+				newcorevec.resize(m_core_vector.size());
+				
+				for (int ii = 0; ii != m_core_vector.size(); ++ii) {
+					
+					auto& told = m_core_vector[ii];
+					auto& tnew = newcorevec[ii];
+					
+					tnew = tensor_create_template<N,T>(
+						m_core_vector[0])
+						.map1(map1)
+						.map2(map2)
+						.name(m_name + "_work_core")
+						.get();
+					
+					copy(*told, *tnew)
+						.move_data(true)
+						.perform();
+						
+				}
+				
+				m_core_vector = std::move(newcorevec);
+				
+			} else {
+				
+				LOG.os<1>("Core tensors are compatible.\n");
+				
+			}
+			
+			#else 
+				
+			if (m_wrview.map1 != map1 || m_wrview.map2 != map2) {
+								
 				LOG.os<1>("Reordering core tensor.\n");
 				auto new_work_tensor = tensor_create_template<N,T>(m_work_tensor)
 					.map1(map1).map2(map2)
@@ -1112,7 +1251,7 @@ public:
 				copy(*m_work_tensor, *new_work_tensor)
 					.move_data(true)
 					.perform();
-					
+									
 				// update
 				m_wrview.dims = dims;
 				m_wrview.map1 = map1;
@@ -1120,14 +1259,15 @@ public:
 				m_wrview.nbatches = get_nbatches(dims);
 				
 				m_work_tensor.reset();
-				
 				m_work_tensor = new_work_tensor;
-					
+								
 			} else {
 				
 				LOG.os<1>("Core tensor is compatible.\n");
 				
 			}
+			
+			#endif
 			
 		}
 		
@@ -1243,6 +1383,12 @@ public:
 		
 		LOG.os<1>("Decompressing from core.\n");
 		
+		#ifdef _CORE_VECTOR
+		//std::cout << "Getting: " << flatten(idx, m_wrview.dims) << std::endl;
+		m_work_tensor = m_core_vector[flatten(idx, m_wrview.dims)];
+		//dbcsr::print(*m_work_tensor);
+		#endif
+		
 		return;
 				
 	}
@@ -1330,7 +1476,7 @@ public:
 				
 					if (i == m_mpirank) {
 						
-						std::cout << "NEW" << std::endl;
+						//std::cout << "NEW" << std::endl;
 						for (auto a : newlocblkidx) {
 							for (auto l : a) {
 								std::cout << l << " ";
@@ -1587,6 +1733,13 @@ public:
 			m_work_tensor->clear();
 			m_read_tensor->clear();
 		}
+		
+		#ifdef _CORE_VECTOR
+		if (m_type == btype::core) {
+			//m_work_tensor.reset();
+		}
+		#endif
+		
 		m_is_decompress_initialized = false;
 	}
 		
