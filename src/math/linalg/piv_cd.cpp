@@ -814,7 +814,8 @@ void pivinc_cd::compute() {
 	
 	int nblks = U->nblkrows_total();
 	
-	double thresh = 1e-12;
+	double thresh = filter_eps / nb;
+	LOG.os<1>("-- Threshold: ", thresh, '\n');
 			
 	std::vector<int> rowperm(N), backperm(N);
 	std::iota(rowperm.begin(), rowperm.end(), 0);
@@ -984,7 +985,7 @@ void pivinc_cd::compute() {
 	dbcsr::iterator<double> iter(*L_reo0);
 	iter.start();
 	
-	double T = 1e-4;
+	double T = 1e-5;
 	
 	while (iter.blocks_left()) {
 		iter.next_block();
