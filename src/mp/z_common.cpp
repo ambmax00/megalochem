@@ -28,12 +28,14 @@ SMatrixXi get_shellpairs(dbcsr::sbtensor<3,double> eri_batched) {
 		iter.stop();
 	
 	};
-	
+
+#ifndef _CORE_VECTOR
 	if (eri_batched->get_type() == dbcsr::btype::core) {
 		
 		add_idx(eri_batched->get_work_tensor());
 	
 	} else {
+#endif
 		 
 		eri_batched->decompress_init({0}, vec<int>{0}, vec<int>{1,2});
 		
@@ -45,8 +47,9 @@ SMatrixXi get_shellpairs(dbcsr::sbtensor<3,double> eri_batched) {
 		}
 		
 		eri_batched->decompress_finalize();
-		
+#ifndef _CORE_VECTOR	
 	} 
+#endif
 	
 	MPI_Allreduce(idx_loc.data(), idx_tot.data(), nblkb*nblkb, MPI_INT,
 		MPI_LOR, eri_batched->comm());

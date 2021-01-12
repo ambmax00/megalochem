@@ -3,11 +3,14 @@
 #include "mp/z_builder.h"
 #include "math/laplace/laplace.h"
 #include "math/linalg/piv_cd.h"
+#include "math/linalg/LLT.h"
 #include "ints/aoloader.h"
 #include <omp.h>
 #include <dbcsr_matrix_ops.hpp>
 #include <dbcsr_tensor_ops.hpp>
 #include <dbcsr_btensor.hpp>
+
+#define _ORTHOGONALIZE
 
 namespace mp {
 	
@@ -147,6 +150,10 @@ void mpmod::compute() {
 		aoload.request(ints::key::qr_xbb, true);
 		
 	}
+	
+	#ifdef _ORTHOGONALIZE
+	aoload.request(ints::key::ovlp_bb, true);
+	#endif
 
 	aoload.compute();
 	auto aoreg = aoload.get_registry();
@@ -170,6 +177,19 @@ void mpmod::compute() {
 		metric_matrix = aoreg.get<dbcsr::shared_matrix<double>>(ints::key::coul_xx);
 		
 	}
+	
+	#ifdef _ORTHOGONALIZE
+	auto s_bb = aoreg.get<dbcsr::shared_matrix<double>>(ints::key::ovlp_bb);
+	
+	LOG.os<1>("Computing square root and square root inverse of S using LLT.\n");
+	
+	math::LLT lltsolver(s_bb, LOG.global_plev());
+	lltsolver.compute();
+	
+	auto Sllt_bb = lltsolver.L(b);
+	auto Sllt_inv_bb = lltsolver.L_inv(b);
+	s_bb->release();
+	#endif
 	
 	spinfotime.start();
 	SMatrixXi spinfo = nullptr;
@@ -274,12 +294,26 @@ void mpmod::compute() {
 		
 		c_occ_exp->scale(exp_occ, "right");
 		c_vir_exp->scale(exp_vir, "right");
+		
+		#ifdef _ORTHOGONALIZE
+		
+		auto c_occ_ortho = dbcsr::create_template<double>(*c_occ_exp)
+			.name("c_occ_ortho")
+			.get();
+			
+		dbcsr::multiply('N', 'N', *Sllt_inv_bb, *c_occ_exp, *c_occ_ortho)
+			.perform();
 				
-		//c_occ_exp->filter();
-		//c_vir_exp->filter();
+		dbcsr::multiply('N', 'T', *c_occ_ortho, *c_occ_ortho, *pseudo_occ)
+			.alpha(pow(omega,0.25)).perform();
+			
+		#else 
 		
 		dbcsr::multiply('N', 'T', *c_occ_exp, *c_occ_exp, *pseudo_occ)
 			.alpha(pow(omega,0.25)).perform();
+			
+		#endif
+		
 		dbcsr::multiply('N', 'T', *c_vir_exp, *c_vir_exp, *pseudo_vir)
 			.alpha(pow(omega,0.25)).perform();
 		
@@ -287,6 +321,7 @@ void mpmod::compute() {
 		
 		//=============== CHOLESKY DECOMPOSITION =======================
 		pcholtime.start();
+		
 		math::pivinc_cd chol(pseudo_occ, LOG.global_plev());
 		//chol.reorder("value");
 		
@@ -298,7 +333,21 @@ void mpmod::compute() {
 		
 		LOG.os<>("Cholesky decomposition rank: ", rank, '\n');
 	
+		#ifdef _ORTHOGONALIZE
+	
+		auto L_bu_ortho = chol.L(b, u);
+		auto L_bu = dbcsr::create_template<double>(*L_bu_ortho)
+			.name("L_bu")
+			.get();
+			
+		dbcsr::multiply('N', 'N', *Sllt_bb, *L_bu_ortho, *L_bu)
+			.perform();
+			
+		#else 
+		
 		auto L_bu = chol.L(b, u);
+		
+		#endif
 		
 		L_bu->filter(dbcsr::global::filter_eps);
 
