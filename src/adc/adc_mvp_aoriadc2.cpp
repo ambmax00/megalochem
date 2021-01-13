@@ -1404,8 +1404,8 @@ smat MVP_AOADC2::compute(smat u_ia, double omega) {
 	time_com.finish();
 	TIME.finish();
 	
-	//TIME.print_info();
-	//exit(0);
+	TIME.print_info();
+	exit(0);
 	
 	return sigma_0;
 	
