@@ -157,9 +157,12 @@ private:
 	std::vector<smat> m_pseudo_occs, m_pseudo_virs;
 	dbcsr::shared_pgrid<2> m_spgrid2;
 	std::shared_ptr<Eigen::MatrixXi> m_shellpairs;
+	dbcsr::shared_matrix<double> m_ssqrt_bb, m_sinvqrt_bb;
 	
 	// private functions
 	smat get_scaled_coeff(char dim, double wght, double xpt, 
+		double wfactor, double xfactor);
+	smat get_ortho_cholesky(char dim, double wght, double xpt, 
 		double wfactor, double xfactor);
 	smat get_density(smat coeff);
 	

@@ -1,6 +1,7 @@
 #include "adc/adc_mvp.h"
 #include "math/laplace/laplace.h"
 #include "math/linalg/piv_cd.h"
+#include "math/linalg/LLT.h"
 #include "adc/adc_defaults.h"
 #include "ints/fitting.h"
 
@@ -51,6 +52,42 @@ smat MVP_AOADC2::get_density(smat coeff) {
 	return p_bb;
 	
 }
+
+smat MVP_AOADC2::get_ortho_cholesky(char dim, double wght, double xpt, 
+	double wfactor, double xfactor) {
+		
+	auto coeff = get_scaled_coeff(dim, wght, xpt, wfactor, xfactor);
+		
+	auto coeff_ortho = dbcsr::create_template<double>(*coeff)
+		.name("co_ortho")
+		.get();
+	
+	dbcsr::multiply('N', 'N', *m_sinvqrt_bb, *coeff, *coeff_ortho)
+		.perform();
+		
+	auto p_ortho = get_density(coeff_ortho);
+	
+	math::pivinc_cd chol(p_ortho, LOG.global_plev());
+	chol.compute();
+	
+	int rank = chol.rank();
+	
+	auto b = m_mol->dims().b();
+	auto u = dbcsr::split_range(rank, m_mol->mo_split());
+	
+	LOG.os<1>("Cholesky decomposition rank: ", rank, '\n');
+
+	auto L_bu_ortho = chol.L(b, u);
+	auto L_bu = dbcsr::create_template<double>(*L_bu_ortho)
+		.name("L_bu")
+		.get();
+		
+	dbcsr::multiply('N', 'N', *m_ssqrt_bb, *L_bu_ortho, *L_bu)
+		.perform();
+		
+	return L_bu;
+	
+}	
 
 /* =====================================================================
  *                         INITIALIZING FUNCTIONS
@@ -108,6 +145,15 @@ void MVP_AOADC2::init() {
 		m_pseudo_occs[ilap] = Do_pseudo;
 		m_pseudo_virs[ilap] = Dv_pseudo;
 	}
+	
+	LOG.os<1>("Computing Cholesky decomposition of S\n");
+	math::LLT chol(m_s_bb, LOG.global_plev());
+	
+	chol.compute();
+	auto b = m_mol->dims().b();
+	
+	m_ssqrt_bb = chol.L(b);
+	m_sinvqrt_bb = chol.L_inv(b);
 	
 	LOG.os<1>("Setting up J,K,Z builders.\n");
 	
@@ -339,20 +385,13 @@ void MVP_AOADC2::compute_intermeds() {
 		
 		t_intermeds_1.start();
 		
+		//auto po = m_pseudo_occs[ilap];
+		
+		auto L_bu = get_ortho_cholesky('O', m_weights[ilap], 
+			m_xpoints[ilap], 0.125, 0.5);
+			
 		auto po = m_pseudo_occs[ilap];
 		auto pv = m_pseudo_virs[ilap];
-		
-		math::pivinc_cd chol(po, LOG.global_plev());
-		
-		chol.compute();
-		
-		int rank = chol.rank();
-		
-		auto u = dbcsr::split_range(rank, m_mol->mo_split());
-		
-		LOG.os<1>("Cholesky decomposition rank: ", rank, '\n');
-	
-		auto L_bu = chol.L(b, u);
 		
 		L_bu->filter(dbcsr::global::filter_eps);
 
@@ -785,6 +824,8 @@ dbcsr::sbtensor<3,double> MVP_AOADC2::compute_R(smat& u_ao) {
 	
 	time_R.finish();
 	
+	LOG.os<1>("Occupation of R: ", R_xbb_batched->occupation() * 100, "%\n");
+	
 	return R_xbb_batched;
 	
 }
@@ -1039,6 +1080,8 @@ std::pair<smat,smat> MVP_AOADC2::compute_sigma_2e_ilap(
 		
 		m_eri3c2e_batched->decompress_finalize();
 		I_xbb_batched->decompress_finalize();
+		
+		LOG.os<1>("Occupation of I_xbb: ", I_xbb_batched->occupation() * 100, "%\n");
 				
 		m_eri3c2e_batched->decompress_init({0},vec<int>{1},vec<int>{0,2});
 		I_xbb_batched->decompress_init({0,2},vec<int>{0,2},vec<int>{1});
@@ -1200,22 +1243,13 @@ smat MVP_AOADC2::compute_sigma_2e(smat& u_ao, double omega) {
 		
 		auto c_bo_scaled = get_scaled_coeff('O', wght_dd, xpt_dd, 0.0, 0.5);
 		auto c_bv_scaled = get_scaled_coeff('V', wght_dd, xpt_dd, 0.0, 0.5);
+		auto L_bu = get_ortho_cholesky('O', wght_dd, xpt_dd, 0.125, 0.5);
 		
 		auto pseudo_o = get_density(c_bo_scaled);
 		auto pseudo_v = get_density(c_bv_scaled);
 		
 		pseudo_o->scale(pow(wght_dd,0.25));
 		pseudo_v->scale(pow(wght_dd,0.25));
-		
-		math::pivinc_cd chol(pseudo_o, LOG.global_plev());
-		chol.compute();
-		
-		int rank = chol.rank();
-		
-		auto u = dbcsr::split_range(rank, m_mol->mo_split());
-		auto b = m_mol->dims().b();
-		
-		auto L_bu = chol.L(b, u);
 		
 		L_bu->filter(dbcsr::global::filter_eps);
 		pseudo_o->filter(dbcsr::global::filter_eps);
@@ -1370,8 +1404,8 @@ smat MVP_AOADC2::compute(smat u_ia, double omega) {
 	time_com.finish();
 	TIME.finish();
 	
-	TIME.print_info();
-	exit(0);
+	//TIME.print_info();
+	//exit(0);
 	
 	return sigma_0;
 	
