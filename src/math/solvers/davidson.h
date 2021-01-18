@@ -469,6 +469,10 @@ public:
 				
 			}
 			
+			// normalize ?
+			double norm = sqrt(x_k->dot(*x_k));
+			x_k->scale(1.0/norm);
+			
 			new_vecs.push_back(x_k);
 			
 		}
