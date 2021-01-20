@@ -2,12 +2,13 @@
 #define UTILS_MATRIX_PLOT_H
 
 #include <dbcsr_conversions.hpp>
-#include "utils/matplotlibcpp.h"
+#include <fstream>
+//#include "utils/matplotlibcpp.h"
 #include <cmath>
 
 namespace util {
 
-namespace plt = matplotlibcpp;
+//namespace plt = matplotlibcpp;
 
 inline void plot(dbcsr::shared_matrix<double> mat_in, double thresh,
 	std::string filename) {
@@ -31,16 +32,15 @@ inline void plot(dbcsr::shared_matrix<double> mat_in, double thresh,
 	auto myworld = mat_in->get_world();
 	if (myworld.rank() == 0) {
 	
-		const int color = 1;
-		
-		plt::title("MATRIX");
-		plt::imshow(ptr, nrows, ncols, color);
-		
-		
-		std::string fullname = filename + ".png";
-		std::cout << "SAVING TO : " << fullname << std::endl; 
-
-		plt::save(fullname);
+		std::ofstream file(filename + ".dat");
+		for (int i = 0; i != nrows; ++i) {
+			for (int j = 0; j != ncols; ++j) {			
+				file << eigen_rowmaj(i,j);
+				if (i != nrows-1) file << " ";
+			}
+			if (j != ncols-1) file << '\n';
+		}
+		file.close();
 		
 	}
 	
