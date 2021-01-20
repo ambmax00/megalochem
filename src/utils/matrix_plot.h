@@ -33,8 +33,8 @@ inline void plot(dbcsr::shared_matrix<double> mat_in, double thresh,
 	if (myworld.rank() == 0) {
 	
 		std::ofstream file(filename + ".dat");
-		for (int i = 0; i != nrows; ++i) {
-			for (int j = 0; j != ncols; ++j) {			
+		for (int j = 0; j != ncols; ++j) {
+			for (int i = 0; i != nrows; ++i) {
 				file << eigen_rowmaj(i,j);
 				if (i != nrows-1) file << " ";
 			}
