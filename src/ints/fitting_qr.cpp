@@ -759,8 +759,8 @@ std::shared_ptr<Eigen::MatrixXi> dfitting::compute_idx(
 	Eigen::MatrixXi idx_global = Eigen::MatrixXi::Zero(x.size(),b.size());
 	
 	cfit_xbb->decompress_init({2}, vec<int>{0}, vec<int>{1,2});
-	int nbatches = (cfit_xbb->get_type() == dbcsr::btype::core) ?
-		1 : cfit_xbb->nbatches(2);
+	int nbatches = cfit_xbb->nbatches(2); // (cfit_xbb->get_type() == dbcsr::btype::core) ?
+		//1 : cfit_xbb->nbatches(2);
 		
 	double tresh = 1e-6;
 		

@@ -814,7 +814,7 @@ void pivinc_cd::compute() {
 	
 	int nblks = U->nblkrows_total();
 	
-	double thresh = filter_eps / nb;
+	double thresh = filter_eps;
 	LOG.os<1>("-- Threshold: ", thresh, '\n');
 			
 	std::vector<int> rowperm(N), backperm(N);
@@ -979,13 +979,13 @@ void pivinc_cd::compute() {
 	// reorder columns to minimize matrix bandwidth 
 	
 	std::vector<double_int> startpos(m_rank, 
-		{std::numeric_limits<double>::max(), N});
-	std::vector<double_int> stoppos(m_rank, {0.0,-1});
+		{std::numeric_limits<double>::max(),N-1});
+	std::vector<double_int> stoppos(m_rank, {0.0,0});
 	
 	dbcsr::iterator<double> iter(*L_reo0);
 	iter.start();
 	
-	double T = 1e-5;
+	double T = dbcsr::global::filter_eps;
 	
 	while (iter.blocks_left()) {
 		iter.next_block();
@@ -1009,7 +1009,7 @@ void pivinc_cd::compute() {
 				double prevval = startpos[icol].d;
 				int prevrow = startpos[icol].i;
 				
-				if (val > T && irow < prevrow) {
+				if (val > T && irow <= prevrow) {
 					startpos[icol].d = val;
 					startpos[icol].i = irow;
 				}
@@ -1017,7 +1017,7 @@ void pivinc_cd::compute() {
 				prevval = stoppos[icol].d;
 				prevrow = stoppos[icol].i;
 				
-				if (val > T && irow > prevrow) {
+				if (val > T && irow >= prevrow) {
 					stoppos[icol].d = val;
 					stoppos[icol].i = irow;
 				} 
@@ -1030,12 +1030,13 @@ void pivinc_cd::compute() {
 	
 	/*for (int ip = 0; ip != wrd.size(); ++ip) {
 		if (ip == wrd.rank()) {
+			int pos = 0;
 			for (auto p : startpos) {
-				std::cout << p.d << " " << p.i << std::endl;
+				std::cout << pos++ << " " << p.d << " " << p.i << std::endl;
 			} std::cout << std::endl;	
-						
+			pos = 0;			
 			for (auto p : stoppos) {
-				std::cout << p.d << " " << p.i << std::endl;
+				std::cout << pos++ << " " << p.d << " " << p.i << std::endl;
 			} std::cout << std::endl;
 		}
 		MPI_Barrier(wrd.comm());
@@ -1064,19 +1065,23 @@ void pivinc_cd::compute() {
 		
 		for (int i = 0; i != m_rank; ++i) {
 			
-			if (startpos_red[i] == N || stoppos_red[i] == -1) {
-				throw std::runtime_error("Cholesky-reoredering failed.");
+			if (startpos_red[i] == N-1 && stoppos_red[i] == 0) {
+				//throw std::runtime_error("Cholesky-reoredering failed.");
+				lmo_pos[i] = N-1;
+			} else {
+				lmo_pos[i] = (double)(startpos_red[i] + stoppos_red[i]) / 2.0;
 			}
-			
-			lmo_pos[i] = (double)(startpos_red[i] + stoppos_red[i]) / 2;
+	
 		}
 		
 		std::stable_sort(lmo_perm.begin(), lmo_perm.end(), 
-			[&lmo_pos](int i1, int i2) { return lmo_pos[i1] < lmo_pos[i2]; });
+			[&lmo_pos](int i1, int i2) { 
+				return lmo_pos[i1] < lmo_pos[i2]; 
+			});
 			
 		LOG.os<1>("-- Reordered LMO indices: \n");
-		for (auto a : lmo_perm) {
-			std::cout << a << " ";
+		for (int i = 0; i != lmo_perm.size(); ++i) {
+			std::cout << lmo_perm[i] << " " << lmo_pos[lmo_perm[i]] << "\n";
 		} std::cout << std::endl;
 		
 	}
@@ -1086,9 +1091,11 @@ void pivinc_cd::compute() {
 	// reorder rows to restore initial order
 	for (int icol = 0; icol != m_rank; ++icol) {
 		
-		L_reo0->get_col(*cvec0, icol);
+		//std::cout << "PUTTING: " << icol << " INTO " << lmo_perm[icol] << std::endl;
 		
-		tmp0->overwrite_colvec(*cvec0, lmo_perm[icol]);
+		L_reo0->get_col(*cvec0, lmo_perm[icol]);
+		
+		tmp0->overwrite_colvec(*cvec0, icol);
 		
 		L_reo1->add(1.0, 1.0, *tmp0);
 		
@@ -1096,6 +1103,18 @@ void pivinc_cd::compute() {
 		tmp0->clear();
 		
 	}
+	
+	//auto eigenreo0 = dbcsr::matrix_to_eigen(*L_reo0);
+	//if (wrd.rank() == 0) std::cout << eigenreo0 << std::endl;
+	
+	//util::plot(L_reo0, 1e-5, "unordered");
+	//util::plot(L_reo1, 1e-5, "ordered");
+	
+	//auto eigenreo1 = dbcsr::matrix_to_eigen(*L_reo1);
+	//if (wrd.rank() == 0) std::cout << eigenreo1 << std::endl;
+	
+	//MPI_Barrier(wrd.comm());
+	//exit(0);
 	
 	L_reo0->clear();
 	
@@ -1144,6 +1163,9 @@ void pivinc_cd::compute() {
 
 dbcsr::smat_d pivinc_cd::L(std::vector<int> rowblksizes, std::vector<int> colblksizes) {
 	
+	static int i = 0;
+	i++;
+	
 	auto wrd = m_L->get_world();
 	
 	auto Lredist = dbcsr::create<double>()
@@ -1158,7 +1180,7 @@ dbcsr::smat_d pivinc_cd::L(std::vector<int> rowblksizes, std::vector<int> colblk
 		
 	Lredist->complete_redistribute(*m_L);
 	Lredist->filter(dbcsr::global::filter_eps);
-	
+			
 	return Lredist;
 	
 }

@@ -22,4 +22,7 @@ target_link_libraries(
 	chem_mp
 	chem_fock
 	chem_locorb
+	Python::Python
+	Python::Module
+	Python::NumPy
 )

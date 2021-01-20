@@ -13,4 +13,7 @@ target_link_libraries(
 	chem_desc
 	chem_math_linalg
 	chem_dbcsrx
+	Python::Python
+	Python::Module
+	Python::NumPy
 )

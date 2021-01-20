@@ -9,7 +9,8 @@ namespace util {
 
 namespace plt = matplotlibcpp;
 
-inline void plot(dbcsr::shared_matrix<double> mat_in, double thresh) {
+inline void plot(dbcsr::shared_matrix<double> mat_in, double thresh,
+	std::string filename) {
 
 	auto eigen_colmaj = dbcsr::matrix_to_eigen(*mat_in);
 	Eigen::Matrix<float, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor> eigen_rowmaj 
@@ -34,7 +35,12 @@ inline void plot(dbcsr::shared_matrix<double> mat_in, double thresh) {
 		
 		plt::title("MATRIX");
 		plt::imshow(ptr, nrows, ncols, color);
-		plt::show();
+		
+		
+		std::string fullname = filename + ".png";
+		std::cout << "SAVING TO : " << fullname << std::endl; 
+
+		plt::save(fullname);
 		
 	}
 	

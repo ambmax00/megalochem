@@ -36,6 +36,9 @@ public:
 	std::pair<smat_d,smat_d> compute_boys(smat_d c_bm, smat_d s_bb);
 #endif	
 	std::pair<smat_d,smat_d> compute_pao(smat_d c_bm, smat_d s_bb); 
+	
+	std::tuple<smat_d, smat_d, std::vector<double>> compute_truncated_pao(
+		smat_d c_bm, smat_d s_bb, std::vector<int> blkidx);
 		
 	dbcsr::shared_matrix<double>
 		compute_conversion(dbcsr::shared_matrix<double> c_bm,

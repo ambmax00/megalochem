@@ -3,11 +3,64 @@
 #include "math/solvers/davidson.h"
 #include "math/linalg/piv_cd.h"
 #include "math/linalg/SVD.h"
+#include "math/solvers/hermitian_eigen_solver.h"
 #include "locorb/locorb.h"
 
 #include <dbcsr_conversions.hpp>
 
 namespace adc {
+	
+dbcsr::shared_matrix<double> canonicalize(dbcsr::shared_matrix<double> u_lm,
+	std::vector<double> eps_m)
+{
+	
+	std::cout << "CANONICALIZING!!!" << std::endl;
+	
+	auto w = u_lm->get_world();
+	
+	auto l = u_lm->row_blk_sizes();
+	auto m = u_lm->col_blk_sizes();
+	
+	auto f_mm = dbcsr::create<double>()
+		.name("f_mm")
+		.set_world(w)
+		.row_blk_sizes(m)
+		.col_blk_sizes(m)
+		.matrix_type(dbcsr::type::no_symmetry)
+		.get();
+	
+	f_mm->reserve_all();
+	
+	f_mm->set_diag(eps_m);
+	
+	dbcsr::print(*u_lm);
+	
+	dbcsr::print(*f_mm);
+	
+	auto f_ll = u_transform(f_mm, 'N', u_lm, 'T', u_lm);
+	
+	dbcsr::print(*f_ll);
+	
+	math::hermitian_eigen_solver solver(f_ll, 'V', 1);
+	solver.compute();
+	
+	auto u_cl = solver.eigvecs();
+	
+	auto eval = solver.eigvals();
+	
+	if (w.rank() == 0) {
+		for (auto e : eval) {
+			std::cout << e << " ";
+		} std::cout << std::endl;
+		for (auto e : eps_m) {
+			std::cout << e << " ";
+		} std::cout << std::endl;
+	}
+	dbcsr::print(*u_cl);
+	
+	return u_cl;
+	
+}
 
 void adcmod::compute() {
 	
@@ -84,6 +137,58 @@ void adcmod::compute() {
 	int nroots = m_opt.get<int>("nroots", ADC_NROOTS);
 	
 	auto& t_davidson = TIME.sub("Davidson diagonalization");
+	
+	/*
+	auto r = filio::read_matrix("lauric.dat", "name", m_world, o, v,
+		dbcsr::type::no_symmetry);
+		
+	auto sigblks = get_significant_blocks(r, 0.995, nullptr, 0.0);
+	
+	LOG.os<>("Significant blocks:\n");
+	for (auto blk : sigblks) {
+		LOG.os<>(blk, " ");
+	}
+	LOG.os<>('\n');
+	
+	auto cbo = m_hfwfn->c_bo_A();
+	auto cbv = m_hfwfn->c_bv_A(); 
+	
+	auto u_bb_a = u_transform(r, 'N', cbo, 'T', cbv);
+	
+	math::SVD solver(r, 'V', 'V', 9999);
+	solver.compute();
+	
+	int rank = solver.rank();
+	std::cout << "MYRANK: " << rank << std::endl;
+	
+	auto l = dbcsr::split_range(rank, 5);
+	
+	auto U_ol = solver.U(o,l);
+	
+	auto V_lv = solver.Vt(l,v);
+	
+	auto U_ol_eigen = dbcsr::matrix_to_eigen(*U_ol);
+	Eigen::MatrixXd tran = U_ol_eigen.transpose();
+	
+	auto U_lo = dbcsr::eigen_to_matrix<double>(tran, m_world, "name",
+		l, o, dbcsr::type::no_symmetry);
+	
+	auto Uc_lo = canonicalize(V_lv, *m_hfwfn->eps_vir_A());
+	
+	locorb::mo_localizer moloc(m_world, m_hfwfn->mol());
+	
+	dbcsr::shared_matrix<double> ctrunc, utrunc;
+	std::vector<double> ene;
+	
+	auto reg = m_ao.get_registry();
+	auto s_bb = reg.get<dbcsr::shared_matrix<double>>(ints::key::ovlp_bb);
+	auto c_bo = m_hfwfn->c_bo_A();
+	
+	std::tie(ctrunc, utrunc, ene) = moloc.compute_truncated_pao(cbv, s_bb, sigblks);
+	
+	//dbcsr::print(*ctrunc);
+	
+	exit(0);*/
 	
 	LOG.os<>("==== Starting ADC(1) Computation ====\n\n"); 
 	
