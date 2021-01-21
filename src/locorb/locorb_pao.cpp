@@ -1,6 +1,7 @@
 #include "locorb/locorb.h"
 #include "math/linalg/LLT.h"
 #include "math/linalg/SVD.h"
+#include "math/solvers/hermitian_eigen_solver.h"
 #include "utils/matrix_plot.h"
 
 namespace locorb {
@@ -27,8 +28,18 @@ std::pair<smat_d,smat_d> mo_localizer::compute_pao(smat_d c_bm, smat_d s_bb) {
 
 std::tuple<smat_d, smat_d, std::vector<double>> 
 	mo_localizer::compute_truncated_pao(
-	smat_d c_bm, smat_d s_bb, std::vector<int> blkidx)
+	smat_d c_bm, smat_d s_bb, std::vector<double> eps_m,
+	std::vector<int> blkidx)
 {
+	
+	/*
+	 * b : atomic orbitals
+	 * p : truncated atomic orbitals
+	 * m : occupied or virtual (o,v)
+	 * r : truncated non-canonical o/v
+	 * s : truncated canonical o/v
+	 * 
+	 */
 	
 	// === Compute overlap matrix inverse of truncated AOs
 	
@@ -112,21 +123,20 @@ std::tuple<smat_d, smat_d, std::vector<double>>
 	}
 	
 	iterpb.stop();
-	
-	
-	dbcsr::print(*s_pb);
-		
+			
 	math::LLT llt(s_pp, LOG.global_plev());
 	llt.compute();
 	
 	math::LLT lltfull(s_bb, LOG.global_plev());
 	lltfull.compute();
 	
+	auto s_sqrt_pp = llt.L(p);
+	auto s_invsqrt_pp = llt.L_inv(p);
 	auto s_inv_pp = llt.inverse(p);
+	
 	auto s_sqrt_bb = lltfull.L(b);
 	
-	
-	dbcsr::print(*s_inv_pp);
+	//dbcsr::print(*s_inv_pp);
 	
 	auto cortho_bm = dbcsr::create_template<double>(*c_bm)
 		.name("c_ortho")
@@ -147,20 +157,6 @@ std::tuple<smat_d, smat_d, std::vector<double>>
 		.col_blk_sizes(b)
 		.matrix_type(dbcsr::type::no_symmetry)
 		.get();
-		
-	auto temp_pp = dbcsr::create<double>()
-		.name("temp_pb")
-		.set_world(m_world)
-		.row_blk_sizes(p)
-		.col_blk_sizes(p)
-		.matrix_type(dbcsr::type::no_symmetry)
-		.get();
-	
-	dbcsr::multiply('N', 'N', *s_pp, *s_inv_pp, *temp_pp)
-		.perform();
-	
-	std::cout << "HERE" << std::endl;
-	dbcsr::print(*temp_pp);
 	
 	dbcsr::multiply('N', 'N', *s_inv_pp, *s_pb, *temp_pb)
 		.perform();
@@ -171,7 +167,7 @@ std::tuple<smat_d, smat_d, std::vector<double>>
 	dbcsr::multiply('N', 'N', *temp_pb, *cortho_bm, *q_pm)
 		.perform();
 	
-	dbcsr::print(*q_pm);
+	//dbcsr::print(*q_pm);
 	
 	math::SVD svd(q_pm, 'V', 'V', LOG.global_plev());
 	svd.compute();
@@ -179,128 +175,176 @@ std::tuple<smat_d, smat_d, std::vector<double>>
 	auto s = svd.s();
 	int rank = s.size();
 	
+	LOG.os<>("SING VALS:\n");
+	for (auto val : s) {
+		LOG.os<>(val, " ");
+	} LOG.os<>('\n');
+	
 	LOG.os<>("RANK: ", rank, '\n');
 	
-	auto u = dbcsr::split_range(rank, m_mol->mo_split());
+	auto r = dbcsr::split_range(rank, m_mol->mo_split());
 	
-	auto c_bu = dbcsr::create<double>()
+	auto u_pr = svd.U(p,r);
+	auto vt_rm = svd.Vt(r,m);
+	
+	vt_rm->filter(1e-6);
+	dbcsr::print(*vt_rm);
+	
+	// canonicalize
+	
+	auto f_mm = dbcsr::create<double>()
+		.name("Fock")
 		.set_world(m_world)
-		.name("c_bu")
-		.row_blk_sizes(b)
-		.col_blk_sizes(u)
+		.row_blk_sizes(m)
+		.col_blk_sizes(m)
 		.matrix_type(dbcsr::type::no_symmetry)
 		.get();
+		
+	auto f_ht_rm = dbcsr::create<double>()
+		.name("Fock_HT")
+		.set_world(m_world)
+		.row_blk_sizes(r)
+		.col_blk_sizes(m)
+		.matrix_type(dbcsr::type::no_symmetry)
+		.get();
+		
+	auto f_rr = dbcsr::create<double>()
+		.name("Fock_HT")
+		.set_world(m_world)
+		.row_blk_sizes(r)
+		.col_blk_sizes(r)
+		.matrix_type(dbcsr::type::no_symmetry)
+		.get();
+		
+	f_mm->reserve_diag_blocks();
+	f_mm->set_diag(eps_m);
 	
-	auto vt_um = svd.Vt(u,m);
-	
-	dbcsr::multiply('N', 'T', *c_bm, *vt_um, *c_bu)
+	dbcsr::multiply('N', 'N', *vt_rm, *f_mm, *f_ht_rm)
 		.perform();
+		
+	dbcsr::multiply('N', 'T', *f_ht_rm, *vt_rm, *f_rr)
+		.perform();
+		
+	math::hermitian_eigen_solver hermsolver(f_rr, 'V', LOG.global_plev());
+	hermsolver.compute();
+	
+	// new molecular energies
+	auto eps_s = hermsolver.eigvals();
 	
 	if (m_world.rank() == 0) {
-		for (auto i : s) {
-			std::cout << i << " ";
+		std::cout << "Old molecular energies: " << std::endl;
+		for (auto e : eps_m) {
+			std::cout << e << " ";
+		} std::cout << std::endl;
+		std::cout << "New molecular energies: " << std::endl;
+		for (auto e : eps_s) {
+			std::cout << e << " ";
 		} std::cout << std::endl;
 	}
 	
-	dbcsr::print(*c_bu);
+	// transformation matrix noncanon -> canon
+	auto T_rs = hermsolver.eigvecs();
 	
-	//util::plot(c_bm, 1e-4);
-	//util::plot(c_bu, 1e-4);
+	// compute MO -> trunc. canonical MO transformation matrix
+	// T_sm = T_rs^t Σ_r Vt_rm
 	
-	MPI_Barrier(m_world.comm());
-	
-	exit(0);
-	
-	/*
-	dbcsr::print(*s_pp);
-	
-	
-	//s_pp->replicate_all();
-	
-	dbcsr::iterator iter(*s_bb);
-	iter.start();
-	
-	/*
-	while(iter.blocks_left()) {
-		
-		iter.next_block();
-		int irblk = iter.row();
-		int icblk = iter.col();
-		int rsize = iter.row_size();
-		int csize = iter.col_size();
-		
-		bool found = true;
-		auto blkpp = s_pp->get_block_p(irblk,icblk,found);
-		
-		std::copy(&iter(0,0), &iter(0,0) + rsize * csize, &blkp(0,0));
-		
-	}
-	
-	s_pp->sum_replicated();
-	s_pp->distribute();
-		
-	std::vector<int> resrow, rescol;
-		
-	for (auto iblk : blkidx) {
-		for (auto jblk : blkidx) {
-			if (strunc_bb->proc(iblk,jblk) == m_world.rank()) {
-				resrow.push_back(iblk);
-				rescol.push_back(jblk);
-			}
-		}
-	}
-	
-	strunc_bb->reserve_blocks(resrow, rescol);
-	strunc_bb->copy_in(*s_bb, true);
-	
-	// invert
-	math::LLT llt(strunc_bb, LOG.global_plev());
-	llt.compute();
-	
-	auto b = m_mol->dims().b();
-	auto strunc_inv_bb = llt.inverse(b);
-	
-	strunc_bb->clear();
-	resrow.clear();
-	rescol.clear();
-	
-	// === compute AO-truncAO overlap ===
-	// reuse strunc_bb
-	
-	for (auto iblk : blkidx) {
-		for (int jblk = 0; jblk != b.size(); ++jblk) {
-			if (strunc_bb->proc(iblk,jblk) == m_world.rank()) {
-				resrow.push_back(iblk);
-				rescol.push_back(jblk);
-			}
-		}
-	}
-	
-	strunc_bb->reserve_blocks(resrow, rescol);
-	strunc_bb->copy_in(*s_bb, true);
-	
-	// === compute truncated MO coefficients ===
-	
-	auto temp = dbcsr::create_template<double>(*c_bm)
-		.name("temp")
+	auto T_sm = dbcsr::create_template<double>(*f_ht_rm)
+		.name("Transformation matrix canon. MOs -> canon. truncated MOs")
 		.get();
 		
-	auto ctrunc_bm = dbcsr::create_template<double>(*c_bm)
-		.name("ctrunc")
+	dbcsr::multiply('T', 'N', *T_rs, *vt_rm, *T_sm)
+		.perform();
+		
+	// compute truncated canonical MO coefficient matrix
+	// Ctrunc_ps = X_pp * U_pr * T_rs
+	
+	auto ctrunc_ortho_ps = dbcsr::create_template<double>(*u_pr)
+		.name("Truncated orthogonal coefficient matrix")
 		.get();
 		
-	dbcsr::multiply('N', 'N', *strunc_bb, *c_bm, *temp)
+	auto ctrunc_ps = dbcsr::create_template<double>(*u_pr)
+		.name("Truncated coefficient matrix")
+		.get();
+	
+	u_pr->scale(s, "right");
+	
+	dbcsr::multiply('N', 'N', *u_pr, *T_rs, *ctrunc_ortho_ps)
 		.perform();
-	dbcsr::multiply('N', 'N', *strunc_inv_bb, *temp, *ctrunc_bm)
+		
+	dbcsr::multiply('N', 'N', *s_invsqrt_pp, *ctrunc_ortho_ps, *ctrunc_ps)
 		.perform();
+		
+	auto p_bb = dbcsr::create<double>()
+		.name("p")
+		.set_world(m_world)
+		.row_blk_sizes(b)
+		.col_blk_sizes(b)
+		.matrix_type(dbcsr::type::no_symmetry)
+		.get();
+		
+	auto p_pp = dbcsr::create<double>()
+		.name("p")
+		.set_world(m_world)
+		.row_blk_sizes(p)
+		.col_blk_sizes(p)
+		.matrix_type(dbcsr::type::no_symmetry)
+		.get();
 	
-	auto utrunc = compute_conversion(c_bm, strunc_bb, ctrunc_bm);
+	dbcsr::multiply('N', 'T', *c_bm, *c_bm, *p_bb)
+		.perform();
+		
+	dbcsr::multiply('N', 'T', *ctrunc_ps, *ctrunc_ps, *p_bb)
+		.alpha(-1.0)
+		.beta(1.0)
+		.perform();
+		
+	p_bb->filter(1e-6);
+	dbcsr::print(*p_bb);
 	
-	std::vector<double> out = {};
-	
-	return std::make_tuple(ctrunc_bm, utrunc, out);*/
+	//LOG.os<>("POP: ", pop_mulliken(*ctrunc_ps, *s_pp, *spp), '\n');
+		
+	return std::make_tuple(ctrunc_ps, T_sm, eps_s);
 	
 	
 }
+/*
+double mo_localizer::pop_mulliken(dbcsr::matrix<double>& c_bo, 
+	dbcsr::matrix<double>& s_bb, dbcsr::matrix<double>& s_sqrt_bb) 
+{
+	auto w = c_bo.get_world();
+	auto b = c_bo.row_blk_sizes();
+	
+	auto p_bb = dbcsr::create<double>()
+		.name("p_bb")
+		.set_world(w)
+		.row_blk_sizes(b)
+		.col_blk_sizes(b)
+		.matrix_type(dbcsr::type::no_symmetry)
+		.get();
+		
+	auto pop_bb = dbcsr::create<double>()
+		.name("pop_bb")
+		.set_world(w)
+		.row_blk_sizes(b)
+		.col_blk_sizes(b)
+		.matrix_type(dbcsr::type::no_symmetry)
+		.get();
+		
+	dbcsr::multiply('N', 'T', c_bo, c_bo, *p_bb)
+		.perform();
+		
+	dbcsr::multiply('N', 'N', *p_bb, s_bb, *pop_bb)
+		.perform();
+		
+	long long int datasize;
+	double* ptr = pop_bb->data(datasize);
+	
+	double nele_loc = std::accumulate(ptr, ptr + datasize, 0.0);
+	
+	MPI_Allreduce(MPI_IN_PLACE, &nele_loc, 1, MPI_DOUBLE, MPI_SUM, w.comm());
+	
+	return nele_loc;
+	
+}*/
 
 } // end namespace

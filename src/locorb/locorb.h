@@ -38,7 +38,8 @@ public:
 	std::pair<smat_d,smat_d> compute_pao(smat_d c_bm, smat_d s_bb); 
 	
 	std::tuple<smat_d, smat_d, std::vector<double>> compute_truncated_pao(
-		smat_d c_bm, smat_d s_bb, std::vector<int> blkidx);
+		smat_d c_bm, smat_d s_bb, std::vector<double> eps_m,
+		std::vector<int> blkidx);
 		
 	dbcsr::shared_matrix<double>
 		compute_conversion(dbcsr::shared_matrix<double> c_bm,
@@ -65,6 +66,9 @@ public:
 		return u_mm;
 		
 	}	
+	
+	//double pop_mulliken(dbcsr::matrix<double>& c_bo, dbcsr::matrix<double>& s_bb,
+	//	dbcsr::matrix<double>& s_sqrt_bb);
 	
 };
 	

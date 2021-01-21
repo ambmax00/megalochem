@@ -9,7 +9,7 @@
 #include <dbcsr_conversions.hpp>
 
 namespace adc {
-	
+
 dbcsr::shared_matrix<double> canonicalize(dbcsr::shared_matrix<double> u_lm,
 	std::vector<double> eps_m)
 {
@@ -123,10 +123,10 @@ void adcmod::compute() {
 	double conv_adc1 = m_opt.get<double>("adc1/dav_conv", ADC_ADC1_DAV_CONV);
 	int maxiter_adc1 = m_opt.get<double>("adc1/maxiter", ADC_ADC1_MAXITER);
 	
-	auto adc1_mvp = create_adc1();
+	//auto adc1_mvp = create_adc1();
 	math::davidson<MVP> dav(m_world.comm(), LOG.global_plev());
 	
-	dav.set_factory(adc1_mvp);
+	//dav.set_factory(adc1_mvp);
 	dav.set_diag(m_d_ov);
 	dav.pseudo(false);
 	dav.balancing(do_balancing);
@@ -138,10 +138,13 @@ void adcmod::compute() {
 	
 	auto& t_davidson = TIME.sub("Davidson diagonalization");
 	
-	/*
+	
 	auto r = filio::read_matrix("lauric.dat", "name", m_world, o, v,
 		dbcsr::type::no_symmetry);
-		
+
+	auto cbo = m_hfwfn->c_bo_A();
+	auto cbv = m_hfwfn->c_bv_A(); 	
+	
 	auto sigblks = get_significant_blocks(r, 0.995, nullptr, 0.0);
 	
 	LOG.os<>("Significant blocks:\n");
@@ -150,45 +153,28 @@ void adcmod::compute() {
 	}
 	LOG.os<>('\n');
 	
-	auto cbo = m_hfwfn->c_bo_A();
-	auto cbv = m_hfwfn->c_bv_A(); 
-	
-	auto u_bb_a = u_transform(r, 'N', cbo, 'T', cbv);
-	
-	math::SVD solver(r, 'V', 'V', 9999);
-	solver.compute();
-	
-	int rank = solver.rank();
-	std::cout << "MYRANK: " << rank << std::endl;
-	
-	auto l = dbcsr::split_range(rank, 5);
-	
-	auto U_ol = solver.U(o,l);
-	
-	auto V_lv = solver.Vt(l,v);
-	
-	auto U_ol_eigen = dbcsr::matrix_to_eigen(*U_ol);
-	Eigen::MatrixXd tran = U_ol_eigen.transpose();
-	
-	auto U_lo = dbcsr::eigen_to_matrix<double>(tran, m_world, "name",
-		l, o, dbcsr::type::no_symmetry);
-	
-	auto Uc_lo = canonicalize(V_lv, *m_hfwfn->eps_vir_A());
-	
 	locorb::mo_localizer moloc(m_world, m_hfwfn->mol());
-	
-	dbcsr::shared_matrix<double> ctrunc, utrunc;
-	std::vector<double> ene;
 	
 	auto reg = m_ao.get_registry();
 	auto s_bb = reg.get<dbcsr::shared_matrix<double>>(ints::key::ovlp_bb);
-	auto c_bo = m_hfwfn->c_bo_A();
 	
-	std::tie(ctrunc, utrunc, ene) = moloc.compute_truncated_pao(cbv, s_bb, sigblks);
+	auto [co_pr, u_ro, epso_r] = moloc.compute_truncated_pao(
+		cbo, s_bb, *epso, sigblks);
+	auto [cv_ps, u_sv, epsv_s] = moloc.compute_truncated_pao(
+		cbv, s_bb, *epsv, sigblks);
 	
+	int nbas = m_hfwfn->mol()->c_basis()->nbf();
+	int nbas_t = co_pr->nfullrows_total();
+	int nocc_t = co_pr->nfullcols_total();
+	int nvir_t = cv_ps->nfullcols_total();
+	
+	LOG.os<>("AO: ", nbas, " -> ", nbas_t, '\n');
+	LOG.os<>("MO (O): ", nocc, " -> ", nocc_t, '\n');
+	LOG.os<>("MO (V): ", nvir, " -> ", nvir_t, '\n');
+		
 	//dbcsr::print(*ctrunc);
-	
-	exit(0);*/
+	MPI_Barrier(m_world.comm());
+	exit(0);
 	
 	LOG.os<>("==== Starting ADC(1) Computation ====\n\n"); 
 	
@@ -196,7 +182,7 @@ void adcmod::compute() {
 	dav.compute(dav_guess, nroots);
 	t_davidson.finish();
 	
-	adc1_mvp->print_info();
+	//adc1_mvp->print_info();
 			
 	auto rvecs = dav.ritz_vectors();
 	auto ex = dav.eigvals();
@@ -307,6 +293,10 @@ std::vector<int> adcmod::get_significant_blocks(dbcsr::shared_matrix<double> u_i
 	auto u_bb_a = u_transform(u_ia, 'N', c_bo, 'T', c_bv);
 	
 	auto b = m_hfwfn->mol()->dims().b();
+
+	auto retvec = b;
+	std::iota(retvec.begin(), retvec.end(), 0);
+	return retvec;
 	
 	auto dims = m_world.dims();
     auto dist = dbcsr::default_dist(b.size(), m_world.size(), b);
