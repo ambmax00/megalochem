@@ -1,7 +1,7 @@
 #ifndef DBCSR_TENSOR_HPP
 #define DBCSR_TENSOR_HPP
 
-#:include "dbcsr.fypp"
+#:include "megalochem.fypp"
 #include <dbcsr_common.hpp>
 #include <dbcsr_matrix.hpp>
 #include <dbcsr_tensor.h>

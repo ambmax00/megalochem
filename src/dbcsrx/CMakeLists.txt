@@ -1,46 +1,14 @@
 set(FYPP_SOURCES
-	dbcsr_common.HPP
-	dbcsr_matrix.HPP
-	dbcsr_tensor.HPP
-	dbcsr_matrix_ops.HPP
-	dbcsr_tensor_ops.HPP
-	fortran_utils.HPP
-	fortran_utils.F
+	dbcsr_common.hpp.fypp
+	dbcsr_matrix.hpp.fypp
+	dbcsr_tensor.hpp.fypp
+	dbcsr_matrix_ops.hpp.fypp
+	dbcsr_tensor_ops.hpp.fypp
+	fortran_utils.hpp.fypp
+	fortran_utils.f.fypp
 )       
 
-set(FYPP_OUT)
-
-foreach (file ${FYPP_SOURCES})	
-
-	get_filename_component(file "${file}" ABSOLUTE)
-	get_filename_component(rootname "${file}" NAME_WE)
-	get_filename_component(extension "${file}" LAST_EXT)
-
-	if(${extension} STREQUAL ".HPP")
-		set(new_extension ".hpp")
-		set(of "${CMAKE_CURRENT_BINARY_DIR}/${rootname}${new_extension}")
-		add_custom_command(
-          	  OUTPUT ${of}
-		  COMMAND "${Python_EXECUTABLE}" -m fypp -F "${file}" "${of}"
-        	  DEPENDS "${file}"
-	        )
-	elseif(${extension} STREQUAL ".F")
-		set(new_extension ".f90")
-		set(of "${CMAKE_CURRENT_BINARY_DIR}/${rootname}${new_extension}")
-		add_custom_command(
-                  OUTPUT ${of}
-                  COMMAND "${Python_EXECUTABLE}" -m fypp "${file}" "${of}"
-                  DEPENDS "${file}"
-                )
-	else()
-		message(FATAL_ERROR "Unknown file extension.")
-	endif()
-
-	list(APPEND FYPP_OUT "${of}")
-
-endforeach()
-
-add_custom_target(fypped ALL DEPENDS ${FYPP_OUT})
+add_fypp_sources(DBCSRX_SRCS dbcsrx_fypp ${FYPP_SOURCES})
 
 set(FORTRAN_SOURCES
 	${CMAKE_CURRENT_BINARY_DIR}/fortran_utils.f90
@@ -56,7 +24,7 @@ target_link_libraries(
 )
 
 add_library(chem_dbcsrx INTERFACE)
-add_dependencies(chem_dbcsrx fypped)
+add_dependencies(chem_dbcsrx dbcsrx_fypp)
 
 target_link_libraries(
 	chem_dbcsrx

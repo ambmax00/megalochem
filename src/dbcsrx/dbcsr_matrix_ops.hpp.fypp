@@ -1,7 +1,7 @@
 #ifndef DBCSR_OPS_HPP
 #define DBCSR_OPS_HPP
 
-#:include "dbcsr.fypp"
+#:include "megalochem.fypp"
 #include <dbcsr_matrix.hpp>
 
 namespace dbcsr {

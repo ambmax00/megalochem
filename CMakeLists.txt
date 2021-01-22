@@ -4,9 +4,12 @@ project(chem)
 enable_language(Fortran CXX)
 
 set(CMAKE_BUILD_TYPE RelWithDebInfo)
-set (CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD 17)
 
-set(CMAKE_MODULE_PATH ${CMAKE_SOURCE_DIR}/cmake/modules)
+set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} ${CMAKE_SOURCE_DIR}/cmake/modules)
+
+set(FYPP_INCLUDE_DIR ${CMAKE_SOURCE_DIR}/src/utils)
+include(fypp_sources)
 
 find_package(Eigen3 REQUIRED NO_MODULE)
 

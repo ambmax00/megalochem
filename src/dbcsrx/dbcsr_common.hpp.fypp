@@ -1,7 +1,7 @@
 #ifndef DBCSR_COMMON_HPP
 #define DBCSR_COMMON_HPP
 
-#:include "dbcsr.fypp"
+#:include "megalochem.fypp"
 
 #include <dbcsr.h>
 #include <vector>

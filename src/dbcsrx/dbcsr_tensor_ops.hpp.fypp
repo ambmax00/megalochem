@@ -1,7 +1,7 @@
 #ifndef DBCSR_TENSOR_OPS_HPP
 #define DBCSR_TENSOR_OPS_HPP
 
-#:include "dbcsr.fypp"
+#:include "megalochem.fypp"
 #include <dbcsr_tensor.hpp>
 
 namespace dbcsr {
