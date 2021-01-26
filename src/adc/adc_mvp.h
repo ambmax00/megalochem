@@ -194,20 +194,20 @@ private:
 	
 	#ifdef _DOUBLES_REDUCED
 	std::tuple<dbcsr::sbtensor<3,double>,dbcsr::sbtensor<3,double>>
-		compute_laplace_batchtensors(smat& u_ia, smat& L_bo, smat& L_bv);
+		compute_laplace_batchtensors(smat& u_ia, smat& L_bo, smat& pv_bb);
 	
 	std::tuple<dbcsr::shared_tensor<2,double>,dbcsr::shared_tensor<2,double>>
-		compute_F(dbcsr::sbtensor<3,double> eri_xov_batched,
-		dbcsr::sbtensor<3,double> J_xov_batched);
+		compute_F(dbcsr::sbtensor<3,double> eri_xob_batched,
+		dbcsr::sbtensor<3,double> J_xob_batched,
+		dbcsr::shared_matrix<double> L_bo);
 		
-	void compute_I(dbcsr::sbtensor<3,double>& eri,
+	dbcsr::sbtensor<3,double> compute_I(dbcsr::sbtensor<3,double>& eri,
 		dbcsr::sbtensor<3,double>& J, dbcsr::shared_tensor<2,double>& F_A,
-		dbcsr::shared_tensor<2,double>& F_B, 
-		dbcsr::sbtensor<3,double>& I);
+		dbcsr::shared_tensor<2,double>& F_B);
 		
 	std::tuple<smat,smat> compute_sigma_ilap(
-		dbcsr::sbtensor<3,double>& I_xov_batched, 
-		smat& L_bo, smat& L_bv, double omega);
+		dbcsr::sbtensor<3,double>& I_xob_batched, 
+		smat& L_bo, double omega);
 	#endif
 	
 	// intermediates

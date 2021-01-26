@@ -123,10 +123,10 @@ void adcmod::compute() {
 	double conv_adc1 = m_opt.get<double>("adc1/dav_conv", ADC_ADC1_DAV_CONV);
 	int maxiter_adc1 = m_opt.get<double>("adc1/maxiter", ADC_ADC1_MAXITER);
 	
-	//auto adc1_mvp = create_adc1();
+	auto adc1_mvp = create_adc1();
 	math::davidson<MVP> dav(m_world.comm(), LOG.global_plev());
 	
-	//dav.set_factory(adc1_mvp);
+	dav.set_factory(adc1_mvp);
 	dav.set_diag(m_d_ov);
 	dav.pseudo(false);
 	dav.balancing(do_balancing);
@@ -138,7 +138,7 @@ void adcmod::compute() {
 	
 	auto& t_davidson = TIME.sub("Davidson diagonalization");
 	
-	
+	/*
 	auto r = filio::read_matrix("lauric.dat", "name", m_world, o, v,
 		dbcsr::type::no_symmetry);
 
@@ -242,6 +242,7 @@ void adcmod::compute() {
 		
 	MPI_Barrier(m_world.comm());
 	exit(0);
+	*/
 	
 	LOG.os<>("==== Starting ADC(1) Computation ====\n\n"); 
 	
@@ -315,7 +316,7 @@ void adcmod::compute() {
 	for (int iroot = istart; iroot != nroots; ++iroot) {
 		
 		LOG.os<>("============================================\n");
-		LOG.os<>("=== Computing excited state nr. ", iroot+1, '\n');
+		LOG.os<>("    Computing excited state nr. ", iroot+1, '\n');
 		LOG.os<>("============================================\n\n");
 		
 		LOG.os<>("Setting up ADC(2) MVP builder.\n");

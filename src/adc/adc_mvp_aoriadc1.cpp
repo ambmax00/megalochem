@@ -97,7 +97,7 @@ smat MVP_AOADC1::compute(smat u_ia, double omega) {
 	
 	// recycle u_ao
 	u_ao->add(0.0, 1.0, *jmat);
-	//u_ao->add(1.0, 1.0, *kmat);
+	u_ao->add(1.0, 1.0, *kmat);
 	
 	LOG.os<>("Sigma adc1 ao:\n");
 	dbcsr::print(*u_ao);

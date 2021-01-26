@@ -54,8 +54,8 @@ void adcmod::init_ao_tensors() {
 	auto kmet_adc1 = fock::str_to_kmethod(kstr_adc1);
 	auto metr_adc1 = ints::str_to_metric(mstr_adc1);
 	
-	//fock::load_jints(jmet_adc1, metr_adc1, m_ao);
-	//fock::load_kints(kmet_adc1, metr_adc1, m_ao);
+	fock::load_jints(jmet_adc1, metr_adc1, m_ao);
+	fock::load_kints(kmet_adc1, metr_adc1, m_ao);
 	
 	bool do_adc2 = m_opt.get<bool>("do_adc2",ADC_DO_ADC2);
 	
