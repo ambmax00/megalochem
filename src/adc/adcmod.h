@@ -45,7 +45,8 @@ private:
 	dbcsr::shared_matrix<double> compute_diag_0();
 	dbcsr::shared_matrix<double> compute_diag_1();
 		
-	std::vector<int> get_significant_blocks(dbcsr::shared_matrix<double> u_bb, 
+	std::tuple<std::vector<int>, std::vector<int>> 
+		get_significant_blocks(dbcsr::shared_matrix<double> u_bb, 
 		double theta, dbcsr::shared_matrix<double> metric_bb, double gamma);
 	
 public:	

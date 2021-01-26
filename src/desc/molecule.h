@@ -65,6 +65,10 @@ protected:
 	
 		block_sizes() {}
 	
+		block_sizes(const block_sizes& in) = default;
+		
+		block_sizes& operator=(const block_sizes& in) = default;
+	
 		block_sizes(molecule& mol, int nsplit) {
 			
 			m_occ_alpha_sizes = split_range(mol.m_nocc_alpha,nsplit);
@@ -82,6 +86,10 @@ protected:
 				m_vir_beta_sizes.begin(),m_vir_beta_sizes.end());
 				
 			set_b(*mol.m_cluster_basis);
+			
+			if (mol.m_cluster_dfbasis) {
+				set_x(*mol.m_cluster_dfbasis);
+			}
 			
 		}
 		
@@ -215,6 +223,9 @@ public:
 	std::string name() {
 		return m_name;
 	}
+	
+	std::shared_ptr<desc::molecule> fragment(int noa, int nob, int nvo,
+		int nvb, std::vector<int> atom_list);
 	
 	friend class create_mol_base;
 

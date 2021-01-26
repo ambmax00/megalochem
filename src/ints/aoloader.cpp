@@ -176,6 +176,9 @@ void aoloader::compute() {
 		time.start();
 		
 		auto c = m_reg.get<smatd>(key::coul_xx);
+		
+		dbcsr::print(*c);
+		
 		auto p = invert(c);
 		auto cinv = p.first;
 		auto cinvsqrt = p.second;

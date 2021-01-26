@@ -74,7 +74,7 @@ smat MVP_AOADC1::compute(smat u_ia, double omega) {
 	
 	LOG.os<1>("Computing ADC0.\n");
 	// compute ADC0 part in MO basis
-	smat sig_0 = compute_sigma_0(u_ia, *m_eps_occ, *m_eps_vir);
+	smat sig_0 = compute_sigma_0(u_ia, m_eps_occ, m_eps_vir);
 		
 	// transform u to ao coordinated
 	
@@ -97,10 +97,10 @@ smat MVP_AOADC1::compute(smat u_ia, double omega) {
 	
 	// recycle u_ao
 	u_ao->add(0.0, 1.0, *jmat);
-	u_ao->add(1.0, 1.0, *kmat);
+	//u_ao->add(1.0, 1.0, *kmat);
 	
-	//LOG.os<>("Sigma adc1 ao:\n");
-	//dbcsr::print(*u_ao);
+	LOG.os<>("Sigma adc1 ao:\n");
+	dbcsr::print(*u_ao);
 	
 	// transform back
 	smat sig_1 = u_transform(u_ao, 'T', m_c_bo, 'N', m_c_bv);

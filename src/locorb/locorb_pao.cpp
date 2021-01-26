@@ -29,7 +29,8 @@ std::pair<smat_d,smat_d> mo_localizer::compute_pao(smat_d c_bm, smat_d s_bb) {
 std::tuple<smat_d, smat_d, std::vector<double>> 
 	mo_localizer::compute_truncated_pao(
 	smat_d c_bm, smat_d s_bb, std::vector<double> eps_m,
-	std::vector<int> blkidx)
+	std::vector<int> blkidx,
+	smat_d u_km)
 {
 	
 	/*
@@ -45,6 +46,7 @@ std::tuple<smat_d, smat_d, std::vector<double>>
 	
 	auto b = c_bm->row_blk_sizes();
 	auto m = c_bm->col_blk_sizes();
+	auto k = u_km->row_blk_sizes();
 	auto boff = c_bm->row_blk_offsets();
 	
 	std::vector<int> p, poff; // projected space
@@ -187,8 +189,8 @@ std::tuple<smat_d, smat_d, std::vector<double>>
 	auto u_pr = svd.U(p,r);
 	auto vt_rm = svd.Vt(r,m);
 	
-	vt_rm->filter(1e-6);
-	dbcsr::print(*vt_rm);
+	//vt_rm->filter(1e-6);
+	//dbcsr::print(*vt_rm);
 	
 	// canonicalize
 	
@@ -215,7 +217,7 @@ std::tuple<smat_d, smat_d, std::vector<double>>
 		.col_blk_sizes(r)
 		.matrix_type(dbcsr::type::no_symmetry)
 		.get();
-		
+	
 	f_mm->reserve_diag_blocks();
 	f_mm->set_diag(eps_m);
 	
@@ -274,7 +276,7 @@ std::tuple<smat_d, smat_d, std::vector<double>>
 	dbcsr::multiply('N', 'N', *s_invsqrt_pp, *ctrunc_ortho_ps, *ctrunc_ps)
 		.perform();
 		
-	auto p_bb = dbcsr::create<double>()
+	/*auto p_bb = dbcsr::create<double>()
 		.name("p")
 		.set_world(m_world)
 		.row_blk_sizes(b)
@@ -301,7 +303,12 @@ std::tuple<smat_d, smat_d, std::vector<double>>
 	p_bb->filter(1e-6);
 	dbcsr::print(*p_bb);
 	
-	//LOG.os<>("POP: ", pop_mulliken(*ctrunc_ps, *s_pp, *spp), '\n');
+	//LOG.os<>("POP: ", pop_mulliken(*ctrunc_ps, *s_pp, *spp), '\n');*/
+	
+	
+	
+	
+	
 		
 	return std::make_tuple(ctrunc_ps, T_sm, eps_s);
 	

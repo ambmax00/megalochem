@@ -165,4 +165,83 @@ void molecule::print_info(int level) {
 	
 }
 
+std::shared_ptr<desc::molecule> molecule::fragment(int noa, int nob, int nva,
+	int nvb, std::vector<int> atom_list)
+{
+	
+	auto frag = std::make_shared<desc::molecule>();
+	
+	// basic members
+	
+	frag->m_name = "Fragment of " + m_name;
+	frag->m_comm = m_comm;
+	
+	frag->m_mult = m_mult;
+	frag->m_charge = m_charge;
+	
+	frag->m_mo_split = m_mo_split;
+	frag->m_nele = m_nele;
+	frag->m_nele_alpha = m_nele_alpha;
+	frag->m_nele_beta = m_nele_beta;
+
+	frag->m_nocc_alpha = noa;
+	frag->m_nocc_beta = nob;
+	frag->m_nvir_alpha = nva;
+	frag->m_nvir_beta = nvb;
+	
+	// atoms
+	
+	for (auto iatom : atom_list) {
+		frag->m_atoms.push_back(m_atoms[iatom]);
+	}
+	
+	// basis set
+	
+	auto get_block = [&frag](desc::cluster_basis& cbas)
+	{
+		
+		std::vector<bool> is_included(cbas.size(),false);
+			
+		int off = 0;
+		for (auto& cluster : cbas) {
+			if (atom_of(cluster[0], frag->m_atoms) != -1) {
+				is_included[off] = true;
+			}
+			++off;
+		}
+		
+		std::vector<int> blklist;
+		for (int ishell = 0; ishell != is_included.size(); ++ishell) {
+			if (is_included[ishell]) blklist.push_back(ishell);
+		}
+		
+		return blklist;
+		
+	};
+	
+	auto blklist_b = get_block(*m_cluster_basis);
+	frag->m_cluster_basis = m_cluster_basis->fragment(blklist_b);
+	
+	if (m_cluster_dfbasis) {
+		auto blklist_x = get_block(*m_cluster_dfbasis);
+		frag->m_cluster_dfbasis = m_cluster_dfbasis->fragment(blklist_x);
+	}
+	
+	frag->m_blocks = block_sizes(*frag, m_mo_split);
+	
+	auto print = [](auto v) {
+		for (auto e : v) {
+			std::cout << e << " ";
+		} std::cout << std::endl;
+	};
+	
+	print(frag->m_blocks.oa());
+	print(frag->m_blocks.va());
+	print(frag->m_blocks.b());
+	print(frag->m_blocks.x());
+	
+	return frag;
+	
+}
+
 }

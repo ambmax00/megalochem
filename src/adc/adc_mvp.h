@@ -73,8 +73,8 @@ private:
 	std::shared_ptr<fock::J> m_jbuilder;
 	std::shared_ptr<fock::K> m_kbuilder;
 	
-	svector<double> m_eps_occ;
-	svector<double> m_eps_vir;
+	std::vector<double> m_eps_occ;
+	std::vector<double> m_eps_vir;
 
 	smat m_c_bo;
 	smat m_c_bv;
@@ -111,8 +111,8 @@ MAKE_STRUCT(
 	(
 		(c_bo, (dbcsr::shared_matrix<double>), required, val),
 		(c_bv, (dbcsr::shared_matrix<double>), required, val),
-		(eps_occ, (std::shared_ptr<std::vector<double>>), required, val),
-		(eps_vir, (std::shared_ptr<std::vector<double>>), required, val),
+		(eps_occ, (std::vector<double>), required, val),
+		(eps_vir, (std::vector<double>), required, val),
 		(eri3c2e_batched, (dbcsr::sbtensor<3,double>), required, val),
 		(fitting_batched, (dbcsr::sbtensor<3,double>), optional, val, nullptr),
 		(v_xx, (dbcsr::shared_matrix<double>), required, val),

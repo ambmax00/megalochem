@@ -145,7 +145,13 @@ void adcmod::compute() {
 	auto cbo = m_hfwfn->c_bo_A();
 	auto cbv = m_hfwfn->c_bv_A(); 	
 	
-	auto sigblks = get_significant_blocks(r, 0.995, nullptr, 0.0);
+	auto [atomblks, sigblks] = get_significant_blocks(r, 0.9995, nullptr, 0.0);
+	
+	LOG.os<>("Significant atoms:\n");
+	for (auto blk : atomblks) {
+		LOG.os<>(blk, " ");
+	}
+	LOG.os<>('\n');
 	
 	LOG.os<>("Significant blocks:\n");
 	for (auto blk : sigblks) {
@@ -171,8 +177,69 @@ void adcmod::compute() {
 	LOG.os<>("AO: ", nbas, " -> ", nbas_t, '\n');
 	LOG.os<>("MO (O): ", nocc, " -> ", nocc_t, '\n');
 	LOG.os<>("MO (V): ", nvir, " -> ", nvir_t, '\n');
+	LOG.os<>("NXbas(prev): ", m_hfwfn->mol()->c_dfbasis()->nbf(), '\n');
+
+	
+	LOG.os<>("Forming fragment...\n");
+	auto mol_frag = m_hfwfn->mol()->fragment(nocc_t, nocc_t, nvir_t, 
+		nvir_t, atomblks);
+		
+	LOG.os<>("Fragment info:\n");
+	LOG.os<>("Nelec alpha: ", mol_frag->nele_alpha(), '\n');
+	LOG.os<>("Nelec beta: ", mol_frag->nele_beta(), '\n');
+	LOG.os<>("Occ: ", mol_frag->nocc_alpha(), '\n');
+	LOG.os<>("Vir: ", mol_frag->nvir_alpha(), '\n');
+	LOG.os<>("Nbas: ", mol_frag->c_basis()->nbf(), '\n');
+	LOG.os<>("NXbas: ", mol_frag->c_dfbasis()->nbf(), '\n');
 		
 	//dbcsr::print(*ctrunc);
+	
+	auto x = mol_frag->dims().x();
+	LOG.os<>("THIS IS X: \n");
+	for (auto f : x) {
+		std::cout << f << std::endl;
+	}
+	
+	
+	ints::aoloader fragloader(m_world, mol_frag, m_opt);
+	
+	fock::load_jints(fock::jmethod::dfao, ints::metric::coulomb, fragloader);
+	fock::load_kints(fock::kmethod::dfao, ints::metric::coulomb, fragloader);
+	
+	fragloader.compute();
+	
+	auto freg = fragloader.get_registry();
+	auto eribatched = freg.get<dbcsr::sbtensor<3,double>>(ints::key::coul_xbb);
+	auto v_xx = freg.get<dbcsr::shared_matrix<double>>(ints::key::coul_xx_inv);
+	auto fitbatched = freg.get<dbcsr::sbtensor<3,double>>(ints::key::dfit_coul_xbb);
+	
+	auto ptr = create_MVP_AOADC1(m_world, mol_frag, LOG.global_plev())
+		.c_bo(co_pr)
+		.c_bv(cv_ps)
+		.eps_occ(epso_r)
+		.eps_vir(epsv_s)
+		.eri3c2e_batched(eribatched)
+		.fitting_batched(fitbatched)
+		.v_xx(v_xx)
+		.jmethod(fock::jmethod::dfao)
+		.kmethod(fock::kmethod::dfao)
+		.get();
+		
+	ptr->init();
+		
+	auto u_rs = u_transform(r, 'N', u_ro, 'T', u_sv);
+	
+	dbcsr::print(*u_rs);
+	
+	double n = sqrt(u_rs->dot(*u_rs));
+	u_rs->scale(1.0/n);
+	
+	auto sig = ptr->compute(u_rs, 0.0);
+	
+	double energy = u_rs->dot(*sig);
+	
+	LOG.os<>("ENERGY: ", energy, '\n');
+		
 	MPI_Barrier(m_world.comm());
 	exit(0);
 	
@@ -254,8 +321,8 @@ void adcmod::compute() {
 		LOG.os<>("Setting up ADC(2) MVP builder.\n");
 		
 		if (local) {
-			auto atomlist = get_significant_blocks(rvecs[0], 0.9975, nullptr, 0.0);
-			adc2_mvp = create_adc2(atomlist);
+			//auto atomlist = get_significant_blocks(rvecs[0], 0.9975, nullptr, 0.0);
+			//adc2_mvp = create_adc2(atomlist);
 		} else if (!is_init) {
 			adc2_mvp = create_adc2();
 		}
@@ -283,7 +350,8 @@ void adcmod::compute() {
 		
 }
 
-std::vector<int> adcmod::get_significant_blocks(dbcsr::shared_matrix<double> u_ia, 
+std::tuple<std::vector<int>, std::vector<int>> 
+	adcmod::get_significant_blocks(dbcsr::shared_matrix<double> u_ia, 
 	double theta, dbcsr::shared_matrix<double> metric_bb, double gamma) 
 {
 	
@@ -293,10 +361,16 @@ std::vector<int> adcmod::get_significant_blocks(dbcsr::shared_matrix<double> u_i
 	auto u_bb_a = u_transform(u_ia, 'N', c_bo, 'T', c_bv);
 	
 	auto b = m_hfwfn->mol()->dims().b();
+	auto atoms = m_hfwfn->mol()->atoms();
+    int natoms = atoms.size();
 
 	auto retvec = b;
 	std::iota(retvec.begin(), retvec.end(), 0);
-	return retvec;
+	
+	std::vector<int> retmol(natoms);
+	std::iota(retmol.begin(), retmol.end(), 0);
+		
+	//return std::make_tuple(retmol,retvec);
 	
 	auto dims = m_world.dims();
     auto dist = dbcsr::default_dist(b.size(), m_world.size(), b);
@@ -315,8 +389,6 @@ std::vector<int> adcmod::get_significant_blocks(dbcsr::shared_matrix<double> u_i
     std::iota(idx_occ.begin(), idx_occ.end(), 0);
     std::iota(idx_vir.begin(), idx_vir.end(), 0);
     
-    auto atoms = m_hfwfn->mol()->atoms();
-    int natoms = atoms.size();
     auto blkmap = m_hfwfn->mol()->c_basis()->block_to_atom(atoms);
     
     // loop over blocks rows/cols
@@ -399,6 +471,7 @@ std::vector<int> adcmod::get_significant_blocks(dbcsr::shared_matrix<double> u_i
 	double totnorm_vir = 0.0;
 	
 	std::vector<int> atoms_check(natoms,0);
+	std::vector<int> atoms_all;
 	
 	for (auto idx : idx_occ) {
 		//std::cout << totnorm << std::endl;
@@ -451,6 +524,12 @@ std::vector<int> adcmod::get_significant_blocks(dbcsr::shared_matrix<double> u_i
 		if (b) idx_all.push_back(idx);
 		idx++;
 	}
+	
+	idx = 0;
+	for (auto a : atoms_check) {
+		if (a) atoms_all.push_back(idx);
+		idx++;
+	}
 		
 	LOG.os<>("IDX ALL: \n");
 	
@@ -463,7 +542,10 @@ std::vector<int> adcmod::get_significant_blocks(dbcsr::shared_matrix<double> u_i
 		}
 		MPI_Barrier(m_world.comm());
 	}
-		
+	
+	return std::make_tuple(atoms_all, idx_all);
+	
+	/*
 	if (metric_bb == nullptr) return idx_all;
 	
 	// now add blocks connected to indices by metric
@@ -508,7 +590,7 @@ std::vector<int> adcmod::get_significant_blocks(dbcsr::shared_matrix<double> u_i
 		LOG.os<1>(v, " ");
 	} LOG.os<1>('\n');
 	
-	return idx_all_aug;	
+	return idx_all_aug;	*/
 	
 }
 

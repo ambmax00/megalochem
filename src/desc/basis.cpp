@@ -519,16 +519,37 @@ std::vector<std::string> cluster_basis::types() const {
 
 void cluster_basis::print_info() const {
 	
+	auto cluster_radii = radii();
+	
 	for (int icluster = 0; icluster != m_clusters.size(); ++icluster) {
 		std::cout << "Cluster: " << icluster << '\n'
 				<< "{" << '\n'
 				<< '\t' << "size: " << m_cluster_sizes[icluster] << '\n'
-				<< '\t' << "radius: " << m_cluster_radii[icluster] << '\n'
+				<< '\t' << "radius: " << cluster_radii[icluster] << '\n'
 				<< '\t' << "diffuse: " << m_cluster_diff[icluster] << '\n'
 				<< '\t' << "type: " << m_cluster_types[icluster] << '\n'
 				<< "}" << std::endl;
 	}
 	
 }
+
+std::shared_ptr<cluster_basis> cluster_basis::fragment(std::vector<int> block_list) {
+	
+	auto basis_frag = std::make_shared<cluster_basis>();
+	
+	for (auto iblk : block_list) {
+		basis_frag->m_clusters.push_back(this->m_clusters[iblk]);
+		basis_frag->m_cluster_sizes.push_back(this->m_cluster_sizes[iblk]);
+		basis_frag->m_cluster_diff.push_back(this->m_cluster_diff[iblk]);
+		basis_frag->m_cluster_types.push_back(this->m_cluster_types[iblk]);
+		basis_frag->m_shell_offsets.push_back(this->m_shell_offsets[iblk]);
+	}
+	
+	basis_frag->m_nsplit = this->m_nsplit;
+	basis_frag->m_split_method = this->m_split_method;
+
+	return basis_frag;
+	
+}	
 
 } // end namespace

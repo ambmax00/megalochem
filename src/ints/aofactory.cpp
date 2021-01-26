@@ -422,9 +422,9 @@ public:
 			} std::cout << std::endl;
 		};
 		
-		//print(m_atm);
-		//print(m_bas);
-		//print(m_env);
+		print(m_atm);
+		print(m_bas);
+		print(m_env);
 		
 		// offsets
 		
@@ -573,6 +573,14 @@ public:
 	
 	
 	dbcsr::shared_matrix<double> compute() {
+		
+		for (auto i : m_tensor_sizes[0]) {
+			std::cout << i << " ";
+		} std::cout << std::endl;
+		
+		for (auto i : m_tensor_sizes[1]) {
+			std::cout << i << " ";
+		} std::cout << std::endl;
 		
 		auto m_ints = dbcsr::create<double>()
 			.name(m_intname)

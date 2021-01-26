@@ -39,7 +39,8 @@ public:
 	
 	std::tuple<smat_d, smat_d, std::vector<double>> compute_truncated_pao(
 		smat_d c_bm, smat_d s_bb, std::vector<double> eps_m,
-		std::vector<int> blkidx);
+		std::vector<int> blkidx,
+		smat_d u_km = nullptr);
 		
 	dbcsr::shared_matrix<double>
 		compute_conversion(dbcsr::shared_matrix<double> c_bm,
