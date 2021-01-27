@@ -138,14 +138,29 @@ void adcmod::compute() {
 	
 	auto& t_davidson = TIME.sub("Davidson diagonalization");
 	
-	/*
 	auto r = filio::read_matrix("lauric.dat", "name", m_world, o, v,
 		dbcsr::type::no_symmetry);
 
 	auto cbo = m_hfwfn->c_bo_A();
 	auto cbv = m_hfwfn->c_bv_A(); 	
 	
-	auto [atomblks, sigblks] = get_significant_blocks(r, 0.9995, nullptr, 0.0);
+	auto rcopy = dbcsr::copy(*r).get();
+	rcopy->scale(1.0/sqrt(rcopy->dot(*rcopy)));
+	
+	math::SVD svdcomp(rcopy, 'V', 'V', 10);
+	svdcomp.compute();
+	
+	auto fullrank = svdcomp.rank();
+	auto fullvals = svdcomp.s();
+	
+	LOG.os<>("RANK FULL: ", fullrank, '\n');
+	LOG.os<>("SING VAL FULL\n");
+	for (auto sval : fullvals) {
+		LOG.os<>(sval, " ");
+	}
+	LOG.os<>('\n');
+	
+	auto [atomblks, sigblks] = get_significant_blocks(r, 0.95, nullptr, 0.0);
 	
 	LOG.os<>("Significant atoms:\n");
 	for (auto blk : atomblks) {
@@ -169,6 +184,25 @@ void adcmod::compute() {
 	auto [cv_ps, u_sv, epsv_s] = moloc.compute_truncated_pao(
 		cbv, s_bb, *epsv, sigblks);
 	
+	auto pv = dbcsr::create_template<double>(*s_bb)
+		.name("pv")
+		.get();
+		
+	auto pvloc = dbcsr::create_template<double>(*s_bb)
+		.name("pv")
+		.get();
+		
+	dbcsr::multiply('N', 'T', *cbv, *cbv, *pv).perform();
+	dbcsr::multiply('N', 'T', *cv_ps, *cv_ps, *pvloc).perform();
+	
+	pv->filter(1e-3);
+	pvloc->filter(1e-3);
+	
+	LOG.os<>("OCCUP: ", pv->occupation(), " ", pvloc->occupation(), '\n');
+	
+	MPI_Barrier(m_world.comm());
+	exit(0);
+	
 	int nbas = m_hfwfn->mol()->c_basis()->nbf();
 	int nbas_t = co_pr->nfullrows_total();
 	int nocc_t = co_pr->nfullcols_total();
@@ -179,10 +213,13 @@ void adcmod::compute() {
 	LOG.os<>("MO (V): ", nvir, " -> ", nvir_t, '\n');
 	LOG.os<>("NXbas(prev): ", m_hfwfn->mol()->c_dfbasis()->nbf(), '\n');
 
+	int natoms = m_hfwfn->mol()->atoms().size();
+	std::vector<int> fullatoms(natoms);
+	std::iota(fullatoms.begin(), fullatoms.end(), 0);
 	
 	LOG.os<>("Forming fragment...\n");
 	auto mol_frag = m_hfwfn->mol()->fragment(nocc_t, nocc_t, nvir_t, 
-		nvir_t, atomblks);
+		nvir_t, fullatoms);
 		
 	LOG.os<>("Fragment info:\n");
 	LOG.os<>("Nelec alpha: ", mol_frag->nele_alpha(), '\n');
@@ -242,7 +279,6 @@ void adcmod::compute() {
 		
 	MPI_Barrier(m_world.comm());
 	exit(0);
-	*/
 	
 	LOG.os<>("==== Starting ADC(1) Computation ====\n\n"); 
 	

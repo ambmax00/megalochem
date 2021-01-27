@@ -30,9 +30,7 @@ smat u_transform(smat& u, char to, smat& c_bo, char tv, smat& c_bv) {
 		.matrix_type(dbcsr::type::no_symmetry)
 		.get();
 	
-	std::cout << "T1" << std::endl;
 	dbcsr::multiply(to, 'N', *c_bo, *u, *u_t1).perform();
-	std::cout << "T2" << std::endl;
 	dbcsr::multiply('N', tv, *u_t1, *c_bv, *u_t2).perform();
 	
 	return u_t2;

@@ -123,6 +123,8 @@ MAKE_STRUCT(
 
 class create_MVP_AOADC2_base;
 
+inline constexpr bool _use_doubles_ob = true; 
+
 class MVP_AOADC2 : public MVP {
 private:
 	
@@ -181,23 +183,46 @@ private:
 	
 	smat compute_sigma_2d(smat& u_ia);
 		
-	smat compute_sigma_2e(smat& u_ao, double omega);
+
+	
+	smat compute_sigma_2e_OB(smat& u_ao, double omega);
 	
 	std::tuple<dbcsr::sbtensor<3,double>,dbcsr::sbtensor<3,double>>
-		compute_laplace_batchtensors(smat& u_ia, smat& L_bo, smat& pv_bb);
+		compute_laplace_batchtensors_OB(smat& u_ia, smat& L_bo, smat& pv_bb);
 	
 	std::tuple<dbcsr::shared_tensor<2,double>,dbcsr::shared_tensor<2,double>>
-		compute_F(dbcsr::sbtensor<3,double> eri_xob_batched,
+		compute_F_OB(dbcsr::sbtensor<3,double> eri_xob_batched,
 		dbcsr::sbtensor<3,double> J_xob_batched,
 		dbcsr::shared_matrix<double> L_bo);
 		
-	dbcsr::sbtensor<3,double> compute_I(dbcsr::sbtensor<3,double>& eri,
+	dbcsr::sbtensor<3,double> compute_I_OB(dbcsr::sbtensor<3,double>& eri,
 		dbcsr::sbtensor<3,double>& J, dbcsr::shared_tensor<2,double>& F_A,
 		dbcsr::shared_tensor<2,double>& F_B);
 		
-	std::tuple<smat,smat> compute_sigma_2e_ilap(
+	std::tuple<smat,smat> compute_sigma_2e_ilap_OB(
 		dbcsr::sbtensor<3,double>& I_xob_batched, 
 		smat& L_bo, double omega);
+		
+		
+	
+	smat compute_sigma_2e_OV(smat& u_ao, double omega);
+	
+	std::tuple<dbcsr::sbtensor<3,double>,dbcsr::sbtensor<3,double>>
+		compute_laplace_batchtensors_OV(smat& u_ia, smat& L_bo, smat& L_bv);
+	
+	std::tuple<dbcsr::shared_tensor<2,double>,dbcsr::shared_tensor<2,double>>
+		compute_F_OV(dbcsr::sbtensor<3,double> eri_xov_batched,
+		dbcsr::sbtensor<3,double> J_xov_batched);
+		
+	dbcsr::sbtensor<3,double> compute_I_OV(dbcsr::sbtensor<3,double>& eri,
+		dbcsr::sbtensor<3,double>& J, dbcsr::shared_tensor<2,double>& F_A,
+		dbcsr::shared_tensor<2,double>& F_B);
+		
+	std::tuple<smat,smat> compute_sigma_2e_ilap_OV(
+		dbcsr::sbtensor<3,double>& I_xob_batched, 
+		smat& L_bo, smat& L_bv, double omega);
+		
+		
 	
 	// intermediates
 	smat m_i_oo;

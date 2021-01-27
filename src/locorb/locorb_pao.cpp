@@ -41,12 +41,14 @@ std::tuple<smat_d, smat_d, std::vector<double>>
 	 * s : truncated canonical o/v
 	 * 
 	 */
+	 
+	LOG.os<>("PAO 1\n");
 	
 	// === Compute overlap matrix inverse of truncated AOs
 	
 	auto b = c_bm->row_blk_sizes();
 	auto m = c_bm->col_blk_sizes();
-	auto k = u_km->row_blk_sizes();
+	//auto k = u_km->row_blk_sizes();
 	auto boff = c_bm->row_blk_offsets();
 	
 	std::vector<int> p, poff; // projected space
@@ -88,6 +90,8 @@ std::tuple<smat_d, smat_d, std::vector<double>>
 	int np = std::accumulate(p.begin(), p.end(), 0);
 	int nb = std::accumulate(b.begin(), b.end(), 0);
 	
+	LOG.os<>("PAO 2\n");
+	
 	dbcsr::iterator iterpp(*s_pp);
 	iterpp.start();
 	
@@ -106,6 +110,8 @@ std::tuple<smat_d, smat_d, std::vector<double>>
 	}
 	
 	iterpp.stop();
+	
+	LOG.os<>("PAO 3\n");
 	
 	dbcsr::iterator iterpb(*s_pb);
 	iterpb.start(); 
@@ -140,6 +146,8 @@ std::tuple<smat_d, smat_d, std::vector<double>>
 	
 	//dbcsr::print(*s_inv_pp);
 	
+	LOG.os<>("PAO 4\n");
+	
 	auto cortho_bm = dbcsr::create_template<double>(*c_bm)
 		.name("c_ortho")
 		.get();
@@ -159,6 +167,8 @@ std::tuple<smat_d, smat_d, std::vector<double>>
 		.col_blk_sizes(b)
 		.matrix_type(dbcsr::type::no_symmetry)
 		.get();
+		
+	LOG.os<>("PAO 5\n");
 	
 	dbcsr::multiply('N', 'N', *s_inv_pp, *s_pb, *temp_pb)
 		.perform();
@@ -187,6 +197,7 @@ std::tuple<smat_d, smat_d, std::vector<double>>
 	auto r = dbcsr::split_range(rank, m_mol->mo_split());
 	
 	auto u_pr = svd.U(p,r);
+	
 	auto vt_rm = svd.Vt(r,m);
 	
 	//vt_rm->filter(1e-6);
@@ -257,9 +268,24 @@ std::tuple<smat_d, smat_d, std::vector<double>>
 	dbcsr::multiply('T', 'N', *T_rs, *vt_rm, *T_sm)
 		.perform();
 		
+		
+	// new MO coefficient matrix:
+	
+	auto c_bs = dbcsr::create<double>()
+		.name(c_bm->name() + "_truncated")
+		.set_world(m_world)
+		.row_blk_sizes(b)
+		.col_blk_sizes(r)
+		.matrix_type(dbcsr::type::no_symmetry)
+		.get();
+		
+	dbcsr::multiply('N', 'T', *c_bm, *T_sm, *c_bs).perform();
+	
+		
 	// compute truncated canonical MO coefficient matrix
 	// Ctrunc_ps = X_pp * U_pr * T_rs
 	
+	/*
 	auto ctrunc_ortho_ps = dbcsr::create_template<double>(*u_pr)
 		.name("Truncated orthogonal coefficient matrix")
 		.get();
@@ -274,7 +300,7 @@ std::tuple<smat_d, smat_d, std::vector<double>>
 		.perform();
 		
 	dbcsr::multiply('N', 'N', *s_invsqrt_pp, *ctrunc_ortho_ps, *ctrunc_ps)
-		.perform();
+		.perform();*/
 		
 	/*auto p_bb = dbcsr::create<double>()
 		.name("p")
@@ -310,7 +336,7 @@ std::tuple<smat_d, smat_d, std::vector<double>>
 	
 	
 		
-	return std::make_tuple(ctrunc_ps, T_sm, eps_s);
+	return std::make_tuple(c_bs, T_sm, eps_s);
 	
 	
 }
