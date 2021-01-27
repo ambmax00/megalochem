@@ -176,9 +176,7 @@ void aoloader::compute() {
 		time.start();
 		
 		auto c = m_reg.get<smatd>(key::coul_xx);
-		
-		dbcsr::print(*c);
-		
+				
 		auto p = invert(c);
 		auto cinv = p.first;
 		auto cinvsqrt = p.second;
@@ -436,6 +434,8 @@ void aoloader::compute() {
 		if (comp(key::dfit_coul_xbb)) m_reg.insert(key::dfit_coul_xbb, c_xbb_batched);
 		if (comp(key::dfit_erfc_xbb)) m_reg.insert(key::dfit_erfc_xbb, c_xbb_batched);
 		
+		auto mat = dfit.compute_idx(c_xbb_batched);
+		
 		time.finish();
 		
 	}
@@ -510,6 +510,8 @@ void aoloader::compute() {
 		auto c_xbb_batched = dfit.compute(qr_batched, v, intermedtype);
 						
 		m_reg.insert(key::dfit_qr_xbb, c_xbb_batched);
+		
+		auto mat = dfit.compute_idx(c_xbb_batched);
 		
 		time.finish();
 		

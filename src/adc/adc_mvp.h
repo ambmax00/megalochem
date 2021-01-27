@@ -123,8 +123,6 @@ MAKE_STRUCT(
 
 class create_MVP_AOADC2_base;
 
-#define _DOUBLES_REDUCED
-
 class MVP_AOADC2 : public MVP {
 private:
 	
@@ -182,17 +180,9 @@ private:
 	smat compute_sigma_2c(smat& jmat, smat& kmat);
 	
 	smat compute_sigma_2d(smat& u_ia);
-	
-	sbtensor3 compute_R(smat& u_ao);
-	
-	std::pair<smat,smat> compute_sigma_2e_ilap(
-		dbcsr::sbtensor<3,double>& J_xbb_batched, 
-		smat& FA, smat& FB, smat& pseudo_o, smat& pseudo_v,
-		bool mem = false);
-	
+		
 	smat compute_sigma_2e(smat& u_ao, double omega);
 	
-	#ifdef _DOUBLES_REDUCED
 	std::tuple<dbcsr::sbtensor<3,double>,dbcsr::sbtensor<3,double>>
 		compute_laplace_batchtensors(smat& u_ia, smat& L_bo, smat& pv_bb);
 	
@@ -205,10 +195,9 @@ private:
 		dbcsr::sbtensor<3,double>& J, dbcsr::shared_tensor<2,double>& F_A,
 		dbcsr::shared_tensor<2,double>& F_B);
 		
-	std::tuple<smat,smat> compute_sigma_ilap(
+	std::tuple<smat,smat> compute_sigma_2e_ilap(
 		dbcsr::sbtensor<3,double>& I_xob_batched, 
 		smat& L_bo, double omega);
-	#endif
 	
 	// intermediates
 	smat m_i_oo;
