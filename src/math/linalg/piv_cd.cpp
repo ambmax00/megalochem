@@ -768,7 +768,7 @@ std::tuple<double,int> get_max_diag(dbcsr::matrix<double>& mat, int istart = 0) 
 }
 
 #ifdef _USE_SPARSE_COMPUTE
-void pivinc_cd::compute() {
+void pivinc_cd::compute(std::optional<int> force_rank) {
 	
 	// convert input mat to scalapack format
 	
@@ -832,6 +832,16 @@ void pivinc_cd::compute() {
 		
 		int i_max;
 		double diag_max;
+		
+		if (force_rank && *force_rank == I) {
+			std::tie(diag_max, i_max) = get_max_diag(*U,I);
+			
+			LOG.os<1>("---- Max rank reached. Max element: ", diag_max, '\n');
+			
+			L->set(I,I,sqrt(diag_max));
+			m_rank = *force_rank;
+			return;
+		}
 		
 		if (I == N-1) {
 			std::tie(diag_max, i_max) = get_max_diag(*U,I);

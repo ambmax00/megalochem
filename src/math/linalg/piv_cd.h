@@ -36,7 +36,7 @@ public:
 		m_mat_in(mat_in), LOG(m_mat_in->get_world().comm(), print) {}
 	~pivinc_cd() {}
 	
-	void compute();
+	void compute(std::optional<int> force_rank = std::nullopt);
 	
 	void compute_sparse();
 	

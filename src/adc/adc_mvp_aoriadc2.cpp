@@ -57,7 +57,9 @@ smat MVP_AOADC2::get_ortho_cholesky(char dim, double wght, double xpt,
 	double wfactor, double xfactor) {
 		
 	auto coeff = get_scaled_coeff(dim, wght, xpt, wfactor, xfactor);
-		
+	
+	int max_rank = coeff->nfullcols_total();
+	
 	auto coeff_ortho = dbcsr::create_template<double>(*coeff)
 		.name("co_ortho")
 		.get();
@@ -68,7 +70,7 @@ smat MVP_AOADC2::get_ortho_cholesky(char dim, double wght, double xpt,
 	auto p_ortho = get_density(coeff_ortho);
 	
 	math::pivinc_cd chol(p_ortho, LOG.global_plev());
-	chol.compute();
+	chol.compute(max_rank);
 	
 	int rank = chol.rank();
 	
@@ -2679,6 +2681,8 @@ smat MVP_AOADC2::compute(smat u_ia, double omega) {
 
 	time_com.finish();
 	TIME.finish();
+	
+	LOG.os<>("DOT: ", u_ia->dot(*sigma_0), '\n');
 	
 	TIME.print_info();
 	exit(0);
