@@ -333,8 +333,12 @@ void adcmod::compute() {
 	
 	if (!do_adc2) return; 
 	
+	//int theta = m_opt.get<int>("adc2/theta", -1.0);
+	
 	auto paos = get_canon_pao(rvecs[0], m_hfwfn->c_bo_A(), m_hfwfn->c_bv_A(), 
 		*m_hfwfn->eps_occ_A(), *m_hfwfn->eps_vir_A(), 0.995);
+		
+	auto dpao_ov = u_transform(m_d_ov, 'T', paos.u_or, 'N', paos.u_vs);
 	
 	LOG.os<>("==== Starting ADC(2) Computation ====\n\n"); 
 	
@@ -348,7 +352,7 @@ void adcmod::compute() {
 	mdav.macro_maxiter(macro_maxiter_adc2);
 	mdav.macro_conv(conv_macro_adc2);
 	
-	mdav.sub().set_diag(m_d_ov);
+	mdav.sub().set_diag(dpao_ov);
 	mdav.sub().pseudo(true);
 	mdav.sub().block(false);
 	mdav.sub().balancing(do_balancing);
@@ -374,8 +378,8 @@ void adcmod::compute() {
 			//auto atomlist = get_significant_blocks(rvecs[0], 0.9975, nullptr, 0.0);
 			//adc2_mvp = create_adc2(atomlist);
 		} else if (!is_init) {
-			adc2_mvp = create_adc2();//nto);
-			//rvecs[0] = u_transform(rvecs[0], 'T', nto.u_or, 'N', nto.u_vs); 
+			adc2_mvp = create_adc2(paos);
+			rvecs[0] = u_transform(rvecs[0], 'T', paos.u_or, 'N', paos.u_vs); 
 		}
 		
 		mdav.sub().set_factory(adc2_mvp);
@@ -818,6 +822,15 @@ adcmod::canon_lmo adcmod::get_canon_pao(dbcsr::shared_matrix<double> u_ia,
 	
 	auto [c_br, u_or, eps_r] = moloc.compute_truncated_pao(c_bo, s_bb, eps_o, basis_blks, nullptr);
 	auto [c_bs, u_vs, eps_s] = moloc.compute_truncated_pao(c_bv, s_bb, eps_v, basis_blks, nullptr);
+	
+	int no_t = c_bo->nfullcols_total();
+	int nv_t = c_bv->nfullcols_total();
+	int no = c_br->nfullcols_total();
+	int nv = c_bs->nfullcols_total();
+	
+	LOG.os<>("DIMENSIONS REDUCED FROM: ", no_t, "/", nv_t, " -> ",
+		no, "/", nv, '\n');
+
 	
 	return canon_lmo{c_br, c_bs, u_or, u_vs, eps_r, eps_s};
 	

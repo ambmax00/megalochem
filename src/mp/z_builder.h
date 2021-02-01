@@ -141,6 +141,47 @@ MAKE_STRUCT(
 	)
 )
 
+#if 0
+class create_LL_Z_base;
+
+class LL_Z : public Z {
+private:	
+	
+	dbcsr::sbtensor<3,double> m_eri3c2e_batched;
+	dbcsr::btype m_intermeds;
+	
+	dbcsr::shared_tensor<2,double> m_locc_01;
+	dbcsr::shared_tensor<2,double> m_pvir_01;
+	
+	friend class create_LL_Z_base;
+	
+public:
+
+	LL_Z(dbcsr::world w, desc::smolecule smol, int nprint) :
+		Z(w,smol,nprint,"LL") {}
+
+	void init() override;
+	void compute() override;
+	
+	~LL_Z() override {}
+	
+	
+};
+
+MAKE_STRUCT(
+	LL_Z, Z,
+	(
+		(world, (dbcsr::world)),
+		(mol, (desc::smolecule)),
+		(print, (int))
+	),
+	(
+		(eri3c2e_batched, (dbcsr::sbtensor<3,double>), required, val),
+		(intermeds, (dbcsr::btype), required, val)
+	)
+)
+#endif
+
 class create_LLMP_MEM_Z_base;
 
 class LLMP_MEM_Z : public Z {

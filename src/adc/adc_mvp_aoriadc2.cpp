@@ -2684,8 +2684,8 @@ smat MVP_AOADC2::compute(smat u_ia, double omega) {
 	
 	LOG.os<>("DOT: ", u_ia->dot(*sigma_0), '\n');
 	
-	TIME.print_info();
-	exit(0);
+	//TIME.print_info();
+	//exit(0);
 	
 	return sigma_0;
 	
