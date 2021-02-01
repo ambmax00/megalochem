@@ -35,7 +35,7 @@ target_link_libraries(
 	OpenMP::OpenMP_CXX
 	PkgConfig::deps
         DBCSR::dbcsr_c
-	${SCALAPACK_LIBRARIES}
+	SCALAPACK::SCALAPACK
 )
 
 target_include_directories(

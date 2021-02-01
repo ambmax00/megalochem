@@ -15,7 +15,7 @@ target_link_libraries(
 	chem_math_linalg
 	chem_math_solvers
         chem_dbcsrx
-        ${SCALAPACK_LIBRARIES}	
+	SCALAPACK::SCALAPACK
 	Python::Python
 	Python::Module
 	Python::NumPy
