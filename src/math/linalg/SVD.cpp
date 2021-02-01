@@ -6,7 +6,7 @@
 
 namespace math {
 
-void SVD::compute() {
+void SVD::compute(double eps) {
 	
 	auto wrd = m_mat_in->get_world();
 	int m = m_mat_in->nfullrows_total();
@@ -88,7 +88,7 @@ void SVD::compute() {
 	LOG.os<2>("Eigenvalues: \n");
 	for (int i = 0; i != size; ++i) {
 		LOG.os<2>(s[i], " ");
-		if (fabs(s[i]) > 1e-10) m_rank++;
+		if (fabs(s[i]) > eps) m_rank++;
 	} LOG.os<2>('\n');
 	
 	LOG.os<1>("RANK: ", m_rank, '\n');	

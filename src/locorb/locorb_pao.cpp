@@ -261,11 +261,15 @@ std::tuple<smat_d, smat_d, std::vector<double>>
 	// compute MO -> trunc. canonical MO transformation matrix
 	// T_sm = T_rs^t Σ_r Vt_rm
 	
-	auto T_sm = dbcsr::create_template<double>(*f_ht_rm)
+	auto T_ms = dbcsr::create<double>()
+		.set_world(m_world)
+		.row_blk_sizes(m)
+		.col_blk_sizes(r)
 		.name("Transformation matrix canon. MOs -> canon. truncated MOs")
+		.matrix_type(dbcsr::type::no_symmetry)
 		.get();
 		
-	dbcsr::multiply('T', 'N', *T_rs, *vt_rm, *T_sm)
+	dbcsr::multiply('T', 'N', *vt_rm, *T_rs, *T_ms)
 		.perform();
 		
 		
@@ -279,7 +283,7 @@ std::tuple<smat_d, smat_d, std::vector<double>>
 		.matrix_type(dbcsr::type::no_symmetry)
 		.get();
 		
-	dbcsr::multiply('N', 'T', *c_bm, *T_sm, *c_bs).perform();
+	dbcsr::multiply('N', 'N', *c_bm, *T_ms, *c_bs).perform();
 	
 		
 	// compute truncated canonical MO coefficient matrix
@@ -330,13 +334,8 @@ std::tuple<smat_d, smat_d, std::vector<double>>
 	dbcsr::print(*p_bb);
 	
 	//LOG.os<>("POP: ", pop_mulliken(*ctrunc_ps, *s_pp, *spp), '\n');*/
-	
-	
-	
-	
-	
 		
-	return std::make_tuple(c_bs, T_sm, eps_s);
+	return std::make_tuple(c_bs, T_ms, eps_s);
 	
 	
 }

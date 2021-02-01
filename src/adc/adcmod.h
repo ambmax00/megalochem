@@ -15,9 +15,13 @@
 
 namespace adc {
 
-	
 class adcmod {
 private:
+
+	struct canon_lmo {
+		dbcsr::shared_matrix<double> c_br, c_bs, u_or, u_vs;
+		std::vector<double> eps_r, eps_s;
+	};
 
 	hf::shared_hf_wfn m_hfwfn;
 	desc::options m_opt;
@@ -38,16 +42,26 @@ private:
 	void init_ao_tensors();
 	
 	std::shared_ptr<MVP> create_adc1();
-	std::shared_ptr<MVP> create_adc2(
-		std::optional<std::vector<int>> atom_list = std::nullopt);
+	std::shared_ptr<MVP> create_adc2(std::optional<canon_lmo> clmo = 
+		std::nullopt);
 	
 	void compute_diag();
 	dbcsr::shared_matrix<double> compute_diag_0();
 	dbcsr::shared_matrix<double> compute_diag_1();
 		
-	std::tuple<std::vector<int>, std::vector<int>> 
-		get_significant_blocks(dbcsr::shared_matrix<double> u_bb, 
+	std::tuple<
+		std::vector<int>, 
+		std::vector<int>> 
+	get_significant_blocks(dbcsr::shared_matrix<double> u_bb, 
 		double theta, dbcsr::shared_matrix<double> metric_bb, double gamma);
+		
+	canon_lmo get_canon_nto(dbcsr::shared_matrix<double> u_ia, dbcsr::shared_matrix<double> c_bo,
+		dbcsr::shared_matrix<double> c_bv, std::vector<double> eps_o, std::vector<double> eps_v,
+		double theta);
+		
+	canon_lmo get_canon_pao(dbcsr::shared_matrix<double> u_ia, dbcsr::shared_matrix<double> c_bo,
+		dbcsr::shared_matrix<double> c_bv, std::vector<double> eps_o, std::vector<double> eps_v,
+		double theta);
 	
 public:	
 

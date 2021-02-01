@@ -123,7 +123,7 @@ MAKE_STRUCT(
 
 class create_MVP_AOADC2_base;
 
-inline constexpr bool _use_doubles_ob = true; 
+inline constexpr bool _use_doubles_ob = false; 
 
 class MVP_AOADC2 : public MVP {
 private:

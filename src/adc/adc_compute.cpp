@@ -138,8 +138,15 @@ void adcmod::compute() {
 	
 	auto& t_davidson = TIME.sub("Davidson diagonalization");
 	
+	/*
 	auto r = filio::read_matrix("lauric.dat", "name", m_world, o, v,
 		dbcsr::type::no_symmetry);
+		
+	auto nto = get_canon_pao(r, m_hfwfn->c_bo_A(),
+		m_hfwfn->c_bv_A(), *m_hfwfn->eps_occ_A(), *m_hfwfn->eps_vir_A(),
+		0.995);*/
+		
+	/*
 
 	auto cbo = m_hfwfn->c_bo_A();
 	auto cbv = m_hfwfn->c_bv_A(); 	
@@ -278,7 +285,7 @@ void adcmod::compute() {
 	LOG.os<>("ENERGY: ", energy, '\n');
 		
 	MPI_Barrier(m_world.comm());
-	exit(0);
+	exit(0);*/
 	
 	LOG.os<>("==== Starting ADC(1) Computation ====\n\n"); 
 	
@@ -286,8 +293,11 @@ void adcmod::compute() {
 	dav.compute(dav_guess, nroots);
 	t_davidson.finish();
 	
-	//adc1_mvp->print_info();
+	adc1_mvp->print_info();
 			
+	//auto rvecs = std::vector<dbcsr::shared_matrix<double>>{r}; //dav.ritz_vectors();
+	//auto ex = std::vector<double>{0.21392}; //dav.eigvals();
+	
 	auto rvecs = dav.ritz_vectors();
 	auto ex = dav.eigvals();
 	
@@ -322,6 +332,9 @@ void adcmod::compute() {
 	bool do_adc2 = m_opt.get<bool>("do_adc2", ADC_DO_ADC2);
 	
 	if (!do_adc2) return; 
+	
+	auto paos = get_canon_pao(rvecs[0], m_hfwfn->c_bo_A(), m_hfwfn->c_bv_A(), 
+		*m_hfwfn->eps_occ_A(), *m_hfwfn->eps_vir_A(), 0.995);
 	
 	LOG.os<>("==== Starting ADC(2) Computation ====\n\n"); 
 	
@@ -361,7 +374,8 @@ void adcmod::compute() {
 			//auto atomlist = get_significant_blocks(rvecs[0], 0.9975, nullptr, 0.0);
 			//adc2_mvp = create_adc2(atomlist);
 		} else if (!is_init) {
-			adc2_mvp = create_adc2();
+			adc2_mvp = create_adc2();//nto);
+			//rvecs[0] = u_transform(rvecs[0], 'T', nto.u_or, 'N', nto.u_vs); 
 		}
 		
 		mdav.sub().set_factory(adc2_mvp);
@@ -631,5 +645,182 @@ std::tuple<std::vector<int>, std::vector<int>>
 	
 }
 
+adcmod::canon_lmo adcmod::get_canon_nto(dbcsr::shared_matrix<double> u_ia, 
+	dbcsr::shared_matrix<double> c_bo, dbcsr::shared_matrix<double> c_bv, 
+	std::vector<double> eps_o, std::vector<double> eps_v,
+	double theta)
+{
+	
+	LOG.os<>("Computing canonicalized NTO coefficient matrices with eps = ", theta, '\n');
+	
+	// Preliminaries
+	auto b = c_bo->row_blk_sizes();
+	auto o = c_bo->col_blk_sizes();
+	auto v = c_bv->col_blk_sizes();
+	
+	// Step 1: SVD decomposition of u_ia'
+	
+	LOG.os<>("-- Computing SVD decomposition of u_ia\n"); 
+	
+	auto u_ia_copy = dbcsr::copy(*u_ia).get();
+	
+	double norm = 1.0/sqrt(u_ia->dot(*u_ia));
+	u_ia_copy->scale(norm);
+	
+	math::SVD svd_decomp(u_ia_copy, 'V', 'V', 0);
+	svd_decomp.compute(theta);
+	int rank = svd_decomp.rank();
+	
+	auto r = dbcsr::split_range(rank, o[0]);
+	
+	auto u_ir = svd_decomp.U(o,r);
+	auto vt_rv = svd_decomp.Vt(r,v);
+
+	// Step 2: Orthogonalize MOs
+	
+	LOG.os<>("-- Orthogonalizing new MOs\n"); 
+	
+	math::SVD svd_o(u_ir, 'V', 'V', 0);
+	math::SVD svd_v(vt_rv, 'V', 'V', 0);
+	
+	svd_o.compute(1e-10);
+	svd_v.compute(1e-10);
+	
+	auto t = dbcsr::split_range(svd_o.rank(), o[0]);
+	auto s = dbcsr::split_range(svd_v.rank(), o[1]);
+	
+	auto uortho_ot = svd_o.U(o,t);
+	auto vtortho_sv = svd_v.Vt(s,v);
+	
+	// Step 3: Form fock matrices
+	
+	LOG.os<>("-- Forming Fock matrices\n"); 
+	
+	auto wrd = c_bo->get_world();
+	
+	auto form_fock = [&](std::vector<int> m, std::vector<double> eps_m) {
+		
+		auto f = dbcsr::create<double>()
+			.set_world(wrd)
+			.name("fock")
+			.row_blk_sizes(m)
+			.col_blk_sizes(m)
+			.matrix_type(dbcsr::type::no_symmetry)
+			.get();
+			
+		f->reserve_diag_blocks();
+		f->set_diag(eps_m);
+		
+		return f;
+		
+	};
+	
+	auto f_oo = form_fock(o,eps_o);
+	auto f_vv = form_fock(v,eps_v);
+	
+	auto f_tt = u_transform(f_oo, 'T', uortho_ot, 'N', uortho_ot);
+	auto f_ss = u_transform(f_vv, 'N', vtortho_sv, 'T', vtortho_sv);
+	
+	// Step 4 : Canonicalize
+	
+	LOG.os<>("-- Canonicalizing NTOs\n"); 
+	
+	math::hermitian_eigen_solver hsolver_o(f_tt, 'V', false);
+	math::hermitian_eigen_solver hsolver_v(f_ss, 'V', false);
+	
+	hsolver_o.compute();
+	hsolver_v.compute();
+	
+	auto canon_tt = hsolver_o.eigvecs();
+	auto canon_ss = hsolver_v.eigvecs();
+	
+	auto eps_t = hsolver_o.eigvals();
+	auto eps_s = hsolver_v.eigvals();
+	
+	auto trans_ot = dbcsr::create<double>()
+		.name("trans ot")
+		.set_world(wrd)
+		.row_blk_sizes(o)
+		.col_blk_sizes(t)
+		.matrix_type(dbcsr::type::no_symmetry)
+		.get();
+		
+	auto trans_vs = dbcsr::create<double>()
+		.name("trans vs")
+		.set_world(wrd)
+		.row_blk_sizes(v)
+		.col_blk_sizes(s)
+		.matrix_type(dbcsr::type::no_symmetry)
+		.get();
+	
+	auto c_bt = dbcsr::create<double>()
+		.name("SVD c_bo")
+		.set_world(wrd)
+		.row_blk_sizes(b)
+		.col_blk_sizes(t)
+		.matrix_type(dbcsr::type::no_symmetry)
+		.get();
+		
+	auto c_bs = dbcsr::create<double>()
+		.name("SVD c_bv")
+		.set_world(wrd)
+		.row_blk_sizes(b)
+		.col_blk_sizes(s)
+		.matrix_type(dbcsr::type::no_symmetry)
+		.get();	
+		
+	LOG.os<>("-- Forming final NTO coefficient matrices\n"); 
+
+	dbcsr::multiply('N', 'N', *uortho_ot, *canon_tt, *trans_ot).perform();
+	dbcsr::multiply('T', 'N', *vtortho_sv, *canon_ss, *trans_vs).perform();
+	
+	dbcsr::multiply('N', 'N', *c_bo, *trans_ot, *c_bt).perform();
+	dbcsr::multiply('N', 'N', *c_bv, *trans_vs, *c_bs).perform();
+
+	auto print = [&](auto v) {
+		for (auto d : v) {
+			LOG.os<>(d, " ");
+		} LOG.os<>('\n');
+	};
+	
+	LOG.os<>("Occupied energies.\n");
+	print(eps_o);
+	print(eps_t);
+
+	LOG.os<>("Virtual energies.\n");
+	print(eps_v);
+	print(eps_s);
+	
+	int no_t = c_bo->nfullcols_total();
+	int nv_t = c_bv->nfullcols_total();
+	int no = c_bt->nfullcols_total();
+	int nv = c_bs->nfullcols_total();
+	
+	LOG.os<>("DIMENSIONS REDUCED FROM: ", no_t, "/", nv_t, " -> ",
+		no, "/", nv, '\n');
+
+	return canon_lmo{c_bt, c_bs, trans_ot, trans_vs, eps_t, eps_s};
 
 }
+
+adcmod::canon_lmo adcmod::get_canon_pao(dbcsr::shared_matrix<double> u_ia, 
+	dbcsr::shared_matrix<double> c_bo, dbcsr::shared_matrix<double> c_bv, 
+	std::vector<double> eps_o, std::vector<double> eps_v,
+	double theta)
+{
+	
+	auto [atom_blks, basis_blks] = get_significant_blocks(u_ia, theta, nullptr, 0.0);
+	
+	locorb::mo_localizer moloc(m_world, m_hfwfn->mol());
+	
+	auto reg = m_ao.get_registry();
+	auto s_bb = reg.get<dbcsr::shared_matrix<double>>(ints::key::ovlp_bb);
+	
+	auto [c_br, u_or, eps_r] = moloc.compute_truncated_pao(c_bo, s_bb, eps_o, basis_blks, nullptr);
+	auto [c_bs, u_vs, eps_s] = moloc.compute_truncated_pao(c_bv, s_bb, eps_v, basis_blks, nullptr);
+	
+	return canon_lmo{c_br, c_bs, u_or, u_vs, eps_r, eps_s};
+	
+}
+
+} // end namespace
