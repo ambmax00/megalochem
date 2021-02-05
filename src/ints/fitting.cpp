@@ -71,8 +71,6 @@ dbcsr::sbtensor<3,double> dfitting::compute(dbcsr::sbtensor<3,double> eri_batche
 	int nbatches_x = eri_batched->nbatches(0);
 	int nbatches_b = eri_batched->nbatches(2);
 
-	std::cout << "NBATCHES: " << nbatches_x << " " << nbatches_b << std::endl;
-
 	std::array<int,3> bdims = {nbatches_x,nbatches_b,nbatches_b};
 
 	auto blkmap_b = m_mol->c_basis()->block_to_atom(m_mol->atoms());
