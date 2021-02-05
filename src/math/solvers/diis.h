@@ -52,7 +52,9 @@ public:
 			bool reduce = false;
 			if (m_delta.size() >= m_max) reduce = true;
 			
-			m_delta.push_back(err);
+			auto err_copy = dbcsr::copy(*err).get();
+			
+			m_delta.push_back(err_copy);
 			
 			// determine error vector with max RMS
 			auto to_erase = std::max_element(m_delta.begin(), m_delta.end(), 

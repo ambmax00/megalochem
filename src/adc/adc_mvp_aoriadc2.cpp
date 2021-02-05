@@ -437,7 +437,7 @@ void MVP_AOADC2::compute_intermeds() {
 			{
 				ints::dfitting dfit(m_world, m_mol, nprint);
 				auto I_fit_xbb = dfit.compute(m_eri3c2e_batched, f_xx_ilap, m_btype);
-				LOG.os<>("Occupancy of Ifit: ", I_fit_xbb->occupation() * 100, '\n');
+				LOG.os<1>("Occupancy of Ifit: ", I_fit_xbb->occupation() * 100, '\n');
 				k_inter = fock::create_DFAO_K(m_world, m_mol, nprint)
 					.eri3c2e_batched(m_eri3c2e_batched)
 					.fitting_batched(I_fit_xbb)
@@ -488,7 +488,7 @@ void MVP_AOADC2::compute_intermeds() {
 								
 	}
 	
-	LOG.os<>("Forming fully transformed intermediates.\n");
+	LOG.os<1>("Forming fully transformed intermediates.\n");
 	
 	dbcsr::multiply('N', 'N', *i_ob, *m_c_bo, *m_i_oo)
 			.perform();
@@ -919,7 +919,6 @@ std::tuple<dbcsr::sbtensor<3,double>,dbcsr::sbtensor<3,double>>
 			m_eri3c2e_batched->full_bounds(2)
 		};
 		
-		LOG.os<>("Contraction 1\n");
 		dbcsr::contract(*eri_02_1, *L_bo_01, *HT_xob_02_1)
 			.bounds2(xn_bounds)
 			.filter(dbcsr::global::filter_eps)
@@ -934,7 +933,6 @@ std::tuple<dbcsr::sbtensor<3,double>,dbcsr::sbtensor<3,double>>
 			eri_xob_batched->full_bounds(1)
 		};
 		
-		LOG.os<>("Contraction 2\n");
 		dbcsr::contract(*HT_xob_01_2, *pv_bb_01, *FT_xob_01_2)
 			.bounds2(xo_bounds)
 			.filter(dbcsr::global::filter_eps)
@@ -946,7 +944,6 @@ std::tuple<dbcsr::sbtensor<3,double>,dbcsr::sbtensor<3,double>>
 			
 		eri_xob_batched->compress({ix}, FT_xob_02_1);
 		
-		LOG.os<>("Contraction 3\n");
 		dbcsr::contract(*HT_xob_01_2, *uh_bb_01, *FT_xob_01_2)
 			.bounds2(xo_bounds)
 			.filter(dbcsr::global::filter_eps)
@@ -959,7 +956,6 @@ std::tuple<dbcsr::sbtensor<3,double>,dbcsr::sbtensor<3,double>>
 			.move_data(true)
 			.perform();
 		
-		LOG.os<>("Contraction 4\n");
 		dbcsr:contract(*eri_02_1, *up_ob_01, *HT_xob_02_1)
 			.bounds2(xn_bounds)
 			.filter(dbcsr::global::filter_eps)
@@ -969,7 +965,6 @@ std::tuple<dbcsr::sbtensor<3,double>,dbcsr::sbtensor<3,double>>
 			.move_data(true)
 			.perform();
 		
-		LOG.os<>("Contraction 5\n");
 		dbcsr::contract(*HT_xob_01_2, *pv_bb_01, *FT_xob_01_2)
 			.alpha(-1.0)
 			.filter(dbcsr::global::filter_eps)
@@ -994,7 +989,7 @@ std::tuple<dbcsr::sbtensor<3,double>,dbcsr::sbtensor<3,double>>
 	
 	time_contr.finish();
 	
-	LOG.os<>("Occupancies: ", J_xob_batched->occupation(), ", ", 
+	LOG.os<1>("Occupancies: ", J_xob_batched->occupation(), ", ", 
 		eri_xob_batched->occupation(), '\n');
 	
 	//MPI_Barrier(m_world.comm());
@@ -1223,7 +1218,7 @@ dbcsr::sbtensor<3,double> MVP_AOADC2::compute_I_OB(dbcsr::sbtensor<3,double>& er
 	
 	time.start();
 
-	LOG.os<>("Compute I\n");
+	LOG.os<1>("Computing I\n");
 	
 	auto I_xob_batched = std::make_shared<dbcsr::btensor<3,double>>(
 		*eri_xob_batched, "I_xob_batched", dbcsr::btype::core, 
@@ -1303,6 +1298,8 @@ dbcsr::sbtensor<3,double> MVP_AOADC2::compute_I_OB(dbcsr::sbtensor<3,double>& er
 	eri_xob_batched->decompress_finalize();
 	
 	time.finish();
+	
+	LOG.os<1>("Occupation of I_OB: ", I_xob_batched->occupation(), '\n');
 	
 	return I_xob_batched;
 	
@@ -1888,7 +1885,6 @@ std::tuple<dbcsr::sbtensor<3,double>,dbcsr::sbtensor<3,double>>
 			m_eri3c2e_batched->full_bounds(2)
 		};
 		
-		LOG.os<>("Contraction 1\n");
 		dbcsr::contract(*eri_02_1, *L_bo_01, *HT_xob_02_1)
 			.bounds2(xn_bounds)
 			.filter(dbcsr::global::filter_eps)
@@ -1903,7 +1899,6 @@ std::tuple<dbcsr::sbtensor<3,double>,dbcsr::sbtensor<3,double>>
 			eri_xov_batched->full_bounds(1)
 		};
 		
-		LOG.os<>("Contraction 2\n");
 		dbcsr::contract(*HT_xob_01_2, *L_bv_01, *FT_xov_01_2)
 			.bounds2(xo_bounds)
 			.filter(dbcsr::global::filter_eps)
@@ -1915,7 +1910,6 @@ std::tuple<dbcsr::sbtensor<3,double>,dbcsr::sbtensor<3,double>>
 			
 		eri_xov_batched->compress({ix}, FT_xov_0_12);
 		
-		LOG.os<>("Contraction 3\n");
 		dbcsr::contract(*HT_xob_01_2, *uh_bv_01, *FT_xov_01_2)
 			.bounds2(xo_bounds)
 			.filter(dbcsr::global::filter_eps)
@@ -1928,7 +1922,6 @@ std::tuple<dbcsr::sbtensor<3,double>,dbcsr::sbtensor<3,double>>
 			.move_data(true)
 			.perform();
 		
-		LOG.os<>("Contraction 4\n");
 		dbcsr:contract(*eri_02_1, *up_ob_01, *HT_xob_02_1)
 			.bounds2(xn_bounds)
 			.filter(dbcsr::global::filter_eps)
@@ -1938,7 +1931,6 @@ std::tuple<dbcsr::sbtensor<3,double>,dbcsr::sbtensor<3,double>>
 			.move_data(true)
 			.perform();
 		
-		LOG.os<>("Contraction 5\n");
 		dbcsr::contract(*HT_xob_01_2, *L_bv_01, *FT_xov_01_2)
 			.alpha(-1.0)
 			.filter(dbcsr::global::filter_eps)
@@ -1963,7 +1955,7 @@ std::tuple<dbcsr::sbtensor<3,double>,dbcsr::sbtensor<3,double>>
 	
 	time_contr.finish();
 	
-	LOG.os<>("Occupancies: ", J_xov_batched->occupation(), ", ", 
+	LOG.os<1>("Occupancies: ", J_xov_batched->occupation(), ", ", 
 		eri_xov_batched->occupation(), '\n');
 	
 	//MPI_Barrier(m_world.comm());
@@ -2084,7 +2076,7 @@ dbcsr::sbtensor<3,double> MVP_AOADC2::compute_I_OV(dbcsr::sbtensor<3,double>& er
 	auto& time = TIME.sub("Computing I batched");
 	time.start();
 
-	LOG.os<>("Compute I\n");
+	LOG.os<1>("Compute I\n");
 	
 	auto I_xov_batched = std::make_shared<dbcsr::btensor<3,double>>(
 		*eri_xov_batched, "I_xov_batched", dbcsr::btype::core, 
@@ -2149,6 +2141,8 @@ dbcsr::sbtensor<3,double> MVP_AOADC2::compute_I_OV(dbcsr::sbtensor<3,double>& er
 	eri_xov_batched->decompress_finalize();
 	
 	time.finish();
+	
+	LOG.os<1>("Occupation of I_OV: ", I_xov_batched->occupation(), '\n');
 	
 	return I_xov_batched;
 	

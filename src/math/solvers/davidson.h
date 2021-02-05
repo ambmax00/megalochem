@@ -8,6 +8,7 @@
 #include <dbcsr_matrix_ops.hpp>
 #include <dbcsr_conversions.hpp>
 #include "utils/mpi_log.h"
+#include "math/solvers/diis.h"
 
 namespace math {
 
@@ -98,6 +99,12 @@ public:
 		
 		if (!omega && m_pseudo) 
 			throw std::runtime_error("Davidson solver initialized as pseudo-eigenvalue problem, but no omega given.");
+		
+		double prev_omega, current_omega, init_omega;
+		if (omega) {
+			prev_omega = *omega;
+			init_omega = *omega;
+		}
 		
 		// copy guesses
 		m_vecs.clear();
@@ -328,9 +335,18 @@ public:
 			// Normal davidson: largest norm of residuals is below certain threshold
 			// pseudo davidson: largest norm of residual is higher than |omega - omega'| 
 			
-			if (m_pseudo) LOG.os<1>("EVALS: ", *omega, " ", evals(m_nroots-1), '\n');
+			if (m_pseudo) {
+				current_omega = evals(m_nroots-1);
+				LOG.os<1>("EVALS: ", *omega, " ", evals(m_nroots-1), 
+					" Err: ", fabs(current_omega - prev_omega), '\n');
+			}
 			
-			m_converged = (m_pseudo) ? (max_err < fabs(*omega - evals(m_nroots - 1))) : (max_err < m_conv);
+			m_converged = (m_pseudo) 
+				? ((m_errs[m_nroots-1] < m_conv) 
+					|| m_errs[m_nroots-1] < fabs(init_omega - current_omega))
+				: (max_err < m_conv);
+				
+			prev_omega = current_omega;
 			
 			if (m_converged) break;
 			
@@ -471,7 +487,7 @@ public:
 			
 			// normalize ?
 			double norm = sqrt(x_k->dot(*x_k));
-			x_k->scale(1.0/norm);
+			if (m_balancing) x_k->scale(1.0/norm);
 			
 			new_vecs.push_back(x_k);
 			
@@ -489,6 +505,12 @@ public:
 		
 	}
 	
+	std::vector<double> residual_norms() {
+		
+		return m_errs;
+		
+	}
+	
 	std::vector<double> eigvals() {
 		return m_eigvals;
 	}
@@ -496,46 +518,78 @@ public:
 }; // end class 
 
 template <class MVFactory>
-class modified_davidson {
+class diis_davidson {
 private:
-
+	
+	MPI_Comm m_comm;
 	util::mpi_log LOG;
 	
 	int m_macro_maxiter = 30;
+	int m_diis_maxiter = 50;
 	double m_macro_conv = 1e-5;
-		
+	double m_cdiis2_threshhold = 1e-16;
+	
+	std::shared_ptr<MVFactory> m_fac;
+	smat m_diag;
 	davidson<MVFactory> m_dav;
 	
-		
 public:
-
-	davidson<MVFactory>& sub() {
-		return m_dav;
-	}
 	
-	modified_davidson& macro_maxiter(int maxi) {
+	diis_davidson& macro_maxiter(int maxi) {
 		m_macro_maxiter = maxi;
 		return *this;
 	}
 	
-	modified_davidson& macro_conv(double macro) {
+	diis_davidson& macro_conv(double macro) {
 		m_macro_conv = macro;
 		return *this;
 	}
 	
-	modified_davidson(MPI_Comm comm, int nprint) : 
+	diis_davidson& set_factory(std::shared_ptr<MVFactory>& fac) {
+		m_fac = fac;
+		m_dav.set_factory(fac);
+		return *this;
+	}
+	
+	diis_davidson& set_diag(smat& in) {
+		m_diag = in;
+		m_dav.set_diag(in);
+		return *this;
+	}
+	
+	diis_davidson& micro_maxiter(int maxi) {
+		m_dav.maxiter(maxi);
+		return *this;
+	}
+	
+	diis_davidson& balancing(bool do_balancing) {
+		m_dav.balancing(do_balancing);
+		return *this;
+	}
+	
+	diis_davidson(MPI_Comm comm, int nprint) : 
 		LOG(comm, nprint),
+		m_comm(comm),
 		m_dav(comm, nprint)
-	{}
+	{
+		m_dav.pseudo(true);
+		m_dav.block(false);
+	}
 	
 	void compute(std::vector<smat>& guess, int nroot, double omega) {
 
 		std::vector<smat> current_guess = guess;
 		double current_omega = omega;
 		
-		for (int i = 0; i != m_macro_maxiter; ++i) {
+		LOG.os<>("========== STARTING DIIS-DAVIDSON ================\n");
+		LOG.os<>("======== PERFORMING PSEUDO-DAVDISON ==============\n");
+		
+		m_macro_conv = 1e-3; //std::max(1e-3, m_macro_conv);
+		m_dav.conv(m_macro_conv);
+		
+		for (int ii = 0; ii != m_macro_maxiter; ++ii) {
 			
-			LOG.os<>(" == MACROITERATION: ", i, " ==\n");
+			LOG.os<>("=== PSEUDO-DAVIDSON MACROITERATION: ", ii, "\n");
 			
 			double old_omega = current_omega;
 			
@@ -544,17 +598,229 @@ public:
 			current_guess = m_dav.ritz_vectors();
 			current_omega = m_dav.eigvals()[nroot-1];
 			
+			auto resnorms = m_dav.residual_norms();
+			
 			double err = fabs(current_omega - old_omega);
 			
-			LOG.os<>("MACRO ITERATION ERROR: ", err, '\n');
-			LOG.os<>("EIGENVALUE: ", current_omega, '\n');
+			LOG.os<>("=== MACRO ITERATION ERROR EIGENVALUE/RESIDUAL: ", 
+				err, "/ ", resnorms[nroot-1], '\n');
+			LOG.os<>("=== EIGENVALUE: ", current_omega, '\n');
 			
-			if (err < m_macro_conv) break;			
+			if (resnorms[nroot-1] < m_macro_conv && err < m_macro_conv) break;			
 						
 		}
 		
-		LOG.os<>("Modified davidson finished\n");
+		double eigval = m_dav.eigvals()[nroot-1];
+		auto b_ov = m_dav.ritz_vectors()[nroot-1];
 		
+		LOG.os<>("============ PSEUDO-DAVIDSON CONVERGED ===========\n");
+						
+		LOG.os<>("================= PERFORMING DIIS=================\n");
+		
+		diis_helper<2> dsolver(m_comm, 10, 5, 12, true);
+		
+		current_omega = eigval;
+		dbcsr::shared_matrix<double> prev_u, prev_b;
+		
+		/*for (int ii = 0; ii != m_diis_maxiter; ++ii) {
+			
+			LOG.os<>("=== DIIS ITERATION: ", ii, '\n');
+			
+			double bdot = b_ov->dot(*b_ov);
+			
+			double old_omega = current_omega;
+			auto sig_ov = m_fac->compute(b_ov, current_omega);
+			
+			// compute new omega
+			// omega(i+1) = (sig(i) b(i))/||b(i)||^2
+			
+			current_omega = (sig_ov->dot(*b_ov))/bdot;
+			double omega_err = fabs(current_omega - old_omega);
+			
+			LOG.os<>("=== OMEGA: ", current_omega, " ERR ", omega_err, '\n');
+			
+			// compute residual
+			// r(i) = (sig(i) - omega(i+1) * u(i))/||u(i)||
+			auto r_ov = dbcsr::copy<double>(*sig_ov)
+				.name("r_ov")
+				.get();
+				
+			r_ov->add(1.0, -current_omega, *b_ov);
+			r_ov->scale(1.0/sqrt(bdot));
+			
+			double r_norm = r_ov->norm(dbcsr_norm_frobenius);
+			
+			LOG.os<>("==== RESIDUAL NORM: ", r_norm, '\n');
+			
+			if (r_norm < 1e-5) break;
+			
+			// compute update b = r/diag
+			auto dinv_ov = dbcsr::create_template<double>(*r_ov)
+				.name("dinv")
+				.get();
+			
+			dinv_ov->reserve_all();
+			//dinv_ov->set(current_omega);
+			dinv_ov->add(1.0, -1.0, *m_diag);
+			//dinv_ov->scale(-1.0);
+			dinv_ov->apply(dbcsr::func::inverse);
+			
+			auto u_ov = dbcsr::create_template<double>(*r_ov)
+				.name("Non-extrapolated update vector")
+				.get();
+				
+			auto uerr_ov = dbcsr::create_template<double>(*r_ov)
+				.name("Error update vector")
+				.get();
+			
+			u_ov->hadamard_product(*r_ov, *dinv_ov);
+			
+			dbcsr::print(*u_ov);
+			
+			if (ii == 0) {
+				
+				b_ov->add(1.0, 1.0, *u_ov);
+				b_ov->scale(1.0/sqrt(bdot));
+				
+				prev_u = u_ov;
+				prev_b = b_ov;
+				
+			} else {
+				
+				uerr_ov->add(0.0, 1.0, *u_ov);
+				uerr_ov->add(1.0, -1.0, *prev_u);
+				
+				prev_u = dbcsr::copy(*u_ov).get();
+						
+				dsolver.compute_extrapolation_parameters(prev_u, uerr_ov, ii);
+				
+				// get new update
+				auto new_u_ov = dbcsr::create_template<double>(*u_ov)
+					.name("Extrapolated update vector")
+					.get();
+			
+				dsolver.extrapolate(new_u_ov, ii);
+			
+				b_ov->add(1.0, 1.0, *new_u_ov);
+				b_ov->scale(1.0/sqrt(bdot));
+								
+			}
+			
+		}*/
+			
+		
+		Eigen::MatrixXd bmat;
+		std::vector<dbcsr::shared_matrix<double>> errvecs, trialvecs;
+		
+		for (int iiter = 0; iiter != m_diis_maxiter; ++iiter) {
+			
+			LOG.os<>("=== DIIS ITERATION ", iiter, " ===\n");
+			
+			// compute sigma vector
+			auto sig_ov = m_fac->compute(b_ov,current_omega);
+			
+			// compute omega
+			double old_omega = current_omega;
+			current_omega = (b_ov->dot(*sig_ov))/(b_ov->dot(*b_ov));
+			
+			LOG.os<>("OMEGA: ", current_omega, " ", 
+				fabs(current_omega - old_omega), '\n'); 
+				
+			// compute residual
+			// r(i) = (sig(i) - omega(i+1) * u(i))/||u(i)||
+			auto r_ov = dbcsr::copy<double>(*sig_ov)
+				.name("r_ov")
+				.get();
+				
+			r_ov->add(1.0, -current_omega, *b_ov);
+			//r_ov->scale(1.0/sqrt(b_ov->dot(*b_ov)));
+			
+			double r_norm = r_ov->norm(dbcsr_norm_frobenius);
+			
+			LOG.os<>("==== RESIDUAL NORM: ", r_norm, '\n');
+			
+			if (r_norm < 1e-5) break;
+			
+			// compute update
+			auto u_ov = dbcsr::create_template<double>(*sig_ov)
+				.name("update vector")
+				.get();
+			
+			auto div = dbcsr::create_template<double>(*sig_ov)
+				.name("divisor")
+				.get();
+			
+			div->reserve_all();
+			div->set(current_omega);
+			div->add(1.0,-1.0,*m_diag);
+			
+			div->apply(dbcsr::func::inverse);
+			u_ov->hadamard_product(*r_ov, *div);
+			
+			// store vectors
+			
+			auto u_copy = dbcsr::copy(*u_ov).get();
+			auto g_copy = dbcsr::copy(*b_ov).get();
+			g_copy->add(1.0,1.0,*u_copy);
+			
+			errvecs.push_back(u_copy);
+			trialvecs.push_back(g_copy);
+			
+			// construct matrices
+			bmat.conservativeResize(iiter+1,iiter+1);
+			
+			for (int ii = 0; ii <= iiter; ++ii) {
+				for (int jj = ii; jj <= iiter; ++jj) {
+					bmat(ii,jj) = bmat(jj,ii) = 
+						errvecs[ii]->dot(*errvecs[jj]);
+				}
+			}
+			
+			// solve
+			Eigen::SelfAdjointEigenSolver<Eigen::MatrixXd> es;
+			es.compute(bmat);
+			
+			Eigen::MatrixXd evecs = es.eigenvectors();
+			Eigen::VectorXd evals = es.eigenvalues();
+			
+			LOG.os<>("EVALS: ", es.eigenvalues(), '\n');
+			
+			LOG.os<>("EVECS: ", evecs, '\n');
+			
+			int pos = -1;
+			
+			// get first eigenvalue above given threshold
+			for (int ii = 0; ii != evals.size(); ++ii) {
+				if (evals(ii) > m_cdiis2_threshhold) {
+					pos = ii;
+					break;
+				}
+			}
+			
+			LOG.os<>("ELE AT ", pos, " : ", evals(pos), '\n');
+			
+			if (pos == -1) {
+				throw std::runtime_error("CDIIS2: linear dependency detected.");
+			}
+			
+			Eigen::VectorXd c = evecs.col(pos);
+			
+			// compute new trial vector
+			auto bnew = dbcsr::create_template<double>(*b_ov)
+				.name("b_new")
+				.get();
+				
+			for (int ii = 0; ii != iiter+1; ++ii) {
+				bnew->add(1.0, c(ii), *trialvecs[ii]);
+			}
+			
+			b_ov = bnew;
+		
+		}
+		
+		LOG.os<>("DIIS CONVERGED!!");
+			
+			
 	}
 	
 	std::vector<smat> ritz_vectors() {

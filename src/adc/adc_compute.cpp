@@ -342,7 +342,7 @@ void adcmod::compute() {
 	
 	LOG.os<>("==== Starting ADC(2) Computation ====\n\n"); 
 	
-	math::modified_davidson<MVP> mdav(m_world.comm(), LOG.global_plev());
+	math::diis_davidson<MVP> mdav(m_world.comm(), LOG.global_plev());
 	
 	double conv_micro_adc2 = m_opt.get<double>("adc2/micro_conv", ADC_ADC2_MICRO_CONV);
 	double conv_macro_adc2 = m_opt.get<double>("adc2(macro_conv", ADC_ADC2_MACRO_CONV);
@@ -352,12 +352,9 @@ void adcmod::compute() {
 	mdav.macro_maxiter(macro_maxiter_adc2);
 	mdav.macro_conv(conv_macro_adc2);
 	
-	mdav.sub().set_diag(dpao_ov);
-	mdav.sub().pseudo(true);
-	mdav.sub().block(false);
-	mdav.sub().balancing(do_balancing);
-	mdav.sub().conv(conv_micro_adc2);
-	mdav.sub().maxiter(micro_maxiter_adc2);
+	mdav.set_diag(m_d_ov); //dpao_ov);
+	mdav.balancing(do_balancing);
+	mdav.micro_maxiter(micro_maxiter_adc2);
 	
 	int istart = (do_block) ? 0 : nroots-1;
 	std::vector<double> ex_adc2(nroots,0.0);
@@ -378,11 +375,11 @@ void adcmod::compute() {
 			//auto atomlist = get_significant_blocks(rvecs[0], 0.9975, nullptr, 0.0);
 			//adc2_mvp = create_adc2(atomlist);
 		} else if (!is_init) {
-			adc2_mvp = create_adc2(paos);
-			rvecs[0] = u_transform(rvecs[0], 'T', paos.u_or, 'N', paos.u_vs); 
+			adc2_mvp = create_adc2(); //paos);
+			//rvecs[0] = u_transform(rvecs[0], 'T', paos.u_or, 'N', paos.u_vs); 
 		}
 		
-		mdav.sub().set_factory(adc2_mvp);
+		mdav.set_factory(adc2_mvp);
 		mdav.compute(rvecs, iroot+1, ex[iroot]);
 		
 		double en = mdav.eigval()[iroot];
