@@ -1091,8 +1091,8 @@ void pivinc_cd::compute(std::optional<int> force_rank) {
 			
 		LOG.os<1>("-- Reordered LMO indices: \n");
 		for (int i = 0; i != lmo_perm.size(); ++i) {
-			std::cout << lmo_perm[i] << " " << lmo_pos[lmo_perm[i]] << "\n";
-		} std::cout << std::endl;
+			LOG.os<1>(lmo_perm[i], " ", lmo_pos[lmo_perm[i]], "\n");
+		} LOG.os<1>('\n');
 		
 	}
 	
