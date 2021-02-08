@@ -8,6 +8,9 @@
 #include <algorithm>
 #include <random>
 #include <unistd.h>
+#include <mutex>
+#include <atomic>
+#include <iostream>
 
 //#define _DLOG
 
@@ -375,6 +378,7 @@ public:
  * masters communicate between nodes for work sharing
  * 
  * Hopefully more transferrable than the other scheduler...
+ * After testing: Nope, this one also has problems
  */
 
 class dynamic_scheduler {
@@ -774,6 +778,8 @@ public:
 	
 };
 
+// This one has problems, too T_T
+
 class dynamic_scheduler2 {
 private:
 
@@ -931,6 +937,241 @@ public:
 	
 };
 
+class basic_scheduler {
+private:
+
+	const int64_t NO_TASK = -1;
+	const int64_t TERMINATE = -2;
+
+	MPI_Comm _global_comm;
+	int _global_rank;
+	int _global_size;
+	
+	MPI_Comm _local_comm;
+	int _local_rank;
+	int _local_size;
+	
+	// global counter
+	MPI_Win _global_win;
+	int64_t* _global_counter;
+	
+	// local mutex
+	MPI_Win _local_mtx_win;
+	std::mutex* _mtx_data;
+	std::mutex* _local_mtx;
+	
+	// local atomics;
+	MPI_Win _local_atomic_win;
+	std::atomic<int64_t>* _atomic_data;
+	std::atomic<int64_t>* _local_counter;
+	std::atomic<int64_t>* _local_ubound;
+	
+	std::function<void(int64_t)>& _executer;
+	int64_t _ntasks;
+	
+	int64_t _ntasks_completed;
+	
+#define _DPRINT(str) \
+	std::cout << "RANK: " << _global_rank << "/" << _local_rank \
+		<< " : " << str << std::endl;
+	
+	bool local_queue_empty() {
+		return (*_local_counter >= *_local_ubound);
+	}
+	
+	bool terminate() {
+		return (*_local_counter == TERMINATE);
+	}
+	
+	void fetch_tasks() {
+				
+		_DPRINT("Fetching tasks");
+		if (_local_mtx->try_lock()) {
+			
+			_DPRINT("Filling queue")
+			
+			int64_t nrequests = _local_size;
+			int64_t ncounter = -1;
+				
+			_DPRINT("Requesting " + std::to_string(nrequests))
+			
+			MPI_Win_lock(MPI_LOCK_EXCLUSIVE, 0, 0, _global_win);
+			MPI_Fetch_and_op(&nrequests, &ncounter, MPI_LONG_LONG, 0, 0,
+				MPI_SUM, _global_win);
+			MPI_Win_unlock(0, _global_win);
+				
+			int64_t last_task = (ncounter + nrequests <= _ntasks) ? 
+				ncounter + nrequests : _ntasks;
+				
+			_DPRINT("NCOUNTER: " + std::to_string(ncounter))
+				
+			ncounter = (ncounter >= _ntasks) ? TERMINATE : ncounter;
+			
+			_DPRINT("NCOUNTER/UBOUND: " + std::to_string(ncounter) +  "/" 
+				+ std::to_string(last_task));
+				
+			std::atomic_store(_local_counter, ncounter);
+			std::atomic_store(_local_ubound, last_task); 
+			
+			_local_mtx->unlock();
+			
+		} else {
+			
+			while (local_queue_empty() && !terminate()) {
+				// flush rank 0 to ensure RMA progress ?
+			}
+			
+		}
+							
+	}
+	
+	int64_t pop_task() {
+		
+		int64_t itask = std::atomic_fetch_add(_local_counter,(int64_t)1);
+		return (itask >= *_local_ubound) ? NO_TASK : itask;
+		
+	}
+			
+
+public:
+
+	basic_scheduler(MPI_Comm comm, int64_t ntasks, std::function<void(int64_t)>& executer) 
+		: _global_comm(comm), _executer(executer), _ntasks(ntasks),
+		_global_size(0), _global_rank(-1),
+		_local_size(0), _local_rank(-1)
+	{
+		
+		// create communicators
+		
+		MPI_Comm_size(_global_comm, &_global_size);
+		MPI_Comm_rank(_global_comm, &_global_rank);
+		
+		int color = _global_rank % 2;
+		int split = _global_rank / 2;
+		
+		//MPI_Comm_split(_global_comm, color, split, &_local_comm);
+		
+		MPI_Comm_split_type(_global_comm, MPI_COMM_TYPE_SHARED, _global_rank, 
+			MPI_INFO_NULL, &_local_comm);
+		
+		MPI_Comm_size(_local_comm, &_local_size);
+		MPI_Comm_rank(_local_comm, &_local_rank);
+		
+		// allocate global window
+		MPI_Win_allocate(sizeof(int64_t), sizeof(int64_t),
+			MPI_INFO_NULL, _global_comm, &_global_counter, &_global_win);
+			
+		// initialize ...
+		if (_global_rank == 0) {
+			MPI_Win_lock(MPI_LOCK_EXCLUSIVE, 0, 0, _global_win);
+			int64_t zero(0);
+			MPI_Put(&zero, 1, MPI_LONG_LONG, 0, 0, 1, MPI_LONG_LONG, _global_win); 
+			MPI_Win_unlock(0, _global_win);
+		}
+		
+		// allocate shared windows
+		// ... for mutex
+		
+		int mtx_size = sizeof(std::mutex);
+		int nele = (_local_rank == 0) ? 1 : 0;
+		
+		MPI_Aint size0;
+		int disp0;
+		
+		MPI_Win_allocate_shared(nele * mtx_size, mtx_size, MPI_INFO_NULL, 
+			_local_comm, &_mtx_data, &_local_mtx_win);
+		
+		// initialize
+		if (_local_rank == 0) {
+			auto init_mtx = new (_mtx_data) std::mutex();
+		}
+			
+		MPI_Win_shared_query(_local_mtx_win, 0, &size0, &disp0,&_local_mtx);
+		
+		// ... for atomics
+		
+		int atom_size = sizeof(std::atomic<int64_t>);
+		int nele_atom = (_local_rank == 0) ? 2 : 0;
+		
+		MPI_Win_allocate_shared(nele_atom * atom_size, atom_size,
+			MPI_INFO_NULL, _local_comm, &_atomic_data, &_local_atomic_win);
+			
+		// initialize
+		if (_local_rank == 0) {
+			auto init = new (_atomic_data) std::atomic<int64_t>(0);
+			auto init2 = new (_atomic_data + 1) std::atomic<int64_t>(0);
+		}
+		
+		MPI_Win_shared_query(_local_atomic_win, 0, &size0, &disp0, &_local_counter);
+		_local_ubound = _local_counter + 1;
+		
+		_DPRINT("INIT: " + std::to_string(*_local_counter) + "/" 
+			+ std::to_string(*_local_ubound))
+		
+	}
+	
+	void run() {
+		
+		_DPRINT("STARTING RUN WITH NTASKS = " + std::to_string(_ntasks))
+		
+		_ntasks_completed = 0;
+		
+		while (true) {
+			
+			if (local_queue_empty()) {
+				
+				fetch_tasks();
+				
+			}
+			
+			if (terminate()) break;
+			
+			// get task
+			int64_t task = pop_task();
+			
+			// perform if task valid
+			if (task != NO_TASK) {
+				_DPRINT("EXECUTING TASK " + std::to_string(task))
+				_executer(task);
+				++_ntasks_completed;
+			}
+			
+		}
+		
+		_DPRINT("DONE")
+		
+		MPI_Request barrier_request;
+		int flag = 0;
+		
+		MPI_Ibarrier(_global_comm,&barrier_request);
+		
+		while (!flag) {
+			MPI_Test(&barrier_request, &flag, MPI_STATUS_IGNORE);
+		}	
+		
+		// check for consistency
+		MPI_Allreduce(MPI_IN_PLACE, &_ntasks_completed, 1, MPI_LONG_LONG,
+			MPI_SUM, _global_comm);
+						
+		if (_global_rank == 0 && _ntasks_completed != _ntasks) {
+			throw std::runtime_error("Scheduler: Not all tasks were executed!!");
+		}
+		
+		_DPRINT("DONE WITH RUN")
+
+	}
+		
+	
+	~basic_scheduler() {
+		MPI_Win_free(&_global_win);
+		MPI_Win_free(&_local_mtx_win);
+		MPI_Win_free(&_local_atomic_win);
+		MPI_Comm_free(&_local_comm);
+	}
+	
+};
+
+#undef _DPRINT
 
 } // end namespace
 

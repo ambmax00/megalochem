@@ -10,7 +10,6 @@
 #include <Eigen/SparseCore>
 
 //#define _USE_FLOAT
-#define _USE_FASTSCHEDULER
 #define _USE_QR
 #define _CHUNK_SIZE 2
 
@@ -702,11 +701,7 @@ dbcsr::sbtensor<3,double> dfitting::compute_qr_new(dbcsr::shared_matrix<double> 
 				
 		}; // end task function
 		
-		#ifdef _USE_FASTSCHEDULER
-		util::dynamic_scheduler2 tasks(m_world.comm(), global_tasks.size(), task_func);
-		#else 
-		util::dynamic_scheduler tasks(m_world.comm(), global_tasks.size(), task_func);
-		#endif
+		util::basic_scheduler tasks(m_world.comm(), global_tasks.size(), task_func);
 		
 		tasks.run();
 	
