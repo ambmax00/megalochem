@@ -11,6 +11,8 @@
 #include <mutex>
 #include <atomic>
 #include <iostream>
+#include <thread>
+#include <chrono>
 
 //#define _DLOG
 
@@ -969,6 +971,8 @@ private:
 	std::function<void(int64_t)>& _executer;
 	int64_t _ntasks;
 	
+	std::thread* _poll_thread;
+	
 	int64_t _ntasks_completed;
 	
 #define _DPRINT(str) \
@@ -995,7 +999,7 @@ private:
 				
 			_DPRINT("Requesting " + std::to_string(nrequests))
 			
-			MPI_Win_lock(MPI_LOCK_EXCLUSIVE, 0, 0, _global_win);
+			MPI_Win_lock(MPI_LOCK_SHARED, 0, MPI_MODE_NOCHECK, _global_win);
 			MPI_Fetch_and_op(&nrequests, &ncounter, MPI_LONG_LONG, 0, 0,
 				MPI_SUM, _global_win);
 			MPI_Win_unlock(0, _global_win);
@@ -1116,28 +1120,56 @@ public:
 		
 		_ntasks_completed = 0;
 		
-		while (true) {
-			
-			if (local_queue_empty()) {
+		/*auto poll_function = [this]() {
+			while (!terminate()) {
+				MPI_Win_lock(MPI_LOCK_SHARED, 0, MPI_MODE_NOCHECK, _global_win);
+				MPI_Win_unlock(0, _global_win);
+				std::this_thread::sleep_for(std::chrono::milliseconds(1000));
+				std::cout << "HELLO" << std::endl;
+			}
+		};
+		
+		if (_global_rank == 0) {
+			_poll_thread = new std::thread(poll_function);
+			_poll_thread->detach();
+		}*/		
+		
+		if (_global_rank != 0) {
+		
+			while (true) {
 				
-				fetch_tasks();
+				if (local_queue_empty()) {
+					
+					fetch_tasks();
+					
+				}
+				
+				if (terminate()) break;
+				
+				// get task
+				int64_t task = pop_task();
+				
+				// perform if task valid
+				if (task != NO_TASK) {
+					_DPRINT("EXECUTING TASK " + std::to_string(task))
+					_executer(task);
+					++_ntasks_completed;
+				}
 				
 			}
 			
-			if (terminate()) break;
+		} else {
 			
-			// get task
-			int64_t task = pop_task();
-			
-			// perform if task valid
-			if (task != NO_TASK) {
-				_DPRINT("EXECUTING TASK " + std::to_string(task))
-				_executer(task);
-				++_ntasks_completed;
+			while (true) {
+				
+				MPI_Win_lock(MPI_LOCK_SHARED, 0, MPI_MODE_NOCHECK, _global_win);
+				MPI_Win_unlock(0, _global_win);
+				if (terminate()) break;
+				
 			}
 			
 		}
-		
+				
 		_DPRINT("DONE")
 		
 		MPI_Request barrier_request;
@@ -1147,6 +1179,10 @@ public:
 		
 		while (!flag) {
 			MPI_Test(&barrier_request, &flag, MPI_STATUS_IGNORE);
+			if (_global_rank == 0) {
+				MPI_Win_lock(MPI_LOCK_SHARED, 0, MPI_MODE_NOCHECK, _global_win);
+				MPI_Win_unlock(0, _global_win);
+			}
 		}	
 		
 		// check for consistency
