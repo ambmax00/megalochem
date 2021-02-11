@@ -3,7 +3,7 @@
 
 #include <dbcsr_conversions.hpp>
 
-#include "utils/mpi_log.h"
+#include "utils/mpi_log.hpp"
 
 #include <utility>
 #include <string>

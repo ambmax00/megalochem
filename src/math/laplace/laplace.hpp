@@ -3,8 +3,8 @@
 
 #include <vector>
 #include <limits>
-#include "utils/mpi_log.h"
-#include "math/laplace/laplace_minimax_c.h"
+#include "utils/mpi_log.hpp"
+#include "math/laplace/laplace_minimax_c.hpp"
 #include <optional>
 
 namespace math {

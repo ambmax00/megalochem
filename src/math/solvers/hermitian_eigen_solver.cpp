@@ -1,8 +1,8 @@
-#include "math/solvers/hermitian_eigen_solver.h"
+#include "math/solvers/hermitian_eigen_solver.hpp"
 #include <dbcsr_matrix_ops.hpp>
 
 //#ifdef USE_SCALAPACK
-#include "extern/scalapack.h"
+#include "extern/scalapack.hpp"
 //#else
 //#include <Eigen/Eigenvalues>
 //#endif

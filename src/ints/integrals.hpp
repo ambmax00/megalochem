@@ -3,10 +3,10 @@
 
 #include <dbcsr_matrix.hpp>
 #include <dbcsr_tensor.hpp>
-#include "utils/pool.h"
+#include "utils/pool.hpp"
 #include "utils/params.hpp"
-#include "desc/basis.h"
-#include "ints/screening.h"
+#include "desc/basis.hpp"
+#include "ints/screening.hpp"
 #include <vector>
 #include <mpi.h>
 

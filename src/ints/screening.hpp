@@ -1,7 +1,7 @@
 #ifndef INTS_SCREENING_H
 #define INTS_SCREENING_H
 
-#include "ints/aofactory.h"
+#include "ints/aofactory.hpp"
 
 #include <Eigen/Core>
 #include <utility>

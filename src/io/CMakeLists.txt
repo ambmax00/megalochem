@@ -1,7 +1,7 @@
 set (SOURCES
-	parser.h
+	parser.hpp
 	parser.cpp
-	io.h
+	io.hpp
 	io.cpp
 )
 

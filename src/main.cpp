@@ -6,20 +6,20 @@
 #include <dbcsr_matrix.hpp>
 #include <dbcsr_conversions.hpp>
 #include <dbcsr_matrix_ops.hpp>
-#include "io/parser.h"
-#include "io/data_handler.h"
-#include "hf/hfmod.h"
-#include "mp/mpmod.h"
-#include "adc/adcmod.h"
-#include "utils/mpi_time.h"
-#include "utils/unique.h"
-#include "extern/scalapack.h"
+#include "io/parser.hpp"
+#include "io/data_handler.hpp"
+#include "hf/hfmod.hpp"
+#include "mp/mpmod.hpp"
+#include "adc/adcmod.hpp"
+#include "utils/mpi_time.hpp"
+#include "utils/unique.hpp"
+#include "extern/scalapack.hpp"
 
 #include <filesystem>
 #include <chrono>
 #include <thread>
 
-#include "math/solvers/davidson.h"
+#include "math/solvers/davidson.hpp"
 #include <Eigen/Eigenvalues>
 #include <Eigen/Core>
 

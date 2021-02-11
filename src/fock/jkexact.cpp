@@ -1,6 +1,6 @@
-#include "fock/jkbuilder.h"
-#include "fock/fock_defaults.h"
-#include "math/linalg/LLT.h"
+#include "fock/jkbuilder.hpp"
+#include "fock/fock_defaults.hpp"
+#include "math/linalg/LLT.hpp"
 #include <dbcsr_tensor_ops.hpp>
 
 namespace fock {

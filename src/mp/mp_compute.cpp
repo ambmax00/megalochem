@@ -1,10 +1,10 @@
-#include "mp/mpmod.h"
-#include "mp/mp_defaults.h"
-#include "mp/z_builder.h"
-#include "math/laplace/laplace.h"
-#include "math/linalg/piv_cd.h"
-#include "math/linalg/LLT.h"
-#include "ints/aoloader.h"
+#include "mp/mpmod.hpp"
+#include "mp/mp_defaults.hpp"
+#include "mp/z_builder.hpp"
+#include "math/laplace/laplace.hpp"
+#include "math/linalg/piv_cd.hpp"
+#include "math/linalg/LLT.hpp"
+#include "ints/aoloader.hpp"
 #include <omp.h>
 #include <dbcsr_matrix_ops.hpp>
 #include <dbcsr_tensor_ops.hpp>

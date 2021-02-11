@@ -1,7 +1,7 @@
 #ifndef UTIL_MPI_TIME_H
 #define UTIL_MPI_TIME_H
 
-#include "utils/mpi_log.h"
+#include "utils/mpi_log.hpp"
 #include <map>
 #include <exception>
 

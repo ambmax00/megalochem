@@ -1,9 +1,9 @@
-#include "hf/hfmod.h"
-#include "hf/hfdefaults.h"
-#include "fock/fockmod.h"
-#include "ints/aofactory.h"
-#include "math/linalg/orthogonalizer.h"
-#include "math/solvers/diis.h"
+#include "hf/hfmod.hpp"
+#include "hf/hfdefaults.hpp"
+#include "fock/fockmod.hpp"
+#include "ints/aofactory.hpp"
+#include "math/linalg/orthogonalizer.hpp"
+#include "math/solvers/diis.hpp"
 
 namespace hf {
 	

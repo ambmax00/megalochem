@@ -1,11 +1,11 @@
 #ifndef HF_MOD_H
 #define HF_MOD_H
 
-#include "desc/molecule.h"
-#include "desc/options.h"
-#include "hf/hf_wfn.h"
+#include "desc/molecule.hpp"
+#include "desc/options.hpp"
+#include "hf/hf_wfn.hpp"
 #include <dbcsr_conversions.hpp>
-#include "utils/mpi_time.h"
+#include "utils/mpi_time.hpp"
 
 #include <mpi.h>
 #include <memory>

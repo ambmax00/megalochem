@@ -5,7 +5,7 @@
 #include <map>
 #include <dbcsr_tensor_ops.hpp>
 #include <dbcsr_btensor.hpp>
-#include "ints/screening.h"
+#include "ints/screening.hpp"
 #include <stdexcept>
 
 namespace util {

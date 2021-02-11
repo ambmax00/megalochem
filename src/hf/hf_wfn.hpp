@@ -1,9 +1,9 @@
 #ifndef HF_HF_WFN_H
 #define HF_HF_WFN_H
 
-#include "desc/molecule.h"
-#include "io/data_handler.h"
-#include "io/io.h"
+#include "desc/molecule.hpp"
+#include "io/data_handler.hpp"
+#include "io/io.hpp"
 
 #include <dbcsr_matrix.hpp>
 #include <dbcsr_conversions.hpp>

@@ -1,13 +1,13 @@
 #ifndef FOCK_JK_BUILDER_H
 #define FOCK_JK_BUILDER_H
 
-#include "ints/aoloader.h"
-#include "utils/registry.h"
-#include "utils/ppdirs.h"
+#include "ints/aoloader.hpp"
+#include "utils/registry.hpp"
+#include "utils/ppdirs.hpp"
 #include "utils/params.hpp"
-#include "desc/molecule.h"
-#include "desc/options.h"
-#include "utils/mpi_time.h"
+#include "desc/molecule.hpp"
+#include "desc/options.hpp"
+#include "utils/mpi_time.hpp"
 #include <dbcsr_btensor.hpp>
 #include <dbcsr_matrix.hpp>
 

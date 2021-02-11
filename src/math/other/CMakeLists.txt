@@ -1,5 +1,5 @@
 set (sources
-	scale.h
+	scale.hpp
 	scale.cpp
 )
 

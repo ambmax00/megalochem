@@ -1,5 +1,5 @@
 set(SOURCES
-	hfmod.h
+	hfmod.hpp
 	hfscf.cpp
 	hfguess.cpp
 	hfdiagfock.cpp

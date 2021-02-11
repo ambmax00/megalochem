@@ -1,11 +1,11 @@
 set (sources
-	orthogonalizer.h
+	orthogonalizer.hpp
 	orthogonalizer.cpp
-	piv_cd.h
+	piv_cd.hpp
 	piv_cd.cpp
-	LLT.h
+	LLT.hpp
 	LLT.cpp
-	SVD.h
+	SVD.hpp
 	SVD.cpp	
 )
 

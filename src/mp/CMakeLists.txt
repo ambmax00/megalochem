@@ -1,7 +1,7 @@
 set(SOURCES
-	mpmod.h
+	mpmod.hpp
 	mp_compute.cpp
-	z_builder.h
+	z_builder.hpp
 	z_common.cpp
 	z_full.cpp
 	z_mem.cpp

@@ -1,5 +1,5 @@
-#include "ints/fitting.h"
-#include "utils/constants.h"
+#include "ints/fitting.hpp"
+#include "utils/constants.hpp"
 
 namespace ints {
 	

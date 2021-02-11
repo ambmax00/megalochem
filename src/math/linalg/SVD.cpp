@@ -1,7 +1,7 @@
-#include "math/linalg/SVD.h"
+#include "math/linalg/SVD.hpp"
 #include <dbcsr_conversions.hpp>
 
-#include "utils/matrix_plot.h"
+#include "utils/matrix_plot.hpp"
 
 
 namespace math {

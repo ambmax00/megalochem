@@ -2,8 +2,8 @@
 #define MATH_LLT_H
 
 #include <dbcsr_matrix_ops.hpp>
-#include "extern/scalapack.h"
-#include "utils/mpi_log.h"
+#include "extern/scalapack.hpp"
+#include "utils/mpi_log.hpp"
 
 namespace math {
 	

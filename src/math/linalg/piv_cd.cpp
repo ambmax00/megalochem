@@ -1,13 +1,13 @@
- #include "math/linalg/piv_cd.h"
+ #include "math/linalg/piv_cd.hpp"
  #include <cmath>
  #include <limits>
  #include <numeric>
  #include <algorithm>
 #include <dbcsr_matrix_ops.hpp>
  
-#include "extern/scalapack.h"
+#include "extern/scalapack.hpp"
 
-#include "utils/matrix_plot.h"
+#include "utils/matrix_plot.hpp"
 
 namespace math {
 	

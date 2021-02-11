@@ -1,5 +1,5 @@
-#include "desc/molecule.h"
-#include "utils/mpi_log.h"
+#include "desc/molecule.hpp"
+#include "utils/mpi_log.hpp"
 #include <utility>
 #include <stdexcept>
 #include <iostream>

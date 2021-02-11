@@ -1,5 +1,5 @@
 set(SOURCES
-	locorb.h
+	locorb.hpp
 	locorb_chol.cpp
 	locorb_boys.cpp
 	locorb_pao.cpp

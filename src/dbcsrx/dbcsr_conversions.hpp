@@ -3,7 +3,7 @@
 
 #include <Eigen/Core>
 
-#include "extern/scalapack.h"
+#include "extern/scalapack.hpp"
 #include <dbcsr_matrix.hpp>
 #include <dbcsr_tensor.hpp>
 #include <limits>

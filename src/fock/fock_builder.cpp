@@ -1,10 +1,10 @@
-#include "fock/fockmod.h"
-#include "ints/screening.h"
-#include "utils/registry.h"
-#include "ints/aoloader.h"
-#include "math/linalg/LLT.h"
-#include "math/solvers/hermitian_eigen_solver.h"
-#include "fock/fock_defaults.h"
+#include "fock/fockmod.hpp"
+#include "ints/screening.hpp"
+#include "utils/registry.hpp"
+#include "ints/aoloader.hpp"
+#include "math/linalg/LLT.hpp"
+#include "math/solvers/hermitian_eigen_solver.hpp"
+#include "fock/fock_defaults.hpp"
 #include <dbcsr_btensor.hpp>
 
 namespace fock {

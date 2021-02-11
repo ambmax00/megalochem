@@ -1,8 +1,8 @@
-#include "hf/hfmod.h"
+#include "hf/hfmod.hpp"
 #include <dbcsr_conversions.hpp>
 #include <dbcsr_matrix_ops.hpp>
-#include "math/solvers/hermitian_eigen_solver.h"
-#include "math/linalg/piv_cd.h"
+#include "math/solvers/hermitian_eigen_solver.hpp"
+#include "math/linalg/piv_cd.hpp"
 #include <algorithm> 
 
 namespace hf { 

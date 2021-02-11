@@ -1,10 +1,10 @@
-#include "adc/adcmod.h"
-#include "adc/adc_mvp.h"
-#include "math/solvers/davidson.h"
-#include "math/linalg/piv_cd.h"
-#include "math/linalg/SVD.h"
-#include "math/solvers/hermitian_eigen_solver.h"
-#include "locorb/locorb.h"
+#include "adc/adcmod.hpp"
+#include "adc/adc_mvp.hpp"
+#include "math/solvers/davidson.hpp"
+#include "math/linalg/piv_cd.hpp"
+#include "math/linalg/SVD.hpp"
+#include "math/solvers/hermitian_eigen_solver.hpp"
+#include "locorb/locorb.hpp"
 
 #include <dbcsr_conversions.hpp>
 

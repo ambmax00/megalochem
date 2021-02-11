@@ -1,8 +1,8 @@
-#include "locorb/locorb.h"
-#include "math/linalg/LLT.h"
-#include "math/linalg/SVD.h"
-#include "math/solvers/hermitian_eigen_solver.h"
-#include "utils/matrix_plot.h"
+#include "locorb/locorb.hpp"
+#include "math/linalg/LLT.hpp"
+#include "math/linalg/SVD.hpp"
+#include "math/solvers/hermitian_eigen_solver.hpp"
+#include "utils/matrix_plot.hpp"
 
 namespace locorb {
 

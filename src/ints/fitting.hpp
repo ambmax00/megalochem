@@ -1,15 +1,15 @@
 #ifndef INTS_FITTING_H
 #define INTS_FITTING_H
 
-#include "utils/registry.h"
-#include "desc/molecule.h"
-#include "desc/options.h"
-#include "ints/screening.h"
-#include "ints/aofactory.h"
+#include "utils/registry.hpp"
+#include "desc/molecule.hpp"
+#include "desc/options.hpp"
+#include "ints/screening.hpp"
+#include "ints/aofactory.hpp"
 #include <dbcsr_btensor.hpp>
 #include <dbcsr_tensor.hpp>
 #include <dbcsr_matrix.hpp>
-#include "utils/mpi_time.h"
+#include "utils/mpi_time.hpp"
 
 namespace ints {
 

@@ -1,9 +1,9 @@
 set(SOURCES
-	adcmod.h
+	adcmod.hpp
 	adc_diag.cpp
 	adc_compute.cpp
 	adc_init.cpp
-	adc_mvp.h
+	adc_mvp.hpp
 	adc_mvp_common.cpp
 	adc_mvp_aoriadc1.cpp
 	adc_mvp_aoriadc2.cpp

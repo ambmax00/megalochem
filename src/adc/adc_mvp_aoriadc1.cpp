@@ -1,5 +1,5 @@
-#include "adc/adc_mvp.h"
-#include "ints/aoloader.h"
+#include "adc/adc_mvp.hpp"
+#include "ints/aoloader.hpp"
 
 namespace adc {
 	

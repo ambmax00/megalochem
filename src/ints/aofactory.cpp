@@ -1,10 +1,10 @@
 #include <vector>
 #include <stdexcept>
-#include "ints/aofactory.h"
-#include "ints/integrals.h"
-#include "ints/screening.h"
-#include "utils/mpi_time.h"
-#include "utils/pool.h"
+#include "ints/aofactory.hpp"
+#include "ints/integrals.hpp"
+#include "ints/screening.hpp"
+#include "utils/mpi_time.hpp"
+#include "utils/pool.hpp"
 
 extern "C" {
 #include <cint.h>

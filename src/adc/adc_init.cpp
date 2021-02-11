@@ -1,9 +1,9 @@
-#include "adc/adcmod.h"
-#include "ints/aoloader.h"
-#include "ints/screening.h"
-#include "math/linalg/LLT.h"
-#include "locorb/locorb.h"
-#include "math/solvers/hermitian_eigen_solver.h"
+#include "adc/adcmod.hpp"
+#include "ints/aoloader.hpp"
+#include "ints/screening.hpp"
+#include "math/linalg/LLT.hpp"
+#include "locorb/locorb.hpp"
+#include "math/solvers/hermitian_eigen_solver.hpp"
 #include <Eigen/Eigenvalues>
 
 #include <type_traits>

@@ -1,7 +1,7 @@
-#include "hf/hfmod.h"
-#include "hf/hfdefaults.h"
-#include "math/solvers/hermitian_eigen_solver.h"
-#include "math/linalg/piv_cd.h"
+#include "hf/hfmod.hpp"
+#include "hf/hfdefaults.hpp"
+#include "math/solvers/hermitian_eigen_solver.hpp"
+#include "math/linalg/piv_cd.hpp"
 #include <dbcsr_conversions.hpp>
 #include <limits>
 
@@ -9,7 +9,7 @@
 
 
 //#ifdef USE_SCALAPACK
-#include "extern/scalapack.h"
+#include "extern/scalapack.hpp"
 //#endif
 
 namespace hf {

@@ -1,4 +1,4 @@
-#include "math/linalg/LLT.h"
+#include "math/linalg/LLT.hpp"
 #include <dbcsr_conversions.hpp>
 
 namespace math {

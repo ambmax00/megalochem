@@ -1,13 +1,13 @@
 #ifndef ADC_ADCMOD_H 
 #define ADC_ADCMOD_H
 
-#include "desc/options.h"
-#include "hf/hf_wfn.h"
-#include "utils/mpi_time.h"
-#include "adc/adc_defaults.h"
-#include "adc/adc_mvp.h"
-#include "utils/registry.h"
-#include "ints/fitting.h"
+#include "desc/options.hpp"
+#include "hf/hf_wfn.hpp"
+#include "utils/mpi_time.hpp"
+#include "adc/adc_defaults.hpp"
+#include "adc/adc_mvp.hpp"
+#include "utils/registry.hpp"
+#include "ints/fitting.hpp"
 #include <dbcsr_matrix.hpp>
 #include <dbcsr_tensor.hpp>
 

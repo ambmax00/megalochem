@@ -3,9 +3,9 @@
 
 #include <dbcsr_matrix_ops.hpp>
 
-#include "utils/mpi_log.h"
-#include "desc/molecule.h"
-#include "ints/aofactory.h"
+#include "utils/mpi_log.hpp"
+#include "desc/molecule.hpp"
+#include "ints/aofactory.hpp"
 #include <utility>
 
 namespace locorb {

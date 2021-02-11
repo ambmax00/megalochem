@@ -1,7 +1,7 @@
 set(SOURCES
-	fockmod.h
+	fockmod.hpp
 	fock_builder.cpp
-	jkbuilder.h
+	jkbuilder.hpp
 	jkcommon.cpp
 	jkexact.cpp
 	jkdf.cpp

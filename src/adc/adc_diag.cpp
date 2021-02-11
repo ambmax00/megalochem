@@ -1,5 +1,5 @@
-#include "adc/adcmod.h"
-#include "ints/aofactory.h"
+#include "adc/adcmod.hpp"
+#include "ints/aofactory.hpp"
 #include <dbcsr_matrix_ops.hpp>
 
 namespace adc {

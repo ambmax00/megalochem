@@ -1,5 +1,5 @@
-#include "locorb/locorb.h"
-#include "math/solvers/diis.h"
+#include "locorb/locorb.hpp"
+#include "math/solvers/diis.hpp"
 
 namespace locorb {
 #if 0

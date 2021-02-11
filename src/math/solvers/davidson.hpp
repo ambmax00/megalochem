@@ -7,8 +7,8 @@
 #include <Eigen/Eigenvalues>
 #include <dbcsr_matrix_ops.hpp>
 #include <dbcsr_conversions.hpp>
-#include "utils/mpi_log.h"
-#include "math/solvers/diis.h"
+#include "utils/mpi_log.hpp"
+#include "math/solvers/diis.hpp"
 
 namespace math {
 

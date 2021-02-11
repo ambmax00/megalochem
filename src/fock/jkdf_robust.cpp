@@ -1,8 +1,8 @@
-#include "fock/jkbuilder.h"
-#include "ints/aofactory.h"
-#include "ints/screening.h"
-#include "math/linalg/SVD.h"
-#include "extern/lapack.h"
+#include "fock/jkbuilder.hpp"
+#include "ints/aofactory.hpp"
+#include "ints/screening.hpp"
+#include "math/linalg/SVD.hpp"
+#include "extern/lapack.hpp"
 #include <Eigen/Core>
 #include <Eigen/SVD>
 

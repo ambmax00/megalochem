@@ -6,9 +6,9 @@
 #include <dbcsr_conversions.hpp>
 #include <dbcsr_btensor.hpp>
 #include <Eigen/Core>
-#include "utils/mpi_time.h"
-#include "utils/ppdirs.h"
-#include "desc/molecule.h"
+#include "utils/mpi_time.hpp"
+#include "utils/ppdirs.hpp"
+#include "desc/molecule.hpp"
 
 namespace mp {
 

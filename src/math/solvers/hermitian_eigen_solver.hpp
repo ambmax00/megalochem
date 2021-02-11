@@ -2,8 +2,8 @@
 #define MATH_HERMITIAN_EIGEN_SOLVER_H
 
 #include <dbcsr_matrix.hpp>
-#include "extern/scalapack.h"
-#include "utils/mpi_log.h"
+#include "extern/scalapack.hpp"
+#include "utils/mpi_log.hpp"
 
 namespace math {
 

@@ -2,10 +2,10 @@
 #define DESC_MOLECULE
 
 #include "utils/params.hpp"
-#include "utils/ppdirs.h"
-#include "desc/atom.h"
-#include "desc/basis.h"
-#include "io/data_handler.h"
+#include "utils/ppdirs.hpp"
+#include "desc/atom.hpp"
+#include "desc/basis.hpp"
+#include "io/data_handler.hpp"
 
 #include <vector>
 #include <mpi.h>

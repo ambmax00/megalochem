@@ -2,8 +2,8 @@
 #define DBCSR_BTENSOR_HPP
 
 #include <dbcsr_tensor_ops.hpp>
-#include "utils/mpi_time.h"
-#include "utils/unique.h"
+#include "utils/mpi_time.hpp"
+#include "utils/unique.hpp"
 
 #include <map>
 #include <mpi.h>

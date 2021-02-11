@@ -1,7 +1,7 @@
-#include "math/linalg/orthogonalizer.h"
-#include "math/solvers/hermitian_eigen_solver.h"
+#include "math/linalg/orthogonalizer.hpp"
+#include "math/solvers/hermitian_eigen_solver.hpp"
 #include <dbcsr_matrix_ops.hpp>
-#include "utils/mpi_log.h"
+#include "utils/mpi_log.hpp"
 
 #include <stdexcept>
 

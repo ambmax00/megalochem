@@ -4,9 +4,9 @@
 #include <string>
 #include <stdexcept>
 
-#include "desc/options.h"
-#include "desc/molecule.h"
-#include "utils/mpi_log.h"
+#include "desc/options.hpp"
+#include "desc/molecule.hpp"
+#include "utils/mpi_log.hpp"
 
 #include "utils/json.hpp"
 

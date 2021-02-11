@@ -1,7 +1,7 @@
-#include "ints/aoloader.h"
-#include "ints/fitting.h"
-#include "math/linalg/LLT.h"
-#include "math/solvers/hermitian_eigen_solver.h"
+#include "ints/aoloader.hpp"
+#include "ints/fitting.hpp"
+#include "math/linalg/LLT.hpp"
+#include "math/solvers/hermitian_eigen_solver.hpp"
 
 namespace ints {
 

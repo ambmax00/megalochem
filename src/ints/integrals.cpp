@@ -1,4 +1,4 @@
-#include "ints/integrals.h"
+#include "ints/integrals.hpp"
 #include <stdexcept>
 #include <map>
 #include <mpi.h>

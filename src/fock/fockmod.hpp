@@ -1,12 +1,12 @@
 #ifndef FOCKMOD_H
 #define FOCKMOD_H
 
-#include "desc/molecule.h"
-#include "desc/options.h"
-#include "utils/mpi_time.h"
-#include "fock/jkbuilder.h"
-#include "ints/fitting.h"
-#include "ints/aoloader.h"
+#include "desc/molecule.hpp"
+#include "desc/options.hpp"
+#include "utils/mpi_time.hpp"
+#include "fock/jkbuilder.hpp"
+#include "ints/fitting.hpp"
+#include "ints/aoloader.hpp"
 #include <dbcsr_matrix.hpp>
 
 namespace fock {

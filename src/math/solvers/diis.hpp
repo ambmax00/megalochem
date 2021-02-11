@@ -7,7 +7,7 @@
 #include <Eigen/QR>
 
 #include <dbcsr_matrix_ops.hpp>
-#include "utils/mpi_log.h"
+#include "utils/mpi_log.hpp"
 
 namespace math {
 

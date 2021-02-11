@@ -1,15 +1,15 @@
 set(SOURCES
-	aofactory.h
+	aofactory.hpp
 	aofactory.cpp
-	integrals.h
+	integrals.hpp
 	integrals.cpp
-	screening.h
+	screening.hpp
 	screening.cpp
-	fitting.h
+	fitting.hpp
 	fitting.cpp
 	fitting_pari.cpp
 	fitting_qr.cpp
-	aoloader.h
+	aoloader.hpp
 	aoloader.cpp
 )
 

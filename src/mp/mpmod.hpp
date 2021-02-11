@@ -1,9 +1,9 @@
 #ifndef MPMOD_H
 #define MPMOD_H
 
-#include "mp/mp_wfn.h"
-#include "desc/options.h"
-#include "utils/mpi_time.h"
+#include "mp/mp_wfn.hpp"
+#include "desc/options.hpp"
+#include "utils/mpi_time.hpp"
 #include <dbcsr_common.hpp>
 
 namespace mp {

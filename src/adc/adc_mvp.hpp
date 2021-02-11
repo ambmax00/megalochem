@@ -3,11 +3,11 @@
 
 #include <dbcsr_matrix_ops.hpp>
 #include <dbcsr_tensor_ops.hpp>
-#include "utils/ppdirs.h"
-#include "desc/options.h"
-#include "fock/jkbuilder.h"
-#include "mp/z_builder.h"
-#include "adc/adc_defaults.h"
+#include "utils/ppdirs.hpp"
+#include "desc/options.hpp"
+#include "fock/jkbuilder.hpp"
+#include "mp/z_builder.hpp"
+#include "adc/adc_defaults.hpp"
 
 namespace adc {
 	

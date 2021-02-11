@@ -1,5 +1,5 @@
-#include "locorb/locorb.h"
-#include "math/linalg/piv_cd.h"
+#include "locorb/locorb.hpp"
+#include "math/linalg/piv_cd.hpp"
 
 namespace locorb {
 

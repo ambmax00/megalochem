@@ -1,4 +1,4 @@
-#include "io/io.h"
+#include "io/io.hpp"
 #include <Eigen/Core>
 
 namespace filio {

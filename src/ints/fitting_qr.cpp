@@ -1,8 +1,8 @@
-#include "ints/fitting.h"
-#include "extern/lapack.h"
-#include "math/solvers/hermitian_eigen_solver.h"
-#include "utils/constants.h"
-#include "utils/scheduler.h"
+#include "ints/fitting.hpp"
+#include "extern/lapack.hpp"
+#include "math/solvers/hermitian_eigen_solver.hpp"
+#include "utils/constants.hpp"
+#include "utils/scheduler.hpp"
 #include <Eigen/Core>
 #include <Eigen/SVD>
 #include <Eigen/Dense>

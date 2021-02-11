@@ -1,4 +1,4 @@
-#include "ints/screening.h"
+#include "ints/screening.hpp"
 #include <dbcsr_matrix_ops.hpp>
 
 namespace ints {

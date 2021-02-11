@@ -5,19 +5,19 @@
 #include <utility>
 #include <cstdlib>
 
-#include "io/io.h"
-#include "io/parser.h"
-#include "io/valid_keys.h"
+#include "io/io.hpp"
+#include "io/parser.hpp"
+#include "io/valid_keys.hpp"
 
-#include "utils/ele_to_int.h"
-#include "utils/constants.h"
+#include "utils/ele_to_int.hpp"
+#include "utils/constants.hpp"
 
-#include "desc/molecule.h"
+#include "desc/molecule.hpp"
 
-#include "math/other/rcm.h"
+#include "math/other/rcm.hpp"
 
 #include <dbcsr_common.hpp>
-#include "ints/aofactory.h"
+#include "ints/aofactory.hpp"
 
 #include <sys/types.h>
 #include <sys/stat.h>

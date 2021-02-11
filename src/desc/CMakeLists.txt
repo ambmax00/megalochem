@@ -6,8 +6,8 @@ configure_file(
 )
 
 set(SOURCES
-	basis.h
-	molecule.h
+	basis.hpp
+	molecule.hpp
 	${CMAKE_CURRENT_BINARY_DIR}/basis.cpp
 	molecule.cpp
 )

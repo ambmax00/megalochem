@@ -1,7 +1,7 @@
 #ifndef MP_MP_WFN_H
 #define MP_MP_WFN_H
 
-#include "hf/hf_wfn.h"
+#include "hf/hf_wfn.hpp"
 
 namespace mp {
 	

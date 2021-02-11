@@ -2,12 +2,12 @@
 #define AOLOADER_H
 
 #include <dbcsr_common.hpp>
-#include "ints/aofactory.h"
-#include "ints/screening.h"
-#include "utils/mpi_time.h"
-#include "utils/registry.h"
-#include "desc/options.h"
-#include "desc/molecule.h"
+#include "ints/aofactory.hpp"
+#include "ints/screening.hpp"
+#include "utils/mpi_time.hpp"
+#include "utils/registry.hpp"
+#include "desc/options.hpp"
+#include "desc/molecule.hpp"
 
 namespace ints {
 

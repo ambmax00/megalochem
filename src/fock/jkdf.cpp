@@ -1,9 +1,9 @@
-#include "fock/jkbuilder.h"
-#include "fock/fock_defaults.h"
-#include "ints/fitting.h"
-#include "math/linalg/LLT.h"
-#include "math/linalg/piv_cd.h"
-#include "math/linalg/SVD.h"
+#include "fock/jkbuilder.hpp"
+#include "fock/fock_defaults.hpp"
+#include "ints/fitting.hpp"
+#include "math/linalg/LLT.hpp"
+#include "math/linalg/piv_cd.hpp"
+#include "math/linalg/SVD.hpp"
 #include <dbcsr_tensor_ops.hpp>
 
 namespace fock {

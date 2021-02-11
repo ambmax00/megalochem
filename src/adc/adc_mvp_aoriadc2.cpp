@@ -1,10 +1,10 @@
-#include "adc/adc_mvp.h"
-#include "math/laplace/laplace.h"
-#include "math/linalg/piv_cd.h"
-#include "math/linalg/LLT.h"
-#include "adc/adc_defaults.h"
-#include "ints/fitting.h"
-#include "utils/matrix_plot.h"
+#include "adc/adc_mvp.hpp"
+#include "math/laplace/laplace.hpp"
+#include "math/linalg/piv_cd.hpp"
+#include "math/linalg/LLT.hpp"
+#include "adc/adc_defaults.hpp"
+#include "ints/fitting.hpp"
+#include "utils/matrix_plot.hpp"
 
 //#define _DLOG
 
