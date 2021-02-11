@@ -12,12 +12,13 @@ Coming soon...
 Currently depends on:
 
 ```
-libint2
-ScaLAPACK
-DBCSR (fork)
+libcint >= 4.0.7 
+ScaLAPACK (>= 2.0 for reference ScaLAPACK)
+HDF5 (with parallel libraries enabled)
+DBCSR (fork from ambmax00)
 fypp (Fortran preprocessor)
+python >= 3.6
 ```
-Exact versions are going to follow
 
 ### Installing
 
@@ -29,10 +30,10 @@ pkg-config libxsmm --libs
 
 CMAKE_PREFIX_PATH=/my/dbcsr/install/location/usr/local/lib/cmake
 cmake 
-    -DLibint2_DIR=(mylibint2_dir) 
+    -DLIBCINT_DIR=(mylibcint_dir) 
     -DSCALAPACK_DIR=(myscalapack_dir)  
-    -DCMAKE_C_COMPILER=(gcc/icc ...) 
     -DCMAKE_CXX_COMPILER=(g++/icpc ...)
+    -DMPI_CXX_COMPILER=(mpic++,...)
     -DMPI_VENDOR=(openmpi/intelmpi ...)
     -DCMAKE_Fortran_COMPILER=(gfortran/ifort)
     -DEigen3_DIR=(Eigen3_dir) 
@@ -43,7 +44,7 @@ Compilers need MPI/OpenMP support. C++ needs to have at least C++17 standard.
 
 ## Implemented
 
-* Hartree Fock (exact/df/df-mem/pari)
+* Hartree Fock (exact/df/df-mem/pari/lmo)
 * MP2 (SOS-AOMP2)
 * ADC (AO-ADC1, SOS-AO-ADC2)
 

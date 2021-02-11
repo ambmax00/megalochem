@@ -14,7 +14,6 @@
 //                       LIBCINT
 // =====================================================================
 
-#ifdef USE_LIBCINT
 extern "C" {
 #include <cint.h>
 
@@ -88,5 +87,4 @@ void calc_ints_schwarz_x(dbcsr::mat_d& m_out, std::vector<std::vector<int>*> she
 
 } // end namespace
 
-#endif // USE_LIBCINT
 #endif // INTS_INTEGRALS_H

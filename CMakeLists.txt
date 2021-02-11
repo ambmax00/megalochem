@@ -31,6 +31,7 @@ find_library(LIBCINT_LIBRARIES
 	PATHS ${LIBCINT_DIR}/lib/
 	REQUIRED
 )
+
 set(LIBCINT_INCLUDE_DIRS ${LIBCINT_DIR}/include/)
 message(STATUS "Found libcint: ${LIBCINT_LIBRARIES}")
 message(STATUS "Include directories: ${LIBCINT_INCLUDE_DIRS}")
