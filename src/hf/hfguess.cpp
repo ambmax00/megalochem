@@ -229,17 +229,17 @@ void hfmod::compute_guess() {
 			
 			bool spinav = m_opt.get<bool>("SAD_spin_average",HF_SAD_SPIN_AVERAGE);
 			
-			desc::smolecule at_smol = desc::create_molecule()
+			desc::shared_molecule at_smol = desc::molecule::create()
 				.comm(mycomm)
 				.name(name)
-				.basis(at_basis)
+				.cluster_basis(at_basis)
 				.atoms(atvec)
 				.charge(charge)
 				.mo_split(10)
 				.mult(mult)
 				.fractional(true)
 				.spin_average(spinav)
-				.get();
+				.build();
 				
 			if (at_dfbasis) at_smol->set_cluster_dfbasis(at_dfbasis);
 								

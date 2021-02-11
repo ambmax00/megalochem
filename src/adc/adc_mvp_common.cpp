@@ -37,7 +37,7 @@ smat u_transform(smat& u, char to, smat& c_bo, char tv, smat& c_bv) {
 	
 }
 	
-MVP::MVP(dbcsr::world w, desc::smolecule smol, int nprint, std::string name) :
+MVP::MVP(dbcsr::world w, desc::shared_molecule smol, int nprint, std::string name) :
 	m_world(w), m_mol(smol), 
 	LOG(w.comm(), nprint),
 	TIME(w.comm(), name)

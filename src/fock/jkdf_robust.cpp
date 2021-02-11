@@ -8,7 +8,7 @@
 
 namespace fock {
 
-DFROBUST_K::DFROBUST_K(dbcsr::world w, desc::smolecule mol, int print) 
+DFROBUST_K::DFROBUST_K(dbcsr::world w, desc::shared_molecule mol, int print) 
 	: K(w,mol,print,"PARI-K") {}
 
 void DFROBUST_K::init() {

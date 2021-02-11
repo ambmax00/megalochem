@@ -23,46 +23,43 @@ static const std::vector<int> reference_S = {  0,
 
 static const std::vector<int> conf_orb = {0, 2, 10, 18, 36, 54, 86, 118};
 
-smolecule create_mol_base::get() {
+molecule::molecule(molecule::create_pack&& p) {
 		
-	smolecule smol = std::make_shared<molecule>();
-	
-	smol->m_comm = *c_comm;
-	smol->m_name = *c_name;
-	smol->m_mult = *c_mult;
-	smol->m_charge = *c_charge;
-	smol->m_mo_split = (c_mo_split) ? *c_mo_split : MOLECULE_MO_SPLIT;
-	smol->m_atoms = *c_atoms;
-	smol->m_cluster_basis = c_basis;
-	smol->m_cluster_dfbasis = c_dfbasis;
+	m_comm = p.p_comm;
+	m_name = p.p_name;
+	m_mult = p.p_mult;
+	m_charge = p.p_charge;
+	m_mo_split = (p.p_mo_split) ? *p.p_mo_split : MOLECULE_MO_SPLIT;
+	m_atoms = p.p_atoms;
+	m_cluster_basis = p.p_cluster_basis;
 	
 	// secondly: occ/virt info
 	
-	smol->m_frac = (c_fractional) ? *c_fractional : false;
+	m_frac = (p.p_fractional) ? *p.p_fractional : false;
 	
-	if (smol->m_frac) {
+	if (m_frac) {
 		
-		if (smol->m_atoms.size() != 1) 
+		if (m_atoms.size() != 1) 
 			throw std::runtime_error("Fractional Occupation only for single atoms for now.");
 		
 		// occupied/virtual info
-		int Z = smol->m_atoms[0].atomic_number;
+		int Z = m_atoms[0].atomic_number;
 		
-		int nbas = smol->m_cluster_basis->nbf();
+		int nbas = m_cluster_basis->nbf();
 		
 		// total number of electrons
-		smol->m_nele = Z - smol->m_charge;
+		m_nele = Z - m_charge;
 		
-		smol->m_mult = reference_S[Z]; // mult is overwritten
+		m_mult = reference_S[Z]; // mult is overwritten
 		
-		if ((c_spin_average) ? *c_spin_average : true) {
+		if ((p.p_spin_average) ? *p.p_spin_average : true) {
 			
-			smol->m_nele_alpha = smol->m_nele_beta = 0.5 * smol->m_nele;
+			m_nele_alpha = m_nele_beta = 0.5 * m_nele;
 			
 		} else {
 			
-			smol->m_nele_alpha = 0.5 * (smol->m_nele + smol->m_mult);
-			smol->m_nele_beta = 0.5 * (smol->m_nele - smol->m_mult);
+			m_nele_alpha = 0.5 * (m_nele + m_mult);
+			m_nele_beta = 0.5 * (m_nele - m_mult);
 		
 		}
 		
@@ -80,51 +77,50 @@ smolecule create_mol_base::get() {
 			nact = (*(++nlimit)) / 2 - ncore;
 		}
 	
-		smol->m_nocc_alpha = smol->m_nocc_beta = nact + ncore;
+		m_nocc_alpha = m_nocc_beta = nact + ncore;
 		
-		double nfraca = sqrt(((double)smol->m_nele_alpha - (double)ncore)/(double)nact);
-		double nfracb = sqrt(((double)smol->m_nele_beta - (double)ncore)/(double)nact);
+		double nfraca = sqrt(((double)m_nele_alpha - (double)ncore)/(double)nact);
+		double nfracb = sqrt(((double)m_nele_beta - (double)ncore)/(double)nact);
 		
-		smol->m_nvir_alpha= smol->m_nvir_beta = nbas - smol->m_nocc_alpha;
+		m_nvir_alpha= m_nvir_beta = nbas - m_nocc_alpha;
 		
 		// form scaled occupation vector
-		std::vector<double> occ_a(smol->m_nocc_alpha, 1.0);
-		std::vector<double> occ_b(smol->m_nocc_beta, 1.0);
+		std::vector<double> occ_a(m_nocc_alpha, 1.0);
+		std::vector<double> occ_b(m_nocc_beta, 1.0);
 		
-		for (size_t i = ncore; i < smol->m_nocc_alpha; ++i) occ_a[i] = nfraca;
-		for (size_t i = ncore; i < smol->m_nocc_beta; ++i) occ_b[i] = nfracb;
+		for (size_t i = ncore; i < m_nocc_alpha; ++i) occ_a[i] = nfraca;
+		for (size_t i = ncore; i < m_nocc_beta; ++i) occ_b[i] = nfracb;
 		
-		smol->m_frac_occ_alpha = occ_a;
-		smol->m_frac_occ_beta = occ_b;
+		m_frac_occ_alpha = occ_a;
+		m_frac_occ_beta = occ_b;
 		
 	} else {
 		
-		int nbas = smol->m_cluster_basis->nbf();
+		int nbas = m_cluster_basis->nbf();
 	
 		// total number of electrons
-		smol->m_nele = 0;
-		for (int i = 0; i != smol->m_atoms.size(); ++i) {
-			smol->m_nele += smol->m_atoms[i].atomic_number;
+		m_nele = 0;
+		for (int i = 0; i != m_atoms.size(); ++i) {
+			m_nele += m_atoms[i].atomic_number;
 		}
 		
-		smol->m_nele -= smol->m_charge;
-		int nue = smol->m_mult - 1; // number of unpaired electrons
+		m_nele -= m_charge;
+		int nue = m_mult - 1; // number of unpaired electrons
 			
-		if ((smol->m_nele - nue) % 2 != 0) 
+		if ((m_nele - nue) % 2 != 0) 
 			throw std::runtime_error("Mult not compatible with charge.");
 			
-		smol->m_nele_alpha = smol->m_nocc_alpha = (smol->m_nele - nue) / 2 + nue;
-		smol->m_nele_beta = smol->m_nocc_beta = (smol->m_nele - nue) / 2;
+		m_nele_alpha = m_nocc_alpha = (m_nele - nue) / 2 + nue;
+		m_nele_beta = m_nocc_beta = (m_nele - nue) / 2;
 			
-		smol->m_nvir_alpha = nbas - smol->m_nocc_alpha;
-		smol->m_nvir_beta = nbas - smol->m_nocc_beta;
+		m_nvir_alpha = nbas - m_nocc_alpha;
+		m_nvir_beta = nbas - m_nocc_beta;
 	
 	}
 	
-	molecule::block_sizes blks(*smol, smol->m_mo_split);
+	molecule::block_sizes blks(*this, m_mo_split);
 	
-	smol->m_blocks = blks;
-	return smol;
+	m_blocks = blks;
 	
 }
 

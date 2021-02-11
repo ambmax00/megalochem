@@ -50,7 +50,7 @@ private:
 	
 public:
 
-	aofactory(desc::smolecule mol, dbcsr::world& w);
+	aofactory(desc::shared_molecule mol, dbcsr::world& w);
 	~aofactory();
 	
 	dbcsr::shared_matrix<double> ao_overlap();
@@ -90,7 +90,7 @@ public:
 	std::function<void(dbcsr::shared_tensor<3,double>&,vec<vec<int>>&)>
 	get_generator(std::shared_ptr<screener> s_scr);
 	
-	desc::smolecule mol();
+	desc::shared_molecule mol();
 	
 		
 }; // end class aofactory

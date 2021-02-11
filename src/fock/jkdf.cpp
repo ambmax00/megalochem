@@ -8,7 +8,7 @@
 
 namespace fock {
 
-DF_J::DF_J(dbcsr::world w, desc::smolecule mol, int print) 
+DF_J::DF_J(dbcsr::world w, desc::shared_molecule mol, int print) 
 	: J(w,mol,print,"DF_J") {} 
 
 void DF_J::init() {
@@ -187,7 +187,7 @@ void DF_J::compute_J() {
 	
 }
 
-DFMO_K::DFMO_K(dbcsr::world w, desc::smolecule mol, int print)
+DFMO_K::DFMO_K(dbcsr::world w, desc::shared_molecule mol, int print)
 	: K(w,mol,print,"DFMO_K") {}
 
 void DFMO_K::init() {
@@ -444,7 +444,7 @@ void DFMO_K::compute_K() {
 		
 }
 
-DFAO_K::DFAO_K(dbcsr::world w, desc::smolecule mol, int print)
+DFAO_K::DFAO_K(dbcsr::world w, desc::shared_molecule mol, int print)
 	: K(w,mol,print,"DFAO_K") {}
 void DFAO_K::init() {
 	
@@ -629,7 +629,7 @@ void DFAO_K::compute_K() {
 			
 }
 
-DFMEM_K::DFMEM_K(dbcsr::world w, desc::smolecule mol, int print)
+DFMEM_K::DFMEM_K(dbcsr::world w, desc::shared_molecule mol, int print)
 	: K(w,mol,print,"DFMEM_K") {}
 void DFMEM_K::init() {
 	
@@ -860,7 +860,7 @@ void DFMEM_K::compute_K() {
 			
 }
 
-DFLMO_K::DFLMO_K(dbcsr::world w, desc::smolecule mol, int print)
+DFLMO_K::DFLMO_K(dbcsr::world w, desc::shared_molecule mol, int print)
 	: K(w,mol,print,"DFLMO_K") {}
 void DFLMO_K::init() {
 	

@@ -12,7 +12,7 @@
 
 namespace filio {
 
-desc::smolecule parse_molecule(nlohmann::json& j, MPI_Comm comm, int nprint);
+desc::shared_molecule parse_molecule(nlohmann::json& j, MPI_Comm comm, int nprint);
 
 desc::options parse_options(nlohmann::json& j, MPI_Comm comm, int nprint);
 

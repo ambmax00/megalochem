@@ -37,7 +37,7 @@ class Z {
 protected:
 
 	dbcsr::world m_world;
-	desc::smolecule m_mol;
+	desc::shared_molecule m_mol;
 	util::mpi_log LOG;
 	util::mpi_time TIME;
 	
@@ -55,7 +55,7 @@ protected:
 
 public:
 
-	Z(dbcsr::world w, desc::smolecule smol, int nprint, std::string mname) : 
+	Z(dbcsr::world w, desc::shared_molecule smol, int nprint, std::string mname) : 
 		m_world(w),
 		m_mol(smol),
 		LOG(m_world.comm(), nprint),
@@ -117,7 +117,7 @@ private:
 	
 public:
 
-	LLMP_FULL_Z(dbcsr::world w, desc::smolecule smol, int nprint) :
+	LLMP_FULL_Z(dbcsr::world w, desc::shared_molecule smol, int nprint) :
 		Z(w,smol,nprint,"LLMP_FULL") {}
 
 	void init() override;
@@ -132,7 +132,7 @@ MAKE_STRUCT(
 	LLMP_FULL_Z, Z,
 	(
 		(world, (dbcsr::world)),
-		(mol, (desc::smolecule)),
+		(mol, (desc::shared_molecule)),
 		(print, (int))
 	),
 	(
@@ -157,7 +157,7 @@ private:
 	
 public:
 
-	LL_Z(dbcsr::world w, desc::smolecule smol, int nprint) :
+	LL_Z(dbcsr::world w, desc::shared_molecule smol, int nprint) :
 		Z(w,smol,nprint,"LL") {}
 
 	void init() override;
@@ -172,7 +172,7 @@ MAKE_STRUCT(
 	LL_Z, Z,
 	(
 		(world, (dbcsr::world)),
-		(mol, (desc::smolecule)),
+		(mol, (desc::shared_molecule)),
 		(print, (int))
 	),
 	(
@@ -196,7 +196,7 @@ private:
 	
 public:
 
-	LLMP_MEM_Z(dbcsr::world w, desc::smolecule smol, int nprint) :
+	LLMP_MEM_Z(dbcsr::world w, desc::shared_molecule smol, int nprint) :
 		Z(w,smol,nprint,"LLMP_MEM") {}
 
 	void init() override;
@@ -211,7 +211,7 @@ MAKE_STRUCT(
 	LLMP_MEM_Z, Z,
 	(
 		(world, (dbcsr::world)),
-		(mol, (desc::smolecule)),
+		(mol, (desc::shared_molecule)),
 		(print, (int))
 	),
 	(
@@ -234,7 +234,7 @@ private:
 	
 public:
 
-	LLMP_ASYM_Z(dbcsr::world w, desc::smolecule& smol, int nprint) :
+	LLMP_ASYM_Z(dbcsr::world w, desc::shared_molecule& smol, int nprint) :
 		Z(w,smol,nprint,"LLMP_MEM") {}
 
 	void init() override;
@@ -248,7 +248,7 @@ MAKE_STRUCT(
 	LLMP_ASYM_Z, Z,
 	(
 		(world, (dbcsr::world)),
-		(mol, (desc::smolecule)),
+		(mol, (desc::shared_molecule)),
 		(print, (int))
 	),
 	(

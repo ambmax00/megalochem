@@ -172,7 +172,7 @@ std::shared_ptr<MVP> adcmod::create_adc1() {
 
 std::shared_ptr<MVP> adcmod::create_adc2(std::optional<canon_lmo> clmo) {
 	
-	desc::smolecule mol;
+	desc::shared_molecule mol;
 	std::shared_ptr<std::vector<double>> eps_o, eps_v;
 	dbcsr::shared_matrix<double> v_xx, s_bb, c_bo, c_bv;
 	dbcsr::sbtensor<3,double> eri3c2e, fitting;

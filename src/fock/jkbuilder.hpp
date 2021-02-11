@@ -58,7 +58,7 @@ inline kmethod str_to_kmethod(std::string s) {
 class JK_common {
 protected:
 	
-	desc::smolecule m_mol;
+	desc::shared_molecule m_mol;
 	dbcsr::world m_world;
 		
 	util::mpi_log LOG;
@@ -76,7 +76,7 @@ protected:
 		
 public:
 	
-	JK_common(dbcsr::world w, desc::smolecule smol, int print, std::string name);
+	JK_common(dbcsr::world w, desc::shared_molecule smol, int print, std::string name);
 	void set_density_alpha(dbcsr::shared_matrix<double>& ipA) { m_p_A = ipA; }
 	void set_density_beta(dbcsr::shared_matrix<double>& ipB) { m_p_B = ipB; }
 	void set_coeff_alpha(dbcsr::shared_matrix<double>& icA) { m_c_A = icA; }
@@ -108,7 +108,7 @@ protected:
 		
 public:
 	
-	J(dbcsr::world w, desc::smolecule smol, int print, std::string name) 
+	J(dbcsr::world w, desc::shared_molecule smol, int print, std::string name) 
 		: JK_common(w,smol,print,name) {}
 	virtual ~J() {}
 	virtual void compute_J() = 0;
@@ -129,7 +129,7 @@ protected:
 		
 public:
 	
-	K(dbcsr::world w, desc::smolecule smol, int print, std::string name) 
+	K(dbcsr::world w, desc::shared_molecule smol, int print, std::string name) 
 		: JK_common(w,smol,print,name) {}
 	virtual ~K() {}
 	virtual void compute_K() = 0;
@@ -157,7 +157,7 @@ private:
 
 public:
 	
-	EXACT_J(dbcsr::world w, desc::smolecule smol, int print);
+	EXACT_J(dbcsr::world w, desc::shared_molecule smol, int print);
 	void compute_J() override;
 	void init() override;
 	
@@ -167,7 +167,7 @@ MAKE_STRUCT(
 	EXACT_J, J,
 	(
 		(world, (dbcsr::world)),
-		(mol, (desc::smolecule)),
+		(mol, (desc::shared_molecule)),
 		(print, (int))
 	),
 	(
@@ -188,7 +188,7 @@ private:
 	
 public:
 
-	EXACT_K(dbcsr::world w, desc::smolecule smol, int print);
+	EXACT_K(dbcsr::world w, desc::shared_molecule smol, int print);
 	void compute_K() override;
 	void init() override;
 	
@@ -198,7 +198,7 @@ MAKE_STRUCT(
 	EXACT_K, K,
 	(
 		(world, (dbcsr::world)),
-		(mol, (desc::smolecule)),
+		(mol, (desc::shared_molecule)),
 		(print, (int))
 	),
 	(
@@ -226,7 +226,7 @@ private:
 
 public:
 
-	DF_J(dbcsr::world w, desc::smolecule smol, int print);
+	DF_J(dbcsr::world w, desc::shared_molecule smol, int print);
 	void compute_J() override;
 	void init() override;
 	
@@ -238,7 +238,7 @@ MAKE_STRUCT(
 	DF_J, J,
 	(
 		(world, (dbcsr::world)),
-		(mol, (desc::smolecule)),
+		(mol, (desc::shared_molecule)),
 		(print, (int))
 	),
 	(
@@ -270,7 +270,7 @@ private:
 	
 public:
 
-	DFMO_K(dbcsr::world w, desc::smolecule smol, int print);
+	DFMO_K(dbcsr::world w, desc::shared_molecule smol, int print);
 	void compute_K() override;
 	void init() override;
 	
@@ -282,7 +282,7 @@ MAKE_STRUCT(
 	DFMO_K, K,
 	(
 		(world, (dbcsr::world)),
-		(mol, (desc::smolecule)),
+		(mol, (desc::shared_molecule)),
 		(print, (int))
 	),
 	(
@@ -312,7 +312,7 @@ private:
 	
 public:
 
-	DFAO_K(dbcsr::world w, desc::smolecule smol, int print);
+	DFAO_K(dbcsr::world w, desc::shared_molecule smol, int print);
 	void compute_K() override;
 	void init() override;
 	
@@ -324,7 +324,7 @@ MAKE_STRUCT(
 	DFAO_K, K,
 	(
 		(world, (dbcsr::world)),
-		(mol, (desc::smolecule)),
+		(mol, (desc::shared_molecule)),
 		(print, (int))
 	),
 	(
@@ -358,7 +358,7 @@ private:
 	
 public:
 
-	DFROBUST_K(dbcsr::world w, desc::smolecule smol, int print);
+	DFROBUST_K(dbcsr::world w, desc::shared_molecule smol, int print);
 	void compute_K() override;
 	void init() override;
 	
@@ -370,7 +370,7 @@ MAKE_STRUCT(
 	DFROBUST_K, K,
 	(
 		(world, (dbcsr::world)),
-		(mol, (desc::smolecule)),
+		(mol, (desc::shared_molecule)),
 		(print, (int))
 	),
 	(
@@ -407,7 +407,7 @@ private:
 	
 public:
 
-	DFMEM_K(dbcsr::world w, desc::smolecule smol, int print);
+	DFMEM_K(dbcsr::world w, desc::shared_molecule smol, int print);
 	void compute_K() override;
 	void init() override;
 	
@@ -419,7 +419,7 @@ MAKE_STRUCT(
 	DFMEM_K, K,
 	(
 		(world, (dbcsr::world)),
-		(mol, (desc::smolecule)),
+		(mol, (desc::shared_molecule)),
 		(print, (int))
 	),
 	(
@@ -446,7 +446,7 @@ private:
 	
 public:
 
-	DFLMO_K(dbcsr::world w, desc::smolecule smol, int print);
+	DFLMO_K(dbcsr::world w, desc::shared_molecule smol, int print);
 	void compute_K() override;
 	void init() override;
 	
@@ -458,7 +458,7 @@ MAKE_STRUCT(
 	DFLMO_K, K,
 	(
 		(world, (dbcsr::world)),
-		(mol, (desc::smolecule)),
+		(mol, (desc::shared_molecule)),
 		(print, (int))
 	),
 	(
@@ -586,7 +586,7 @@ inline void load_kints(kmethod kmet, ints::metric metr, ints::aoloader& ao) {
 class create_j_base {
 
 	make_param(create_j_base, world, dbcsr::world, required, val)
-	make_param(create_j_base, mol, desc::smolecule, required, val)
+	make_param(create_j_base, mol, desc::shared_molecule, required, val)
 	make_param(create_j_base, method, jmethod, required, val)
 	make_param(create_j_base, aoloader, ints::aoloader, required, ref)
 	make_param(create_j_base, print, int, optional, val)
@@ -656,7 +656,7 @@ inline create_j_base create_j() { return create_j_base(); }
 class create_k_base {
 
 	make_param(create_k_base, world, dbcsr::world, required, val)
-	make_param(create_k_base, mol, desc::smolecule, required, val)
+	make_param(create_k_base, mol, desc::shared_molecule, required, val)
 	make_param(create_k_base, method, kmethod, required, val)
 	make_param(create_k_base, aoloader, ints::aoloader, required, ref)
 	make_param(create_k_base, print, int, optional, val)

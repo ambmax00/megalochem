@@ -1,6 +1,8 @@
 #ifndef DESC_MOLECULE
 #define DESC_MOLECULE
 
+#:include "megalochem.fypp"
+
 #include "utils/params.hpp"
 #include "utils/ppdirs.hpp"
 #include "desc/atom.hpp"
@@ -151,6 +153,22 @@ protected:
 	
 public:
 
+#:set list = [&
+	['comm', 'MPI_Comm', _REQ, _VAL],&
+	['name', 'std::string', _REQ, _VAL],&
+	['atoms', 'std::vector<Atom>', _REQ, _VAL],&
+	['charge', 'int', _REQ, _VAL],&
+	['mult', 'int', _REQ, _VAL],&
+	['mo_split', 'int', _OPT, _VAL],&
+	['fractional', 'bool', _OPT, _VAL],&
+	['spin_average', 'bool', _OPT, _VAL],&
+	['cluster_basis', 'shared_cluster_basis', _REQ, _VAL]]
+
+${_MAKE_PARAM_STRUCT('create', list)}$
+${_MAKE_BUILDER_CLASS('molecule', 'create', list, True)}$
+
+	molecule(create_pack&& p);
+	
 	molecule() {}
 	
 	~molecule() {}
@@ -232,42 +250,7 @@ public:
 
 };
 
-using smolecule = std::shared_ptr<molecule>;
-
-class create_mol_base {
-private:
-
-	shared_cluster_basis c_basis;
-	shared_cluster_basis c_dfbasis;
-	
-	make_param(create_mol_base,comm,MPI_Comm,required,val)
-	make_param(create_mol_base,name,std::string,required,val)
-	make_param(create_mol_base,atoms,std::vector<Atom>,required,ref)
-	make_param(create_mol_base,charge,int,required,val)
-	make_param(create_mol_base,mult,int,required,val)
-	make_param(create_mol_base,mo_split,int,optional,val)
-	make_param(create_mol_base,fractional,bool,optional,val)
-	make_param(create_mol_base,spin_average,bool,optional,val)
-
-public:
-
-	create_mol_base() {}
-
-	create_mol_base& basis(shared_cluster_basis& t_basis) {
-		c_basis = t_basis; return *this;
-	}
-	
-	create_mol_base& dfbasis(shared_cluster_basis& t_dfbasis) {
-		c_dfbasis = t_dfbasis; return *this;
-	}
-	
-	smolecule get();
-	
-};
-
-inline create_mol_base create_molecule() {
-	return create_mol_base();
-}
+using shared_molecule = std::shared_ptr<molecule>;
 
 inline void write_molecule(std::string name, desc::molecule& mol, filio::data_handler& dh) {
 

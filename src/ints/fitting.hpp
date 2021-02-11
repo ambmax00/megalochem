@@ -17,13 +17,13 @@ class dfitting {
 private:
 
 	dbcsr::world m_world;
-	desc::smolecule m_mol;
+	desc::shared_molecule m_mol;
 	util::mpi_log LOG;
 	util::mpi_time TIME;
 
 public:
 
-	dfitting(dbcsr::world w, desc::smolecule smol, int print = 0) :
+	dfitting(dbcsr::world w, desc::shared_molecule smol, int print = 0) :
 		m_world(w),
 		m_mol(smol),
 		LOG(w.comm(), print),

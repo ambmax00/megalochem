@@ -5,7 +5,7 @@
 
 namespace fock {
 	
-JK_common::JK_common(dbcsr::world w, desc::smolecule mol, int print, std::string name) :
+JK_common::JK_common(dbcsr::world w, desc::shared_molecule mol, int print, std::string name) :
 	m_world(w), m_mol(mol),
 	LOG(m_world.comm(),print),
 	TIME(m_world.comm(), name, print) {}

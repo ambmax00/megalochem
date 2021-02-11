@@ -20,7 +20,7 @@ class hfmod {
 private:
 	
 	// descriptors
-	desc::smolecule m_mol;
+	desc::shared_molecule m_mol;
 	desc::options m_opt;
 	dbcsr::world m_world;
 	util::mpi_log LOG;
@@ -71,7 +71,7 @@ private:
 
 public:
 
-	hfmod(dbcsr::world wrd, desc::smolecule mol, desc::options opt);
+	hfmod(dbcsr::world wrd, desc::shared_molecule mol, desc::options opt);
 	
 	hfmod() = delete;
 	hfmod(hfmod& hfmod_in) = delete;

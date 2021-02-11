@@ -9,7 +9,7 @@
 
 namespace fock {
 	
-fockmod::fockmod (dbcsr::world iworld, desc::smolecule imol, desc::options iopt) :
+fockmod::fockmod (dbcsr::world iworld, desc::shared_molecule imol, desc::options iopt) :
 	m_world(iworld),
 	m_mol(imol),
 	m_opt(iopt),

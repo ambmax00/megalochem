@@ -91,3 +91,144 @@ $:    ", ".join([name + "(" + ":," * ndim_pre + str(i) + ",:"*ndim_post + ")" fo
 #:enddef
 
 #:endmute
+
+#include <memory>
+#include <optional>
+#include <functional>
+
+#:mute
+
+#:set _REQ = "required"
+#:set _OPT = "optional"
+#:set _VAL = "val"
+#:set _REF = "ref"
+
+#:def _TYPE_FULL(type,reqopt,refval,wrapper)
+    #:if reqopt == "required" and refval == "ref"
+		#:if not wrapper
+		$:	type + "&"
+		#:else
+		$: "std::reference_wrapper<" + type + ">"
+		#:endif
+	#:elif reqopt == "required" and refval == "val"
+		$: type
+	#:elif reqopt == "optional" and refval == "ref"
+		$: "std::optional<std::reference_wrapper<" + type + ">>"
+	#:elif reqopt == "optional" and refval == "val"
+		$: "std::optional<" + type + ">"
+	#:else
+		#:stop 'Unknown value in _TYPE_FULL'
+	#:endif
+#:enddef
+
+#:def _TYPE_BUILDER(type,refval)
+    #:if refval == "ref"
+	$:	"std::optional<std::reference_wrapper<" + type + ">>"
+	#:elif refval == "val"
+	$:	"std::optional<" + type + ">"
+	#:else
+		#:stop 'Unknown value in _TYPE_BUILDER'
+	#:endif
+#:enddef
+
+#:def _TYPE_SIMPLE(type,refval)
+	#:if refval == "ref"
+	$: type + "&"
+	#:else
+	$: type
+	#:endif
+#:enddef
+
+#:def _MAKE_CLASS_MEMBERS(params)
+private:
+	#:for name,type,reqopt,refval in params
+	${_TYPE_FULL(type,reqopt,refval,False)}$ m_${name}$;
+	#:endfor
+#:enddef
+
+#:def _MAKE_INIT_FROM_STRUCT(params)
+$: ", ".join(["m_" + name + "(p.p_" + name + ")" &
+	for name,type,reqopt,refval in params])
+#:enddef
+
+#:def _MAKE_PARAM_STRUCT(structname, params)
+private:
+	struct ${structname}$_pack {
+	#:for name,type,reqopt,refval in params
+		${_TYPE_FULL(type,reqopt,refval,False)}$ p_${name}$;
+	#:endfor
+	};
+#:enddef
+
+#:def _MAKE_BUILDER_CLASS(classname, structname, params, pointer)
+private:
+	
+	class ${structname}$_base {
+	private:
+	#:for name,type,reqopt,refval in params
+		${_TYPE_BUILDER(type,refval)}$ c_${name}$;
+	#:endfor 
+	
+	public:
+	#:for name,type,reqopt,refval in params
+		inline ${structname}$_base& 
+		${name}$(${_TYPE_SIMPLE(type,refval)}$ i_${name}$) {
+			c_${name}$.emplace(i_${name}$);
+			return *this;
+		}
+	#:endfor
+		
+		${structname}$_base() = default;
+		~${structname}$_base() {}
+ 
+	#:if pointer == True
+		std::shared_ptr<${classname}$>
+	#:else
+		${classname}$
+	#:endif
+		build() {
+	
+			#:for name,type,reqopt,refval in params
+			#:if reqopt == "required"
+			if (!c_${name}$) {
+				throw std::runtime_error(
+				"${classname}$ builder \"${structname}$\" requires ${name}$!");
+			}
+			#:endif
+			#:endfor
+			
+			${structname}$_pack p = {
+			#:for ii in range(0,len(params))
+			#:set delim = ','
+			#:if ii == len(params) - 1
+				#:set delim = ''
+			#:endif
+			#:set name,type,reqopt,reval = params[ii]
+			#:if reqopt == "required"
+				*c_${name}$${delim}$
+			#:else
+				(c_${name}$) ? c_${name}$ : std::nullopt${delim}$
+			#:endif
+			#:endfor
+			};
+		
+			#:if pointer == True
+			auto out = new ${classname}$(std::move(p));
+			return std::shared_ptr<${classname}$>(out);
+			#:else
+			auto out = ${classname}$(std::move(p));
+			return out;
+			#:endif
+		}
+		
+	};
+	
+public:
+
+	static ${structname}$_base ${structname}$() { return ${structname}$_base(); }
+
+	
+
+#:enddef
+#:endmute
+

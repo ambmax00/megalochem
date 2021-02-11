@@ -37,7 +37,7 @@ class MVP {
 protected:
 
 	dbcsr::world m_world;
-	desc::smolecule m_mol;
+	desc::shared_molecule m_mol;
 	
 	util::mpi_log LOG;
 	util::mpi_time TIME;
@@ -46,7 +46,7 @@ protected:
 
 public:
 
-	MVP(dbcsr::world w, desc::smolecule smol, int nprint, std::string name);
+	MVP(dbcsr::world w, desc::shared_molecule smol, int nprint, std::string name);
 		
 	virtual smat compute(smat u_ia, double omega = 0.0) = 0;
 	
@@ -83,7 +83,7 @@ private:
 
 public:
 
-	MVP_AOADC1(dbcsr::world w, desc::smolecule smol, int nprint) : 
+	MVP_AOADC1(dbcsr::world w, desc::shared_molecule smol, int nprint) : 
 		MVP(w,smol,nprint,"MVP_AOADC1") {}
 		
 	void init() override;
@@ -105,7 +105,7 @@ MAKE_STRUCT(
 	MVP_AOADC1, MVP,
 	(
 		(world, (dbcsr::world)),
-		(mol, (desc::smolecule)),
+		(mol, (desc::shared_molecule)),
 		(print, (int))
 	),
 	(
@@ -232,7 +232,7 @@ private:
 
 public:
 
-	MVP_AOADC2(dbcsr::world w, desc::smolecule smol, int nprint) : 
+	MVP_AOADC2(dbcsr::world w, desc::shared_molecule smol, int nprint) : 
 		MVP(w,smol,nprint,"MVP_AOADC2") {}
 		
 	void init() override;
@@ -249,7 +249,7 @@ MAKE_STRUCT(
 	MVP_AOADC2, MVP,
 	(
 		(world, (dbcsr::world)),
-		(mol, (desc::smolecule)),
+		(mol, (desc::shared_molecule)),
 		(print, (int))
 	),
 	(
@@ -335,7 +335,7 @@ private:
 	
 public:
 
-	MVP_ao_ri_adc2(dbcsr::world& w, desc::smolecule smol,
+	MVP_ao_ri_adc2(dbcsr::world& w, desc::shared_molecule smol,
 		desc::options opt, util::registry& reg,
 		svector<double> epso, svector<double> epsv) :
 		MVP(w,smol,opt,reg,epso,epsv) {}

@@ -20,7 +20,7 @@ class hfmod;
 class hf_wfn {
 private:
 
-	desc::smolecule m_mol;
+	desc::shared_molecule m_mol;
 	
 	dbcsr::smatrix<double> m_c_bo_A;
 	dbcsr::smatrix<double> m_c_bv_A;
@@ -40,7 +40,7 @@ private:
 public:
 
 	hf_wfn(
-		desc::smolecule mol,
+		desc::shared_molecule mol,
 		dbcsr::smatrix<double> c_bo_A,
 		dbcsr::smatrix<double> c_bo_B,
 		dbcsr::smatrix<double> c_bv_A,
@@ -61,7 +61,7 @@ public:
 	{};
 	hf_wfn(const hf_wfn& wfn_in) = default;
 	
-	desc::smolecule mol() { return m_mol; }
+	desc::shared_molecule mol() { return m_mol; }
 	
 	//dbcsr::smatrix<double> s_bb() { return m_s_bb; }
 	
@@ -123,7 +123,7 @@ inline void write_hfwfn(std::string name, hf_wfn& hfwfn, filio::data_handler& dh
 
 }
 
-inline shared_hf_wfn read_hfwfn(std::string name, desc::smolecule mol, 
+inline shared_hf_wfn read_hfwfn(std::string name, desc::shared_molecule mol, 
 	dbcsr::world w, filio::data_handler& dh) 
 {
 	

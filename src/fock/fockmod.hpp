@@ -14,7 +14,7 @@ namespace fock {
 class fockmod {
 private:
 
-	desc::smolecule m_mol;
+	desc::shared_molecule m_mol;
 	desc::options m_opt;
 	dbcsr::world m_world;
 	util::mpi_log LOG;
@@ -42,7 +42,7 @@ private:
 
 public:
 
-	fockmod (dbcsr::world iworld, desc::smolecule imol, desc::options iopt);
+	fockmod (dbcsr::world iworld, desc::shared_molecule imol, desc::options iopt);
 	~fockmod() {}
 	
 	fockmod(fockmod& f) = delete;

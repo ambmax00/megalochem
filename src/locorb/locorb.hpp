@@ -16,7 +16,7 @@ class mo_localizer {
 private:	
 
 	dbcsr::world m_world;
-	desc::smolecule m_mol;
+	desc::shared_molecule m_mol;
 	
 	std::shared_ptr<ints::aofactory> m_aofac;
 	
@@ -24,7 +24,7 @@ private:
 	
 public:
 
-	mo_localizer(dbcsr::world w, desc::smolecule mol) :
+	mo_localizer(dbcsr::world w, desc::shared_molecule mol) :
 		m_world(w),
 		m_mol(mol),
 		LOG(w.comm(), 0),

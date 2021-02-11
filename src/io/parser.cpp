@@ -183,7 +183,7 @@ T assign(json& j, std::string name, T default_val) {
 	return (it != j.end()) ? (T)it.value() : default_val;
 }
 
-desc::smolecule parse_molecule(json& jdata, MPI_Comm comm, int nprint) {
+desc::shared_molecule parse_molecule(json& jdata, MPI_Comm comm, int nprint) {
 	
 	util::mpi_log LOG(comm,nprint);
 	
@@ -256,15 +256,15 @@ desc::smolecule parse_molecule(json& jdata, MPI_Comm comm, int nprint) {
 	
 	LOG.reset();
 	
-	auto mol = desc::create_molecule()
+	auto mol = desc::molecule::create()
 		.comm(comm)
 		.name(name)
 		.atoms(atoms)
-		.basis(cbas)
+		.cluster_basis(cbas)
 		.charge(charge)
 		.mult(mult)
 		.mo_split(mo_split)
-		.get();
+		.build();
 		
 	mol->print_info(1);
 	LOG.os<>('\n');

@@ -241,12 +241,12 @@ public:
 		
 	}
 	
-	desc::smolecule mol() { return m_mol; }
+	desc::shared_molecule mol() { return m_mol; }
 
 protected:
 
 	dbcsr::world m_world;
-	desc::smolecule m_mol;
+	desc::shared_molecule m_mol;
 	
 	std::vector<int> m_atm;
 	std::vector<int> m_bas;
@@ -315,7 +315,7 @@ protected:
 
 public:
 	
-	impl(desc::smolecule mol, dbcsr::world w) :
+	impl(desc::shared_molecule mol, dbcsr::world w) :
 		m_world(w),
 		m_mol(mol),
 		m_natoms(0),
@@ -729,7 +729,7 @@ public:
 
 };
 
-aofactory::aofactory(desc::smolecule mol, dbcsr::world& w) : 
+aofactory::aofactory(desc::shared_molecule mol, dbcsr::world& w) : 
 	pimpl(new impl(mol, w))  {}
 	
 aofactory::~aofactory() { delete pimpl; }
@@ -888,6 +888,6 @@ std::function<void(dbcsr::stensor<3>&,vec<vec<int>>&)>
 		
 }
 
-desc::smolecule aofactory::mol() { return pimpl->mol(); }
+desc::shared_molecule aofactory::mol() { return pimpl->mol(); }
 
 } // end namespace ints

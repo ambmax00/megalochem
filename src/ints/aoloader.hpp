@@ -47,7 +47,7 @@ private:
 	desc::options m_opt;
 	util::mpi_log LOG;
 	util::mpi_time TIME;
-	desc::smolecule m_mol;
+	desc::shared_molecule m_mol;
 
 	util::key_registry<key> m_reg;
 
@@ -63,7 +63,7 @@ private:
 
 public:
 
-	aoloader(dbcsr::world w, desc::smolecule smol, desc::options opt) :
+	aoloader(dbcsr::world w, desc::shared_molecule smol, desc::options opt) :
 		m_world(w), m_opt(opt), m_mol(smol),
 		LOG(w.comm(), opt.get<int>("print",0)),
 		TIME(w.comm(), "AO-loader") 
