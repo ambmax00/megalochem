@@ -1,10 +1,10 @@
 #ifndef FOCK_JK_BUILDER_H
 #define FOCK_JK_BUILDER_H
 
+#:include "megalochem.fypp"
+
 #include "ints/aoloader.hpp"
 #include "utils/registry.hpp"
-#include "utils/ppdirs.hpp"
-#include "utils/params.hpp"
 #include "desc/molecule.hpp"
 #include "desc/options.hpp"
 #include "utils/mpi_time.hpp"
@@ -141,8 +141,9 @@ public:
 	
 };
 
-class create_EXACT_J_base;
-class create_EXACT_K_base;
+#:def _BASE_INIT(jk, jkname) 
+${jk}$(p.p_world, p.p_molecule, (p.p_print) ? *p.p_print : 0, "${jkname}$")
+#:enddef
 
 class EXACT_J : public J {
 private:
@@ -153,27 +154,25 @@ private:
 	
 	dbcsr::shared_pgrid<3> m_spgrid_bbd;
 	
-	friend class create_EXACT_J_base;
-
 public:
+
+#:set list = [&
+	['world', 'dbcsr::world', _REQ, _VAL],&
+	['molecule', 'desc::shared_molecule', _REQ, _VAL],&
+	['print', 'int', _OPT, _VAL],&
+	['eri4c2e_batched', 'dbcsr::sbtensor<4,double>', _REQ, _VAL]]
 	
-	EXACT_J(dbcsr::world w, desc::shared_molecule smol, int print);
+${_MAKE_PARAM_STRUCT('create', list)}$
+${_MAKE_BUILDER_CLASS('EXACT_J', 'create', list, True)}$
+	
+	EXACT_J(create_pack&& p) : 
+		m_eri4c2e_batched(p.p_eri4c2e_batched),
+		${_BASE_INIT('J', 'EXACT_J')}$
+	{}
 	void compute_J() override;
 	void init() override;
 	
 };
-
-MAKE_STRUCT(
-	EXACT_J, J,
-	(
-		(world, (dbcsr::world)),
-		(mol, (desc::shared_molecule)),
-		(print, (int))
-	),
-	(
-		(eri4c2e_batched, (dbcsr::sbtensor<4,double>), required, val)
-	)
-)
 
 class EXACT_K : public K {
 private:
@@ -183,30 +182,27 @@ private:
 	dbcsr::shared_tensor<3,double> m_p_bbd;
 	
 	dbcsr::shared_pgrid<3> m_spgrid_bbd;
-	
-	friend class create_EXACT_K_base;
-	
+		
 public:
 
-	EXACT_K(dbcsr::world w, desc::shared_molecule smol, int print);
+#:set list = [&
+	['world', 'dbcsr::world', _REQ, _VAL],&
+	['molecule', 'desc::shared_molecule', _REQ, _VAL],&
+	['print', 'int', _OPT, _VAL],&
+	['eri4c2e_batched', 'dbcsr::sbtensor<4,double>', _REQ, _VAL]]
+	
+${_MAKE_PARAM_STRUCT('create', list)}$
+${_MAKE_BUILDER_CLASS('EXACT_K', 'create', list, True)}$
+
+	EXACT_K(create_pack&& p) :
+		m_eri4c2e_batched(p.p_eri4c2e_batched),
+		${_BASE_INIT('K', 'EXACT_K')}$
+	{}
 	void compute_K() override;
 	void init() override;
 	
 };
 
-MAKE_STRUCT(
-	EXACT_K, K,
-	(
-		(world, (dbcsr::world)),
-		(mol, (desc::shared_molecule)),
-		(print, (int))
-	),
-	(
-		(eri4c2e_batched, (dbcsr::sbtensor<4,double>), required, val)
-	)
-)
-
-class create_DF_J_base;
 class DF_J : public J {
 private:
 
@@ -222,11 +218,23 @@ private:
 	dbcsr::shared_pgrid<3> m_spgrid_bbd;
 	dbcsr::shared_pgrid<2> m_spgrid_xd, m_spgrid2;
 	
-	friend class create_DF_J_base;
-
 public:
 
-	DF_J(dbcsr::world w, desc::shared_molecule smol, int print);
+#:set list = [&
+	['world', 'dbcsr::world', _REQ, _VAL],&
+	['molecule', 'desc::shared_molecule', _REQ, _VAL],&
+	['print', 'int', _OPT, _VAL],&
+	['eri3c2e_batched', 'dbcsr::sbtensor<3,double>', _REQ, _VAL],&
+	['metric_inv', 'dbcsr::shared_matrix<double>', _REQ, _VAL]]
+	
+${_MAKE_PARAM_STRUCT('create', list)}$
+${_MAKE_BUILDER_CLASS('DF_J', 'create', list, True)}$
+
+	DF_J(create_pack&& p) : 
+		m_eri3c2e_batched(p.p_eri3c2e_batched),
+		m_v_inv(p.p_metric_inv),
+		${_BASE_INIT('J', 'DF_J')}$
+	{}
 	void compute_J() override;
 	void init() override;
 	
@@ -234,20 +242,6 @@ public:
 	
 };
 
-MAKE_STRUCT(
-	DF_J, J,
-	(
-		(world, (dbcsr::world)),
-		(mol, (desc::shared_molecule)),
-		(print, (int))
-	),
-	(
-		(eri3c2e_batched, (dbcsr::sbtensor<3,double>), required, val),
-		(v_inv, (dbcsr::shared_matrix<double>), required, val)
-	)
-)
-
-class create_DFMO_K_base;
 class DFMO_K : public K {
 private:
 	
@@ -265,32 +259,32 @@ private:
 	dbcsr::shared_tensor<2,double> m_v_invsqrt_01;
 	
 	dbcsr::shared_pgrid<2> m_spgrid2;
-	
-	friend class create_DFMO_K_base;
-	
+		
 public:
 
-	DFMO_K(dbcsr::world w, desc::shared_molecule smol, int print);
+#:set list = [&
+	['world', 'dbcsr::world', _REQ, _VAL],&
+	['molecule', 'desc::shared_molecule', _REQ, _VAL],&
+	['print', 'int', _OPT, _VAL],&
+	['eri3c2e_batched', 'dbcsr::sbtensor<3,double>', _REQ, _VAL],&
+	['metric_invsqrt', 'dbcsr::shared_matrix<double>', _REQ, _VAL],&
+	['occ_nbatches', 'int', _OPT, _VAL]]
+	
+${_MAKE_PARAM_STRUCT('create', list)}$
+${_MAKE_BUILDER_CLASS('DFMO_K', 'create', list, True)}$
+
+	DFMO_K(create_pack&& p) : 
+		m_eri3c2e_batched(p.p_eri3c2e_batched),
+		m_v_invsqrt(p.p_metric_invsqrt),
+		m_occ_nbatches((p.p_occ_nbatches) ? *p.p_occ_nbatches : 5),
+		${_BASE_INIT('K', 'DFMO_K')}$
+	{}
 	void compute_K() override;
 	void init() override;
 	
 	~DFMO_K() {}
 	
 };
-
-MAKE_STRUCT(
-	DFMO_K, K,
-	(
-		(world, (dbcsr::world)),
-		(mol, (desc::shared_molecule)),
-		(print, (int))
-	),
-	(
-		(eri3c2e_batched, (dbcsr::sbtensor<3,double>), required, val),
-		(v_invsqrt, (dbcsr::shared_matrix<double>), required, val),
-		(occ_nbatches, (int), optional, val, 5)
-	)
-)
 
 class create_DFAO_K_base;
 class DFAO_K : public K {
@@ -307,12 +301,25 @@ private:
 	
 	dbcsr::shared_pgrid<2> m_spgrid2;
 	dbcsr::shared_pgrid<3> m_spgrid3_xbb;
-	
-	friend class create_DFAO_K_base;
-	
+		
 public:
 
-	DFAO_K(dbcsr::world w, desc::shared_molecule smol, int print);
+#:set list = [&
+	['world', 'dbcsr::world', _REQ, _VAL],&
+	['molecule', 'desc::shared_molecule', _REQ, _VAL],&
+	['print', 'int', _OPT, _VAL],&
+	['eri3c2e_batched', 'dbcsr::sbtensor<3,double>', _REQ, _VAL],&
+	['fitting_batched', 'dbcsr::sbtensor<3,double>', _REQ, _VAL]]
+	
+${_MAKE_PARAM_STRUCT('create', list)}$
+${_MAKE_BUILDER_CLASS('DFAO_K', 'create', list, True)}$
+
+	DFAO_K(create_pack&& p) : 
+		m_eri3c2e_batched(p.p_eri3c2e_batched),
+		m_fitting_batched(p.p_fitting_batched),
+		${_BASE_INIT('K', 'DFAO_K')}$
+	{}
+	
 	void compute_K() override;
 	void init() override;
 	
@@ -320,20 +327,6 @@ public:
 	
 };
 
-MAKE_STRUCT(
-	DFAO_K, K,
-	(
-		(world, (dbcsr::world)),
-		(mol, (desc::shared_molecule)),
-		(print, (int))
-	),
-	(
-		(eri3c2e_batched, (dbcsr::sbtensor<3,double>), required, val),
-		(fitting_batched, (dbcsr::sbtensor<3,double>), required, val)
-	)
-)
-
-class create_DFROBUST_K_base;
 class DFROBUST_K : public K {
 private:
 
@@ -353,12 +346,27 @@ private:
 	dbcsr::shared_tensor<3,double> m_cpq_xbb_02_1;
 	
 	dbcsr::shared_pgrid<2> m_spgrid2;
-	
-	friend class create_DFROBUST_K_base;
-	
+		
 public:
 
-	DFROBUST_K(dbcsr::world w, desc::shared_molecule smol, int print);
+#:set list = [&
+	['world', 'dbcsr::world', _REQ, _VAL],&
+	['molecule', 'desc::shared_molecule', _REQ, _VAL],&
+	['print', 'int', _OPT, _VAL],&
+	['eri3c2e_batched', 'dbcsr::sbtensor<3,double>', _REQ, _VAL],&
+	['fitting_batched', 'dbcsr::sbtensor<3,double>', _REQ, _VAL],&
+	['metric', 'dbcsr::shared_matrix<double>', _REQ, _VAL]]
+	
+${_MAKE_PARAM_STRUCT('create', list)}$
+${_MAKE_BUILDER_CLASS('DFROBUST_K', 'create', list, True)}$
+
+	DFROBUST_K(create_pack&& p) : 
+		m_eri3c2e_batched(p.p_eri3c2e_batched),
+		m_fitting_batched(p.p_fitting_batched),
+		m_v_xx(p.p_metric),
+		${_BASE_INIT('K', 'DFROBUST_K')}$
+	{}
+	
 	void compute_K() override;
 	void init() override;
 	
@@ -366,21 +374,6 @@ public:
 	
 };
 
-MAKE_STRUCT(
-	DFROBUST_K, K,
-	(
-		(world, (dbcsr::world)),
-		(mol, (desc::shared_molecule)),
-		(print, (int))
-	),
-	(
-		(eri3c2e_batched, (dbcsr::sbtensor<3,double>), required, val),
-		(fitting_batched, (dbcsr::sbtensor<3,double>), required, val),
-		(v_xx, (dbcsr::shared_matrix<double>), required, val)
-	)
-)
-
-class create_DFMEM_K_base;
 class DFMEM_K : public K {
 private:
 
@@ -402,31 +395,31 @@ private:
 	dbcsr::shared_pgrid<3> m_spgrid3_xbb;
 	
 	Eigen::MatrixXi m_idx_list;
-	
-	friend class create_DFMEM_K_base;
-	
+		
 public:
 
-	DFMEM_K(dbcsr::world w, desc::shared_molecule smol, int print);
+#:set list = [&
+	['world', 'dbcsr::world', _REQ, _VAL],&
+	['molecule', 'desc::shared_molecule', _REQ, _VAL],&
+	['print', 'int', _OPT, _VAL],&
+	['eri3c2e_batched', 'dbcsr::sbtensor<3,double>', _REQ, _VAL],&
+	['metric_inv', 'dbcsr::shared_matrix<double>', _REQ, _VAL]]
+	
+${_MAKE_PARAM_STRUCT('create', list)}$
+${_MAKE_BUILDER_CLASS('DFMEM_K', 'create', list, True)}$
+
+	DFMEM_K(create_pack&& p) : 
+		m_eri3c2e_batched(p.p_eri3c2e_batched),
+		m_v_xx(p.p_metric_inv),
+		${_BASE_INIT('K', 'DFMEM_K')}$
+	{}
+	
 	void compute_K() override;
 	void init() override;
 	
 	~DFMEM_K() {}
 	
 };
-
-MAKE_STRUCT(
-	DFMEM_K, K,
-	(
-		(world, (dbcsr::world)),
-		(mol, (desc::shared_molecule)),
-		(print, (int))
-	),
-	(
-		(eri3c2e_batched, (dbcsr::sbtensor<3,double>), required, val),
-		(v_xx, (dbcsr::shared_matrix<double>), required, val)
-	)
-)
 
 class create_DFLMO_K_base;
 class DFLMO_K : public K {
@@ -439,34 +432,35 @@ private:
 	dbcsr::shared_tensor<2,double> m_v_xx_01;
 	
 	dbcsr::shared_pgrid<2> m_spgrid2;
-
-	friend class create_DFLMO_K_base;
 	
 	int m_occ_nbatches;
 	
 public:
 
-	DFLMO_K(dbcsr::world w, desc::shared_molecule smol, int print);
+#:set list = [&
+	['world', 'dbcsr::world', _REQ, _VAL],&
+	['molecule', 'desc::shared_molecule', _REQ, _VAL],&
+	['print', 'int', _OPT, _VAL],&
+	['eri3c2e_batched', 'dbcsr::sbtensor<3,double>', _REQ, _VAL],&
+	['metric_inv', 'dbcsr::shared_matrix<double>', _REQ, _VAL],&
+	['occ_nbatches', 'int', _OPT, _VAL]]
+	
+${_MAKE_PARAM_STRUCT('create', list)}$
+${_MAKE_BUILDER_CLASS('DFLMO_K', 'create', list, True)}$
+
+	DFLMO_K(create_pack&& p) : 
+		m_eri3c2e_batched(p.p_eri3c2e_batched),
+		m_v_xx(p.p_metric_inv),
+		m_occ_nbatches((p.p_occ_nbatches) ? *p.p_occ_nbatches : 5),
+		${_BASE_INIT('K', 'DFLMO_K')}$
+	{}
+	
 	void compute_K() override;
 	void init() override;
 	
 	~DFLMO_K() {}
 	
 };
-
-MAKE_STRUCT(
-	DFLMO_K, K,
-	(
-		(world, (dbcsr::world)),
-		(mol, (desc::shared_molecule)),
-		(print, (int))
-	),
-	(
-		(eri3c2e_batched, (dbcsr::sbtensor<3,double>), required, val),
-		(v_xx, (dbcsr::shared_matrix<double>), required, val),
-		(occ_nbatches, (int), optional, val, 1)
-	)
-)
 
 inline void load_jints(jmethod jmet, ints::metric metr, ints::aoloader& ao) {
 	
@@ -516,21 +510,25 @@ inline void load_kints(kmethod kmet, ints::metric metr, ints::aoloader& ao) {
 			ao.request(ints::key::coul_xx_inv,false);
 			ao.request(ints::key::coul_xbb,true);
 			ao.request(ints::key::dfit_coul_xbb,true);
+			
 		} else if (metr == ints::metric::erfc_coulomb) {
 			ao.request(ints::key::erfc_xx,false);
 			ao.request(ints::key::erfc_xx_inv,false);
 			ao.request(ints::key::erfc_xbb,true);
 			ao.request(ints::key::dfit_erfc_xbb,true);
+			
 		} else if (metr == ints::metric::qr_fit) {
 			ao.request(ints::key::coul_xx, true);
 			ao.request(ints::key::ovlp_xx, false);
 			ao.request(ints::key::ovlp_xx_inv, false);
 			ao.request(ints::key::qr_xbb, true);
 			ao.request(ints::key::dfit_qr_xbb, true);
+			
 		} else if (metr == ints::metric::pari) {
 			ao.request(ints::key::coul_xx, true);
 			ao.request(ints::key::pari_xbb, true);
 			ao.request(ints::key::dfit_pari_xbb, true);
+			
 		}
 		
 	} else if (kmet == kmethod::dfmo) {
@@ -541,8 +539,10 @@ inline void load_kints(kmethod kmet, ints::metric metr, ints::aoloader& ao) {
 			ao.request(ints::key::coul_xx,false);
 			ao.request(ints::key::coul_xx_invsqrt,true);
 			ao.request(ints::key::coul_xbb,true);
+			
 		} else {
 			throw std::runtime_error("DFMO with non coulomb metric disabled.");
+			
 		}
 		
 	} else if (kmet == kmethod::dfmem || kmet == kmethod::dflmo) {
@@ -553,18 +553,22 @@ inline void load_kints(kmethod kmet, ints::metric metr, ints::aoloader& ao) {
 			ao.request(ints::key::coul_xx,false);
 			ao.request(ints::key::coul_xx_inv,true);
 			ao.request(ints::key::coul_xbb,true);
+			
 		} else if (metr == ints::metric::erfc_coulomb) {
 			ao.request(ints::key::erfc_xx,false);
 			ao.request(ints::key::erfc_xx_inv,true);
 			ao.request(ints::key::erfc_xbb,true);
+			
 		} else if (metr == ints::metric::qr_fit) {
 			ao.request(ints::key::coul_xx, true);
 			ao.request(ints::key::ovlp_xx, false);
 			ao.request(ints::key::ovlp_xx_inv, false);
 			ao.request(ints::key::qr_xbb, true);
+			
 		} else if (metr == ints::metric::pari) {
 			ao.request(ints::key::coul_xx, true);
 			ao.request(ints::key::pari_xbb, true);
+			
 		}
 		
 	} else if (kmet == kmethod::dfrobust) {
@@ -574,32 +578,39 @@ inline void load_kints(kmethod kmet, ints::metric metr, ints::aoloader& ao) {
 		if (metr != ints::metric::pari) {
 			throw std::runtime_error(
 				"Cannot use robust k for method other than PARI");
+				
 		} else if (metr == ints::metric::pari) {
 			ao.request(ints::key::coul_xx, false);
 			ao.request(ints::key::coul_xbb, true);
 			ao.request(ints::key::pari_xbb, true);
+			
 		}
 		
 	}
 }
 
+#:set list = [&
+	['world', 'dbcsr::world', _REQ, _VAL],&
+	['molecule', 'desc::shared_molecule', _REQ, _VAL],&
+	['method', 'jmethod', _REQ, _VAL],&
+	['aoloader', 'ints::aoloader', _REQ, _REF],&
+	['print', 'int', _OPT, _VAL],&
+	['metric', 'ints::metric', _REQ, _VAL]]
+	
 class create_j_base {
 
-	make_param(create_j_base, world, dbcsr::world, required, val)
-	make_param(create_j_base, mol, desc::shared_molecule, required, val)
-	make_param(create_j_base, method, jmethod, required, val)
-	make_param(create_j_base, aoloader, ints::aoloader, required, ref)
-	make_param(create_j_base, print, int, optional, val)
-	make_param(create_j_base, metric, ints::metric, required, val)
+${_MAKE_BUILDER_MEMBERS('create_j', list)}$
 
 public:
 
 	create_j_base() {}
 	
-	std::shared_ptr<J> get() {
+	std::shared_ptr<J> build() {
+
+		${_CHECK_REQUIRED('create_j', '', list)}$
 
 		std::shared_ptr<J> jbuilder;
-		auto aoreg = c_aoloader->get_registry();
+		auto aoreg = (*c_aoloader).get().get_registry();
 		
 		int nprint = (c_print) ? *c_print : 0;
 	
@@ -607,9 +618,12 @@ public:
 			
 			auto eris = aoreg.get<dbcsr::sbtensor<4,double>>(ints::key::coul_bbbb);
 			
-			jbuilder = create_EXACT_J(*c_world, *c_mol, nprint)
+			jbuilder = EXACT_J::create()
+				.world(*c_world)
+				.molecule(*c_molecule)
+				.print(nprint)
 				.eri4c2e_batched(eris)
-				.get();
+				.build();
 			
 		} else if (*c_method == jmethod::dfao) {
 			
@@ -638,10 +652,13 @@ public:
 				
 			}
 			
-			jbuilder = create_DF_J(*c_world, *c_mol, nprint)
+			jbuilder = DF_J::create()
+				.world(*c_world)
+				.molecule(*c_molecule)
+				.print(nprint)
 				.eri3c2e_batched(eris)
-				.v_inv(v_inv)
-				.get();
+				.metric_inv(v_inv)
+				.build();
 			
 		}
 		
@@ -653,24 +670,29 @@ public:
 
 inline create_j_base create_j() { return create_j_base(); }
 
+#:set list = [&
+	['world', 'dbcsr::world', _REQ, _VAL],&
+	['molecule', 'desc::shared_molecule', _REQ, _VAL],&
+	['method', 'kmethod', _REQ, _VAL],&
+	['aoloader', 'ints::aoloader', _REQ, _REF],&
+	['print', 'int', _OPT, _VAL],&
+	['metric', 'ints::metric', _REQ, _VAL],&
+	['occ_nbatches', 'int', _OPT, _VAL]]
+
 class create_k_base {
 
-	make_param(create_k_base, world, dbcsr::world, required, val)
-	make_param(create_k_base, mol, desc::shared_molecule, required, val)
-	make_param(create_k_base, method, kmethod, required, val)
-	make_param(create_k_base, aoloader, ints::aoloader, required, ref)
-	make_param(create_k_base, print, int, optional, val)
-	make_param(create_k_base, metric, ints::metric, required, val)
-	make_param(create_k_base, occ_nbatches, int, optional, val)
-
+	${_MAKE_BUILDER_MEMBERS('create_k', list)}$
+	
 public:
 
 	create_k_base() {}
 	
-	std::shared_ptr<K> get() {
+	std::shared_ptr<K> build() {
+	
+		${_CHECK_REQUIRED('create_k_base', '', list)}$
 
 		std::shared_ptr<K> kbuilder;
-		auto aoreg = c_aoloader->get_registry();
+		auto aoreg = (*c_aoloader).get().get_registry();
 		
 		int nprint = (c_print) ? *c_print : 0;
 		int nobatches = (c_occ_nbatches) ? *c_occ_nbatches : 1;
@@ -680,9 +702,12 @@ public:
 			
 			auto eris = aoreg.get<dbcsr::sbtensor<4,double>>(ints::key::coul_bbbb);
 			
-			kbuilder = create_EXACT_K(*c_world, *c_mol, nprint)
+			kbuilder = EXACT_K::create()
+				.world(*c_world)
+				.molecule(*c_molecule)
+				.print(nprint)
 				.eri4c2e_batched(eris)
-				.get();
+				.build();
 			
 		} else if (*c_method == kmethod::dfao) {
 			
@@ -708,21 +733,27 @@ public:
 					break;
 			}
 			
-			kbuilder = create_DFAO_K(*c_world, *c_mol, nprint)
+			kbuilder = DFAO_K::create()
+				.world(*c_world)
+				.molecule(*c_molecule)
+				.print(nprint)
 				.eri3c2e_batched(eris)
 				.fitting_batched(cfit)
-				.get();
+				.build();
 			
 		} else if (*c_method == kmethod::dfmo) {
 			
 			auto eris = aoreg.get<dbcsr::sbtensor<3,double>>(ints::key::coul_xbb);
 			auto invsqrt = aoreg.get<dbcsr::shared_matrix<double>>(ints::key::coul_xx_invsqrt);
 			
-			kbuilder = create_DFMO_K(*c_world, *c_mol, nprint)
+			kbuilder = DFMO_K::create()
+				.world(*c_world)
+				.molecule(*c_molecule)
+				.print(nprint)
 				.eri3c2e_batched(eris)
-				.v_invsqrt(invsqrt)
+				.metric_invsqrt(invsqrt)
 				.occ_nbatches(nobatches)
-				.get();
+				.build();
 		
 		} else if (*c_method == kmethod::dfmem || *c_method == kmethod::dflmo) {
 			
@@ -749,16 +780,24 @@ public:
 			}
 			
 			if (*c_method == kmethod::dfmem) {
-				kbuilder = create_DFMEM_K(*c_world, *c_mol, nprint)
+				kbuilder = DFMEM_K::create()
+					.world(*c_world)
+					.molecule(*c_molecule)
+					.print(nprint)
 					.eri3c2e_batched(eris)
-					.v_xx(v_xx)
-					.get();
+					.metric_inv(v_xx)
+					.build();
+					
 			} else {
-				kbuilder = create_DFLMO_K(*c_world, *c_mol, nprint)
+				kbuilder = DFLMO_K::create()
+					.world(*c_world)
+					.molecule(*c_molecule)
+					.print(nprint)
 					.eri3c2e_batched(eris)
-					.v_xx(v_xx)
+					.metric_inv(v_xx)
 					.occ_nbatches(nobatches)
-					.get();
+					.build();
+					
 			}
 			
 		} else if (*c_method == kmethod::dfrobust) {
@@ -767,11 +806,14 @@ public:
 			auto cfit = aoreg.get<dbcsr::sbtensor<3,double>>(ints::key::pari_xbb);
 			auto v_xx = aoreg.get<dbcsr::shared_matrix<double>>(ints::key::coul_xx);
 			
-			kbuilder = create_DFROBUST_K(*c_world, *c_mol, nprint)
+			kbuilder = DFROBUST_K::create()
+				.world(*c_world)
+				.molecule(*c_molecule)
+				.print(nprint)
 				.eri3c2e_batched(eris)
 				.fitting_batched(cfit)
-				.v_xx(v_xx)
-				.get();
+				.metric(v_xx)
+				.build();
 				
 		}
 		

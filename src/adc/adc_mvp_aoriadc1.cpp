@@ -16,10 +16,13 @@ void MVP_AOADC1::init() {
 	switch (m_jmethod) {
 		case fock::jmethod::dfao: 
 		{
-			m_jbuilder = fock::create_DF_J(m_world, m_mol, nprint)
+			m_jbuilder = fock::DF_J::create()
+				.world(m_world)
+				.molecule(m_mol)
+				.print(nprint)
 				.eri3c2e_batched(m_eri3c2e_batched)
-				.v_inv(m_v_xx)
-				.get();
+				.metric_inv(m_v_xx)
+				.build();
 			break;
 		}
 		default:
@@ -31,26 +34,35 @@ void MVP_AOADC1::init() {
 	switch (m_kmethod) {
 		case fock::kmethod::dfao:
 		{
-			m_kbuilder = fock::create_DFAO_K(m_world, m_mol, nprint)
+			m_kbuilder = fock::DFAO_K::create()
+				.world(m_world)
+				.molecule(m_mol)
+				.print(nprint)
 				.eri3c2e_batched(m_eri3c2e_batched)
 				.fitting_batched(m_fitting_batched)
-				.get();
+				.build();
 			break;
 		}
 		case fock::kmethod::dfmem:
 		{
-			m_kbuilder = fock::create_DFMEM_K(m_world, m_mol, nprint)
+			m_kbuilder = fock::DFMEM_K::create()
+				.world(m_world)
+				.molecule(m_mol)
+				.print(nprint)
 				.eri3c2e_batched(m_eri3c2e_batched)
-				.v_xx(m_v_xx)
-				.get();
+				.metric_inv(m_v_xx)
+				.build();
 			break;
 		}
 		case fock::kmethod::dflmo:
-			m_kbuilder = fock::create_DFLMO_K(m_world, m_mol, nprint)
+			m_kbuilder = fock::DFLMO_K::create()
+				.world(m_world)
+				.molecule(m_mol)
+				.print(nprint)
 				.eri3c2e_batched(m_eri3c2e_batched)
-				.v_xx(m_v_xx)
+				.metric_inv(m_v_xx)
 				.occ_nbatches(1)
-				.get();
+				.build();
 			break;
 		default:
 		{

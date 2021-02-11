@@ -8,9 +8,6 @@
 
 namespace fock {
 
-DF_J::DF_J(dbcsr::world w, desc::shared_molecule mol, int print) 
-	: J(w,mol,print,"DF_J") {} 
-
 void DF_J::init() {
 	
 	init_base();
@@ -186,9 +183,6 @@ void DF_J::compute_J() {
 	TIME.finish();
 	
 }
-
-DFMO_K::DFMO_K(dbcsr::world w, desc::shared_molecule mol, int print)
-	: K(w,mol,print,"DFMO_K") {}
 
 void DFMO_K::init() {
 	
@@ -444,8 +438,6 @@ void DFMO_K::compute_K() {
 		
 }
 
-DFAO_K::DFAO_K(dbcsr::world w, desc::shared_molecule mol, int print)
-	: K(w,mol,print,"DFAO_K") {}
 void DFAO_K::init() {
 	
 	init_base();
@@ -629,8 +621,6 @@ void DFAO_K::compute_K() {
 			
 }
 
-DFMEM_K::DFMEM_K(dbcsr::world w, desc::shared_molecule mol, int print)
-	: K(w,mol,print,"DFMEM_K") {}
 void DFMEM_K::init() {
 	
 	init_base();
@@ -860,8 +850,6 @@ void DFMEM_K::compute_K() {
 			
 }
 
-DFLMO_K::DFLMO_K(dbcsr::world w, desc::shared_molecule mol, int print)
-	: K(w,mol,print,"DFLMO_K") {}
 void DFLMO_K::init() {
 	
 	init_base();

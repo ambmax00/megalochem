@@ -65,22 +65,22 @@ void fockmod::init() {
 	
 	std::shared_ptr<J> jbuilder = create_j()
 		.world(m_world)
-		.mol(m_mol)
+		.molecule(m_mol)
 		.metric(metr)
 		.method(jmet)
 		.aoloader(m_ao)
 		.print(nprint)
-		.get();
+		.build();
 	
 	std::shared_ptr<K> kbuilder = create_k()
 		.world(m_world)
-		.mol(m_mol)
+		.molecule(m_mol)
 		.metric(metr)
 		.method(kmet)
 		.aoloader(m_ao)
 		.print(nprint)
 		.occ_nbatches(noccbatches)
-		.get();
+		.build();
 	
 	m_J_builder = jbuilder;
 	m_K_builder = kbuilder;

@@ -160,6 +160,33 @@ private:
 	};
 #:enddef
 
+#:def _MAKE_BUILDER_MEMBERS(structname,params)
+private:
+	#:for name,type,reqopt,refval in params
+		${_TYPE_BUILDER(type,refval)}$ c_${name}$;
+	#:endfor 
+	
+public:
+	#:for name,type,reqopt,refval in params
+		inline ${structname}$_base& 
+		${name}$(${_TYPE_SIMPLE(type,refval)}$ i_${name}$) {
+			c_${name}$.emplace(i_${name}$);
+			return *this;
+		}
+	#:endfor
+#:enddef
+
+#:def _CHECK_REQUIRED(classname, structname, params) 
+#:for name,type,reqopt,refval in params
+	#:if reqopt == "required"
+	if (!c_${name}$) {
+		throw std::runtime_error(
+		"${classname}$ builder \"${structname}$\" requires ${name}$!");
+	}
+	#:endif
+#:endfor
+#:enddef
+
 #:def _MAKE_BUILDER_CLASS(classname, structname, params, pointer)
 private:
 	

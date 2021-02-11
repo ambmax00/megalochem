@@ -5,11 +5,6 @@
 
 namespace fock {
 
-EXACT_J::EXACT_J(dbcsr::world w, desc::shared_molecule mol, int print) 
-	: J(w,mol,print,"EXACT_J") {} 
-EXACT_K::EXACT_K(dbcsr::world w, desc::shared_molecule mol, int print) 
-	: K(w,mol,print,"EXACT_K") {} 
-
 void EXACT_J::init() {
 	
 	init_base();

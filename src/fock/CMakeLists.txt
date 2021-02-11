@@ -1,14 +1,20 @@
 set(SOURCES
 	fockmod.hpp
 	fock_builder.cpp
-	jkbuilder.hpp
 	jkcommon.cpp
 	jkexact.cpp
 	jkdf.cpp
 	jkdf_robust.cpp
 )
 
+set(FYPP_SOURCES
+	jkbuilder.hpp.fypp
+)
+
+add_fypp_sources(HEADERS chem_fock_fypp ${FYPP_SOURCES})
+
 add_library(chem_fock ${SOURCES})
+add_dependencies(chem_fock chem_fock_fypp)
 
 target_link_libraries(
 	chem_fock
