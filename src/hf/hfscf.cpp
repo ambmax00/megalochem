@@ -79,7 +79,7 @@ hfmod::hfmod(dbcsr::world w, desc::smolecule mol, desc::options opt)
 		
 	}
 	
-	if (!m_nobetaorb) {
+	if (!m_nobetaorb && !m_restricted) {
 		
 		m_c_bm_B = dbcsr::create<double>()
 			.set_world(m_world)

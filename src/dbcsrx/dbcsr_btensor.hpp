@@ -3,6 +3,7 @@
 
 #include <dbcsr_tensor_ops.hpp>
 #include "utils/mpi_time.h"
+#include "utils/unique.h"
 
 #include <map>
 #include <mpi.h>
@@ -194,7 +195,10 @@ public:
 		LOG.os<1>("Setting up batch tensor information.\n");
 		
 		std::string path = std::filesystem::current_path();
-		path += "/batching/";
+		path += "/" + util::unique("mega_batchtensor", "", m_comm) + "/";
+		if (m_mpirank == 0) {
+			std::filesystem::create_directory(path);
+		}
 		
 		m_path = path;
 		m_filename = path + name + ".dat";
@@ -284,13 +288,18 @@ public:
 		m_is_decompress_initialized(false),
 		m_type(mytype)
 	{
-		m_path = in.m_path;
+		m_path = util::unique("mega_batchtensor", "", m_comm) + "/";
+		if (m_mpirank == 0) {
+			std::filesystem::create_directory(m_path);
+		}
 		m_filename = m_path + name + ".dat";
 		m_blk_bounds = in.m_blk_bounds;
 		m_bounds = in.m_bounds;
 		m_full_blk_bounds = in.m_full_blk_bounds;
 		m_full_bounds = in.m_full_bounds;
 		m_nbatches_dim = in.m_nbatches_dim;
+		
+		MPI_Barrier(m_comm);
 			
 		if (m_type == btype::disk) {
 			create_file();
@@ -366,8 +375,13 @@ public:
 	}
 	
 	~btensor() { 
-		if (m_type == btype::disk) delete_file();  
+		if (m_type == btype::disk) delete_file(); 
 		reset_var();
+		if (m_mpirank == 0) {
+			std::cout << "Removing " << m_name << " in " 
+				<< m_path << std::endl;
+			std::filesystem::remove(m_path);
+		}
 	}
 	
 	int flatten(vec<int>& idx, vec<int>& dims) {

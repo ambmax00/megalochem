@@ -80,151 +80,6 @@ public:
 	double nuc_energy() { return m_nuc_energy; }
 	double wfn_energy() { return m_wfn_energy; }
 	
-	void write_to_file(std::string name) {
-		
-		std::string molname = name;
-		std::string prefix = molname + "_data/";
-		std::string suffix = ".dat";
-		
-		auto filename = [&](std::string root) {
-			return prefix + root + suffix;
-		};
-		
-		//write_matrix(m_s_bb, mname);
-		
-		filio::write_matrix(m_c_bo_A, filename("c_bo_A"));
-		filio::write_matrix(m_c_bv_A, filename("c_bv_A"));
-		
-		if (m_c_bo_B) {
-	
-			filio::write_matrix(m_c_bo_B, filename("c_bo_B"));
-			filio::write_matrix(m_c_bv_B, filename("c_bv_B"));
-			
-		}
-		
-		MPI_Comm comm = m_c_bo_A->get_world().comm();
-		
-		filio::write_vector(m_eps_occ_A, filename("eps_occ_A"), comm);
-		filio::write_vector(m_eps_vir_A, filename("eps_vir_A"), comm);
-		
-		if (m_eps_occ_B) {
-			filio::write_vector(m_eps_occ_B, filename("eps_occ_B"), comm);
-			filio::write_vector(m_eps_vir_B, filename("eps_vir_B"), comm);
-		}
-		
-	}
-	
-	void read_from_file(std::string name, desc::smolecule& mol, dbcsr::world& w) {
-		
-		m_mol = mol;
-		
-		std::string molname = name;
-		std::string prefix = molname + "_data/" ;
-		std::string suffix = ".dat";
-		
-		auto filename = [&](std::string root) {
-			return prefix + root + suffix;
-		};
-		
-		auto b = m_mol->dims().b();
-		auto oA = m_mol->dims().oa();
-		auto oB = m_mol->dims().ob();
-		auto vA = m_mol->dims().va();
-		auto vB = m_mol->dims().vb();
-
-		//m_s_bb = read_matrix(m_mol->name(), "s_bb", w, b, b, dbcsr_type_symmetric);
-		
-		m_c_bo_A = filio::read_matrix(filename("c_bo_A"), "c_bo_A", w, b, oA, dbcsr::type::no_symmetry);
-		m_c_bv_A = filio::read_matrix(filename("c_bv_A"), "c_bv_A", w, b, vA, dbcsr::type::no_symmetry);
-		
-		bool read_beta = (m_mol->nele_alpha() == m_mol->nele_beta()) ? false : true;
-		
-		if (read_beta) {
-				
-			m_c_bo_B = filio::read_matrix(filename("c_bo_B"), "c_bo_B", w, b, oB, dbcsr::type::no_symmetry);
-			m_c_bv_B = filio::read_matrix(filename("c_bv_B"), "c_bv_B", w, b, vB, dbcsr::type::no_symmetry);
-			
-		}
-		
-		filio::read_vector(m_eps_occ_A, filename("eps_occ_A"));
-		filio::read_vector(m_eps_vir_A, filename("eps_vir_A"));
-		
-		if (read_beta) {
-		
-			filio::read_vector(m_eps_occ_B, filename("eps_occ_B"));
-			filio::read_vector(m_eps_vir_B, filename("eps_vir_B"));
-			
-		}
-		
-	}	
-	
-	void write_results(std::string filename) {
-		
-		nlohmann::json data;
-		nlohmann::json hfdata;
-		std::ofstream out;
-		std::ifstream in;
-		
-		int rank = m_c_bo_A->get_world().rank();
-					
-		if (std::filesystem::exists(filename) && rank == 0) {
-					
-			std::filesystem::remove(filename);
-			
-		}
-		
-		out.open(filename);
-			
-		hfdata["scf_energy"] = m_scf_energy;
-		hfdata["nuc_energy"] = m_nuc_energy;
-		hfdata["wfn_energy"] = m_wfn_energy;
-		
-		hfdata["nele_alpha"] = m_mol->nele_alpha();
-		hfdata["nele_beta"] = m_mol->nele_beta();
-		hfdata["nbf"] = m_mol->c_basis()->nbf();
-		hfdata["nocc_alpha"] = m_mol->nocc_alpha();
-		hfdata["nvir_alpha"] = m_mol->nvir_alpha();
-		hfdata["nocc_beta"] = m_mol->nocc_beta();
-		hfdata["nvir_beta"] = m_mol->nvir_beta();
-		
-		data["hf"] = std::move(hfdata);
-		
-		if (rank == 0) {
-			out << data.dump(4);
-		}
-		
-		out.close();
-		
-	}
-	
-	void read_results(std::string filename) {
-		
-		nlohmann::json data;
-		std::ifstream in;
-				
-		if (std::filesystem::exists(filename)) {
-		
-			in.open(filename);
-		
-			in >> data;
-			
-			in.close();
-			
-		} else {
-			
-			throw std::runtime_error("File " + filename + " does not exist");
-			
-		}
-		
-		auto& hfdata = data["hf"];
-			
-		m_scf_energy = hfdata["scf_energy"];
-		m_nuc_energy = hfdata["nuc_energy"];
-		m_wfn_energy = hfdata["nuc_energy"];
-		
-	}
-		
-	
 };
 
 using shared_hf_wfn = std::shared_ptr<hf_wfn>;
@@ -239,7 +94,7 @@ inline void write_hfwfn(std::string name, hf_wfn& hfwfn, filio::data_handler& dh
 		if (mat) {
 			hsize_t nrows = mat->nfullrows_total();
 			hsize_t ncols = mat->nfullcols_total();
-			auto eigen = dbcsr::matrix_to_eigen(*mat);
+			auto eigen = dbcsr::matrix_to_eigen<double,Eigen::RowMajor>(*mat);
 			dh.write<double>(name, eigen.data(), {nrows,ncols}, 0);
 		}
 	};
@@ -279,12 +134,15 @@ inline shared_hf_wfn read_hfwfn(std::string name, desc::smolecule mol,
 		std::vector<int> c, bool throw_if_not_present) 
 	{
 		
+		std::cout << "Looking for " << name << std::endl;
+		
 		int nrows = std::accumulate(r.begin(), r.end(), 0);
 		int ncols = std::accumulate(c.begin(), c.end(), 0);
 		
 		if (throw_if_not_present && !dh.exists(name)) {
 			throw std::runtime_error("Read hfwfn: could not find " + name + ".");
 		} else if (!dh.exists(name)) {
+			std::cout << name << " not present" << std::endl;
 			dbcsr::shared_matrix<double> out = nullptr;
 			return out;
 		}
@@ -295,7 +153,8 @@ inline shared_hf_wfn read_hfwfn(std::string name, desc::smolecule mol,
 			throw std::runtime_error("Read hfwfn: incompatible matrix dimensions.");
 		}
 		
-		Eigen::Map<Eigen::MatrixXd> emap(darray.data, nrows, ncols);
+		Eigen::Map<MatrixX<double,Eigen::RowMajor>>
+			emap(darray.data.data(), nrows, ncols);
 		
 		auto mat = dbcsr::eigen_to_matrix(emap, w, name, r, c, 
 			dbcsr::type::no_symmetry);
@@ -304,10 +163,20 @@ inline shared_hf_wfn read_hfwfn(std::string name, desc::smolecule mol,
 		
 	};
 	
-	auto read_vec = [&](std::string name) {
+	auto read_vec = [&](std::string name, bool throw_if_not_present) {
+		
+		std::cout << "Looking for " << name << std::endl;
+		
+		if (throw_if_not_present && !dh.exists(name)) {
+			throw std::runtime_error("Read hfwfn: could not find " + name + ".");
+		} else if (!dh.exists(name)) {
+			std::cout << name << " not present" << std::endl;
+			std::shared_ptr<std::vector<double>> out = nullptr;
+			return out;
+		}
 		
 		auto darray = dh.read<double>(name);
-		return std::make_shared<std::vector<double>(darray.data);
+		return std::make_shared<std::vector<double>>(darray.data);
 		
 	};
 	
@@ -322,14 +191,14 @@ inline shared_hf_wfn read_hfwfn(std::string name, desc::smolecule mol,
 	auto c_bv_A = read_mat(name + "/c_bv_A", b, va, true);
 	auto c_bv_B = read_mat(name + "/c_bv_B", b, vb, false);
 	
-	auto eps_occ_A = read_vec("/eps_occ_A");
-	auto eps_occ_B = read_vec("/eps_occ_B");
-	auto eps_vir_A = read_vec("/eps_vir_A");
-	auto eps_vir_B = read_vec("/eps_vir_B");
+	auto eps_occ_A = read_vec(name + "/eps_occ_A", true);
+	auto eps_occ_B = read_vec(name + "/eps_occ_B", false);
+	auto eps_vir_A = read_vec(name + "/eps_vir_A", true);
+	auto eps_vir_B = read_vec(name + "/eps_vir_B", false);
 	
-	double scf_energy = dh.read_single<double>("/scf_energy");
-	double nuc_energy = dh.read_single<double>("/nuc_energy");
-	double wfn_energy = dh.read_single<double>("/wfn_energy");
+	double scf_energy = dh.read_single<double>(name + "/scf_energy");
+	double nuc_energy = dh.read_single<double>(name + "/nuc_energy");
+	double wfn_energy = dh.read_single<double>(name + "/wfn_energy");
 	
 	auto hfwfn = std::make_shared<hf_wfn>(
 		mol, c_bo_A, c_bo_B, c_bv_A, c_bv_B, eps_occ_A, eps_occ_B,

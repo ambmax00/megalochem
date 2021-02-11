@@ -3,21 +3,22 @@
 
 #include <Eigen/Core>
 
-//#ifdef USE_SCALAPACK
 #include "extern/scalapack.h"
-//#endif
 #include <dbcsr_matrix.hpp>
 #include <dbcsr_tensor.hpp>
 #include <limits>
 
 
-template <class T>
-using MatrixX = Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic>;
+template <typename T, int StorageOrder>
+using MatrixX = Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic, StorageOrder>;
 
 namespace dbcsr {
 
-template <typename T = double>
-MatrixX<T> matrix_to_eigen(matrix<T>& mat_in, int prow, int pcol) {
+template <typename T = double, int StorageOrder = Eigen::ColMajor>
+MatrixX<T,StorageOrder> matrix_to_eigen(matrix<T>& mat_in) {
+		
+	int prow = -1;
+	int pcol = -1;
 	
 	auto mat_copy = dbcsr::copy(mat_in)
 			.name("Copy of " + mat_in.name())
@@ -38,7 +39,8 @@ MatrixX<T> matrix_to_eigen(matrix<T>& mat_in, int prow, int pcol) {
 		
 		mat_desym->replicate_all();
 			
-		MatrixX<T> eigenmat = MatrixX<T>::Zero(row,col);
+		MatrixX<T,StorageOrder> eigenmat 
+			= MatrixX<T,StorageOrder>::Zero(row,col);
 
 	#pragma omp parallel 
 	{
@@ -94,14 +96,15 @@ MatrixX<T> matrix_to_eigen(matrix<T>& mat_in, int prow, int pcol) {
 			.get();
 			
 		locmat->complete_redistribute(*mat_desym);
-		MatrixX<T>* eigenmat;
+		MatrixX<T,StorageOrder>* eigenmat;
 		
 		if (prow = w.myprow() && pcol == w.mypcol()) {
 			
 			int nrows = mat_in.nfullrows_total();
 			int ncols = mat_in.nfullcols_total();
 			
-			eigenmat = new MatrixX<T>(MatrixX<T>::Zero(nrows,ncols));
+			eigenmat = new MatrixX<T,StorageOrder>(
+				MatrixX<T,StorageOrder>::Zero(nrows,ncols));
 			
 			#pragma omp parallel 
 			{
@@ -129,7 +132,8 @@ MatrixX<T> matrix_to_eigen(matrix<T>& mat_in, int prow, int pcol) {
 			
 		} else {
 			
-			eigenmat = new MatrixX<T>(MatrixX<T>::Zero(0,0));
+			eigenmat = new MatrixX<T,StorageOrder>(
+				MatrixX<T,StorageOrder>::Zero(0,0));
 			
 		}
 		
@@ -143,8 +147,11 @@ template <typename Derived, typename T = double>
 shared_matrix<typename Derived::Scalar> eigen_to_matrix(
 	const Eigen::MatrixBase<Derived>& mat, 
 	world& w, std::string name, vec<int>& row_blk_sizes, 
-	vec<int>& col_blk_sizes, type mtype, int prow, int pcol) 
+	vec<int>& col_blk_sizes, type mtype) 
 {
+	
+	int prow = -1;
+	int pcol = -1;
 	
 	if (prow < 0 || pcol < 0) {
 	
@@ -545,13 +552,13 @@ void copy_matrix_to_tensor(matrix<T>& m_in, tensor<2,T>& t_out, std::optional<bo
 }
 
 template <typename T>
-MatrixX<double> block_norms(matrix<T>& m_in) {
+Eigen::MatrixXd block_norms(matrix<T>& m_in) {
 	
 	// returns an eigen matrix with block norms
 	int nrows = m_in.nblkrows_total();
 	int ncols = m_in.nblkcols_total();
 	
-	MatrixX<double> eigen_out(nrows,ncols);
+	Eigen::MatrixXd eigen_out(nrows,ncols);
 	
 	m_in.replicate_all();
 

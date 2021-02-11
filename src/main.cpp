@@ -12,7 +12,7 @@
 #include "mp/mpmod.h"
 #include "adc/adcmod.h"
 #include "utils/mpi_time.h"
-
+#include "utils/unique.h"
 #include "extern/scalapack.h"
 
 #include <filesystem>
@@ -23,47 +23,15 @@
 #include <Eigen/Eigenvalues>
 #include <Eigen/Core>
 
-class testmvp {
-public:
-	Eigen::MatrixXd m_mat;
-
-	testmvp(Eigen::MatrixXd& A) : m_mat(A) {}
-	
-	dbcsr::shared_matrix<double> compute(dbcsr::shared_matrix<double> u_ia,
-		double omega = 0.0) {
-			
-		auto u_eigen = dbcsr::matrix_to_eigen(*u_ia);
-		int r = u_eigen.rows();
-		int c = u_eigen.cols();
-				
-		Eigen::VectorXd u_vec(r*c);
-		std::copy(u_eigen.data(), u_eigen.data() + r*c, u_vec.data());
-		
-		Eigen::VectorXd sig_vec = m_mat * u_vec;
-		
-		Eigen::MatrixXd sig(r,c);
-		std::copy(sig_vec.data(), sig_vec.data() + r*c, sig.data());
-		
-		auto world = u_ia->get_world();
-		auto rblk = u_ia->row_blk_sizes();
-		auto cblk = u_ia->col_blk_sizes();
-		
-		auto out = dbcsr::eigen_to_matrix(sig, world, "test", rblk, cblk, 
-			dbcsr::type::no_symmetry);
-						
-		return out;
-		
-	}
-	
-};
-
 int main(int argc, char** argv) {
 
 	MPI_Init(&argc, &argv);
 	MPI_Comm comm = MPI_COMM_WORLD;
 	
-	util::mpi_time time(comm, "Megalochem");
+	dbcsr::init();
+	dbcsr::world wrd(comm);
 	
+	util::mpi_time time(comm, "Megalochem");
 	util::mpi_log LOG(comm ,0);
 	
 	//std::cout << std::scientific;
@@ -103,10 +71,6 @@ int main(int argc, char** argv) {
 	//set working directory
 	std::filesystem::current_path(workdir);
 	
-	//create data and batching directory
-	std::filesystem::create_directory(filename + "_data");
-	std::filesystem::create_directory("batching");
-	
 	// set up files
 	std::string hdf5file = filename + ".hdf5";
 	std::string hdf5backup = filename + ".back.hdf5";
@@ -114,17 +78,17 @@ int main(int argc, char** argv) {
 	filio::data_handler *dh, *dh_back;
 	
 	if (std::filesystem::exists(hdf5file)) {
-		std::filesystem::copy(hdf5file, hdf5backup);
+		if (wrd.rank() == 0 && std::filesystem::exists(hdf5backup))
+			std::filesystem::remove(hdf5backup);
+		
+		if (wrd.rank() == 0) std::filesystem::copy(hdf5file, hdf5backup);
+		
 		dh_back = new filio::data_handler(hdf5backup, 
-			filio::create_mode::truncate, comm);
+			filio::create_mode::append, comm);
 	}
 	
 	dh = new filio::data_handler(hdf5file, filio::create_mode::truncate, 
 		comm);
-	
-	dbcsr::init();
-	
-	dbcsr::world wrd(comm);
 	
 	LOG.os<>("Running ", wrd.size(), " MPI processes with ", omp_get_max_threads(), " threads each.\n\n");
 	
@@ -152,6 +116,8 @@ int main(int argc, char** argv) {
 	auto mol = filio::parse_molecule(data,comm,0);
 	auto opt = filio::parse_options(data,comm,0);
 	
+	desc::write_molecule("molecule", *mol, *dh);
+	
 	if (wrd.rank() == 0) {
 		opt.print();
 	}
@@ -168,16 +134,13 @@ int main(int argc, char** argv) {
 	
 		myhf.compute();
 		myhfwfn = myhf.wfn();
-		myhfwfn->write_to_file(filename);
-		myhfwfn->write_results(filename + "_data/out.json");
-		
-		hf::write_hfwfn("wavefunction", *myhfwfn, *dh);
+		hf::write_hfwfn("hf_wfn", *myhfwfn, *dh);
 		
 	} else {
 		
 		LOG.os<>("Reading HF info from files...\n");
-		myhfwfn->read_from_file(filename,mol,wrd);
-		myhfwfn->read_results(filename + "_data/out.json");
+		myhfwfn = hf::read_hfwfn("hf_wfn", mol, wrd, *dh_back);
+		hf::write_hfwfn("hf_wfn", *myhfwfn, *dh);
 		LOG.os<>("Done.\n");
 		
 	}

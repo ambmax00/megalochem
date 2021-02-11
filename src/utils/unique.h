@@ -1,34 +1,35 @@
 #ifndef UTIL_UNIQUE_DIR_H
 #define UTIL_UNIQUE_DIR_H
 
+#include <filesystem>
+#include <mpi.h>
+
 // functions to obtain unique file names and directories
 
 namespace util {
 	
-std::string unique(std::string prefix, std::string suffix) {
+inline std::string unique(std::string prefix, std::string suffix, MPI_Comm comm) {
+	
+	int rank = -1;
+	MPI_Comm_rank(comm, &rank);
+	
+	long long int id = 0;
+	
+	if (rank == 0) {
+		for (long long int ii = 0; ii <= std::numeric_limits<size_t>::max(); ++ii) {
+			id = ii;
+			std::string fname = prefix + std::to_string(id) + suffix;
+			if (!std::filesystem::exists(fname)) break;
+		}
+	}
+	
+	MPI_Bcast(&id, 1, MPI_LONG_LONG, 0, comm);
 	
 	std::string uname;
-	for (size_t ii = 0; ii <= std::numeric_limits<size_t>::max(); ++ii) {
-		
-		uname = prefix + std::to_string(ii) + suffix;
-		if (!std::filesyste::exists(uname)) break;
-		
-	}
+	uname = prefix + std::to_string(id) + suffix;
 	
 	return uname;
 	
-}
-	
-std::string unique_file() {
-	return unique("megafile_", ".dat");
-}
-
-std::string unique_dir() {
-	return unique("megadir_", "");
-}
-
-std::string unique_workdir() {
-	return unique("megaworkdir_", "");
 }
 	
 } // end namespace

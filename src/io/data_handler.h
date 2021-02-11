@@ -178,17 +178,17 @@ public:
 
 		if (cmode == create_mode::truncate) {
 			
-			if (fs::exists(_filename)) fs::remove(_filename);
+			if (_rank == 0 && fs::exists(_filename)) fs::remove(_filename);
 			auto file_id = H5Fcreate(_abs_filename.c_str(), H5F_ACC_TRUNC, 
 				H5P_DEFAULT, _plist_id);
 			H5Fclose(file_id);
 
 		} else {
 
-			if (fs::exists(_filename)) 
+			if (!fs::exists(_filename)) 
 				throw std::runtime_error(
 				"Datahandler: file " + _abs_filename + 
-			       	" already exists!");	       
+			       	" does not exist!");	       
 		}
 	
 	}

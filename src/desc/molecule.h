@@ -5,6 +5,7 @@
 #include "utils/ppdirs.h"
 #include "desc/atom.h"
 #include "desc/basis.h"
+#include "io/data_handler.h"
 
 #include <vector>
 #include <mpi.h>
@@ -266,6 +267,38 @@ public:
 
 inline create_mol_base create_molecule() {
 	return create_mol_base();
+}
+
+inline void write_molecule(std::string name, desc::molecule& mol, filio::data_handler& dh) {
+
+	dh.open(filio::access_mode::rdwr);
+	dh.create_group(name);
+	
+	// write constants
+	dh.write<std::string>(name + "/name", mol.name());
+	dh.write<int>(name + "/charge", mol.charge());
+	dh.write<int>(name + "/mult", mol.mult());
+	dh.write<int>(name + "/mo_split", mol.mo_split());
+	
+	// write atoms
+	auto atoms = mol.atoms();
+	
+	hsize_t natoms = atoms.size();
+	hsize_t slots = 4;
+	
+	std::vector<double> atom_vec;
+	
+	for (auto a : atoms) {
+		atom_vec.push_back((double)a.atomic_number);
+		atom_vec.push_back(a.x);
+		atom_vec.push_back(a.y);
+		atom_vec.push_back(a.z);
+	}
+	
+	dh.write<double>(name + "/atoms", atom_vec.data(), {natoms,slots});
+	
+	dh.close();
+	
 }
 
 } // end namespace
