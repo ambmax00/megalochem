@@ -6,12 +6,11 @@
 #include <cstdlib>
 
 #include "io/io.h"
-#include "io/reader.h"
+#include "io/parser.h"
 #include "io/valid_keys.h"
 
 #include "utils/ele_to_int.h"
 #include "utils/constants.h"
-#include "utils/json.hpp"
 
 #include "desc/molecule.h"
 
@@ -55,7 +54,7 @@ void validate(std::string section, const json& j, const json& compare) {
 	
 }
 
-std::vector<desc::Atom> get_geometry(const json& j, std::string filename, util::mpi_log& LOG) {
+std::vector<desc::Atom> get_geometry(const json& j, util::mpi_log& LOG) {
 	
 	std::vector<desc::Atom> out;
 	
@@ -183,35 +182,14 @@ T assign(json& j, std::string name, T default_val) {
 	auto it = j.find(name);
 	return (it != j.end()) ? (T)it.value() : default_val;
 }
-	  	
 
-reader::reader(MPI_Comm comm, std::string filename, int print) : m_comm(comm), LOG(comm, print) {
+desc::smolecule parse_molecule(json& jdata, MPI_Comm comm, int nprint) {
 	
-	std::ifstream in;
-	in.open(filename + ".json");
+	util::mpi_log LOG(comm,nprint);
 	
-	if (!in) {
-		throw std::runtime_error("Input file not found.");
-	}
+	validate("all", jdata, valid_keys);
 	
-	LOG.os<>("Reading input file...\n\n");
-
-	json data;
-	
-	in >> data;
-	
-	validate("all", data, valid_keys);
-	
-	if (data.find("global") != data.end()) {
-		json& jglob = data["global"];
-		
-		dbcsr::global::filter_eps = assign<double>(jglob, "block_threshold", 1e-9);
-		ints::global::precision = assign<double>(jglob, "integral_precision", 1e-9);
-		ints::global::omega = assign<double>(jglob, "integral_omega", 0.1);
-
-	}
-	
-	json& jmol = data["molecule"];
+	json& jmol = jdata["molecule"];
 	
 	int mo_split;
 	std::string ao_split_method;
@@ -220,7 +198,7 @@ reader::reader(MPI_Comm comm, std::string filename, int print) : m_comm(comm), L
 	ao_split_method = assign<std::string>(jmol, "ao_split_method", "atomic");
 	
 	LOG.os<>("Processing atomic coordinates...\n");
-	auto atoms = get_geometry(jmol,filename,LOG);
+	auto atoms = get_geometry(jmol,LOG);
 	
 	bool reorder = assign<bool>(jmol, "reorder", false);
 	
@@ -278,8 +256,8 @@ reader::reader(MPI_Comm comm, std::string filename, int print) : m_comm(comm), L
 	
 	LOG.reset();
 	
-	m_mol = desc::create_molecule()
-		.comm(m_comm)
+	auto mol = desc::create_molecule()
+		.comm(comm)
 		.name(name)
 		.atoms(atoms)
 		.basis(cbas)
@@ -288,15 +266,34 @@ reader::reader(MPI_Comm comm, std::string filename, int print) : m_comm(comm), L
 		.mo_split(mo_split)
 		.get();
 		
-	m_mol->print_info(1);
+	mol->print_info(1);
 	LOG.os<>('\n');
+	
+	return mol;
+	
+}
+
+desc::options parse_options(json& jdata, MPI_Comm comm, int nprint) {
+		
+	util::mpi_log LOG(comm,nprint);	
+
+	validate("all", jdata, valid_keys);
+	
+	if (jdata.find("global") != jdata.end()) {
+		json& jglob = jdata["global"];
+		
+		dbcsr::global::filter_eps = assign<double>(jglob, "block_threshold", 1e-9);
+		ints::global::precision = assign<double>(jglob, "integral_precision", 1e-9);
+		ints::global::omega = assign<double>(jglob, "integral_omega", 0.1);
+
+	}
 	
 	desc::options opt;
 	
 	auto read_section = [&](std::string r)
 	{
-		if (data.find(r) != data.end()) {
-			unpack(data, opt, r, r, LOG);
+		if (jdata.find(r) != jdata.end()) {
+			unpack(jdata, opt, r, r, LOG);
 			opt.set<bool>("do_"+r, true);
 		} else {
 			opt.set<bool>("do_"+r, false);
@@ -307,14 +304,7 @@ reader::reader(MPI_Comm comm, std::string filename, int print) : m_comm(comm), L
 	read_section("mp");
 	read_section("adc");
 	
-	//std::cout << opt.get<bool>("hf/diis") << std::endl;
-	//std::cout << opt.get<double>("hf/conv") << std::endl;
-	
-	//if (opt.get<bool>("hf/use_df",false)) {
-	//	std::cout << "Using DENSITY FITTING." << std::endl;
-	//}
-	
-	m_opt = opt;
+	return opt;
 	
 }
 

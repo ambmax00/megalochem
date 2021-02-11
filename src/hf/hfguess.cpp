@@ -257,13 +257,29 @@ void hfmod::compute_guess() {
 			
 			auto at_wfn = atomic_hf.wfn();
 			
-			auto pA = at_wfn->po_bb_A();
-			auto pB = at_wfn->po_bb_B();
+			auto coA = at_wfn->c_bo_A();
+			auto coB = at_wfn->c_bo_B();
+			
+			auto b = at_smol->dims().b();
+			auto pA = dbcsr::create<double>()
+				.name("p_bb_A")
+				.set_world(at_world)
+				.row_blk_sizes(b)
+				.col_blk_sizes(b)
+				.matrix_type(dbcsr::type::symmetric)
+				.get();
+				
+			auto pB = dbcsr::create_template<double>(*pA)
+				.name("p_bb_B")
+				.get();
+				
+			dbcsr::multiply('N', 'T', *coA, *coA, *pA).perform();
+			if (coB) dbcsr::multiply('N', 'T', *coB, *coB, *pB).perform();
 			
 			//std::cout << "PA on rank: " << myrank << std::endl;
 			//dbcsr::print(*pA);
 			
-			if (pB) {
+			if (coB) {
 			
 				auto pscaled = dbcsr::copy<double>(*pA)
 					.name(at_smol->name() + "_density").get();

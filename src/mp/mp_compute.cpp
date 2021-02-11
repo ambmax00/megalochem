@@ -200,9 +200,6 @@ void mpmod::compute() {
 	//                         SETUP OTHER TENSORS
 	//==================================================================
 	
-	auto p_occ = m_hfwfn->po_bb_A();
-	auto p_vir = m_hfwfn->pv_bb_A();
-	
 	auto c_occ = m_hfwfn->c_bo_A();
 	auto c_vir = m_hfwfn->c_bv_A();
 	
@@ -214,10 +211,10 @@ void mpmod::compute() {
 	auto c_vir_exp = dbcsr::create_template(*c_vir)
 		.name("Scaled Vir Coeff").get();
 		
-	auto pseudo_occ = dbcsr::create_template(*p_occ)
+	auto pseudo_occ = dbcsr::create_template(*s_bb)
 		.name("Pseudo Density (OCC)").get();
 		
-	auto pseudo_vir = dbcsr::create_template(*p_vir)
+	auto pseudo_vir = dbcsr::create_template(*s_bb)
 		.name("Pseudo Density (VIR)").get();
 		
 	auto ztilde_XX = dbcsr::create_template(*metric_matrix)

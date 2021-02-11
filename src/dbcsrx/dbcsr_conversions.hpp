@@ -17,15 +17,11 @@ using MatrixX = Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic>;
 namespace dbcsr {
 
 template <typename T = double>
-MatrixX<T> matrix_to_eigen(matrix<T>& mat_in) {
-	
-	int row = mat_in.nfullrows_total();
-	int col = mat_in.nfullcols_total();
+MatrixX<T> matrix_to_eigen(matrix<T>& mat_in, int prow, int pcol) {
 	
 	auto mat_copy = dbcsr::copy(mat_in)
-		.name("Copy of " + mat_in.name())
-		.get();
-	
+			.name("Copy of " + mat_in.name())
+			.get();
 	decltype(mat_copy) mat_desym;
 	
 	if (mat_copy->has_symmetry()) {
@@ -34,79 +30,214 @@ MatrixX<T> matrix_to_eigen(matrix<T>& mat_in) {
 		mat_desym = mat_copy;
 	}
 	
-	mat_desym->replicate_all();
+	if (prow < 0 || pcol < 0) {
+		// replicate on all ranks
 		
-	MatrixX<T> eigenmat = MatrixX<T>::Zero(row,col);
-
-#pragma omp parallel 
-{
-
-	iterator<T> iter(*mat_desym);
-	
-	iter.start();
-	
-	while (iter.blocks_left()) {
+		int row = mat_in.nfullrows_total();
+		int col = mat_in.nfullcols_total();
 		
-		iter.next_block();
-		for (int j = 0; j != iter.col_size(); ++j) {
-			for (int i = 0; i != iter.row_size(); ++i) {
-				eigenmat(i + iter.row_offset(), j + iter.col_offset())
-					= iter(i,j);
+		mat_desym->replicate_all();
+			
+		MatrixX<T> eigenmat = MatrixX<T>::Zero(row,col);
+
+	#pragma omp parallel 
+	{
+
+		iterator<T> iter(*mat_desym);
+		
+		iter.start();
+		
+		while (iter.blocks_left()) {
+			
+			iter.next_block();
+			for (int j = 0; j != iter.col_size(); ++j) {
+				for (int i = 0; i != iter.row_size(); ++i) {
+					eigenmat(i + iter.row_offset(), j + iter.col_offset())
+						= iter(i,j);
+				}
 			}
+		
 		}
-	
+		
+		iter.stop();
+		mat_desym->finalize();	
+		
 	}
-	
-	iter.stop();
-	mat_desym->finalize();	
-	
-}
 
-	return eigenmat;
-	
-}
-
-template <typename T = double>
-shared_matrix<T> eigen_to_matrix(MatrixX<T>& mat, world& w, std::string name, vec<int>& row_blk_sizes, 
-	vec<int>& col_blk_sizes, type mtype) {
-	
-	auto out = create<T>().name(name).set_world(w).row_blk_sizes(row_blk_sizes)
-		.col_blk_sizes(col_blk_sizes).matrix_type(mtype).get();
-	
-	if (out->has_symmetry()) {
-		//reserve upper diagonal blocks
-		out->reserve_sym();
+		return eigenmat;
 		
 	} else {
 		
-		out->reserve_all();
+		// eigen matrix only on one rank
+		auto w = mat_in.get_world();
 		
-	}
-	
-#pragma omp parallel 
-{
-	
-	iterator<T> iter(*out);
-	
-	iter.start();
-	
-	while (iter.blocks_left()) {
+		int nblkrow = mat_in.nblkrows_total();
+		int nblkcol = mat_in.nblkcols_total();
 		
-		iter.next_block();
+		std::vector<int> rowdist(nblkrow,prow);
+		std::vector<int> coldist(nblkcol,pcol);
 		
-		for (int j = 0; j != iter.col_size(); ++j) {
-			for (int i = 0; i != iter.row_size(); ++i) {
-				iter(i,j) = mat(i + iter.row_offset(), j + iter.col_offset());
+		dist locdist = dist::create()
+			.set_world(w)
+			.row_dist(rowdist)
+			.col_dist(coldist);
+			
+		auto rblksizes = mat_in.row_blk_sizes();
+		auto cblksizes = mat_in.col_blk_sizes();
+			
+		auto locmat = dbcsr::create<double>()
+			.set_dist(locdist)
+			.name("locmat")
+			.row_blk_sizes(rblksizes)
+			.col_blk_sizes(cblksizes)
+			.matrix_type(dbcsr::type::no_symmetry)
+			.get();
+			
+		locmat->complete_redistribute(*mat_desym);
+		MatrixX<T>* eigenmat;
+		
+		if (prow = w.myprow() && pcol == w.mypcol()) {
+			
+			int nrows = mat_in.nfullrows_total();
+			int ncols = mat_in.nfullcols_total();
+			
+			eigenmat = new MatrixX<T>(MatrixX<T>::Zero(nrows,ncols));
+			
+			#pragma omp parallel 
+			{
+
+				iterator<T> iter(*locmat);
+				
+				iter.start();
+				
+				while (iter.blocks_left()) {
+					
+					iter.next_block();
+					for (int j = 0; j != iter.col_size(); ++j) {
+						for (int i = 0; i != iter.row_size(); ++i) {
+							(*eigenmat)(i + iter.row_offset(), j + iter.col_offset())
+								= iter(i,j);
+						}
+					}
+				
+				}
+				
+				iter.stop();
+				locmat->finalize();	
+				
 			}
+			
+		} else {
+			
+			eigenmat = new MatrixX<T>(MatrixX<T>::Zero(0,0));
+			
 		}
+		
+		return *eigenmat;
+		
 	}
-	
-	iter.stop();
-	out->finalize();
 	
 }
 
-	return out;
+template <typename Derived, typename T = double>
+shared_matrix<typename Derived::Scalar> eigen_to_matrix(
+	const Eigen::MatrixBase<Derived>& mat, 
+	world& w, std::string name, vec<int>& row_blk_sizes, 
+	vec<int>& col_blk_sizes, type mtype, int prow, int pcol) 
+{
+	
+	if (prow < 0 || pcol < 0) {
+	
+		auto out = create<T>().name(name).set_world(w).row_blk_sizes(row_blk_sizes)
+			.col_blk_sizes(col_blk_sizes).matrix_type(mtype).get();
+		
+		if (out->has_symmetry()) {
+			out->reserve_sym();
+		} else {
+			out->reserve_all();
+		}
+		
+		#pragma omp parallel 
+		{
+			iterator<T> iter(*out);
+			iter.start();
+			
+			while (iter.blocks_left()) {
+				
+				iter.next_block();
+				
+				for (int j = 0; j != iter.col_size(); ++j) {
+					for (int i = 0; i != iter.row_size(); ++i) {
+						iter(i,j) = mat(i + iter.row_offset(), j + iter.col_offset());
+					}
+				}
+			}
+			iter.stop();
+			out->finalize();
+		}
+
+		return out;
+		
+	} else {
+		
+		std::vector<int> rowdist(row_blk_sizes.size(), prow),
+			coldist(col_blk_sizes.size(), pcol);
+			
+		dist locdist = dist::create()
+			.set_world(w)
+			.row_dist(rowdist)
+			.col_dist(coldist);
+		
+		auto locmat = create<T>()
+			.name(name)
+			.set_dist(locdist)
+			.row_blk_sizes(row_blk_sizes)
+			.col_blk_sizes(col_blk_sizes)
+			.matrix_type(mtype)
+			.get();
+		
+		auto out = create<T>()
+			.name(name)
+			.set_world(w)
+			.row_blk_sizes(row_blk_sizes)
+			.col_blk_sizes(col_blk_sizes)
+			.matrix_type(mtype)
+			.get();
+			
+		if (locmat->has_symmetry()) {
+			locmat->reserve_sym();
+		} else {
+			locmat->reserve_all();
+		}
+		
+		if (prow == w.myprow() && pcol == w.mypcol()) {
+		
+			#pragma omp parallel 
+			{
+				iterator<T> iter(*locmat);
+				iter.start();
+				
+				while (iter.blocks_left()) {
+					
+					iter.next_block();
+					
+					for (int j = 0; j != iter.col_size(); ++j) {
+						for (int i = 0; i != iter.row_size(); ++i) {
+							iter(i,j) = mat(i + iter.row_offset(), j + iter.col_offset());
+						}
+					}
+				}
+				iter.stop();
+				locmat->finalize();
+			}
+			
+		}
+		
+		out->complete_redistribute(*locmat);
+		
+		return out;
+		
+	}
 	
 }
 

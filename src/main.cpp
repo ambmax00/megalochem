@@ -6,8 +6,8 @@
 #include <dbcsr_matrix.hpp>
 #include <dbcsr_conversions.hpp>
 #include <dbcsr_matrix_ops.hpp>
-#include "io/reader.h"
-#include "io/io.h"
+#include "io/parser.h"
+#include "io/data_handler.h"
 #include "hf/hfmod.h"
 #include "mp/mpmod.h"
 #include "adc/adcmod.h"
@@ -60,10 +60,11 @@ public:
 int main(int argc, char** argv) {
 
 	MPI_Init(&argc, &argv);
+	MPI_Comm comm = MPI_COMM_WORLD;
 	
-	util::mpi_time time(MPI_COMM_WORLD, "Megalochem");
+	util::mpi_time time(comm, "Megalochem");
 	
-	util::mpi_log LOG(MPI_COMM_WORLD,0);
+	util::mpi_log LOG(comm ,0);
 	
 	//std::cout << std::scientific;
 
@@ -106,9 +107,24 @@ int main(int argc, char** argv) {
 	std::filesystem::create_directory(filename + "_data");
 	std::filesystem::create_directory("batching");
 	
+	// set up files
+	std::string hdf5file = filename + ".hdf5";
+	std::string hdf5backup = filename + ".back.hdf5";
+	
+	filio::data_handler *dh, *dh_back;
+	
+	if (std::filesystem::exists(hdf5file)) {
+		std::filesystem::copy(hdf5file, hdf5backup);
+		dh_back = new filio::data_handler(hdf5backup, 
+			filio::create_mode::truncate, comm);
+	}
+	
+	dh = new filio::data_handler(hdf5file, filio::create_mode::truncate, 
+		comm);
+	
 	dbcsr::init();
 	
-	dbcsr::world wrd(MPI_COMM_WORLD);
+	dbcsr::world wrd(comm);
 	
 	LOG.os<>("Running ", wrd.size(), " MPI processes with ", omp_get_max_threads(), " threads each.\n\n");
 	
@@ -124,70 +140,25 @@ int main(int argc, char** argv) {
 	c_blacs_gridinit(&gridctxt, 'R', wrd.nprow(), wrd.npcol());
 	scalapack::global_grid.set(gridctxt);
 	
-	filio::reader filereader(MPI_COMM_WORLD, filename);
+	std::string input_file = filename + ".json";
+	if (!std::filesystem::exists(input_file)) {
+		throw std::runtime_error("Could not find input file!");
+	}
 	
-	auto mol = filereader.get_mol();
-	auto opt = filereader.get_opt();
+	nlohmann::json data;
+	std::ifstream ifstr(input_file);
+	ifstr >> data;
+	
+	auto mol = filio::parse_molecule(data,comm,0);
+	auto opt = filio::parse_options(data,comm,0);
 	
 	if (wrd.rank() == 0) {
 		opt.print();
 	}
 	
-	/*
-	int no = 6;
-	int nv = 12;
-	int nroots = 8;
-	double sparsity = 0.01;
-	
-	std::vector<int> rblk = {no};
-	std::vector<int> cblk = {nv};
-	
-	std::vector<dbcsr::shared_matrix<double>> guesses(nroots);
-	for (int i = 0; i != nroots; ++i) {
-		Eigen::MatrixXd guess_eigen = Eigen::MatrixXd::Zero(no,nv);
-		guess_eigen.data()[i] = 1.0;
-		guesses[i] = dbcsr::eigen_to_matrix(guess_eigen, wrd, "test", rblk, cblk, 
-			dbcsr::type::no_symmetry);
-	}
-	
-	auto diagm = dbcsr::copy(guesses[0]).get();
-	diagm->set(2.0);	
-
-	Eigen::MatrixXd M = Eigen::MatrixXd::Random(no*nv, no*nv);
-	
-	Eigen::MatrixXd Mt = M.transpose();
-	M = 0.5 * M + 0.5 * Mt;
-	
-	M = sparsity * M;
-	for (int i = 0; i != M.rows(); ++i) {
-		M(i,i) = i+1.2;
-	}
-	
-	std::cout << M << std::endl;
-	
-	std::shared_ptr<testmvp> test = std::make_shared<testmvp>(M);
-	
-	math::davidson<testmvp> dav(MPI_COMM_WORLD, 3);
-	dav.set_factory(test);
-	dav.set_diag(diagm);
-	dav.compute(guesses, nroots);
-	
-	Eigen::SelfAdjointEigenSolver<Eigen::MatrixXd> es;
-	es.compute(M);
-			
-	auto evals = es.eigenvalues();
-	auto evecs = es.eigenvectors();
-	
-	for (int i = 0; i != nroots; ++i) {
-		std::cout << evals(i) << " ";
-	} std::cout << std::endl;
-	
-	exit(0);
-	*/
-	
 	auto hfopt = opt.subtext("hf");
 	
-	hf::shared_hf_wfn myhfwfn = std::make_shared<hf::hf_wfn>();
+	hf::shared_hf_wfn myhfwfn;
 	hf::hfmod myhf(wrd,mol,hfopt);
 
 	bool skip_hf = hfopt.get<bool>("skip", false);
@@ -199,6 +170,8 @@ int main(int argc, char** argv) {
 		myhfwfn = myhf.wfn();
 		myhfwfn->write_to_file(filename);
 		myhfwfn->write_results(filename + "_data/out.json");
+		
+		hf::write_hfwfn("wavefunction", *myhfwfn, *dh);
 		
 	} else {
 		

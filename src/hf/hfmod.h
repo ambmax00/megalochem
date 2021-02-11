@@ -82,21 +82,6 @@ public:
 	
 	hf::shared_hf_wfn wfn() { 
 		
-		hf::hf_wfn* ptr = new hf::hf_wfn();
-		
-		hf::shared_hf_wfn out(ptr);
-		
-		out->m_mol = m_mol;
-			
-		out->m_po_bb_A = m_p_bb_A;
-		out->m_po_bb_B = m_p_bb_B;
-		
-		// compute virtual densities
-		compute_virtual_density();
-		
-		out->m_pv_bb_A = m_pv_bb_A;
-		out->m_pv_bb_B = m_pv_bb_B;
-		
 		// separate occupied and virtual coefficient matrix
 		auto separate = [&](dbcsr::shared_matrix<double>& in, 
 			dbcsr::shared_matrix<double>& out_o, 
@@ -136,33 +121,28 @@ public:
 				
 		};
 		
-		out->m_eps_occ_A = std::make_shared<std::vector<double>>(m_eps_A->begin(), m_eps_A->begin() + m_mol->nocc_alpha());
-		if (m_eps_B) 
-			out->m_eps_occ_B = std::make_shared<std::vector<double>>(m_eps_B->begin(), m_eps_B->begin() + m_mol->nocc_beta());
-		out->m_eps_vir_A = std::make_shared<std::vector<double>>(m_eps_A->begin() + m_mol->nocc_alpha(), m_eps_A->end());
-		if (m_eps_B) 
-			out->m_eps_vir_B = std::make_shared<std::vector<double>>(m_eps_B->begin() + m_mol->nocc_beta(), m_eps_B->end());
-			
-		//std::cout << "HERE IS OCC ENERGY: " << std::endl;
-		//for (auto e : *(out->m_eps_occ_A)) {
-		//	std::cout << e << std::endl;
-		//}
+		std::shared_ptr<std::vector<double>> epsoA, epsoB, epsvA, epsvB;
 		
+		epsoA = std::make_shared<std::vector<double>>(m_eps_A->begin(), 
+			m_eps_A->begin() + m_mol->nocc_alpha());
+		if (m_eps_B) 
+			epsoB = std::make_shared<std::vector<double>>(m_eps_B->begin(), 
+				m_eps_B->begin() + m_mol->nocc_beta());
+			
+		epsvA = std::make_shared<std::vector<double>>(m_eps_A->begin() 
+			+ m_mol->nocc_alpha(), m_eps_A->end());
+		if (m_eps_B) 
+			epsvB = std::make_shared<std::vector<double>>(m_eps_B->begin() 
+				+ m_mol->nocc_beta(), m_eps_B->end());
+			
 		smat_d cboA, cboB, cbvA, cbvB;
 		separate(m_c_bm_A, cboA, cbvA, "A");
-		
-		//dbcsr::print(*m_c_bm_A);
-		
+				
 		if (m_c_bm_B) separate(m_c_bm_B, cboB, cbvB, "B");
 		
-		out->m_c_bo_A = cboA;
-		out->m_c_bv_A = cbvA;
-		out->m_c_bo_B = cboB;
-		out->m_c_bv_B = cbvB;
-
-		out->m_scf_energy = m_scf_energy;
-		out->m_nuc_energy = m_nuc_energy;
-		out->m_wfn_energy = m_scf_energy + m_nuc_energy;
+		auto out = std::make_shared<hf_wfn>(m_mol, cboA, cboB, cbvA, cbvB,
+			epsoA, epsoB, epsvA, epsvB, m_scf_energy, m_nuc_energy,
+			m_nuc_energy + m_scf_energy);
 		
 		return out; 
 	

@@ -1,6 +1,6 @@
 set (SOURCES
-	reader.h
-	reader.cpp
+	parser.h
+	parser.cpp
 	io.h
 	io.cpp
 )
