@@ -9,6 +9,7 @@
 #include "fock/jkbuilder.hpp"
 #include "mp/z_builder.hpp"
 #include "adc/adc_defaults.hpp"
+#include "math/laplace/laplace_helper.hpp"
 
 namespace adc {
 	
@@ -149,22 +150,24 @@ private:
 	dbcsr::btype m_btype;
 	
 	// created with init()
+	
 	std::vector<double> m_weights, m_xpoints, 
 		m_weights_dd, m_xpoints_dd;
+		
+	double m_prev_omega = -1;
+	
+	double m_old_omega = -1.0;
+	
+	std::shared_ptr<math::laplace_helper> m_laphelper_ss, 
+		m_laphelper_dd;
+	
 	std::shared_ptr<fock::J> m_jbuilder;
 	std::shared_ptr<fock::K> m_kbuilder;
 	std::shared_ptr<mp::Z> m_zbuilder;
-	std::vector<smat> m_pseudo_occs, m_pseudo_virs;
+	
 	dbcsr::shared_pgrid<2> m_spgrid2;
 	std::shared_ptr<Eigen::MatrixXi> m_shellpairs;
-	dbcsr::shared_matrix<double> m_ssqrt_bb, m_sinvqrt_bb;
-	
-	// private functions
-	smat get_scaled_coeff(char dim, double wght, double xpt, 
-		double wfactor, double xfactor);
-	smat get_ortho_cholesky(char dim, double wght, double xpt, 
-		double wfactor, double xfactor);
-	smat get_density(smat coeff);
+	dbcsr::shared_matrix<double> m_s_sqrt_bb, m_s_invsqrt_bb;
 	
 	// adc 1
 	std::pair<smat,smat> compute_jk(smat& u_ao);
@@ -199,8 +202,6 @@ private:
 		dbcsr::sbtensor<3,double>& I_xob_batched, 
 		smat& L_bo, double omega);
 		
-		
-	
 	smat compute_sigma_2e_OV(smat& u_ao, double omega);
 	
 	std::tuple<dbcsr::sbtensor<3,double>,dbcsr::sbtensor<3,double>>

@@ -9,101 +9,6 @@
 //#define _DLOG
 
 namespace adc {
-	
-/* =====================================================================
- *                         AUXILIARY FUNCTIONS
- * ====================================================================*/
-	
-smat MVP_AORISOSADC2::get_scaled_coeff(char dim, double wght, double xpt, 
-	double wfactor, double xfactor) {
-	
-	auto c_bm = (dim == 'O') ? m_c_bo : m_c_bv;
-	auto eps_m = (dim == 'O') ? m_eps_occ : m_eps_vir;
-	int sign = (dim == 'O') ? 1 : -1;
-	
-	auto c_bm_scaled = dbcsr::copy(*c_bm).get();
-	auto eps_scaled = eps_m;
-	
-	std::for_each(eps_scaled.begin(),eps_scaled.end(),
-		[xpt,wght,wfactor,xfactor,sign](double& eps) {
-			eps = exp(wfactor * log(wght) + sign * xfactor * eps * xpt);
-	});
-			
-	c_bm_scaled->scale(eps_scaled, "right");
-	
-	return c_bm_scaled;
-	
-}
-
-smat MVP_AORISOSADC2::get_density(smat coeff) {
-	
-	auto b = m_mol->dims().b();
-	
-	auto p_bb = dbcsr::create<double>()
-		.set_world(m_world)
-		.name("density matrix")
-		.row_blk_sizes(b)
-		.col_blk_sizes(b)
-		.matrix_type(dbcsr::type::symmetric)
-		.get();
-		
-	dbcsr::multiply('N', 'T', *coeff, *coeff, *p_bb).perform();
-	
-	return p_bb;
-	
-}
-
-smat MVP_AORISOSADC2::get_ortho_cholesky(char dim, double wght, double xpt, 
-	double wfactor, double xfactor) {
-		
-	auto coeff = get_scaled_coeff(dim, wght, xpt, wfactor, xfactor);
-	
-	int max_rank = coeff->nfullcols_total();
-	
-	auto coeff_ortho = dbcsr::create_template<double>(*coeff)
-		.name("co_ortho")
-		.get();
-	
-	dbcsr::multiply('N', 'N', *m_ssqrt_bb, *coeff, *coeff_ortho)
-		.perform();
-		
-	auto p_ortho = get_density(coeff_ortho);
-	
-	math::pivinc_cd chol(p_ortho, LOG.global_plev());
-	chol.compute(max_rank);
-	
-	int rank = chol.rank();
-	
-	auto b = m_mol->dims().b();
-	auto u = dbcsr::split_range(rank, m_mol->mo_split());
-	
-	LOG.os<1>("Cholesky decomposition rank: ", rank, '\n');
-
-	static int i = 0;
-	++i;
-	
-	std::string filename_ortho = std::string(std::filesystem::current_path())
-		+ "/cholortho_" + dim + "_" + std::to_string(i);
-
-	std::string filename = std::string(std::filesystem::current_path())
-		+ "/chol_" + dim + "_" + std::to_string(i);
-
-	auto L_bu_ortho = chol.L(b, u);
-	
-	util::plot(L_bu_ortho, 1e-5, filename_ortho);
-	
-	auto L_bu = dbcsr::create_template<double>(*L_bu_ortho)
-		.name("L_bu")
-		.get();
-		
-	dbcsr::multiply('N', 'N', *m_sinvqrt_bb, *L_bu_ortho, *L_bu)
-		.perform();
-		
-	util::plot(L_bu, 1e-5, filename);
-		
-	return L_bu;
-	
-}	
 
 /* =====================================================================
  *                         INITIALIZING FUNCTIONS
@@ -117,59 +22,33 @@ void MVP_AORISOSADC2::init() {
 	
 	TIME.start();
 	t_init.start();
-	
-	// laplace
-	LOG.os<1>("Computing laplace points.\n");
-		
-	double emin = m_eps_occ.front();
-	double ehomo = m_eps_occ.back();
-	double elumo = m_eps_vir.front();
-	double emax = m_eps_vir.back();
-	
-	double ymin = 2*(elumo - ehomo);
-	double ymax = 2*(emax - emin);
-	
-	LOG.os<1>("eps_min/eps_homo/eps_lumo/eps_max ", emin, " ", ehomo, " ", elumo, " ", emax, '\n');
-	LOG.os<1>("ymin/ymax ", ymin, " ", ymax, '\n');
-	
-	math::laplace lp(m_world.comm(), LOG.global_plev());
-	
-	lp.compute(m_nlap, ymin, ymax);
-		
-	m_weights = lp.omega();
-	m_xpoints = lp.alpha();
-	
-	m_pseudo_occs.resize(m_nlap);
-	m_pseudo_virs.resize(m_nlap);
-	
-	for (int ilap = 0; ilap != m_nlap; ++ilap) {
-		
-		double wght = m_weights[ilap];
-		double xpt = m_xpoints[ilap];
-		
-		auto c_bo_ilap = get_scaled_coeff('O', wght, xpt, 0.0, 0.5);
-		auto c_bv_ilap = get_scaled_coeff('V', wght, xpt, 0.0, 0.5);
-		
-		auto Do_pseudo = get_density(c_bo_ilap);
-		auto Dv_pseudo = get_density(c_bv_ilap);
-		
-		double wfac = pow(wght,0.25);
-		
-		Do_pseudo->scale(wfac);
-		Dv_pseudo->scale(wfac);
-				
-		m_pseudo_occs[ilap] = Do_pseudo;
-		m_pseudo_virs[ilap] = Dv_pseudo;
-	}
-	
+
 	LOG.os<1>("Computing Cholesky decomposition of S\n");
 	math::LLT chol(m_s_bb, LOG.global_plev());
 	
 	chol.compute();
 	auto b = m_mol->dims().b();
 	
-	m_ssqrt_bb = chol.L(b);
-	m_sinvqrt_bb = chol.L_inv(b);
+	m_s_sqrt_bb = chol.L(b);
+	m_s_invsqrt_bb = chol.L_inv(b);
+	
+	// laplace
+	LOG.os<1>("Computing laplace points for ground state densities.\n");
+	
+	auto& t_chol = TIME.sub("Computing cholesky decomposition (ss)");
+	t_chol.start();
+	
+	m_laphelper_ss = std::make_shared<math::laplace_helper>(m_nlap, m_c_bo, 
+		m_c_bv, m_s_sqrt_bb, m_s_invsqrt_bb, m_eps_occ, m_eps_vir, 
+		LOG.global_plev());
+		
+	m_laphelper_dd = std::make_shared<math::laplace_helper>(m_nlap, m_c_bo, 
+		m_c_bv, m_s_sqrt_bb, m_s_invsqrt_bb, m_eps_occ, m_eps_vir, 
+		LOG.global_plev());
+		
+	m_laphelper_ss->compute(true, false, 0.0, m_mol->mo_split());
+	
+	t_chol.finish();
 	
 	LOG.os<1>("Setting up J,K,Z builders.\n");
 	
@@ -416,16 +295,12 @@ void MVP_AORISOSADC2::compute_intermeds() {
 		
 		t_intermeds_1.start();
 		
-		//auto po = m_pseudo_occs[ilap];
-		
-		auto L_bu = get_ortho_cholesky('O', m_weights[ilap], 
-			m_xpoints[ilap], 0.125, 0.5);
-			
-		auto po = m_pseudo_occs[ilap];
-		auto pv = m_pseudo_virs[ilap];
+		auto po = m_laphelper_ss->pseudo_densities_occ()[ilap];
+		auto pv = m_laphelper_ss->pseudo_densities_vir()[ilap];
+		auto L_bu = m_laphelper_ss->pseudo_cholesky_occ()[ilap];
 		
 		L_bu->filter(dbcsr::global::filter_eps);
-
+		po->filter(dbcsr::global::filter_eps);
 		pv->filter(dbcsr::global::filter_eps);
 		
 		m_zbuilder->set_occ_coeff(L_bu);
@@ -484,11 +359,8 @@ void MVP_AORISOSADC2::compute_intermeds() {
 		k_inter->compute_K();
 		auto ko_ilap = k_inter->get_K_A();
 		
-		double wght = m_weights[ilap];
-		double xpt = m_xpoints[ilap];
-		
-		auto c_bo_scaled = get_scaled_coeff('O', wght, xpt, 0.25, 1.0);
-		auto c_bv_scaled = get_scaled_coeff('V', wght, xpt, 0.25, 1.0);
+		auto c_bo_scaled = m_laphelper_ss->get_scaled_coeff('O', ilap, 0.25, 1.0);
+		auto c_bv_scaled = m_laphelper_ss->get_scaled_coeff('V', ilap, 0.25, -1.0);
 		
 		LOG.os<1>("Forming partly-transformed intermediates.\n");
 		
@@ -618,8 +490,8 @@ smat MVP_AORISOSADC2::compute_sigma_2c(smat& jmat, smat& kmat) {
 	
 	for (int ilap = 0; ilap != m_nlap; ++ilap) {
 		
-		auto pseudo_o = m_pseudo_occs[ilap];
-		auto pseudo_v = m_pseudo_virs[ilap];
+		auto pseudo_o = m_laphelper_ss->pseudo_densities_occ()[ilap];
+		auto pseudo_v = m_laphelper_ss->pseudo_densities_vir()[ilap];
 		
 		auto I_pseudo = u_transform(I_ao, 'T', pseudo_o, 'N', pseudo_v);
 		
@@ -628,11 +500,8 @@ smat MVP_AORISOSADC2::compute_sigma_2c(smat& jmat, smat& kmat) {
 		
 		auto jmat_pseudo = m_jbuilder->get_J();
 		
-		double wght = m_weights[ilap];
-		double xpt = m_xpoints[ilap];
-		
-		auto c_bo_scaled = get_scaled_coeff('O', wght, xpt, 0.25, 1.0);
-		auto c_bv_scaled = get_scaled_coeff('V', wght, xpt, 0.25, 1.0);
+		auto c_bo_scaled = m_laphelper_ss->get_scaled_coeff('O', ilap, 0.25, 1.0);
+		auto c_bv_scaled = m_laphelper_ss->get_scaled_coeff('V', ilap, 0.25, -1.0);
 		
 		auto jmat_trans = u_transform(jmat_pseudo, 
 			'T', c_bo_scaled, 'N', c_bv_scaled);
@@ -664,18 +533,15 @@ smat MVP_AORISOSADC2::compute_sigma_2d(smat& u_ia) {
 	 
 	LOG.os<1>("==== Computing ADC(2) SIGMA 2D ====\n");
 	 
-	auto I_ao = dbcsr::create_template<double>(*m_pseudo_occs[0])
+	auto I_ao = dbcsr::create_template<double>(*m_s_bb)
 		.name("I_ao")
 		.matrix_type(dbcsr::type::no_symmetry)
 		.get();
 	 
 	for (int ilap = 0; ilap != m_nlap; ++ilap) {
 		
-		double wght = m_weights[ilap];
-		double xpt = m_xpoints[ilap];
-		
-		auto c_bo_scaled = get_scaled_coeff('O', wght, xpt, 0.25, 1.0);
-		auto c_bv_scaled = get_scaled_coeff('V', wght, xpt, 0.25, 1.0);
+		auto c_bo_scaled = m_laphelper_ss->get_scaled_coeff('O', ilap, 0.25, 1.0);
+		auto c_bv_scaled = m_laphelper_ss->get_scaled_coeff('V', ilap, 0.25, -1.0);
 		
 		auto u_pseudo = u_transform(u_ia, 'N', c_bo_scaled, 
 			'T', c_bv_scaled);
@@ -688,8 +554,8 @@ smat MVP_AORISOSADC2::compute_sigma_2d(smat& u_ia) {
 		
 		auto jpseudo1 = m_jbuilder->get_J();
 		
-		auto po = m_pseudo_occs[ilap];
-		auto pv = m_pseudo_virs[ilap];
+		auto po = m_laphelper_ss->pseudo_densities_occ()[ilap];
+		auto pv = m_laphelper_ss->pseudo_densities_vir()[ilap];;
 		auto jpseudo2 = u_transform(jpseudo1, 'N', po, 'T', pv); 
 		
 		I_ao->add(1.0, 0.5, *jpseudo2);
@@ -1579,23 +1445,23 @@ smat MVP_AORISOSADC2::compute_sigma_2e_OB(smat& u_ao, double omega) {
 	auto& time_2e = TIME.sub("Computing sigma(2e)");
 	time_2e.start();
 	
-	double emin = m_eps_occ.front();
-	double ehomo = m_eps_occ.back();
-	double elumo = m_eps_vir.front();
-	double emax = m_eps_vir.back();
+	LOG.os<1>("Computing lapalce matrices for doubles part.");
+	if (std::fabs(m_old_omega - omega) 
+		< std::numeric_limits<double>::epsilon() * 10)
+	{
+		LOG.os<1>("Omega is unchanged, no need to recompute.");
 	
-	double ymin = 2*(elumo - ehomo) + omega;
-	double ymax = 2*(emax - emin) + omega;
-	
-	LOG.os<1>("eps_min/eps_homo/eps_lumo/eps_max ", emin, " ", ehomo, " ", elumo, " ", emax, '\n');
-	LOG.os<1>("ymin/ymax ", ymin, " ", ymax, '\n');
-	
-	math::laplace lp_dd(m_world.comm(), LOG.global_plev());
-	
-	lp_dd.compute(m_nlap, ymin, ymax);
+	} else {
 		
-	auto weights_dd = lp_dd.omega();
-	auto xpoints_dd = lp_dd.alpha();
+		auto& time_chol = TIME.sub("Cholesky in sigma E");
+		time_chol.start();
+	
+		LOG.os<1>("Omega changed, recomputing...\n");
+		m_laphelper_dd->compute(true,false,omega,m_mol->mo_split());
+		
+		time_chol.finish();
+			
+	}
 	
 	auto o = m_mol->dims().oa();
 	auto v = m_mol->dims().va();
@@ -1616,19 +1482,8 @@ smat MVP_AORISOSADC2::compute_sigma_2e_OB(smat& u_ao, double omega) {
 	// Loop
 	for (int ilap = 0; ilap != m_nlap; ++ilap) {
 		
-		double wght_dd = weights_dd[ilap];
-		double xpt_dd = xpoints_dd[ilap];
-		
-		auto& time_chol = TIME.sub("Cholesky in sigma E");
-		time_chol.start();
-		
-		auto L_bo = get_ortho_cholesky('O', wght_dd, xpt_dd, 0.125, 0.5);
-		auto L_bv = get_ortho_cholesky('V', wght_dd, xpt_dd, 0.125, 0.5);
-
-		auto cscaled_bv = get_scaled_coeff('V', wght_dd, xpt_dd, 0.125, 0.5);
-		auto pseudo_v_bb = get_density(cscaled_bv);
-		
-		time_chol.finish();
+		auto L_bo = m_laphelper_dd->pseudo_cholesky_occ()[ilap];
+		auto pseudo_v_bb = m_laphelper_dd->pseudo_densities_vir()[ilap];
 		
 		L_bo->filter(dbcsr::global::filter_eps);
 		pseudo_v_bb->filter(dbcsr::global::filter_eps);
@@ -1650,7 +1505,7 @@ smat MVP_AORISOSADC2::compute_sigma_2e_OB(smat& u_ao, double omega) {
 			
 		I_xob_batched->reset();
 		
-		double xpt = xpoints_dd[ilap];
+		double xpt = m_laphelper_dd->xpoints()[ilap];
 		
 		sig_ilap_E1->scale(exp(omega * xpt));
 		sig_ilap_E2->scale(exp(omega * xpt));
@@ -2505,23 +2360,23 @@ smat MVP_AORISOSADC2::compute_sigma_2e_OV(smat& u_ao, double omega) {
 	auto& time_2e = TIME.sub("Computing sigma(2e)");
 	time_2e.start();
 	
-	double emin = m_eps_occ.front();
-	double ehomo = m_eps_occ.back();
-	double elumo = m_eps_vir.front();
-	double emax = m_eps_vir.back();
+	LOG.os<1>("Computing lapalce matrices for doubles part.");
+	if (std::fabs(m_old_omega - omega) 
+		< std::numeric_limits<double>::epsilon() * 10)
+	{
+		LOG.os<1>("Omega is unchanged, no need to recompute.");
 	
-	double ymin = 2*(elumo - ehomo) + omega;
-	double ymax = 2*(emax - emin) + omega;
+	} else {
 	
-	LOG.os<1>("eps_min/eps_homo/eps_lumo/eps_max ", emin, " ", ehomo, " ", elumo, " ", emax, '\n');
-	LOG.os<1>("ymin/ymax ", ymin, " ", ymax, '\n');
-	
-	math::laplace lp_dd(m_world.comm(), LOG.global_plev());
-	
-	lp_dd.compute(m_nlap, ymin, ymax);
+		auto& time_chol = TIME.sub("Cholesky in sigma E");
+		time_chol.start();
 		
-	auto weights_dd = lp_dd.omega();
-	auto xpoints_dd = lp_dd.alpha();
+		LOG.os<1>("Omega changed, recomputing...\n");
+		m_laphelper_dd->compute(true,true,omega,m_mol->mo_split());
+		
+		time_chol.finish();
+			
+	}
 	
 	auto o = m_mol->dims().oa();
 	auto v = m_mol->dims().va();
@@ -2542,24 +2397,16 @@ smat MVP_AORISOSADC2::compute_sigma_2e_OV(smat& u_ao, double omega) {
 	// Loop
 	for (int ilap = 0; ilap != m_nlap; ++ilap) {
 		
-		double wght_dd = weights_dd[ilap];
-		double xpt_dd = xpoints_dd[ilap];
+		auto L_bo = m_laphelper_dd->pseudo_cholesky_occ()[ilap];
+		auto L_bv = m_laphelper_dd->pseudo_cholesky_vir()[ilap];
 		
-		auto& time_chol = TIME.sub("Cholesky in sigma E");
-		time_chol.start();
-		
-		auto L_bo = get_ortho_cholesky('O', wght_dd, xpt_dd, 0.125, 0.5);
-		auto L_bv = get_ortho_cholesky('V', wght_dd, xpt_dd, 0.125, 0.5);
-		
-		std::string file_o = std::string(std::filesystem::current_path()) + 
+		/*std::string file_o = std::string(std::filesystem::current_path()) + 
 			"/chol_occ_" + std::to_string(ilap);
 		std::string file_v = std::string(std::filesystem::current_path()) + 
 			"/chol_vir_" + std::to_string(ilap);
 		
 		//util::plot(L_bo, 1e-5, file_o);
-		//util::plot(L_bv, 1e-5, file_v);
-		
-		time_chol.finish();
+		//util::plot(L_bv, 1e-5, file_v);*/
 		
 		L_bo->filter(dbcsr::global::filter_eps);
 		L_bv->filter(dbcsr::global::filter_eps);
@@ -2578,7 +2425,7 @@ smat MVP_AORISOSADC2::compute_sigma_2e_OV(smat& u_ao, double omega) {
 		auto [sig_ilap_E1, sig_ilap_E2] = compute_sigma_2e_ilap_OV(I_xov_batched, 
 			L_bo, L_bv, omega);
 		
-		double xpt = xpoints_dd[ilap];
+		double xpt = m_laphelper_dd->xpoints()[ilap];
 		
 		sig_ilap_E1->scale(exp(omega * xpt));
 		sig_ilap_E2->scale(exp(omega * xpt));

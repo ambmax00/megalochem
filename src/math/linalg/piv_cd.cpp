@@ -776,7 +776,7 @@ void pivinc_cd::compute(std::optional<int> force_rank) {
 	
 	LOG.os<1>("-- Setting up dbcsr environment and matrices.\n"); 
 	
-	double filter_eps = dbcsr::global::filter_eps/10;
+	double filter_eps = dbcsr::global::filter_eps/100;
 	
 	auto wrd = m_mat_in->get_world();
 	
