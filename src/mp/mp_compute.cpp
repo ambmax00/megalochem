@@ -238,16 +238,22 @@ void mpmod::compute() {
 	
 	if (zmeth == zmethod::llmp_full) {
 		
-		zbuilder = create_LLMP_FULL_Z(m_world, m_hfwfn->mol(), LOG.global_plev())
+		zbuilder = LLMP_FULL_Z::create()
+			.world(m_world)
+			.molecule(m_hfwfn->mol())
+			.print(LOG.global_plev())
 			.eri3c2e_batched(eri3c2e_batched)
 			.intermeds(intermeds)
-			.get();
+			.build();
 		
 	} else if (zmeth == zmethod::llmp_mem) {
 		
-		zbuilder = create_LLMP_MEM_Z(m_world, m_hfwfn->mol(), LOG.global_plev())
+		zbuilder = LLMP_MEM_Z::create()
+			.world(m_world)
+			.molecule(m_hfwfn->mol())
+			.print(LOG.global_plev())
 			.eri3c2e_batched(eri3c2e_batched)
-			.get();
+			.build();
 		
 	}
 	

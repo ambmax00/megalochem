@@ -1,13 +1,14 @@
 #ifndef MP_Z_BUILDER_H
 #define MP_Z_BUILDER_H
 
+#:include "megalochem.fypp"
+
 #include <dbcsr_matrix_ops.hpp>
 #include <dbcsr_tensor_ops.hpp>
 #include <dbcsr_conversions.hpp>
 #include <dbcsr_btensor.hpp>
 #include <Eigen/Core>
 #include "utils/mpi_time.hpp"
-#include "utils/ppdirs.hpp"
 #include "desc/molecule.hpp"
 
 namespace mp {
@@ -101,7 +102,9 @@ public:
 	
 };
 
-class create_LLMP_FULL_Z_base;
+#:def _INIT(name)
+	Z(p.p_world, p.p_molecule, (p.p_print) ? *p.p_print : 0, "${name}$")
+#:enddef
 
 class LLMP_FULL_Z : public Z {
 private:	
@@ -112,13 +115,24 @@ private:
 	dbcsr::sbtensor<3,double> m_FT3c2e_batched;
 	dbcsr::shared_tensor<2,double> m_locc_01;
 	dbcsr::shared_tensor<2,double> m_pvir_01;
-	
-	friend class create_LLMP_FULL_Z_base;
-	
+		
 public:
 
-	LLMP_FULL_Z(dbcsr::world w, desc::shared_molecule smol, int nprint) :
-		Z(w,smol,nprint,"LLMP_FULL") {}
+#:set list = [&
+	['world', 'dbcsr::world', _REQ, _VAL],&
+	['molecule', 'desc::shared_molecule', _REQ, _VAL],&
+	['print', 'int', _OPT, _VAL],&
+	['eri3c2e_batched', 'dbcsr::sbtensor<3,double>', _REQ, _VAL],&
+	['intermeds', 'dbcsr::btype', _REQ, _VAL]]
+	
+${_MAKE_PARAM_STRUCT('create', list)}$
+${_MAKE_BUILDER_CLASS('LLMP_FULL_Z', 'create', list, True)}$
+
+	LLMP_FULL_Z(create_pack&& p) : 
+		m_eri3c2e_batched(p.p_eri3c2e_batched),
+		m_intermeds(p.p_intermeds),
+		${_INIT('LLMP_FULL')}$ 
+	{}
 
 	void init() override;
 	void compute() override;
@@ -128,20 +142,7 @@ public:
 	
 };
 
-MAKE_STRUCT(
-	LLMP_FULL_Z, Z,
-	(
-		(world, (dbcsr::world)),
-		(mol, (desc::shared_molecule)),
-		(print, (int))
-	),
-	(
-		(eri3c2e_batched, (dbcsr::sbtensor<3,double>), required, val),
-		(intermeds, (dbcsr::btype), required, val)
-	)
-)
-
-#if 0
+/*
 class create_LL_Z_base;
 
 class LL_Z : public Z {
@@ -152,9 +153,7 @@ private:
 	
 	dbcsr::shared_tensor<2,double> m_locc_01;
 	dbcsr::shared_tensor<2,double> m_pvir_01;
-	
-	friend class create_LL_Z_base;
-	
+		
 public:
 
 	LL_Z(dbcsr::world w, desc::shared_molecule smol, int nprint) :
@@ -180,9 +179,7 @@ MAKE_STRUCT(
 		(intermeds, (dbcsr::btype), required, val)
 	)
 )
-#endif
-
-class create_LLMP_MEM_Z_base;
+*/
 
 class LLMP_MEM_Z : public Z {
 private:	
@@ -191,13 +188,22 @@ private:
 	
 	dbcsr::shared_tensor<2,double> m_locc_01;
 	dbcsr::shared_tensor<2,double> m_pvir_01;
-	
-	friend class create_LLMP_MEM_Z_base;
-	
+		
 public:
 
-	LLMP_MEM_Z(dbcsr::world w, desc::shared_molecule smol, int nprint) :
-		Z(w,smol,nprint,"LLMP_MEM") {}
+#:set list = [&
+	['world', 'dbcsr::world', _REQ, _VAL],&
+	['molecule', 'desc::shared_molecule', _REQ, _VAL],&
+	['print', 'int', _OPT, _VAL],&
+	['eri3c2e_batched', 'dbcsr::sbtensor<3,double>', _REQ, _VAL]]
+	
+${_MAKE_PARAM_STRUCT('create', list)}$
+${_MAKE_BUILDER_CLASS('LLMP_MEM_Z', 'create', list, True)}$
+
+	LLMP_MEM_Z(create_pack&& p) : 
+		m_eri3c2e_batched(p.p_eri3c2e_batched),
+		${_INIT('LLMP_MEM')}$ 
+	{}
 
 	void init() override;
 	void compute() override;
@@ -207,20 +213,6 @@ public:
 	
 };
 
-MAKE_STRUCT(
-	LLMP_MEM_Z, Z,
-	(
-		(world, (dbcsr::world)),
-		(mol, (desc::shared_molecule)),
-		(print, (int))
-	),
-	(
-		(eri3c2e_batched, (dbcsr::sbtensor<3,double>), required, val)
-	)
-)
-
-class create_LLMP_ASYM_Z_base;
-
 class LLMP_ASYM_Z : public Z {
 private:	
 	
@@ -229,33 +221,31 @@ private:
 	
 	dbcsr::shared_tensor<2,double> m_locc_01;
 	dbcsr::shared_tensor<2,double> m_pvir_01;
-	
-	friend class create_LLMP_ASYM_Z_base;
-	
+		
 public:
 
-	LLMP_ASYM_Z(dbcsr::world w, desc::shared_molecule& smol, int nprint) :
-		Z(w,smol,nprint,"LLMP_MEM") {}
+#:set list = [&
+	['world', 'dbcsr::world', _REQ, _VAL],&
+	['molecule', 'desc::shared_molecule', _REQ, _VAL],&
+	['print', 'int', _OPT, _VAL],&
+	['t3c2e_left_batched', 'dbcsr::sbtensor<3,double>', _REQ, _VAL],&
+	['t3c2e_right_batched', 'dbcsr::sbtensor<3,double>', _REQ, _VAL]]
+	
+${_MAKE_PARAM_STRUCT('create', list)}$
+${_MAKE_BUILDER_CLASS('LLMP_ASYM_Z', 'create', list, True)}$
 
+	LLMP_ASYM_Z(create_pack&& p) : 
+		m_t3c2e_left_batched(p.p_t3c2e_left_batched),
+		m_t3c2e_right_batched(p.p_t3c2e_right_batched),
+		${_INIT('LLMP_ASYM')}$ 
+	{}
+	
 	void init() override;
 	void compute() override;
 	
 	~LLMP_ASYM_Z() override {}
 	
 };
-
-MAKE_STRUCT(
-	LLMP_ASYM_Z, Z,
-	(
-		(world, (dbcsr::world)),
-		(mol, (desc::shared_molecule)),
-		(print, (int))
-	),
-	(
-		(t3c2e_left_batched, (dbcsr::sbtensor<3,double>), required, val),
-		(t3c2e_right_batched, (dbcsr::sbtensor<3,double>), required, val)
-	)
-)
 
 } // end namespace
 

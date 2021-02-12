@@ -230,17 +230,23 @@ void MVP_AOADC2::init() {
 	switch (m_zmethod) {
 		case mp::zmethod::llmp_full:
 		{
-			m_zbuilder = mp::create_LLMP_FULL_Z(m_world, m_mol, nprint)
+			m_zbuilder = mp::LLMP_FULL_Z::create()
+				.world(m_world)
+				.molecule(m_mol)
+				.print(LOG.global_plev())
 				.eri3c2e_batched(m_eri3c2e_batched)
 				.intermeds(m_btype)
-				.get();
+				.build();
 			break;
 		}
 		case mp::zmethod::llmp_mem:
 		{
-			m_zbuilder = mp::create_LLMP_MEM_Z(m_world, m_mol, nprint)
+			m_zbuilder = mp::LLMP_MEM_Z::create()
+				.world(m_world)
+				.molecule(m_mol)
+				.print(LOG.global_plev())
 				.eri3c2e_batched(m_eri3c2e_batched)
-				.get();
+				.build();
 			break;
 		}
 		default:
