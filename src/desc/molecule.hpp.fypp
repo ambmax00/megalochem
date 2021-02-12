@@ -3,8 +3,6 @@
 
 #:include "megalochem.fypp"
 
-#include "utils/params.hpp"
-#include "utils/ppdirs.hpp"
 #include "desc/atom.hpp"
 #include "desc/basis.hpp"
 #include "io/data_handler.hpp"

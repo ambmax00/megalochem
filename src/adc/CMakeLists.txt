@@ -3,13 +3,19 @@ set(SOURCES
 	adc_diag.cpp
 	adc_compute.cpp
 	adc_init.cpp
-	adc_mvp.hpp
 	adc_mvp_common.cpp
 	adc_mvp_aoriadc1.cpp
 	adc_mvp_aoriadc2.cpp
 )
 
+set(FYPP_SOURCES
+        adc_mvp.hpp.fypp
+)
+
+add_fypp_sources(HEADERS chem_adc_fypp ${FYPP_SOURCES})
+
 add_library(chem_adc ${SOURCES})
+add_dependencies(chem_adc chem_adc_fypp)
 
 target_link_libraries(
 	chem_adc

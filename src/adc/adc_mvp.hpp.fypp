@@ -1,9 +1,10 @@
 #ifndef ADC_MVP_H
 #define ADC_MVP_H
 
+#:include "megalochem.fypp"
+
 #include <dbcsr_matrix_ops.hpp>
 #include <dbcsr_tensor_ops.hpp>
-#include "utils/ppdirs.hpp"
 #include "desc/options.hpp"
 #include "fock/jkbuilder.hpp"
 #include "mp/z_builder.hpp"
@@ -58,9 +59,7 @@ public:
 	
 };
 
-class create_MVP_AOADC1_base;
-
-class MVP_AOADC1 : public MVP {
+class MVP_AORIADC1 : public MVP {
 private:
 	
 	fock::jmethod m_jmethod;
@@ -79,12 +78,33 @@ private:
 	smat m_c_bo;
 	smat m_c_bv;
 
-	friend class create_MVP_AOADC1_base;
-
 public:
 
-	MVP_AOADC1(dbcsr::world w, desc::shared_molecule smol, int nprint) : 
-		MVP(w,smol,nprint,"MVP_AOADC1") {}
+#:set list = [&
+	['world', 'dbcsr::world', _REQ, _VAL],&
+	['molecule', 'desc::shared_molecule', _REQ, _VAL],&
+	['print', 'int', _OPT, _VAL],&
+	['c_bo', 'dbcsr::shared_matrix<double>', _REQ, _VAL],&
+	['c_bv', 'dbcsr::shared_matrix<double>', _REQ, _VAL],&
+	['metric_inv', 'dbcsr::shared_matrix<double>', _REQ, _VAL],&
+	['eps_occ', 'std::vector<double>', _REQ, _VAL],&
+	['eps_vir', 'std::vector<double>', _REQ, _VAL],&
+	['eri3c2e_batched', 'dbcsr::sbtensor<3,double>', _REQ, _VAL],&
+	['fitting_batched', 'dbcsr::sbtensor<3,double>', _REQ, _VAL],&
+	['kmethod', 'fock::kmethod', _REQ, _VAL],&
+	['jmethod', 'fock::jmethod', _REQ, _VAL]]
+	
+${_MAKE_PARAM_STRUCT('create', list)}$
+${_MAKE_BUILDER_CLASS('MVP_AORIADC1', 'create', list, True)}$
+
+	MVP_AORIADC1(create_pack&& p) :
+		m_c_bo(p.p_c_bo), m_c_bv(p.p_c_bv), m_v_xx(p.p_metric_inv),
+		m_eps_occ(p.p_eps_occ), m_eps_vir(p.p_eps_vir), 
+		m_eri3c2e_batched(p.p_eri3c2e_batched),
+		m_fitting_batched(p.p_fitting_batched),
+		m_kmethod(p.p_kmethod), m_jmethod(p.p_jmethod),
+		MVP(p.p_world, p.p_molecule, (p.p_print) ? *p.p_print : 0,
+			"MVP_AORIADC1") {}
 		
 	void init() override;
 	
@@ -97,40 +117,18 @@ public:
 		m_kbuilder->print_info();
 	}
 	
-	~MVP_AOADC1() override {}
+	~MVP_AORIADC1() override {}
 	
 };
 
-MAKE_STRUCT(
-	MVP_AOADC1, MVP,
-	(
-		(world, (dbcsr::world)),
-		(mol, (desc::shared_molecule)),
-		(print, (int))
-	),
-	(
-		(c_bo, (dbcsr::shared_matrix<double>), required, val),
-		(c_bv, (dbcsr::shared_matrix<double>), required, val),
-		(eps_occ, (std::vector<double>), required, val),
-		(eps_vir, (std::vector<double>), required, val),
-		(eri3c2e_batched, (dbcsr::sbtensor<3,double>), required, val),
-		(fitting_batched, (dbcsr::sbtensor<3,double>), optional, val, nullptr),
-		(v_xx, (dbcsr::shared_matrix<double>), required, val),
-		(kmethod, (fock::kmethod), required, val),
-		(jmethod, (fock::jmethod), required, val)
-	)
-)
-
-class create_MVP_AOADC2_base;
-
 inline constexpr bool _use_doubles_ob = false; 
 
-class MVP_AOADC2 : public MVP {
+class MVP_AORISOSADC2 : public MVP {
 private:
 	
 	// input:
-	svector<double> m_eps_occ;
-	svector<double> m_eps_vir;
+	std::vector<double> m_eps_occ;
+	std::vector<double> m_eps_vir;
 
 	smat m_s_bb;
 	smat m_c_bo;
@@ -183,8 +181,6 @@ private:
 	
 	smat compute_sigma_2d(smat& u_ia);
 		
-
-	
 	smat compute_sigma_2e_OB(smat& u_ao, double omega);
 	
 	std::tuple<dbcsr::sbtensor<3,double>,dbcsr::sbtensor<3,double>>
@@ -221,19 +217,49 @@ private:
 	std::tuple<smat,smat> compute_sigma_2e_ilap_OV(
 		dbcsr::sbtensor<3,double>& I_xob_batched, 
 		smat& L_bo, smat& L_bv, double omega);
-		
-		
 	
 	// intermediates
 	smat m_i_oo;
 	smat m_i_vv;
 	
-	friend class create_MVP_AOADC2_base;
-
 public:
 
-	MVP_AOADC2(dbcsr::world w, desc::shared_molecule smol, int nprint) : 
-		MVP(w,smol,nprint,"MVP_AOADC2") {}
+#:set list = [&
+	['world', 'dbcsr::world', _REQ, _VAL],&
+	['molecule', 'desc::shared_molecule', _REQ, _VAL],&
+	['print', 'int', _OPT, _VAL],&
+	['c_bo', 'dbcsr::shared_matrix<double>', _REQ, _VAL],&
+	['c_bv', 'dbcsr::shared_matrix<double>', _REQ, _VAL],&
+	['s_bb', 'dbcsr::shared_matrix<double>', _REQ, _VAL],&
+	['metric_inv', 'dbcsr::shared_matrix<double>', _REQ, _VAL],&
+	['eps_occ', 'std::vector<double>', _REQ, _VAL],&
+	['eps_vir', 'std::vector<double>', _REQ, _VAL],&
+	['eri3c2e_batched', 'dbcsr::sbtensor<3,double>', _REQ, _VAL],&
+	['fitting_batched', 'dbcsr::sbtensor<3,double>', _REQ, _VAL],&
+	['kmethod', 'fock::kmethod', _REQ, _VAL],&
+	['jmethod', 'fock::jmethod', _REQ, _VAL],&
+	['zmethod', 'mp::zmethod', _REQ, _VAL],&
+	['btype', 'dbcsr::btype', _REQ, _VAL],&
+	['nlap', 'int', _OPT, _VAL],&
+	['c_os', 'double', _OPT, _VAL],&
+	['c_os_coupling', 'double', _OPT, _VAL]]
+	
+${_MAKE_PARAM_STRUCT('create', list)}$
+${_MAKE_BUILDER_CLASS('MVP_AORISOSADC2', 'create', list, True)}$
+
+	MVP_AORISOSADC2(create_pack&& p) :
+		m_c_bo(p.p_c_bo), m_c_bv(p.p_c_bv), m_v_xx(p.p_metric_inv),
+		m_s_bb(p.p_s_bb), m_eps_occ(p.p_eps_occ), m_eps_vir(p.p_eps_vir), 
+		m_eri3c2e_batched(p.p_eri3c2e_batched),
+		m_fitting_batched(p.p_fitting_batched),
+		m_kmethod(p.p_kmethod), m_jmethod(p.p_jmethod), m_zmethod(p.p_zmethod),
+		m_btype(p.p_btype), 
+		m_nlap((p.p_nlap) ? *p.p_nlap : ADC_ADC2_NLAP),
+		m_c_os((p.p_c_os) ? *p.p_c_os : ADC_ADC2_C_OS),
+		m_c_os_coupling((p.p_c_os_coupling) ? 
+			*p.p_c_os_coupling : ADC_ADC2_C_OS_COUPLING),
+		MVP(p.p_world, p.p_molecule, (p.p_print) ? *p.p_print : 0, 
+			"MVP_AORISOSADC2") {}
 		
 	void init() override;
 	
@@ -241,35 +267,9 @@ public:
 	
 	void print_info() override {}
 	
-	~MVP_AOADC2() override {}
+	~MVP_AORISOSADC2() override {}
 	
 };
-
-MAKE_STRUCT(
-	MVP_AOADC2, MVP,
-	(
-		(world, (dbcsr::world)),
-		(mol, (desc::shared_molecule)),
-		(print, (int))
-	),
-	(
-		(c_bo, (dbcsr::shared_matrix<double>), required, val),
-		(c_bv, (dbcsr::shared_matrix<double>), required, val),
-		(s_bb, (dbcsr::shared_matrix<double>), required, val),
-		(v_xx, (dbcsr::shared_matrix<double>), required, val),
-		(eri3c2e_batched, (dbcsr::sbtensor<3,double>), required, val),
-		(fitting_batched, (dbcsr::sbtensor<3,double>), optional, val, nullptr),
-		(eps_occ, (std::shared_ptr<std::vector<double>>), required, val),
-		(eps_vir, (std::shared_ptr<std::vector<double>>), required, val),
-		(kmethod, (fock::kmethod), required, val),
-		(jmethod, (fock::jmethod), required, val),
-		(zmethod, (mp::zmethod), required, val),
-		(btype, (dbcsr::btype), required, val),
-		(nlap, (int), optional, val, ADC_ADC2_NLAP),
-		(c_os, (double), optional, val, ADC_ADC2_C_OS),
-		(c_os_coupling, (double), optional, val, ADC_ADC2_C_OS_COUPLING)
-	)
-)
 
 /*
 class MVP_ao_ri_adc2 : public MVP {

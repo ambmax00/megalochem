@@ -152,17 +152,20 @@ std::shared_ptr<MVP> adcmod::create_adc1() {
 		}
 	}
 	
-	auto ptr = create_MVP_AOADC1(m_world, m_hfwfn->mol(), LOG.global_plev())
+	auto ptr = MVP_AORIADC1::create()
+		.world(m_world)
+		.molecule( m_hfwfn->mol())
+		.print(LOG.global_plev())
 		.c_bo(m_hfwfn->c_bo_A())
 		.c_bv(m_hfwfn->c_bv_A())
 		.eps_occ(*m_hfwfn->eps_occ_A())
 		.eps_vir(*m_hfwfn->eps_vir_A())
 		.eri3c2e_batched(eri3c2e)
 		.fitting_batched(fitting)
-		.v_xx(v_xx)
+		.metric_inv(v_xx)
 		.jmethod(jmeth)
 		.kmethod(kmeth)
-		.get();
+		.build();
 		
 	ptr->init();
 	
@@ -257,15 +260,18 @@ std::shared_ptr<MVP> adcmod::create_adc2(std::optional<canon_lmo> clmo) {
 		
 	}
 
-	auto ptr = create_MVP_AOADC2(m_world, mol, LOG.global_plev())
+	auto ptr = MVP_AORISOSADC2::create()
+		.world(m_world)
+		.molecule(mol)
+		.print(LOG.global_plev())
 		.c_bo(c_bo)
 		.c_bv(c_bv)
 		.s_bb(s_bb)
-		.eps_occ(eps_o)
-		.eps_vir(eps_v)
+		.eps_occ(*eps_o)
+		.eps_vir(*eps_v)
 		.eri3c2e_batched(eri3c2e)
 		.fitting_batched(fitting)
-		.v_xx(v_xx)
+		.metric_inv(v_xx)
 		.jmethod(jmeth)
 		.kmethod(kmeth)
 		.zmethod(zmeth)
@@ -273,7 +279,7 @@ std::shared_ptr<MVP> adcmod::create_adc2(std::optional<canon_lmo> clmo) {
 		.nlap(nlap)
 		.c_os(c_os)
 		.c_os_coupling(c_os_coupling)
-		.get();
+		.build();
 				
 	ptr->init();
 	

@@ -14,7 +14,7 @@ namespace adc {
  *                         AUXILIARY FUNCTIONS
  * ====================================================================*/
 	
-smat MVP_AOADC2::get_scaled_coeff(char dim, double wght, double xpt, 
+smat MVP_AORISOSADC2::get_scaled_coeff(char dim, double wght, double xpt, 
 	double wfactor, double xfactor) {
 	
 	auto c_bm = (dim == 'O') ? m_c_bo : m_c_bv;
@@ -22,7 +22,7 @@ smat MVP_AOADC2::get_scaled_coeff(char dim, double wght, double xpt,
 	int sign = (dim == 'O') ? 1 : -1;
 	
 	auto c_bm_scaled = dbcsr::copy(*c_bm).get();
-	auto eps_scaled = *eps_m;
+	auto eps_scaled = eps_m;
 	
 	std::for_each(eps_scaled.begin(),eps_scaled.end(),
 		[xpt,wght,wfactor,xfactor,sign](double& eps) {
@@ -35,7 +35,7 @@ smat MVP_AOADC2::get_scaled_coeff(char dim, double wght, double xpt,
 	
 }
 
-smat MVP_AOADC2::get_density(smat coeff) {
+smat MVP_AORISOSADC2::get_density(smat coeff) {
 	
 	auto b = m_mol->dims().b();
 	
@@ -53,7 +53,7 @@ smat MVP_AOADC2::get_density(smat coeff) {
 	
 }
 
-smat MVP_AOADC2::get_ortho_cholesky(char dim, double wght, double xpt, 
+smat MVP_AORISOSADC2::get_ortho_cholesky(char dim, double wght, double xpt, 
 	double wfactor, double xfactor) {
 		
 	auto coeff = get_scaled_coeff(dim, wght, xpt, wfactor, xfactor);
@@ -109,7 +109,7 @@ smat MVP_AOADC2::get_ortho_cholesky(char dim, double wght, double xpt,
  *                         INITIALIZING FUNCTIONS
  * ====================================================================*/
 	
-void MVP_AOADC2::init() {
+void MVP_AORISOSADC2::init() {
 	
 	LOG.os<1>("Initializing AO-ADC(2)\n");
 	
@@ -121,10 +121,10 @@ void MVP_AOADC2::init() {
 	// laplace
 	LOG.os<1>("Computing laplace points.\n");
 		
-	double emin = m_eps_occ->front();
-	double ehomo = m_eps_occ->back();
-	double elumo = m_eps_vir->front();
-	double emax = m_eps_vir->back();
+	double emin = m_eps_occ.front();
+	double ehomo = m_eps_occ.back();
+	double elumo = m_eps_vir.front();
+	double emax = m_eps_vir.back();
 	
 	double ymin = 2*(elumo - ehomo);
 	double ymax = 2*(emax - emin);
@@ -282,7 +282,7 @@ void MVP_AOADC2::init() {
  * ====================================================================*/
 
 // Computes the pseudo J and K matrices with the excited state density
-std::pair<smat,smat> MVP_AOADC2::compute_jk(smat& u_ao) {
+std::pair<smat,smat> MVP_AORISOSADC2::compute_jk(smat& u_ao) {
 	
 	auto& t_jk = TIME.sub("Computing pseudo-JK");
 	t_jk.start();
@@ -305,7 +305,7 @@ std::pair<smat,smat> MVP_AOADC2::compute_jk(smat& u_ao) {
 }
 
 // computes the ADC(1) MVP part using the pseudo J,K matrices
-smat MVP_AOADC2::compute_sigma_1(smat& jmat, smat& kmat) {
+smat MVP_AORISOSADC2::compute_sigma_1(smat& jmat, smat& kmat) {
 	
 	auto j = u_transform(jmat, 'T', m_c_bo, 'N', m_c_bv);
 	auto k = u_transform(kmat, 'T', m_c_bo, 'N', m_c_bv);
@@ -335,7 +335,7 @@ smat MVP_AOADC2::compute_sigma_1(smat& jmat, smat& kmat) {
  *                         ADC(2) INTERMEDIATES
  * ====================================================================*/
  
-void MVP_AOADC2::compute_intermeds() {
+void MVP_AORISOSADC2::compute_intermeds() {
 	
 	/* computes
 	 *   
@@ -533,7 +533,7 @@ void MVP_AOADC2::compute_intermeds() {
  *                         ADC(2) P-H CONTRIBUTIONS
  * ====================================================================*/
 
-smat MVP_AOADC2::compute_sigma_2a(smat& u_ia) {
+smat MVP_AORISOSADC2::compute_sigma_2a(smat& u_ia) {
 	
 	auto& t_sig = TIME.sub("Computing sigma (A)");
 	t_sig.start();
@@ -553,7 +553,7 @@ smat MVP_AOADC2::compute_sigma_2a(smat& u_ia) {
 	
 }
 
-smat MVP_AOADC2::compute_sigma_2b(smat& u_ia) {
+smat MVP_AORISOSADC2::compute_sigma_2b(smat& u_ia) {
 	
 	auto& t_sig = TIME.sub("Computing sigma (B)");
 	t_sig.start();
@@ -573,7 +573,7 @@ smat MVP_AOADC2::compute_sigma_2b(smat& u_ia) {
 	
 } 
 
-smat MVP_AOADC2::compute_sigma_2c(smat& jmat, smat& kmat) {
+smat MVP_AORISOSADC2::compute_sigma_2c(smat& jmat, smat& kmat) {
 	
 	// sig_2c = -1/2 t_iajb^SOS * I_jb
 	// I_ia = [2*(jb|ia) - (ja|ib)] u_jb
@@ -648,7 +648,7 @@ smat MVP_AOADC2::compute_sigma_2c(smat& jmat, smat& kmat) {
 	return sig_2c;
 }
 
-smat MVP_AOADC2::compute_sigma_2d(smat& u_ia) {
+smat MVP_AORISOSADC2::compute_sigma_2d(smat& u_ia) {
 	
 	/* sig_2d = - 0.5 sum_jb [2 * (ia|bj) - (ja|ib)] * I_jb
 	 * where I_ia = sum_jb t_iajb^SOS u_jb
@@ -728,7 +728,7 @@ smat MVP_AOADC2::compute_sigma_2d(smat& u_ia) {
  * ====================================================================*/
 
 std::tuple<dbcsr::sbtensor<3,double>,dbcsr::sbtensor<3,double>>
-	MVP_AOADC2::compute_laplace_batchtensors_OB(smat& u_ao, smat& L_bo, smat& pv_bb)
+	MVP_AORISOSADC2::compute_laplace_batchtensors_OB(smat& u_ao, smat& L_bo, smat& pv_bb)
 {
 	
 	LOG.os<1>("Compute J and Teri\n");
@@ -1023,7 +1023,7 @@ std::tuple<dbcsr::sbtensor<3,double>,dbcsr::sbtensor<3,double>>
 }
 
 std::tuple<dbcsr::shared_tensor<2,double>,dbcsr::shared_tensor<2,double>>
-	MVP_AOADC2::compute_F_OB(dbcsr::sbtensor<3,double> eri_xob_batched,
+	MVP_AORISOSADC2::compute_F_OB(dbcsr::sbtensor<3,double> eri_xob_batched,
 	dbcsr::sbtensor<3,double> J_xob_batched, 
 	dbcsr::shared_matrix<double> L_bo)
 {
@@ -1228,7 +1228,7 @@ std::tuple<dbcsr::shared_tensor<2,double>,dbcsr::shared_tensor<2,double>>
 	
 }
 
-dbcsr::sbtensor<3,double> MVP_AOADC2::compute_I_OB(dbcsr::sbtensor<3,double>& eri_xob_batched,
+dbcsr::sbtensor<3,double> MVP_AORISOSADC2::compute_I_OB(dbcsr::sbtensor<3,double>& eri_xob_batched,
 	dbcsr::sbtensor<3,double>& R_xob_batched, dbcsr::shared_tensor<2,double>& F_A,
 	dbcsr::shared_tensor<2,double>& F_B)
 {
@@ -1326,7 +1326,7 @@ dbcsr::sbtensor<3,double> MVP_AOADC2::compute_I_OB(dbcsr::sbtensor<3,double>& er
 	
 }
 
-std::tuple<smat,smat> MVP_AOADC2::compute_sigma_2e_ilap_OB(
+std::tuple<smat,smat> MVP_AORISOSADC2::compute_sigma_2e_ilap_OB(
 	dbcsr::sbtensor<3,double>& I_xob_batched, smat& L_bo, double omega)
 {
 	
@@ -1556,7 +1556,7 @@ std::tuple<smat,smat> MVP_AOADC2::compute_sigma_2e_ilap_OB(
 	
 } 
 
-smat MVP_AOADC2::compute_sigma_2e_OB(smat& u_ao, double omega) {
+smat MVP_AORISOSADC2::compute_sigma_2e_OB(smat& u_ao, double omega) {
 	
 	/* IN AO:
 	 * sig_e2 = - c_os_c ^2 [ sum_t,2>
@@ -1579,10 +1579,10 @@ smat MVP_AOADC2::compute_sigma_2e_OB(smat& u_ao, double omega) {
 	auto& time_2e = TIME.sub("Computing sigma(2e)");
 	time_2e.start();
 	
-	double emin = m_eps_occ->front();
-	double ehomo = m_eps_occ->back();
-	double elumo = m_eps_vir->front();
-	double emax = m_eps_vir->back();
+	double emin = m_eps_occ.front();
+	double ehomo = m_eps_occ.back();
+	double elumo = m_eps_vir.front();
+	double emax = m_eps_vir.back();
 	
 	double ymin = 2*(elumo - ehomo) + omega;
 	double ymax = 2*(emax - emin) + omega;
@@ -1686,7 +1686,7 @@ smat MVP_AOADC2::compute_sigma_2e_OB(smat& u_ao, double omega) {
 }
 
 std::tuple<dbcsr::sbtensor<3,double>,dbcsr::sbtensor<3,double>>
-	MVP_AOADC2::compute_laplace_batchtensors_OV(smat& u_ao, smat& L_bo, smat& L_bv)
+	MVP_AORISOSADC2::compute_laplace_batchtensors_OV(smat& u_ao, smat& L_bo, smat& L_bv)
 {
 	
 	LOG.os<1>("Compute J and Teri\n");
@@ -1989,7 +1989,7 @@ std::tuple<dbcsr::sbtensor<3,double>,dbcsr::sbtensor<3,double>>
 }
 
 std::tuple<dbcsr::shared_tensor<2,double>,dbcsr::shared_tensor<2,double>>
-	MVP_AOADC2::compute_F_OV(dbcsr::sbtensor<3,double> eri_xov_batched,
+	MVP_AORISOSADC2::compute_F_OV(dbcsr::sbtensor<3,double> eri_xov_batched,
 	dbcsr::sbtensor<3,double> J_xov_batched)
 {
 	
@@ -2089,7 +2089,7 @@ std::tuple<dbcsr::shared_tensor<2,double>,dbcsr::shared_tensor<2,double>>
 	
 }
 
-dbcsr::sbtensor<3,double> MVP_AOADC2::compute_I_OV(dbcsr::sbtensor<3,double>& eri_xov_batched,
+dbcsr::sbtensor<3,double> MVP_AORISOSADC2::compute_I_OV(dbcsr::sbtensor<3,double>& eri_xov_batched,
 	dbcsr::sbtensor<3,double>& R_xov_batched, dbcsr::shared_tensor<2,double>& F_A,
 	dbcsr::shared_tensor<2,double>& F_B)
 {
@@ -2169,7 +2169,7 @@ dbcsr::sbtensor<3,double> MVP_AOADC2::compute_I_OV(dbcsr::sbtensor<3,double>& er
 	
 }
 
-std::tuple<smat,smat> MVP_AOADC2::compute_sigma_2e_ilap_OV(
+std::tuple<smat,smat> MVP_AORISOSADC2::compute_sigma_2e_ilap_OV(
 	dbcsr::sbtensor<3,double>& I_xov_batched, smat& L_bo, smat& L_bv,
 	double omega)
 {
@@ -2482,7 +2482,7 @@ std::tuple<smat,smat> MVP_AOADC2::compute_sigma_2e_ilap_OV(
 	
 } 
 
-smat MVP_AOADC2::compute_sigma_2e_OV(smat& u_ao, double omega) {
+smat MVP_AORISOSADC2::compute_sigma_2e_OV(smat& u_ao, double omega) {
 	
 	/* IN AO:
 	 * sig_e2 = - c_os_c ^2 [ sum_t,2>
@@ -2505,10 +2505,10 @@ smat MVP_AOADC2::compute_sigma_2e_OV(smat& u_ao, double omega) {
 	auto& time_2e = TIME.sub("Computing sigma(2e)");
 	time_2e.start();
 	
-	double emin = m_eps_occ->front();
-	double ehomo = m_eps_occ->back();
-	double elumo = m_eps_vir->front();
-	double emax = m_eps_vir->back();
+	double emin = m_eps_occ.front();
+	double ehomo = m_eps_occ.back();
+	double elumo = m_eps_vir.front();
+	double emax = m_eps_vir.back();
 	
 	double ymin = 2*(elumo - ehomo) + omega;
 	double ymax = 2*(emax - emin) + omega;
@@ -2617,7 +2617,7 @@ smat MVP_AOADC2::compute_sigma_2e_OV(smat& u_ao, double omega) {
  *                         ADC(2) SIGMA CONSTRUCTOR
  * ====================================================================*/
 
-smat MVP_AOADC2::compute(smat u_ia, double omega) {
+smat MVP_AORISOSADC2::compute(smat u_ia, double omega) {
 	
 	auto& time_com = TIME.sub("Computing sigma ADC(2)");
 	
@@ -2627,7 +2627,7 @@ smat MVP_AOADC2::compute(smat u_ia, double omega) {
 	LOG.os<1>("Computing AO-ADC(2) MVP product... \n");
 	LOG.os<1>("Computing sigma_0 of AO-ADC(2) ... \n");
 	
-	auto sigma_0 = compute_sigma_0(u_ia, *m_eps_occ, *m_eps_vir);
+	auto sigma_0 = compute_sigma_0(u_ia, m_eps_occ, m_eps_vir);
 	
 #ifdef _DLOG
 	LOG.os<>("SIGMA 0");
