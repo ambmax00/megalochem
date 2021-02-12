@@ -192,7 +192,7 @@ public:
 		MPI_Comm_rank(m_comm, &m_mpirank);
 		MPI_Comm_size(m_comm, &m_mpisize);
 		
-		LOG.os<1>("Setting up batch tensor information.\n");
+		LOG.os<1>("Setting up batch tensor information for ", name, + ".\n");
 		
 		std::string path = std::filesystem::current_path();
 		path += "/" + util::unique("mega_batchtensor", "", m_comm) + "/";
@@ -267,7 +267,7 @@ public:
 			create_file();
 		}
 		
-		LOG.os<1>("Finished setting up batchtensor.\n");
+		LOG.os<1>("Finished setting up batchtensor ", name, ".\n");
 		
 		reset_var();
 		
@@ -288,6 +288,8 @@ public:
 		m_is_decompress_initialized(false),
 		m_type(mytype)
 	{
+		LOG.os<1>("Setting up batch tensor information for ", name, + ".\n");
+		
 		m_path = util::unique("mega_batchtensor", "", m_comm) + "/";
 		if (m_mpirank == 0) {
 			std::filesystem::create_directory(m_path);
@@ -305,7 +307,7 @@ public:
 			create_file();
 		}
 		
-		LOG.os<1>("Finished setting up batchtensor.\n");
+		LOG.os<1>("Finished setting up batchtensor ", name, ".\n");
 		
 		reset_var();
 		
@@ -378,8 +380,7 @@ public:
 		if (m_type == btype::disk) delete_file(); 
 		reset_var();
 		if (m_mpirank == 0) {
-			std::cout << "Removing " << m_name << " in " 
-				<< m_path << std::endl;
+			LOG.os<1>("Removing ", m_name, " in ", m_path, '\n');
 			std::filesystem::remove(m_path);
 		}
 	}
@@ -418,7 +419,7 @@ public:
 	void compress_init(std::initializer_list<int> dim_list, vec<int> map1, vec<int> map2) 
 	{
 		
-		LOG.os<1>("Initializing compression...\n");
+		LOG.os<1>("Initializing compression for ", m_name, "...\n");
 		
 		vec<int> dims = dim_list;
 		
@@ -464,6 +465,8 @@ public:
 		
 		m_is_compress_initialized = true;
 		
+		LOG.os<1>("Finished initializing compression for ", m_name, "...\n");
+		
 	}
 	
 	vec<vec<int>> get_bounds(vec<int> idx, vec<int> dims) {
@@ -508,6 +511,8 @@ public:
 	/* ... */
 	void compress(std::initializer_list<int> idx_list, stensor<N,T> tensor_in) {
 	
+		LOG.os<1>("Compressing into ", m_name, "...\n");
+	
 		if (!m_is_compress_initialized) {
 			throw std::runtime_error("Compression not initialized.\n");
 		}
@@ -533,6 +538,8 @@ public:
 			case btype::direct: compress_direct(tensor_in);
 			break;
 		}
+		
+		LOG.os<1>("Finished compression for ", m_name, "...\n");
 		
 	}
 	
@@ -759,7 +766,8 @@ public:
 	
 	void compress_finalize() {
 		
-		LOG.os<1>("Finalizing compression...\n");
+		LOG.os<1>("Finalizing compression for ", m_name, "...\n");
+		
 		//if (m_type == dbcsr::btype::core) m_work_tensor->batched_contract_finalize();
 		
 		m_is_compress_initialized = false;
@@ -1113,6 +1121,9 @@ public:
 		}
 				
 		MPI_File_close(&fh_read);
+		
+		rview.map1 = map1;
+		rview.map2 = map2;
 				
 		return rview;
 			
@@ -1124,7 +1135,18 @@ public:
 		
 		vec<int> dims = dims_list;
 		
-		LOG.os<1>("Initializing decompression...\n");
+		LOG.os<1>("Initializing decompression for ", m_name, "...\n");
+		
+		std::string vstr;
+		for (auto i : map1) {
+			vstr += std::to_string(i);
+		}
+		vstr += "|";
+		for (auto i : map2) {
+			vstr += std::to_string(i);
+		}
+		
+		LOG.os<1>("Requested view: ", vstr, '\n');
 		
 		m_read_current_is_contiguous = (dims == m_wrview.dims) ? true : false;
 		m_read_current_dims = dims;
@@ -1345,12 +1367,16 @@ public:
 		
 		m_is_decompress_initialized = true;
 		
+		LOG.os<1>("Finished initializing decompression for ", m_name, "...\n");
+		
 		//std::cout << "NATCHED." << std::endl;
 		
 	}
 	
 	// if tensor_in nullptr, then gives back m_stensor
 	void decompress(std::initializer_list<int> idx_list) {
+		
+		LOG.os<1>("Decompressing ", m_name, "...\n");
 		
 		if (!m_is_decompress_initialized) {
 			throw std::runtime_error("Decompression not initialized.\n");
@@ -1370,6 +1396,8 @@ public:
 			case btype::core : decompress_core(idx);
 			break;
 		}
+		
+		LOG.os<1>("Finished decompression for  ", m_name, "...\n");
 				
 	}
 	
@@ -1707,9 +1735,17 @@ public:
 			
 			auto map1 = m_work_tensor->map1_2d();
 			auto map2 = m_work_tensor->map2_2d();
-									
+			
+			auto rmap1 = rdview.map1;
+			auto rmap2 = rdview.map2;
+			
 			std::array<int,N> idx, blksize;
 			std::array<int,2> blk2size;
+			
+			/*std::cout << "MAP: " << std::endl;
+			for (auto m : map1) std::cout << m << " ";
+			for (auto m : map2) std::cout << m << " ";
+			std::cout << std::endl;*/
 			
 			for (int iblk = 0; iblk != nblk; ++iblk) {
 								
@@ -1717,17 +1753,32 @@ public:
 					idx[i] = newlocblkidx[i][iblk];
 					blksize[i] = m_blk_sizes[i][idx[i]];
 				}
+				
+				int rowsize = 1;
+				int colsize = 1;
+				
+				for (auto m : m_wrview.map1) {
+					rowsize *= m_blk_sizes[m][idx[m]];
+				}
+				
+				for (auto m : m_wrview.map2) {
+					colsize *= m_blk_sizes[m][idx[m]];
+				}
 								
 				// get work tensor block
 				bool found = false;
 				auto blk_work = m_work_tensor->get_block(idx, blksize, found);
 				
+				if (!found) {
+					throw std::runtime_error("Block not found...");
+				}
+				
 				T* data = buffer + buffer_offset;
 				
-				blk2size[0] = 1;
-				blk2size[1] = 1;
+				blk2size[0] = rowsize;
+				blk2size[1] = colsize;
 				
-				blk_work.reshape(data, blk2size, map1, map2);
+				blk_work.reshape(data, blk2size, m_wrview.map1, m_wrview.map2);
 				
 				m_work_tensor->put_block(idx, blk_work);
 				

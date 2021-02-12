@@ -648,7 +648,7 @@ std::tuple<dbcsr::sbtensor<3,double>,dbcsr::sbtensor<3,double>>
 		.blk_sizes(xob_chol)
 		.blk_map(blkmaps)
 		.batch_dims(bdims)
-		.btensor_type(dbcsr::btype::core)
+		.btensor_type(m_btype)
 		.print(LOG.global_plev())
 		.get();
 			
@@ -658,7 +658,7 @@ std::tuple<dbcsr::sbtensor<3,double>,dbcsr::sbtensor<3,double>>
 		.blk_sizes(xob_chol)
 		.blk_map(blkmaps)
 		.batch_dims(bdims)
-		.btensor_type(dbcsr::btype::core)
+		.btensor_type(m_btype)
 		.print(LOG.global_plev())
 		.get();
 		
@@ -1108,7 +1108,7 @@ dbcsr::sbtensor<3,double> MVP_AORISOSADC2::compute_I_OB(dbcsr::sbtensor<3,double
 	LOG.os<1>("Computing I\n");
 	
 	auto I_xob_batched = std::make_shared<dbcsr::btensor<3,double>>(
-		*eri_xob_batched, "I_xob_batched", dbcsr::btype::core, 
+		*eri_xob_batched, "I_xob_batched", m_btype, 
 		LOG.global_plev());
 	
 	time_init.start();
@@ -1605,7 +1605,7 @@ std::tuple<dbcsr::sbtensor<3,double>,dbcsr::sbtensor<3,double>>
 		.blk_sizes(xov_chol)
 		.blk_map(blkmaps)
 		.batch_dims(bdims)
-		.btensor_type(dbcsr::btype::core)
+		.btensor_type(m_btype)
 		.print(LOG.global_plev())
 		.get();
 			
@@ -1615,7 +1615,7 @@ std::tuple<dbcsr::sbtensor<3,double>,dbcsr::sbtensor<3,double>>
 		.blk_sizes(xov_chol)
 		.blk_map(blkmaps)
 		.batch_dims(bdims)
-		.btensor_type(dbcsr::btype::core)
+		.btensor_type(m_btype)
 		.print(LOG.global_plev())
 		.get();
 		
@@ -1955,7 +1955,7 @@ dbcsr::sbtensor<3,double> MVP_AORISOSADC2::compute_I_OV(dbcsr::sbtensor<3,double
 	LOG.os<1>("Compute I\n");
 	
 	auto I_xov_batched = std::make_shared<dbcsr::btensor<3,double>>(
-		*eri_xov_batched, "I_xov_batched", dbcsr::btype::core, 
+		*eri_xov_batched, "I_xov_batched", m_btype, 
 		LOG.global_plev());
 
 	I_xov_batched->compress_init({2}, vec<int>{0}, vec<int>{1,2});

@@ -92,9 +92,11 @@ $:    ", ".join([name + "(" + ":," * ndim_pre + str(i) + ",:"*ndim_post + ")" fo
 
 #:endmute
 
+#:if CPLUSPLUS == 0
 #include <memory>
 #include <optional>
 #include <functional>
+#:endif
 
 #:mute
 
