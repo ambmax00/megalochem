@@ -574,13 +574,13 @@ public:
 	
 	dbcsr::shared_matrix<double> compute() {
 		
-		auto m_ints = dbcsr::create<double>()
+		auto m_ints = dbcsr::matrix<double>::create()
 			.name(m_intname)
 			.set_world(m_world)
 			.row_blk_sizes(m_tensor_sizes[0])
 			.col_blk_sizes(m_tensor_sizes[1])
 			.matrix_type(dbcsr::type::symmetric)
-			.get();
+			.build();
 			
 		m_ints->reserve_sym();
 		
@@ -594,13 +594,13 @@ public:
 	
 	std::array<dbcsr::shared_matrix<double>,3> compute_xyz(std::array<int,3> O) {
 		
-		auto ints_x = dbcsr::create<double>()
+		auto ints_x = dbcsr::matrix<double>::create()
 			.name(m_intname + "_x")
 			.set_world(m_world)
 			.row_blk_sizes(m_tensor_sizes[0])
 			.col_blk_sizes(m_tensor_sizes[1])
 			.matrix_type(dbcsr::type::symmetric)
-			.get();
+			.build();
 			
 		auto ints_y = dbcsr::create_template<double>(*ints_x)
 			.name(m_intname + "_y")
@@ -679,11 +679,12 @@ public:
 		
 		auto sym = (dim == "bbbb") ? dbcsr::type::symmetric : dbcsr::type::no_symmetry;
 		
-		auto m_ints = dbcsr::create<double>()
+		auto m_ints = dbcsr::matrix<double>::create()
 			.name(m_intname)
 			.set_world(m_world)
 			.row_blk_sizes(rowsizes).col_blk_sizes(colsizes)
-			.matrix_type(sym).get();
+			.matrix_type(sym)
+			.build();
 			
 		// reserve symmtric blocks
 		int nblks = m_ints->nblkrows_total();

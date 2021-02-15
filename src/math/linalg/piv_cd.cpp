@@ -449,18 +449,19 @@ public:
 		auto rdist = dbcsr::cyclic_dist(distrvec.size(),wrd.dims()[0]);
 		auto cdist = dbcsr::cyclic_dist(distcvec.size(),wrd.dims()[1]);
 
-		dbcsr::dist mdist = dbcsr::dist::create()
+		auto mdist = dbcsr::dist::create()
 			.set_world(wrd)
 			.row_dist(rdist)
-			.col_dist(cdist);
+			.col_dist(cdist)
+			.build();
 				
-		auto mat = dbcsr::create<T>()
+		auto mat = dbcsr::matrix<T>::create()
 			.name("submatrix")
-			.set_dist(mdist)
+			.set_dist(*mdist)
 			.row_blk_sizes(distrvec)
 			.col_blk_sizes(distcvec)
 			.matrix_type(dbcsr::type::no_symmetry)
-			.get();
+			.build();
 				
 		auto out = std::make_shared<xmatrix<T>>(std::move(*mat));
 		return out;
@@ -1137,13 +1138,13 @@ void pivinc_cd::compute(std::optional<int> force_rank) {
 	
 	auto rvec = dbcsr::split_range(nrows, 8);
 	
-	auto Lredist = dbcsr::create<double>()
+	auto Lredist = dbcsr::matrix<double>::create()
 		.set_world(wrd)
 		.name("Cholesky decomposition")
 		.row_blk_sizes(matrowblksizes)
 		.col_blk_sizes(rvec)
 		.matrix_type(dbcsr::type::no_symmetry)
-		.get();
+		.build();
 		
 	LOG.os<1>("-- Redistributing L\n");
 		
@@ -1178,13 +1179,13 @@ dbcsr::smat_d pivinc_cd::L(std::vector<int> rowblksizes, std::vector<int> colblk
 	
 	auto wrd = m_L->get_world();
 	
-	auto Lredist = dbcsr::create<double>()
+	auto Lredist = dbcsr::matrix<>::create()
 		.set_world(wrd)
 		.name("Cholesky decomposition")
 		.row_blk_sizes(rowblksizes)
 		.col_blk_sizes(colblksizes)
 		.matrix_type(dbcsr::type::no_symmetry)
-		.get();
+		.build();
 		
 	LOG.os<1>("-- Redistributing L\n");
 		

@@ -69,13 +69,13 @@ public:
 		auto b = c_bm->row_blk_sizes();
 		
 		auto w = c_bm->get_world();
-		auto p_bb = dbcsr::create<double>()
+		auto p_bb = dbcsr::matrix<>::create()
 			.set_world(w)
 			.name("density matrix of " + c_bm->name())
 			.row_blk_sizes(b)
 			.col_blk_sizes(b)
 			.matrix_type(dbcsr::type::symmetric)
-			.get();
+			.build();
 			
 		dbcsr::multiply('N', 'T', *c_bm, *c_bm, *p_bb)
 			.perform();

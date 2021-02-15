@@ -53,13 +53,13 @@ public:
 		auto w = c_bm->get_world();
 		auto m = c_bm->col_blk_sizes();
 		
-		auto u_mm = dbcsr::create<double>()
+		auto u_mm = dbcsr::matrix<>::create()
 			.name("u_mm")
 			.set_world(w)
 			.row_blk_sizes(m)
 			.col_blk_sizes(m)
 			.matrix_type(dbcsr::type::no_symmetry)
-			.get();
+			.build();
 		
 		dbcsr::multiply('N', 'N', *s_bb, *c_bm, *temp).perform();
 		dbcsr::multiply('T', 'N', *l_bm, *temp, *u_mm).perform();

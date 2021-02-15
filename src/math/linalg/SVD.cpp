@@ -151,12 +151,13 @@ dbcsr::shared_matrix<double> SVD::inverse() {
 	//dbcsr::print(*U);
 	//dbcsr::print(*Vt);
 			
-	auto out = dbcsr::create<double>().set_world(w)
+	auto out = dbcsr::matrix<>::create()
+		.set_world(w)
 		.name("SVD inverse of " + m_mat_in->name())
 		.row_blk_sizes(colsizes)
 		.col_blk_sizes(rowsizes)
 		.matrix_type(dbcsr::type::no_symmetry)
-		.get();
+		.build();
 	
 	auto sigma = *m_s;
 	
@@ -173,23 +174,24 @@ dbcsr::shared_matrix<double> SVD::inverse() {
 	
 	//dbcsr::print(*out);
 	
-	auto ide = dbcsr::create<double>().set_world(w)
+	auto ide = dbcsr::matrix<>::create()
+		.set_world(w)
 		.name("IDE1")
 		.row_blk_sizes(rowsizes)
 		.col_blk_sizes(rowsizes)
 		.matrix_type(dbcsr::type::no_symmetry)
-		.get();
+		.build();
 		
 	dbcsr::multiply('N', 'N', *m_mat_in, *out, *ide).perform();
 	
 	//dbcsr::print(*ide);
 	
-	auto ide1 = dbcsr::create<double>().set_world(w)
+	auto ide1 = dbcsr::matrix<>::create()
 		.name("IDE2")
 		.row_blk_sizes(rowsizes)
 		.col_blk_sizes(colsizes)
 		.matrix_type(dbcsr::type::no_symmetry)
-		.get();
+		.build();
 	
 	dbcsr::multiply('N', 'N', *ide, *m_mat_in, *ide1).perform();
 	

@@ -14,21 +14,21 @@ smat u_transform(smat& u, char to, smat& c_bo, char tv, smat& c_bv) {
 	auto rblks_out = (to == 'N') ? c_bo->row_blk_sizes() : c_bo->col_blk_sizes();
 	auto cblks_out = (tv == 'T') ? c_bv->row_blk_sizes() : c_bv->col_blk_sizes();
 	
-	smat u_t1 = dbcsr::create<double>()
+	smat u_t1 = dbcsr::matrix<>::create()
 		.set_world(w)
 		.name("u_t1")
 		.row_blk_sizes(rblks_out)
 		.col_blk_sizes(cblks_in)
 		.matrix_type(dbcsr::type::no_symmetry)
-		.get();
+		.build();
 		
-	smat u_t2 = dbcsr::create<double>()
+	smat u_t2 = dbcsr::matrix<>::create()
 		.set_world(w)
 		.name("u_transformed")
 		.row_blk_sizes(rblks_out)
 		.col_blk_sizes(cblks_out)
 		.matrix_type(dbcsr::type::no_symmetry)
-		.get();
+		.build();
 	
 	dbcsr::multiply(to, 'N', *c_bo, *u, *u_t1).perform();
 	dbcsr::multiply('N', tv, *u_t1, *c_bv, *u_t2).perform();

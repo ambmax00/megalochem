@@ -14,13 +14,13 @@ dbcsr::shared_matrix<double> adcmod::compute_diag_0() {
 	auto o = m_hfwfn->mol()->dims().oa();
 	auto v = m_hfwfn->mol()->dims().va();
 	
-	auto d_ov_0 = dbcsr::create<double>()
+	auto d_ov_0 = dbcsr::matrix<>::create()
 		.name("diag_ov_0")
 		.set_world(m_world)
 		.row_blk_sizes(o)
 		.col_blk_sizes(v)
 		.matrix_type(dbcsr::type::no_symmetry)
-		.get();
+		.build();
 		
 	d_ov_0->reserve_all();
 	
@@ -193,21 +193,21 @@ dbcsr::shared_matrix<double> adcmod::compute_diag_1() {
 		.map1({0,1,2}).map2({3})
 		.get();
 		
-	auto d_iaia = dbcsr::create<double>()
+	auto d_iaia = dbcsr::matrix<>::create()
 		.set_world(m_world)
 		.name("d_ia_1")
 		.row_blk_sizes(o)
 		.col_blk_sizes(v)
 		.matrix_type(dbcsr::type::no_symmetry)
-		.get();
+		.build();
 		
-	auto d_iiaa = dbcsr::create<double>()
+	auto d_iiaa = dbcsr::matrix<>::create()
 		.set_world(m_world)
 		.name("d_ia_2")
 		.row_blk_sizes(o)
 		.col_blk_sizes(v)
 		.matrix_type(dbcsr::type::no_symmetry)
-		.get();
+		.build();
 		
 	auto c_bo_01 = dbcsr::tensor_create<2>()
 		.name("c_bo")

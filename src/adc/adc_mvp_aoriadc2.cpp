@@ -251,37 +251,37 @@ void MVP_AORISOSADC2::compute_intermeds() {
 	
 	arrvec<int,2> xx = {x,x};
 	
-	m_i_oo = dbcsr::create<double>()
+	m_i_oo = dbcsr::matrix<>::create()
 		.name("I_ij")
 		.set_world(m_world)
 		.row_blk_sizes(o)
 		.col_blk_sizes(o)
 		.matrix_type(dbcsr::type::no_symmetry)
-		.get();
+		.build();
 		
-	m_i_vv = dbcsr::create<double>()
+	m_i_vv = dbcsr::matrix<>::create()
 		.name("I_ab")
 		.set_world(m_world)
 		.row_blk_sizes(v)
 		.col_blk_sizes(v)
 		.matrix_type(dbcsr::type::no_symmetry)
-		.get();
+		.build();
 		
-	auto i_ob = dbcsr::create<double>()
+	auto i_ob = dbcsr::matrix<>::create()
 		.name("I_ij_part")
 		.set_world(m_world)
 		.row_blk_sizes(o)
 		.col_blk_sizes(b)
 		.matrix_type(dbcsr::type::no_symmetry)
-		.get();
+		.build();
 		
-	auto i_vb = dbcsr::create<double>()
+	auto i_vb = dbcsr::matrix<>::create()
 		.name("I_ab_part")
 		.set_world(m_world)
 		.row_blk_sizes(v)
 		.col_blk_sizes(b)
 		.matrix_type(dbcsr::type::no_symmetry)
-		.get();
+		.build();
 		
 	auto i_oo_tmp = dbcsr::create_template(*m_i_oo)
 		.name("i_oo_temp").get();
@@ -478,13 +478,13 @@ smat MVP_AORISOSADC2::compute_sigma_2c(smat& jmat, smat& kmat) {
 	auto o = m_mol->dims().oa();
 	auto v = m_mol->dims().va();
 	
-	auto sig_2c = dbcsr::create<double>()
+	auto sig_2c = dbcsr::matrix<>::create()
 		.set_world(m_world)
 		.name("sig_2c")
 		.row_blk_sizes(o)
 		.col_blk_sizes(v)
 		.matrix_type(dbcsr::type::no_symmetry)
-		.get();
+		.build();
 		
 	LOG.os<1>("-- Contracting over laplace points...\n");
 	
@@ -732,21 +732,21 @@ std::tuple<dbcsr::sbtensor<3,double>,dbcsr::sbtensor<3,double>>
 		.name("SPv_bb")
 		.get();
 	
-	auto up_ob = dbcsr::create<double>()
+	auto up_ob = dbcsr::matrix<>::create()
 		.set_world(m_world)
 		.name("u particle")
 		.row_blk_sizes(o_chol)
 		.col_blk_sizes(b)
 		.matrix_type(dbcsr::type::no_symmetry)
-		.get();
+		.build();
 		
-	auto uh_bb = dbcsr::create<double>()
+	auto uh_bb = dbcsr::matrix<>::create()
 		.set_world(m_world)
 		.name("u hole")
 		.row_blk_sizes(b)
 		.col_blk_sizes(b)
 		.matrix_type(dbcsr::type::no_symmetry)
-		.get();
+		.build();
 		
 	dbcsr::multiply('N', 'N', *m_s_bb, *L_bo, *SL_bo)
 		.perform();
@@ -1355,21 +1355,21 @@ std::tuple<smat,smat> MVP_AORISOSADC2::compute_sigma_2e_ilap_OB(
 		auto o = m_mol->dims().oa();
 		auto v = m_mol->dims().va();
 		
-		auto sig_pre_E1_bb = dbcsr::create<double>()
+		auto sig_pre_E1_bb = dbcsr::matrix<>::create()
 			.name("sigmaE1_bb")
 			.set_world(m_world)
 			.row_blk_sizes(b)
 			.col_blk_sizes(b)
 			.matrix_type(dbcsr::type::no_symmetry)
-			.get();
+			.build();
 			
-		auto sig_pre_E2_ob = dbcsr::create<double>()
+		auto sig_pre_E2_ob = dbcsr::matrix<>::create()
 			.name("sigmaE2_bb")
 			.set_world(m_world)
 			.row_blk_sizes(o_chol)
 			.col_blk_sizes(b)
 			.matrix_type(dbcsr::type::no_symmetry)
-			.get();
+			.build();
 			
 		dbcsr::copy_tensor_to_matrix(*sig_pre_E1_bb_01, *sig_pre_E1_bb);
 		dbcsr::copy_tensor_to_matrix(*sig_pre_E2_ob_01, *sig_pre_E2_ob);
@@ -1377,29 +1377,29 @@ std::tuple<smat,smat> MVP_AORISOSADC2::compute_sigma_2e_ilap_OB(
 		sig_pre_E1_bb_01->destroy();
 		sig_pre_E2_ob_01->destroy();
 			
-		auto SC_bv = dbcsr::create<double>()
+		auto SC_bv = dbcsr::matrix<>::create()
 			.name("SC_bv")
 			.set_world(m_world)
 			.row_blk_sizes(b)
 			.col_blk_sizes(v)
 			.matrix_type(dbcsr::type::no_symmetry)
-			.get();
+			.build();
 			
-		auto SC_bo = dbcsr::create<double>()
+		auto SC_bo = dbcsr::matrix<>::create()
 			.name("SL_bo")
 			.set_world(m_world)
 			.row_blk_sizes(b)
 			.col_blk_sizes(o)
 			.matrix_type(dbcsr::type::no_symmetry)
-			.get();
+			.build();
 			
-		auto LSC_co = dbcsr::create<double>()
+		auto LSC_co = dbcsr::matrix<>::create()
 			.name("LSC_co")
 			.set_world(m_world)
 			.row_blk_sizes(o_chol)
 			.col_blk_sizes(o)
 			.matrix_type(dbcsr::type::no_symmetry)
-			.get();
+			.build();
 			
 		dbcsr::multiply('N', 'N', *m_s_bb, *m_c_bv, *SC_bv)
 			.perform();
@@ -1468,13 +1468,13 @@ smat MVP_AORISOSADC2::compute_sigma_2e_OB(smat& u_ao, double omega) {
 	auto b = m_mol->dims().b();
 	auto x = m_mol->dims().x();
 	
-	auto sigma_2e_A = dbcsr::create<double>()
+	auto sigma_2e_A = dbcsr::matrix<>::create()
 		.name("sigma_2e_A")
 		.set_world(m_world)
 		.row_blk_sizes(o)
 		.col_blk_sizes(v)
 		.matrix_type(dbcsr::type::no_symmetry)
-		.get();
+		.build();
 		
 	auto sigma_2e_B = dbcsr::create_template<double>(*sigma_2e_A)
 		.name("sigma_2e_B").get();
@@ -1692,21 +1692,21 @@ std::tuple<dbcsr::sbtensor<3,double>,dbcsr::sbtensor<3,double>>
 		.name("SL_bv")
 		.get();
 	
-	auto up_ob = dbcsr::create<double>()
+	auto up_ob = dbcsr::matrix<>::create()
 		.set_world(m_world)
 		.name("u particle")
 		.row_blk_sizes(o_chol)
 		.col_blk_sizes(b)
 		.matrix_type(dbcsr::type::no_symmetry)
-		.get();
+		.build();
 		
-	auto uh_bv = dbcsr::create<double>()
+	auto uh_bv = dbcsr::matrix<>::create()
 		.set_world(m_world)
 		.name("u hole")
 		.row_blk_sizes(b)
 		.col_blk_sizes(v_chol)
 		.matrix_type(dbcsr::type::no_symmetry)
-		.get();
+		.build();
 		
 	dbcsr::multiply('N', 'N', *m_s_bb, *L_bo, *SL_bo)
 		.perform();
@@ -2264,21 +2264,21 @@ std::tuple<smat,smat> MVP_AORISOSADC2::compute_sigma_2e_ilap_OV(
 		auto o = m_mol->dims().oa();
 		auto v = m_mol->dims().va();
 		
-		auto sigmaE1_HT = dbcsr::create<double>()
+		auto sigmaE1_HT = dbcsr::matrix<>::create()
 			.name("sigmaE1_HT")
 			.set_world(m_world)
 			.row_blk_sizes(b)
 			.col_blk_sizes(v_chol)
 			.matrix_type(dbcsr::type::no_symmetry)
-			.get();
+			.build();
 			
-		auto sigmaE2_HT = dbcsr::create<double>()
+		auto sigmaE2_HT = dbcsr::matrix<>::create()
 			.name("sigmaE2_HT")
 			.set_world(m_world)
 			.row_blk_sizes(o_chol)
 			.col_blk_sizes(b)
 			.matrix_type(dbcsr::type::no_symmetry)
-			.get();
+			.build();
 			
 		dbcsr::copy_tensor_to_matrix(*sigmaE1_HT_01, *sigmaE1_HT);
 		dbcsr::copy_tensor_to_matrix(*sigmaE2_HT_01, *sigmaE2_HT);
@@ -2286,21 +2286,21 @@ std::tuple<smat,smat> MVP_AORISOSADC2::compute_sigma_2e_ilap_OV(
 		sigmaE1_HT_01->destroy();
 		sigmaE2_HT_01->destroy();
 			
-		auto Po_bb = dbcsr::create<double>()
+		auto Po_bb = dbcsr::matrix<>::create()
 			.name("Po_bb")
 			.set_world(m_world)
 			.row_blk_sizes(b)
 			.col_blk_sizes(b)
 			.matrix_type(dbcsr::type::symmetric)
-			.get();
+			.build();
 			
-		auto Pv_bb = dbcsr::create<double>()
+		auto Pv_bb = dbcsr::matrix<>::create()
 			.name("Pv_bb")
 			.set_world(m_world)
 			.row_blk_sizes(b)
 			.col_blk_sizes(b)
 			.matrix_type(dbcsr::type::symmetric)
-			.get();
+			.build();
 			
 		dbcsr::multiply('N', 'T', *m_c_bo, *m_c_bo, *Po_bb)
 			.perform();
@@ -2383,13 +2383,13 @@ smat MVP_AORISOSADC2::compute_sigma_2e_OV(smat& u_ao, double omega) {
 	auto b = m_mol->dims().b();
 	auto x = m_mol->dims().x();
 	
-	auto sigma_2e_A = dbcsr::create<double>()
+	auto sigma_2e_A = dbcsr::matrix<>::create()
 		.name("sigma_2e_A")
 		.set_world(m_world)
 		.row_blk_sizes(o)
 		.col_blk_sizes(v)
 		.matrix_type(dbcsr::type::no_symmetry)
-		.get();
+		.build();
 		
 	auto sigma_2e_B = dbcsr::create_template<double>(*sigma_2e_A)
 		.name("sigma_2e_B").get();

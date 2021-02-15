@@ -79,21 +79,22 @@ MatrixX<T,StorageOrder> matrix_to_eigen(matrix<T>& mat_in) {
 		std::vector<int> rowdist(nblkrow,prow);
 		std::vector<int> coldist(nblkcol,pcol);
 		
-		dist locdist = dist::create()
+		auto locdist = dist::create()
 			.set_world(w)
 			.row_dist(rowdist)
-			.col_dist(coldist);
+			.col_dist(coldist)
+			.build();
 			
 		auto rblksizes = mat_in.row_blk_sizes();
 		auto cblksizes = mat_in.col_blk_sizes();
 			
-		auto locmat = dbcsr::create<double>()
-			.set_dist(locdist)
+		auto locmat = matrix<T>::create()
+			.set_dist(*locdist)
 			.name("locmat")
 			.row_blk_sizes(rblksizes)
 			.col_blk_sizes(cblksizes)
 			.matrix_type(dbcsr::type::no_symmetry)
-			.get();
+			.build();
 			
 		locmat->complete_redistribute(*mat_desym);
 		MatrixX<T,StorageOrder>* eigenmat;
@@ -155,8 +156,13 @@ shared_matrix<typename Derived::Scalar> eigen_to_matrix(
 	
 	if (prow < 0 || pcol < 0) {
 	
-		auto out = create<T>().name(name).set_world(w).row_blk_sizes(row_blk_sizes)
-			.col_blk_sizes(col_blk_sizes).matrix_type(mtype).get();
+		auto out = matrix<T>::create()
+			.name(name)
+			.set_world(w)
+			.row_blk_sizes(row_blk_sizes)
+			.col_blk_sizes(col_blk_sizes)
+			.matrix_type(mtype)
+			.build();
 		
 		if (out->has_symmetry()) {
 			out->reserve_sym();
@@ -190,26 +196,27 @@ shared_matrix<typename Derived::Scalar> eigen_to_matrix(
 		std::vector<int> rowdist(row_blk_sizes.size(), prow),
 			coldist(col_blk_sizes.size(), pcol);
 			
-		dist locdist = dist::create()
+		auto locdist = dist::create()
 			.set_world(w)
 			.row_dist(rowdist)
-			.col_dist(coldist);
+			.col_dist(coldist)
+			.build();
 		
-		auto locmat = create<T>()
+		auto locmat = matrix<T>::create()
 			.name(name)
-			.set_dist(locdist)
+			.set_dist(*locdist)
 			.row_blk_sizes(row_blk_sizes)
 			.col_blk_sizes(col_blk_sizes)
 			.matrix_type(mtype)
-			.get();
+			.build();
 		
-		auto out = create<T>()
+		auto out = matrix<T>::create()
 			.name(name)
 			.set_world(w)
 			.row_blk_sizes(row_blk_sizes)
 			.col_blk_sizes(col_blk_sizes)
 			.matrix_type(mtype)
-			.get();
+			.build();
 			
 		if (locmat->has_symmetry()) {
 			locmat->reserve_sym();
@@ -266,10 +273,19 @@ scalapack::distmat<T> matrix_to_scalapack(shared_matrix<T> mat_in, std::string n
 	vec<int> rowdist = cyclic_dist(rowsizes.size(),mworld.dims()[0]);
 	vec<int> coldist = cyclic_dist(colsizes.size(),mworld.dims()[1]);
 	
-	dist scaldist = dist::create().set_world(mworld).row_dist(rowdist).col_dist(coldist);
+	auto scaldist = dist::create()
+		.set_world(mworld)
+		.row_dist(rowdist)
+		.col_dist(coldist)
+		.build();
 	
-	shared_matrix<T> mat_out = create<T>().name(mat_in->name() + " redist.").set_dist(scaldist)
-		.row_blk_sizes(rowsizes).col_blk_sizes(colsizes).matrix_type(type::no_symmetry).get();
+	shared_matrix<T> mat_out = matrix<T>::create()
+		.name(mat_in->name() + " redist.")
+		.set_dist(*scaldist)
+		.row_blk_sizes(rowsizes)
+		.col_blk_sizes(colsizes)
+		.matrix_type(type::no_symmetry)
+		.build();
 
 	if (mat_in->has_symmetry()) {
 		auto mat_in_nosym = mat_in->desymmetrize();
@@ -310,7 +326,7 @@ scalapack::distmat<T> matrix_to_scalapack(shared_matrix<T> mat_in, std::string n
 	mat_out->finalize();
 }	
 	mat_out->release();
-	scaldist.release();
+	scaldist->release();
 	
 	//scamat.print();
 	
@@ -345,14 +361,19 @@ shared_matrix<T> scalapack_to_matrix(scalapack::distmat<T>& sca_mat_in, std::str
 	vec<int> rowdist = cyclic_dist(rowcycsizes.size(),world_in.dims()[0]);
 	vec<int> coldist = cyclic_dist(colcycsizes.size(),world_in.dims()[1]);
 	
-	dist cycdist = dist::create().set_world(world_in).row_dist(rowdist).col_dist(coldist);
+	auto cycdist = dist::create()
+		.set_world(world_in)
+		.row_dist(rowdist)
+		.col_dist(coldist)
+		.build();
 	
-	auto mat_cyclic = create<T>()
+	auto mat_cyclic = matrix<T>::create()
 		.name(nameint + "cyclic")
-		.set_dist(cycdist)
+		.set_dist(*cycdist)
 		.row_blk_sizes(rowcycsizes)
 		.col_blk_sizes(colcycsizes)
-		.matrix_type(type::no_symmetry).get();
+		.matrix_type(type::no_symmetry)
+		.build();
 	
 	mat_cyclic->reserve_all();
 
@@ -399,11 +420,13 @@ shared_matrix<T> scalapack_to_matrix(scalapack::distmat<T>& sca_mat_in, std::str
 }	
 	
 	// make new matrix
-	shared_matrix<T> mat_out = create<T>()
-		.name(nameint).set_world(world_in)
+	shared_matrix<T> mat_out = matrix<T>::create()
+		.name(nameint)
+		.set_world(world_in)
 		.row_blk_sizes(rowblksizes)
 		.col_blk_sizes(colblksizes)
-		.matrix_type((sym) ? type::symmetric : type::no_symmetry).get();
+		.matrix_type((sym) ? type::symmetric : type::no_symmetry)
+		.build();
 
 	bool keep_sp = false;
 
@@ -417,7 +440,7 @@ shared_matrix<T> scalapack_to_matrix(scalapack::distmat<T>& sca_mat_in, std::str
 	if (sym) mat_out->filter(1e-16);
 
 	mat_cyclic->release();
-	cycdist.release();
+	cycdist->release();
 	
 	return mat_out;
 	
@@ -590,8 +613,6 @@ Eigen::MatrixXd block_norms(matrix<T>& m_in) {
 	return eigen_out;
 	
 }
-	
-
 	
 }
 	

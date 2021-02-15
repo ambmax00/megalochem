@@ -11,13 +11,13 @@ std::pair<smat_d,smat_d>
 	
 	int norb = c_bm->nfullcols_total();
 	
-	auto p_bb = dbcsr::create<double>()
+	auto p_bb = dbcsr::matrix<>::create()
 		.name("p_bb")
 		.set_world(m_world)
 		.row_blk_sizes(b)
 		.col_blk_sizes(b)
 		.matrix_type(dbcsr::type::symmetric)
-		.get();
+		.build();
 		
 	dbcsr::multiply('N', 'T', *c_bm, *c_bm, *p_bb).perform();
 	

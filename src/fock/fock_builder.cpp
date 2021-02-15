@@ -19,13 +19,13 @@ fockmod::fockmod (dbcsr::world iworld, desc::shared_molecule imol, desc::options
 {
 	// set up tensors
 	auto b = m_mol->dims().b();
-	m_f_bb_A = dbcsr::create<double>()
+	m_f_bb_A = dbcsr::matrix<>::create()
 		.set_world(m_world)
 		.name("f_bb_A")
 		.row_blk_sizes(b)
 		.col_blk_sizes(b)
 		.matrix_type(dbcsr::type::symmetric)
-		.get();
+		.build();
 		
 	if (m_mol->nele_alpha() != m_mol->nele_beta() && m_mol->nele_beta() != 0) {
 		m_f_bb_B = dbcsr::create_template<double>(*m_f_bb_A)

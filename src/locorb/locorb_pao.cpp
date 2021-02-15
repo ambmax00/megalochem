@@ -65,21 +65,21 @@ std::tuple<smat_d, smat_d, std::vector<double>>
 		off += size;
 	}
 	
-	auto s_pp = dbcsr::create<double>()
+	auto s_pp = dbcsr::matrix<>::create()
 		.name("s_pp")
 		.set_world(m_world)
 		.row_blk_sizes(p)
 		.col_blk_sizes(p)
 		.matrix_type(dbcsr::type::no_symmetry)
-		.get();
+		.build();
 	
-	auto s_pb = dbcsr::create<double>()
+	auto s_pb = dbcsr::matrix<>::create()
 		.name("s_pb")
 		.set_world(m_world)
 		.row_blk_sizes(p)
 		.col_blk_sizes(b)
 		.matrix_type(dbcsr::type::no_symmetry)
-		.get();
+		.build();
 		
 	s_pp->reserve_all();
 	s_pb->reserve_all();
@@ -152,21 +152,21 @@ std::tuple<smat_d, smat_d, std::vector<double>>
 		.name("c_ortho")
 		.get();
 	
-	auto q_pm = dbcsr::create<double>()
+	auto q_pm = dbcsr::matrix<>::create()
 		.name("q_pm")
 		.set_world(m_world)
 		.row_blk_sizes(p)
 		.col_blk_sizes(m)
 		.matrix_type(dbcsr::type::no_symmetry)
-		.get();
+		.build();
 		
-	auto temp_pb = dbcsr::create<double>()
+	auto temp_pb = dbcsr::matrix<>::create()
 		.name("temp_pb")
 		.set_world(m_world)
 		.row_blk_sizes(p)
 		.col_blk_sizes(b)
 		.matrix_type(dbcsr::type::no_symmetry)
-		.get();
+		.build();
 		
 	LOG.os<>("PAO 5\n");
 	
@@ -205,29 +205,29 @@ std::tuple<smat_d, smat_d, std::vector<double>>
 	
 	// canonicalize
 	
-	auto f_mm = dbcsr::create<double>()
+	auto f_mm = dbcsr::matrix<>::create()
 		.name("Fock")
 		.set_world(m_world)
 		.row_blk_sizes(m)
 		.col_blk_sizes(m)
 		.matrix_type(dbcsr::type::no_symmetry)
-		.get();
+		.build();
 		
-	auto f_ht_rm = dbcsr::create<double>()
+	auto f_ht_rm = dbcsr::matrix<>::create()
 		.name("Fock_HT")
 		.set_world(m_world)
 		.row_blk_sizes(r)
 		.col_blk_sizes(m)
 		.matrix_type(dbcsr::type::no_symmetry)
-		.get();
+		.build();
 		
-	auto f_rr = dbcsr::create<double>()
+	auto f_rr = dbcsr::matrix<>::create()
 		.name("Fock_HT")
 		.set_world(m_world)
 		.row_blk_sizes(r)
 		.col_blk_sizes(r)
 		.matrix_type(dbcsr::type::no_symmetry)
-		.get();
+		.build();
 	
 	f_mm->reserve_diag_blocks();
 	f_mm->set_diag(eps_m);
@@ -261,31 +261,29 @@ std::tuple<smat_d, smat_d, std::vector<double>>
 	// compute MO -> trunc. canonical MO transformation matrix
 	// T_sm = T_rs^t Σ_r Vt_rm
 	
-	auto T_ms = dbcsr::create<double>()
+	auto T_ms = dbcsr::matrix<>::create()
 		.set_world(m_world)
 		.row_blk_sizes(m)
 		.col_blk_sizes(r)
 		.name("Transformation matrix canon. MOs -> canon. truncated MOs")
 		.matrix_type(dbcsr::type::no_symmetry)
-		.get();
+		.build();
 		
 	dbcsr::multiply('T', 'N', *vt_rm, *T_rs, *T_ms)
 		.perform();
 		
-		
 	// new MO coefficient matrix:
 	
-	auto c_bs = dbcsr::create<double>()
+	auto c_bs = dbcsr::matrix<>::create()
 		.name(c_bm->name() + "_truncated")
 		.set_world(m_world)
 		.row_blk_sizes(b)
 		.col_blk_sizes(r)
 		.matrix_type(dbcsr::type::no_symmetry)
-		.get();
+		.build();
 		
 	dbcsr::multiply('N', 'N', *c_bm, *T_ms, *c_bs).perform();
 	
-		
 	// compute truncated canonical MO coefficient matrix
 	// Ctrunc_ps = X_pp * U_pr * T_rs
 	

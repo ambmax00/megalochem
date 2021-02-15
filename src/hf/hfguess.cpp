@@ -261,13 +261,13 @@ void hfmod::compute_guess() {
 			auto coB = at_wfn->c_bo_B();
 			
 			auto b = at_smol->dims().b();
-			auto pA = dbcsr::create<double>()
+			auto pA = dbcsr::matrix<>::create()
 				.name("p_bb_A")
 				.set_world(at_world)
 				.row_blk_sizes(b)
 				.col_blk_sizes(b)
 				.matrix_type(dbcsr::type::symmetric)
-				.get();
+				.build();
 				
 			auto pB = dbcsr::create_template<double>(*pA)
 				.name("p_bb_B")

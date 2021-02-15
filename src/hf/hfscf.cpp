@@ -48,12 +48,13 @@ hfmod::hfmod(dbcsr::world w, desc::shared_molecule mol, desc::options opt)
 	
 	// alpha
 	
-	m_core_bb = dbcsr::create<double>()
+	m_core_bb = dbcsr::matrix<>::create()
 		.set_world(m_world)
 		.name("core_bb")
 		.row_blk_sizes(b)
 		.col_blk_sizes(b)
-		.matrix_type(dbcsr::type::symmetric).get();
+		.matrix_type(dbcsr::type::symmetric)
+		.build();
 		
 	m_p_bb_A = dbcsr::create_template<double>(*m_core_bb)
 		.name("p_bb_A").get();
@@ -61,13 +62,13 @@ hfmod::hfmod(dbcsr::world w, desc::shared_molecule mol, desc::options opt)
 	m_f_bb_A = dbcsr::create_template<double>(*m_core_bb)
 		.name("f_bb_A").get();	
 	
-	m_c_bm_A = dbcsr::create<double>()
+	m_c_bm_A = dbcsr::matrix<>::create()
 		.set_world(m_world)
 		.name("c_bm_A")
 		.row_blk_sizes(b)
 		.col_blk_sizes(mA)
 		.matrix_type(dbcsr::type::no_symmetry)
-		.get();
+		.build();
 		
 	if (!m_restricted) {
 		
@@ -81,13 +82,13 @@ hfmod::hfmod(dbcsr::world w, desc::shared_molecule mol, desc::options opt)
 	
 	if (!m_nobetaorb && !m_restricted) {
 		
-		m_c_bm_B = dbcsr::create<double>()
+		m_c_bm_B = dbcsr::matrix<>::create()
 			.set_world(m_world)
 			.name("c_bm_B")
 			.row_blk_sizes(b)
 			.col_blk_sizes(mB)
 			.matrix_type(dbcsr::type::no_symmetry)
-			.get();
+			.build();
 
 	}
 		

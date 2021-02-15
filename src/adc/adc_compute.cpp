@@ -21,13 +21,13 @@ dbcsr::shared_matrix<double> canonicalize(dbcsr::shared_matrix<double> u_lm,
 	auto l = u_lm->row_blk_sizes();
 	auto m = u_lm->col_blk_sizes();
 	
-	auto f_mm = dbcsr::create<double>()
+	auto f_mm = dbcsr::matrix<>::create()
 		.name("f_mm")
 		.set_world(w)
 		.row_blk_sizes(m)
 		.col_blk_sizes(m)
 		.matrix_type(dbcsr::type::no_symmetry)
-		.get();
+		.build();
 	
 	f_mm->reserve_all();
 	
@@ -701,13 +701,13 @@ adcmod::canon_lmo adcmod::get_canon_nto(dbcsr::shared_matrix<double> u_ia,
 	
 	auto form_fock = [&](std::vector<int> m, std::vector<double> eps_m) {
 		
-		auto f = dbcsr::create<double>()
+		auto f = dbcsr::matrix<>::create()
 			.set_world(wrd)
 			.name("fock")
 			.row_blk_sizes(m)
 			.col_blk_sizes(m)
 			.matrix_type(dbcsr::type::no_symmetry)
-			.get();
+			.build();
 			
 		f->reserve_diag_blocks();
 		f->set_diag(eps_m);
@@ -738,37 +738,37 @@ adcmod::canon_lmo adcmod::get_canon_nto(dbcsr::shared_matrix<double> u_ia,
 	auto eps_t = hsolver_o.eigvals();
 	auto eps_s = hsolver_v.eigvals();
 	
-	auto trans_ot = dbcsr::create<double>()
+	auto trans_ot = dbcsr::matrix<>::create()
 		.name("trans ot")
 		.set_world(wrd)
 		.row_blk_sizes(o)
 		.col_blk_sizes(t)
 		.matrix_type(dbcsr::type::no_symmetry)
-		.get();
+		.build();
 		
-	auto trans_vs = dbcsr::create<double>()
+	auto trans_vs = dbcsr::matrix<>::create()
 		.name("trans vs")
 		.set_world(wrd)
 		.row_blk_sizes(v)
 		.col_blk_sizes(s)
 		.matrix_type(dbcsr::type::no_symmetry)
-		.get();
+		.build();
 	
-	auto c_bt = dbcsr::create<double>()
+	auto c_bt = dbcsr::matrix<>::create()
 		.name("SVD c_bo")
 		.set_world(wrd)
 		.row_blk_sizes(b)
 		.col_blk_sizes(t)
 		.matrix_type(dbcsr::type::no_symmetry)
-		.get();
+		.build();
 		
-	auto c_bs = dbcsr::create<double>()
+	auto c_bs = dbcsr::matrix<>::create()
 		.name("SVD c_bv")
 		.set_world(wrd)
 		.row_blk_sizes(b)
 		.col_blk_sizes(s)
 		.matrix_type(dbcsr::type::no_symmetry)
-		.get();	
+		.build();
 		
 	LOG.os<>("-- Forming final NTO coefficient matrices\n"); 
 

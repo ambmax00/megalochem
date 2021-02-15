@@ -15,13 +15,13 @@ void J::init_base() {
 	// set up J
 	auto b = m_mol->dims().b();
 	
-	m_J = dbcsr::create<double>()
+	m_J = dbcsr::matrix<>::create()
 		.name("J_bb")
 		.set_world(m_world)
 		.row_blk_sizes(b)
 		.col_blk_sizes(b)
 		.matrix_type((m_sym) ? dbcsr::type::symmetric : dbcsr::type::no_symmetry)
-		.get();
+		.build();
 	
 }
 
@@ -30,22 +30,22 @@ void K::init_base() {
 	// set up K's
 	auto b = m_mol->dims().b();
 	
-	m_K_A = dbcsr::create<double>()
+	m_K_A = dbcsr::matrix<>::create()
 		.name("K_bb_A")
 		.set_world(m_world)
 		.row_blk_sizes(b)
 		.col_blk_sizes(b)
 		.matrix_type((m_sym) ? dbcsr::type::symmetric : dbcsr::type::no_symmetry)
-		.get();
+		.build();
 		
 	if (m_p_B) {
-		m_K_B = dbcsr::create<double>()
+		m_K_B = dbcsr::matrix<>::create()
 			.name("K_bb_B")
 			.set_world(m_world)
 			.row_blk_sizes(b)
 			.col_blk_sizes(b)
 			.matrix_type((m_sym) ? dbcsr::type::symmetric : dbcsr::type::no_symmetry)
-			.get();
+			.build();
 	}
 	
 }

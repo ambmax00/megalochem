@@ -10,13 +10,13 @@ void LLMP_MEM_Z::init() {
 	
 	arrvec<int,2> xx = {x,x};
 	
-	m_zmat = dbcsr::create<double>()
+	m_zmat = dbcsr::matrix<>::create()
 		.set_world(m_world)
 		.name("zmat")
 		.row_blk_sizes(x)
 		.col_blk_sizes(x)
 		.matrix_type(dbcsr::type::no_symmetry)
-		.get();
+		.build();
 	
 	m_spgrid2 = dbcsr::create_pgrid<2>(m_world.comm()).get();
 	
@@ -321,13 +321,13 @@ void LLMP_ASYM_Z::init() {
 	
 	arrvec<int,2> xx = {x,x};
 	
-	m_zmat = dbcsr::create<double>()
+	m_zmat = dbcsr::matrix<>::create()
 		.set_world(m_world)
 		.name("zmat")
 		.row_blk_sizes(x)
 		.col_blk_sizes(x)
 		.matrix_type(dbcsr::type::no_symmetry)
-		.get();
+		.build();
 	
 	m_spgrid2 = dbcsr::create_pgrid<2>(m_world.comm()).get();
 	
