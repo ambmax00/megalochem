@@ -21,7 +21,7 @@ function (ADD_FYPP_SOURCES OUTVAR FYPP_TARGET)
 			set(of "${CMAKE_CURRENT_BINARY_DIR}/${root}${new_extension}")
 			add_custom_command(
                   		OUTPUT ${of}
-				COMMAND "${Python_EXECUTABLE}" -m fypp -I "${FYPP_INCLUDE_DIR}" "${file}" "${of}"
+				COMMAND "${Python_EXECUTABLE}" -m fypp -I "${FYPP_INCLUDE_DIR}" -DCPLUSPLUS=1 "${file}" "${of}"
                   		DEPENDS "${file}"
                 	)
 			list(APPEND outfiles "${of}")

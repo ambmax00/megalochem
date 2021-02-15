@@ -19,7 +19,7 @@ include_directories(${dir})
 
 find_package(OpenMP REQUIRED)
 find_package(MPI REQUIRED)
-find_package(DBCSR 2.0.0 CONFIG REQUIRED)
+find_package(DBCSR 2.1.0 CONFIG REQUIRED)
 find_package(Python REQUIRED COMPONENTS Interpreter Development NumPy)
 find_package(HDF5 REQUIRED)
 find_package(PkgConfig)
