@@ -642,21 +642,21 @@ std::tuple<dbcsr::sbtensor<3,double>,dbcsr::sbtensor<3,double>>
 		.tensor_dims(dims_xob_chol)
 		.build();
 	
-	auto J_xob_batched = dbcsr::btensor_create<3>()
+	auto J_xob_batched = dbcsr::btensor<3>::create()
 		.name("J_xob_batched")
 		.set_pgrid(spgrid_xob_chol)
 		.blk_sizes(xob_chol)
-		.blk_map(blkmaps)
+		.blk_maps(blkmaps)
 		.batch_dims(bdims)
 		.btensor_type(m_btype)
 		.print(LOG.global_plev())
 		.build();
 			
-	auto eri_xob_batched = dbcsr::btensor_create<3>()
+	auto eri_xob_batched = dbcsr::btensor<3>::create()
 		.name("eri_xov_batched")
 		.set_pgrid(spgrid_xob_chol)
 		.blk_sizes(xob_chol)
-		.blk_map(blkmaps)
+		.blk_maps(blkmaps)
 		.batch_dims(bdims)
 		.btensor_type(m_btype)
 		.print(LOG.global_plev())
@@ -1107,9 +1107,12 @@ dbcsr::sbtensor<3,double> MVP_AORISOSADC2::compute_I_OB(dbcsr::sbtensor<3,double
 
 	LOG.os<1>("Computing I\n");
 	
-	auto I_xob_batched = std::make_shared<dbcsr::btensor<3,double>>(
-		*eri_xob_batched, "I_xob_batched", m_btype, 
-		LOG.global_plev());
+	auto I_xob_batched = 
+		dbcsr::btensor<3>::create_template(*eri_xob_batched)
+			.name("I_xob_batched")
+			.btensor_type(m_btype) 
+			.print(LOG.global_plev())
+			.build();
 	
 	time_init.start();
 	
@@ -1599,21 +1602,21 @@ std::tuple<dbcsr::sbtensor<3,double>,dbcsr::sbtensor<3,double>>
 		.tensor_dims(dims_xob_chol)
 		.build();
 	
-	auto J_xov_batched = dbcsr::btensor_create<3>()
+	auto J_xov_batched = dbcsr::btensor<3>::create()
 		.name("J_xov_batched")
 		.set_pgrid(spgrid_xov_chol)
 		.blk_sizes(xov_chol)
-		.blk_map(blkmaps)
+		.blk_maps(blkmaps)
 		.batch_dims(bdims)
 		.btensor_type(m_btype)
 		.print(LOG.global_plev())
 		.build();
 			
-	auto eri_xov_batched = dbcsr::btensor_create<3>()
+	auto eri_xov_batched = dbcsr::btensor<3>::create()
 		.name("eri_xov_batched")
 		.set_pgrid(spgrid_xov_chol)
 		.blk_sizes(xov_chol)
-		.blk_map(blkmaps)
+		.blk_maps(blkmaps)
 		.batch_dims(bdims)
 		.btensor_type(m_btype)
 		.print(LOG.global_plev())
@@ -1954,9 +1957,12 @@ dbcsr::sbtensor<3,double> MVP_AORISOSADC2::compute_I_OV(dbcsr::sbtensor<3,double
 
 	LOG.os<1>("Compute I\n");
 	
-	auto I_xov_batched = std::make_shared<dbcsr::btensor<3,double>>(
-		*eri_xov_batched, "I_xov_batched", m_btype, 
-		LOG.global_plev());
+	auto I_xov_batched = 
+		dbcsr::btensor<3>::create_template(*eri_xov_batched)
+			.name("I_xov_batched")
+			.btensor_type(m_btype)
+			.print(LOG.global_plev())
+			.build();
 
 	I_xov_batched->compress_init({2}, vec<int>{0}, vec<int>{1,2});
 	R_xov_batched->decompress_init({2}, vec<int>{0}, vec<int>{1,2});

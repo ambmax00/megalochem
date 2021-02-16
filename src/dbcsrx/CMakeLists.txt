@@ -2,6 +2,7 @@ set(FYPP_SOURCES
 	dbcsr_common.hpp.fypp
 	dbcsr_matrix.hpp.fypp
 	dbcsr_tensor.hpp.fypp
+	dbcsr_btensor.hpp.fypp
 	dbcsr_matrix_ops.hpp.fypp
 	dbcsr_tensor_ops.hpp.fypp
 	fortran_utils.hpp.fypp

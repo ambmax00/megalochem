@@ -4,6 +4,7 @@
 #include <dbcsr_tensor_ops.hpp>
 #include "utils/mpi_time.hpp"
 #include "utils/unique.hpp"
+#:include "megalochem.fypp"
 
 #include <map>
 #include <mpi.h>
@@ -88,7 +89,7 @@ inline vec<vec<int>> make_blk_bounds(std::vector<int> blksizes,
 		
 }
 	
-template <int N, typename T, 
+template <int N, typename T = double, 
 	typename = typename std::enable_if<(N >= 3 && N <= 4)>::type>
 class btensor {
 protected:
@@ -110,7 +111,7 @@ protected:
 	
 	std::string m_name;
 	dbcsr::shared_pgrid<N> m_spgrid_N;
-	arrvec<int,N> m_blk_sizes;
+	arrvec<int,N> m_blk_sizes, m_blk_maps;
 	
 	std::string m_filename;
 	std::string m_path;
@@ -172,27 +173,37 @@ protected:
 public:
 
 	btensor(MPI_Comm comm, int print) : LOG(comm,print) {}	
+	
+#:set list = [&
+	['set_pgrid', 'shared_pgrid<N>', _REQ, _VAL],&
+	['blk_sizes', 'arrvec<int,N>', _REQ, _REF],&
+	['blk_maps', 'arrvec<int,N>', _REQ, _REF],&
+	['batch_dims', 'std::array<int,N>', _REQ, _VAL],&
+	['name', 'std::string', _REQ, _VAL],&
+	['btensor_type', 'dbcsr::btype', _REQ, _VAL],&
+	['print', 'int', _OPT, _VAL]]
 
-	/* batchsize: given in MB */
-	btensor(std::string name, shared_pgrid<N> spgrid, arrvec<int,N> blksizes, 
-		std::array<int,N> nbatches, arrvec<int,N> blkmap, btype mytype, 
-		int print = -1) : 
-		m_comm(spgrid->comm()),
-		m_name(name),
-		m_spgrid_N(spgrid),
-		m_blk_sizes(blksizes),
+${_MAKE_PARAM_STRUCT('create', list)}$
+${_MAKE_BUILDER_CLASS('btensor', 'create', list, True)}$
+
+	btensor(create_pack&& p) :
+		m_comm(p.p_set_pgrid->comm()),
+		m_name(p.p_name),
+		m_spgrid_N(p.p_set_pgrid),
+		m_blk_sizes(p.p_blk_sizes),
+		m_blk_maps(p.p_blk_maps),
 		m_filename(),
 		m_mpirank(-1), m_mpisize(-1),
-		LOG(spgrid->comm(),print),
+		LOG(p.p_set_pgrid->comm(),(p.p_print) ? *p.p_print : 0),
 		m_is_compress_initialized(false),
 		m_is_decompress_initialized(false),
-		m_type(mytype)
+		m_type(p.p_btensor_type)
 	{
 		
 		MPI_Comm_rank(m_comm, &m_mpirank);
 		MPI_Comm_size(m_comm, &m_mpisize);
 		
-		LOG.os<1>("Setting up batch tensor information for ", name, + ".\n");
+		LOG.os<1>("Setting up batch tensor information for ", m_name, + ".\n");
 		
 		std::string path = std::filesystem::current_path();
 		path += "/" + util::unique("mega_batchtensor", "", m_comm) + "/";
@@ -201,11 +212,12 @@ public:
 		}
 		
 		m_path = path;
-		m_filename = path + name + ".dat";
+		m_filename = path + m_name + ".dat";
 		
 		// divide dimensions
 		
 		arrvec<int,N> blkoffsets;
+		auto nbatches = p.p_batch_dims;
 		
 		for (int i = 0; i != N; ++i) {
 			
@@ -217,7 +229,8 @@ public:
 			}
 			
 			// batch bounds
-			m_blk_bounds[i] = make_blk_bounds(blksizes[i],nbatches[i],blkmap[i]);
+			m_blk_bounds[i] = make_blk_bounds(m_blk_sizes[i],
+				nbatches[i],m_blk_maps[i]);
 	
 			m_bounds[i] = m_blk_bounds[i];
 			auto& ibds = m_bounds[i];
@@ -243,7 +256,8 @@ public:
 			
 			// check if memory sufficient
 			
-			int nele = std::accumulate(blksizes[i].begin(),blksizes[i].end(),0);
+			int nele = std::accumulate(m_blk_sizes[i].begin(),
+				m_blk_sizes[i].end(),0);
 			double nele_per_batch = (double) nele / (double) m_nbatches_dim[i];
 			
 			if (nele_per_batch * sizeof(T) >= 2 * 1e+9) {
@@ -267,39 +281,51 @@ public:
 			create_file();
 		}
 		
-		LOG.os<1>("Finished setting up batchtensor ", name, ".\n");
+		LOG.os<1>("Finished setting up batchtensor ", m_name, ".\n");
 		
 		reset_var();
 		
 	}
 	
 	btensor(const btensor& in) = delete;
+
+#:set init_list = [&
+	['t_in', 'btensor<N,T>', _REQ, _REF]] 
+
+#:set list = [&
+	['name', 'std::string', _REQ, _VAL],&
+	['btensor_type', 'dbcsr::btype', _REQ, _VAL],&
+	['print', 'int', _OPT, _VAL]]
+
+${_MAKE_PARAM_STRUCT('create_template', list, init_list)}$
+${_MAKE_BUILDER_CLASS('btensor', 'create_template', list, True, init_list)}$	
 	
-	btensor(const btensor& in, std::string name, btype mytype, int nprint) :
-		m_comm(in.m_comm),
-		m_name(name),
-		m_spgrid_N(in.m_spgrid_N),
-		m_blk_sizes(in.m_blk_sizes),
+	btensor(create_template_pack&& p) :
+		m_comm(p.p_t_in.m_comm),
+		m_name(p.p_name),
+		m_spgrid_N(p.p_t_in.m_spgrid_N),
+		m_blk_sizes(p.p_t_in.m_blk_sizes),
+		m_blk_maps(p.p_t_in.m_blk_maps),
 		m_filename(),
-		m_mpirank(in.m_mpirank),
-		m_mpisize(in.m_mpisize),
-		LOG(in.m_comm,nprint),
+		m_mpirank(p.p_t_in.m_mpirank),
+		m_mpisize(p.p_t_in.m_mpisize),
+		LOG(p.p_t_in.m_comm,(p.p_print) ? *p.p_print : 0),
 		m_is_compress_initialized(false),
 		m_is_decompress_initialized(false),
-		m_type(mytype)
+		m_type(p.p_btensor_type)
 	{
-		LOG.os<1>("Setting up batch tensor information for ", name, + ".\n");
+		LOG.os<1>("Setting up batch tensor information for ", m_name, + ".\n");
 		
 		m_path = util::unique("mega_batchtensor", "", m_comm) + "/";
 		if (m_mpirank == 0) {
 			std::filesystem::create_directory(m_path);
 		}
-		m_filename = m_path + name + ".dat";
-		m_blk_bounds = in.m_blk_bounds;
-		m_bounds = in.m_bounds;
-		m_full_blk_bounds = in.m_full_blk_bounds;
-		m_full_bounds = in.m_full_bounds;
-		m_nbatches_dim = in.m_nbatches_dim;
+		m_filename = m_path + m_name + ".dat";
+		m_blk_bounds = p.p_t_in.m_blk_bounds;
+		m_bounds = p.p_t_in.m_bounds;
+		m_full_blk_bounds = p.p_t_in.m_full_blk_bounds;
+		m_full_bounds = p.p_t_in.m_full_bounds;
+		m_nbatches_dim = p.p_t_in.m_nbatches_dim;
 		
 		MPI_Barrier(m_comm);
 			
@@ -307,7 +333,7 @@ public:
 			create_file();
 		}
 		
-		LOG.os<1>("Finished setting up batchtensor ", name, ".\n");
+		LOG.os<1>("Finished setting up batchtensor ", m_name, ".\n");
 		
 		reset_var();
 		
@@ -1933,102 +1959,6 @@ public:
 
 template <int N, typename T>
 using sbtensor = std::shared_ptr<btensor<N,T>>;
-
-template <int N, typename T>
-class btensor_create_base {
-private:
-
-	shared_pgrid<N> c_pgrid;
-	arrvec<int,N> c_blk_sizes;
-	std::array<int,N> c_bdims;
-	arrvec<int,N> c_blkmap;
-	std::string c_name;
-	dbcsr::btype c_btype;
-	int c_print;
-	
-public:
-
-	btensor_create_base() {}
-	
-	btensor_create_base& name(std::string t_name) {
-		c_name = t_name; return *this;
-	}
-	
-	btensor_create_base& set_pgrid(shared_pgrid<N>& t_pgrid) {
-		c_pgrid = t_pgrid; return *this;
-	}
-	
-	btensor_create_base& blk_sizes(arrvec<int,N> t_blk_sizes) {
-		c_blk_sizes = t_blk_sizes; return *this;
-	}
-	
-	btensor_create_base& batch_dims(std::array<int,N> t_bdims) {
-		c_bdims = t_bdims; return *this;
-	}
-	
-	btensor_create_base& blk_map(arrvec<int,N> t_blkmap) {
-		c_blkmap = t_blkmap; return *this;
-	}
-	
-	btensor_create_base& btensor_type(btype t_btype) {
-		c_btype = t_btype; return *this;
-	}
-	
-	btensor_create_base& print(int n) {
-		c_print = n; return *this;
-	}
-	
-	sbtensor<N,T> build() {
-		auto out = std::make_shared<btensor<N,T>>(c_name,c_pgrid,c_blk_sizes,
-			c_bdims,c_blkmap,c_btype,c_print);
-		return out;
-	}
-
-};
-
-template <int N, typename T = double>
-btensor_create_base<N,T> btensor_create() {
-	return btensor_create_base<N,T>();
-}
-
-template <int N, typename T>
-class btensor_create_template_base {
-private:
-
-	std::shared_ptr<btensor<N,T>> c_in;
-	std::string c_name;
-	dbcsr::btype c_btype;
-	int c_print;
-	
-public:
-
-	btensor_create_template_base(std::shared_ptr<btensor<N,T>>& in) :
-		c_in(in) {}
-	
-	btensor_create_template_base& name(std::string t_name) {
-		c_name = t_name; return *this;
-	}
-	
-	btensor_create_template_base& btensor_type(btype t_btype) {
-		c_btype = t_btype; return *this;
-	}
-	
-	btensor_create_template_base& print(int n) {
-		c_print = n; return *this;
-	}
-	
-	sbtensor<N,T> build() {
-		auto out = std::make_shared<btensor<N,T>>(*c_in,c_name,c_btype,c_print);
-		return out;
-	}
-
-};
-
-template <int N, typename T = double>
-btensor_create_template_base<N,T> btensor_create_template
-	(std::shared_ptr<btensor<N,T>>& in) {
-	return btensor_create_template_base<N,T>(in);
-}
 
 } //end namespace
 

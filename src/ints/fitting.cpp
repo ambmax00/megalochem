@@ -78,12 +78,12 @@ dbcsr::sbtensor<3,double> dfitting::compute(dbcsr::sbtensor<3,double> eri_batche
 		
 	arrvec<int,3> blkmaps = {blkmap_x, blkmap_b, blkmap_b};
 	
-	auto c_xbb_batched = dbcsr::btensor_create<3>()
+	auto c_xbb_batched = dbcsr::btensor<3>::create()
 		.name(m_mol->name() + "_c_xbb_batched")
 		.set_pgrid(spgrid3_xbb)
 		.blk_sizes(xbb)
 		.batch_dims(bdims)
-		.blk_map(blkmaps)
+		.blk_maps(blkmaps)
 		.btensor_type(mytype)
 		.print(LOG.global_plev())
 		.build();

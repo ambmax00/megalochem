@@ -38,11 +38,11 @@ void LLMP_FULL_Z::init() {
 		
 	auto spgrid3_xbb = m_eri3c2e_batched->spgrid();	
 	
-	m_FT3c2e_batched = dbcsr::btensor_create<3>()
+	m_FT3c2e_batched = dbcsr::btensor<3>::create()
 		.set_pgrid(spgrid3_xbb)
 		.blk_sizes(xbb)
 		.name(m_mol->name() + "_z_xbb_batched")
-		.blk_map(blkmap_xbb)
+		.blk_maps(blkmap_xbb)
 		.batch_dims(bdims)
 		.btensor_type(m_intermeds)
 		.print(LOG.global_plev())

@@ -232,11 +232,11 @@ void aoloader::compute() {
 		auto blkmap_b = m_mol->c_basis()->block_to_atom(m_mol->atoms());
 		arrvec<int,4> blkmaps = {blkmap_b, blkmap_b, blkmap_b, blkmap_b};
 		
-		auto eri_batched = dbcsr::btensor_create<4>()
+		auto eri_batched = dbcsr::btensor<4>::create()
 			.name(m_mol->name() + "_eri_batched")
 			.set_pgrid(spgrid4)
 			.blk_sizes(bbbb)
-			.blk_map(blkmaps)
+			.blk_maps(blkmaps)
 			.batch_dims(bdims)
 			.btensor_type(dbcsr::btype::core)
 			.print(LOG.global_plev())
@@ -342,13 +342,13 @@ void aoloader::compute() {
 		
 		arrvec<int,3> blkmaps = {blkmap_x, blkmap_b, blkmap_b};
 		
-		auto eri_batched = dbcsr::btensor_create<3>()
+		auto eri_batched = dbcsr::btensor<3>::create()
 			.name(m_mol->name() + "_eri_batched")
 			.set_pgrid(spgrid3)
 			.blk_sizes(xbb)
 			.batch_dims(bdims)
 			.btensor_type(mytype)
-			.blk_map(blkmaps)
+			.blk_maps(blkmaps)
 			.print(LOG.global_plev())
 			.build();
 			

@@ -82,11 +82,11 @@ dbcsr::sbtensor<3,double> dfitting::compute_pari(dbcsr::shared_matrix<double> s_
 	
 	arrvec<int,3> blkmaps = {blkmap_x, blkmap_b, blkmap_b};
 	
-	auto c_xbb_batched = dbcsr::btensor_create<3,double>()
+	auto c_xbb_batched = dbcsr::btensor<3>::create()
 		.name("cpari_xbb_batched")
 		.set_pgrid(spgrid3_xbb)
 		.blk_sizes(xbb)
-		.blk_map(blkmaps)
+		.blk_maps(blkmaps)
 		.batch_dims(bdims)
 		.btensor_type(mytype)
 		.print(1)

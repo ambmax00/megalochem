@@ -92,13 +92,13 @@ dbcsr::shared_matrix<double> adcmod::compute_diag_1() {
 	auto blkmap_b = mol->c_basis()->block_to_atom(mol->atoms());
 	arrvec<int,4> blkmap = {blkmap_b, blkmap_b, blkmap_b, blkmap_b};
 	
-	auto eri4c2e_direct = dbcsr::btensor_create<4>()
+	auto eri4c2e_direct = dbcsr::btensor<4>::create()
 			.name("eri4c2e_direct")
 			.set_pgrid(spgrid4)
 			.blk_sizes(bbbb)
 			.batch_dims(bdims)
 			.btensor_type(dbcsr::btype::direct)
-			.blk_map(blkmap)
+			.blk_maps(blkmap)
 			.print(LOG.global_plev())
 			.build();
 			
