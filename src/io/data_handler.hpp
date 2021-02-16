@@ -161,7 +161,11 @@ private:
 	hid_t _plist_id, _file_id;
 	bool _is_open;
 	
-	const size_t _max_strlength = 128;
+	static const size_t _max_strlength = 128;
+
+	struct alignas(_max_strlength) fixed_string {
+		char data[_max_strlength];
+	};
 
 public:
 
@@ -258,10 +262,8 @@ public:
 	>
 	void write(std::string vname, T* data, std::vector<hsize_t> dims, int wrank = 0) {
 		
-		auto filetype = H5Tcopy (H5T_FORTRAN_S1);
-		auto status = H5Tset_size (filetype, _max_strlength-1);
-		auto memtype = H5Tcopy (H5T_C_S1);
-		status = H5Tset_size (memtype, _max_strlength);
+		auto strtype = H5Tcopy (H5T_C_S1);
+		auto status = H5Tset_size (strtype, _max_strlength);
 		
 		auto space = H5Screate_simple(dims.size(),dims.data(),NULL);
 				
@@ -270,21 +272,26 @@ public:
 		
 		hsize_t ntot = std::accumulate(dims.begin(), dims.end(), 1, 
 			std::multiplies<hsize_t>());
-			
-		std::vector<const char*> c_strings(ntot);
+		
+		std::vector<fixed_string> c_strings(ntot);
+		
 		for (hsize_t ii = 0; ii != ntot; ++ii) {
-			c_strings[ii] = data[ii].c_str();
-			if (data[ii].size() > _max_strlength) {
+			
+			std::copy(data[ii].begin(), data[ii].end(), c_strings[ii].data);
+			std::cout << c_strings[ii].data << std::endl;
+ 			c_strings[ii].data[data[ii].size()] = '\0';
+						
+			if (data[ii].size() > _max_strlength-1) {
 				throw std::runtime_error(
 				"Datahandler: string exceeds size limit.");
 			}
 		}
 		
-		auto dset = H5Dcreate(_file_id, vname.c_str(), filetype, space,
+		auto dset = H5Dcreate(_file_id, vname.c_str(), strtype, space,
 			H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
 			
 		if (wrank == _rank) {
-			auto err = H5Dwrite(dset, memtype, H5S_ALL, H5S_ALL,
+			auto err = H5Dwrite(dset, strtype, H5S_ALL, H5S_ALL,
 				data_plist, c_strings.data());
 		}
 		
