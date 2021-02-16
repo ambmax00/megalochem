@@ -77,62 +77,62 @@ dbcsr::sbtensor<3,double> dfitting::compute_qr_new(dbcsr::shared_matrix<double> 
 	auto blkmap_b = m_mol->c_basis()->block_to_atom(m_mol->atoms());
 	auto blkmap_x = m_mol->c_dfbasis()->block_to_atom(m_mol->atoms());
 	
-	auto spgrid2_local = dbcsr::create_pgrid<2>(MPI_COMM_SELF).get();
-	auto spgrid3_local = dbcsr::create_pgrid<3>(MPI_COMM_SELF).get();
+	auto spgrid2_local = dbcsr::pgrid<2>::create(MPI_COMM_SELF).build();
+	auto spgrid3_local = dbcsr::pgrid<3>::create(MPI_COMM_SELF).build();
 		
-	auto prs_xbb_local = dbcsr::tensor_create<3,double>()
+	auto prs_xbb_local = dbcsr::tensor<3>::create()
 		.name("prs_xbb_local")
-		.pgrid(spgrid3_local)
+		.set_pgrid(*spgrid3_local)
 		.blk_sizes(xbb)
 		.map1({0}).map2({1,2})
-		.get();
+		.build();
 	
-	auto c_xbb_local = dbcsr::tensor_create<3,double>()
+	auto c_xbb_local = dbcsr::tensor<3>::create()
 		.name("c_xbb_local")
-		.pgrid(spgrid3_local)
+		.set_pgrid(*spgrid3_local)
 		.blk_sizes(xbb)
 		.map1({0}).map2({1,2})
-		.get();
+		.build();
 		
-	auto ovlp_xbb_local = dbcsr::tensor_create<3,double>()
+	auto ovlp_xbb_local = dbcsr::tensor<3>::create()
 		.name("eri_local")
-		.pgrid(spgrid3_local)
+		.set_pgrid(*spgrid3_local)
 		.blk_sizes(xbb)
 		.map1({0}).map2({1,2})
-		.get();
+		.build();
 	
-	auto eri_local = dbcsr::tensor_create<3,double>()
+	auto eri_local = dbcsr::tensor<3>::create()
 		.name("eri_local")
-		.pgrid(spgrid3_local)
+		.set_pgrid(*spgrid3_local)
 		.blk_sizes(xbb)
 		.map1({0}).map2({1,2})
-		.get();
+		.build();
 		
-	auto s_xx_inv_local = dbcsr::tensor_create<2,double>()
+	auto s_xx_inv_local = dbcsr::tensor<2>::create()
 		.name("s_xx_inv_local")
-		.pgrid(spgrid2_local)
+		.set_pgrid(*spgrid2_local)
 		.blk_sizes(xx)
 		.map1({0}).map2({1})
-		.get();
+		.build();
 		
-	auto c_xbb_global = dbcsr::tensor_create<3,double>()
+	auto c_xbb_global = dbcsr::tensor<3>::create()
 		.name("c_xbb_global_1bb")
-		.pgrid(spgrid3_xbb)
+		.set_pgrid(*spgrid3_xbb)
 		.blk_sizes(xbb)
 		.map1({0}).map2({1,2})
-		.get();
+		.build();
 			
 	arrvec<int,3> blkmaps = {blkmap_x, blkmap_b, blkmap_b};
 		
 	auto c_xbb_batched = dbcsr::btensor_create<3,double>()
 		.name("cqr_xbb_batched")
-		.pgrid(spgrid3_xbb)
+		.set_pgrid(spgrid3_xbb)
 		.blk_sizes(xbb)
 		.blk_map(blkmaps)
 		.batch_dims(bdims)
 		.btensor_type(mytype)
 		.print(0)
-		.get();
+		.build();
 	
 	dbcsr::world single_world(MPI_COMM_SELF);
 	

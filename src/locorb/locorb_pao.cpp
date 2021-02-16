@@ -290,11 +290,11 @@ std::tuple<smat_d, smat_d, std::vector<double>>
 	/*
 	auto ctrunc_ortho_ps = dbcsr::create_template<double>(*u_pr)
 		.name("Truncated orthogonal coefficient matrix")
-		.get();
+		.build();
 		
 	auto ctrunc_ps = dbcsr::create_template<double>(*u_pr)
 		.name("Truncated coefficient matrix")
-		.get();
+		.build();
 	
 	u_pr->scale(s, "right");
 	
@@ -310,7 +310,7 @@ std::tuple<smat_d, smat_d, std::vector<double>>
 		.row_blk_sizes(b)
 		.col_blk_sizes(b)
 		.matrix_type(dbcsr::type::no_symmetry)
-		.get();
+		.build();
 		
 	auto p_pp = dbcsr::create<double>()
 		.name("p")
@@ -318,7 +318,7 @@ std::tuple<smat_d, smat_d, std::vector<double>>
 		.row_blk_sizes(p)
 		.col_blk_sizes(p)
 		.matrix_type(dbcsr::type::no_symmetry)
-		.get();
+		.build();
 	
 	dbcsr::multiply('N', 'T', *c_bm, *c_bm, *p_bb)
 		.perform();
@@ -350,7 +350,7 @@ double mo_localizer::pop_mulliken(dbcsr::matrix<double>& c_bo,
 		.row_blk_sizes(b)
 		.col_blk_sizes(b)
 		.matrix_type(dbcsr::type::no_symmetry)
-		.get();
+		.build();
 		
 	auto pop_bb = dbcsr::create<double>()
 		.name("pop_bb")
@@ -358,7 +358,7 @@ double mo_localizer::pop_mulliken(dbcsr::matrix<double>& c_bo,
 		.row_blk_sizes(b)
 		.col_blk_sizes(b)
 		.matrix_type(dbcsr::type::no_symmetry)
-		.get();
+		.build();
 		
 	dbcsr::multiply('N', 'T', c_bo, c_bo, *p_bb)
 		.perform();

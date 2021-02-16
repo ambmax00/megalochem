@@ -151,7 +151,7 @@ void adcmod::compute() {
 	auto cbo = m_hfwfn->c_bo_A();
 	auto cbv = m_hfwfn->c_bv_A(); 	
 	
-	auto rcopy = dbcsr::copy(*r).get();
+	auto rcopy = dbcsr::copy(*r).build();
 	rcopy->scale(1.0/sqrt(rcopy->dot(*rcopy)));
 	
 	math::SVD svdcomp(rcopy, 'V', 'V', 10);
@@ -193,11 +193,11 @@ void adcmod::compute() {
 	
 	auto pv = dbcsr::create_template<double>(*s_bb)
 		.name("pv")
-		.get();
+		.build();
 		
 	auto pvloc = dbcsr::create_template<double>(*s_bb)
 		.name("pv")
-		.get();
+		.build();
 		
 	dbcsr::multiply('N', 'T', *cbv, *cbv, *pv).perform();
 	dbcsr::multiply('N', 'T', *cv_ps, *cv_ps, *pvloc).perform();
@@ -267,7 +267,7 @@ void adcmod::compute() {
 		.v_xx(v_xx)
 		.jmethod(fock::jmethod::dfao)
 		.kmethod(fock::kmethod::dfao)
-		.get();
+		.build();
 		
 	ptr->init();
 		

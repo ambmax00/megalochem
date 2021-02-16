@@ -441,22 +441,22 @@ public:
 			LOG.os<1>("Allocating core work tensors.\n");
 			m_core_vector.resize(m_wrview.nbatches);
 			for (auto& t : m_core_vector) {
-				t = tensor_create<N,T>()
+				t = tensor<N,T>::create()
 					.name(m_name + "_work")
-					.pgrid(m_spgrid_N)
+					.set_pgrid(*m_spgrid_N)
 					.map1(map1).map2(map2)
 					.blk_sizes(m_blk_sizes)
-					.get();
+					.build();
 			}
 				
 			#else			
 			LOG.os<1>("Allocating core work tensor.\n");
-			m_work_tensor = tensor_create<N,T>()
+			m_work_tensor = tensor<N,T>::create()
 				.name(m_name + "_work")
-				.pgrid(m_spgrid_N)
+				.set_pgrid(*m_spgrid_N)
 				.map1(map1).map2(map2)
 				.blk_sizes(m_blk_sizes)
-				.get();
+				.build();
 			#endif
 						
 			//m_work_tensor->batched_contract_init();	
@@ -801,7 +801,7 @@ public:
 		//std::cout << "REO" << std::endl;
 		
 		stensor<N,T> newtensor = tensor_create_template<N,T>(m_stensor)
-			.name(m_stensor->name()).map1(map1).map2(map2).get();
+			.name(m_stensor->name()).map1(map1).map2(map2).build();
 			
 		if (m_type == btype::core) {
 			dbcsr::copy(*m_stensor, *newtensor).move_data(true).perform();
@@ -814,7 +814,7 @@ public:
 	void reorder(shared_tensor<N,T> mytensor) {
 		
 		stensor<N,T> newtensor = tensor_create_template<N,T>(mytensor)
-			.name(m_stensor->name()).get();
+			.name(m_stensor->name()).build();
 			
 		if (m_type == btype::core) {
 			dbcsr::copy(*m_stensor, *newtensor).move_data(true).perform();
@@ -1165,10 +1165,10 @@ public:
 				
 				for (auto& t : newcorevec) {
 				
-					t = tensor_create_template<N,T>(m_core_vector[0])
+					t = tensor<N,T>::create_template(*m_core_vector[0])
 						.map1(map1).map2(map2)
 						.name(m_name + "_work_core")
-						.get();
+						.build();
 					
 					t->batched_contract_init();		
 				
@@ -1255,12 +1255,12 @@ public:
 					auto& told = m_core_vector[ii];
 					auto& tnew = newcorevec[ii];
 					
-					tnew = tensor_create_template<N,T>(
-						m_core_vector[0])
+					tnew = tensor<N,T>::create_template(
+						*m_core_vector[0])
 						.map1(map1)
 						.map2(map2)
 						.name(m_name + "_work_core")
-						.get();
+						.build();
 					
 					copy(*told, *tnew)
 						.move_data(true)
@@ -1281,9 +1281,12 @@ public:
 			if (m_wrview.map1 != map1 || m_wrview.map2 != map2) {
 								
 				LOG.os<1>("Reordering core tensor.\n");
-				auto new_work_tensor = tensor_create_template<N,T>(m_work_tensor)
+				
+				auto new_work_tensor = 
+					tensor<N,T>::create_template(*m_work_tensor)
 					.map1(map1).map2(map2)
-					.name(m_name + "_work_core").get();
+					.name(m_name + "_work_core").build();
+				
 				copy(*m_work_tensor, *new_work_tensor)
 					.move_data(true)
 					.perform();
@@ -1311,16 +1314,16 @@ public:
 			
 			LOG.os<1>("Creating direct work and read tensors.\n");
 			
-			m_work_tensor = tensor_create<N,T>()
+			m_work_tensor = tensor<N,T>::create()
 				.name(m_name + "_work_direct")
-				.pgrid(m_spgrid_N)
+				.set_pgrid(*m_spgrid_N)
 				.map1(map1).map2(map2)
 				.blk_sizes(m_blk_sizes)
-				.get();
+				.build();
 				
-			m_read_tensor = tensor_create_template(m_work_tensor)
+			m_read_tensor = tensor<N,T>::create_template(*m_work_tensor)
 				.name(m_name + "_read_direct")
-				.get();
+				.build();
 				
 			// update 
 			m_wrview.dims = dims;
@@ -1334,18 +1337,18 @@ public:
 			
 			LOG.os<1>("Creating disk work and read tensors.\n");
 			
-			m_work_tensor = tensor_create<N,T>()
+			m_work_tensor = tensor<N,T>::create()
 				.name(m_name + "_work_disk")
-				.pgrid(m_spgrid_N)
+				.set_pgrid(*m_spgrid_N)
 				.map1(map1).map2(map2)
 				.blk_sizes(m_blk_sizes)
-				.get();
+				.build();
 				
-			m_read_tensor = tensor_create_template(m_work_tensor)
+			m_read_tensor = tensor<N,T>::create_template(*m_work_tensor)
 				.name(m_name + "_read_disk")
 				.map1(m_wrview.map1)
 				.map2(m_wrview.map2)
-				.get();
+				.build();
 			
 		}
 		
@@ -1864,12 +1867,12 @@ public:
 	dbcsr::shared_tensor<N,T> get_template(std::string name, vec<int> map1,
 		vec<int> map2) 
 	{
-		auto out = dbcsr::tensor_create<N,T>()
+		auto out = dbcsr::tensor<N,T>::create()
 			.name(name)
-			.pgrid(m_spgrid_N)
+			.set_pgrid(*m_spgrid_N)
 			.blk_sizes(m_blk_sizes)
 			.map1(map1).map2(map2)
-			.get();
+			.build();
 			
 		return out;
 	}
@@ -1882,8 +1885,9 @@ public:
 		out->m_mpisize = m_mpisize;
 		
 		if (m_read_tensor) {
-			out->m_read_tensor = dbcsr::tensor_create_template<3,double>(m_read_tensor)
-				.name(m_read_tensor->name()).get();
+			out->m_read_tensor = dbcsr::tensor<3>::create_template(
+				*m_read_tensor)
+				.name(m_read_tensor->name()).build();
 		}
 		
 		if (m_work_tensor) {
@@ -1950,7 +1954,7 @@ public:
 		c_name = t_name; return *this;
 	}
 	
-	btensor_create_base& pgrid(shared_pgrid<N>& t_pgrid) {
+	btensor_create_base& set_pgrid(shared_pgrid<N>& t_pgrid) {
 		c_pgrid = t_pgrid; return *this;
 	}
 	
@@ -1974,7 +1978,7 @@ public:
 		c_print = n; return *this;
 	}
 	
-	sbtensor<N,T> get() {
+	sbtensor<N,T> build() {
 		auto out = std::make_shared<btensor<N,T>>(c_name,c_pgrid,c_blk_sizes,
 			c_bdims,c_blkmap,c_btype,c_print);
 		return out;
@@ -2013,7 +2017,7 @@ public:
 		c_print = n; return *this;
 	}
 	
-	sbtensor<N,T> get() {
+	sbtensor<N,T> build() {
 		auto out = std::make_shared<btensor<N,T>>(*c_in,c_name,c_btype,c_print);
 		return out;
 	}

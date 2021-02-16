@@ -14,17 +14,17 @@ auto get_sum = [](auto& in, auto comm) {
 dbcsr::sbtensor<3,double> dfitting::compute(dbcsr::sbtensor<3,double> eri_batched, 
 	dbcsr::shared_matrix<double> inv, dbcsr::btype mytype) {
 		
-	auto spgrid2 = dbcsr::create_pgrid<2>(m_world.comm()).get();
+	auto spgrid2 = dbcsr::pgrid<2>::create(m_world.comm()).build();
 	auto x = m_mol->dims().x();
 	
 	arrvec<int,2> xx = {x,x};
 
-	auto s_xx_inv = dbcsr::tensor_create<2>()
+	auto s_xx_inv = dbcsr::tensor<2>::create()
 		.name("s_xx_inv")
-		.pgrid(spgrid2)
+		.set_pgrid(*spgrid2)
 		.blk_sizes(xx)
 		.map1({0}).map2({1})
-		.get();
+		.build();
 		
 	dbcsr::copy_matrix_to_tensor(*inv, *s_xx_inv);
 	
@@ -56,17 +56,17 @@ dbcsr::sbtensor<3,double> dfitting::compute(dbcsr::sbtensor<3,double> eri_batche
 		} std::cout << std::endl;
 	};
 	
-	auto c_xbb_0_12 = dbcsr::tensor_create<3>()
+	auto c_xbb_0_12 = dbcsr::tensor<3>::create()
 		.name("c_xbb_0_12")
-		.pgrid(spgrid3_xbb)
+		.set_pgrid(*spgrid3_xbb)
 		.blk_sizes(xbb)
 		.map1({0}).map2({1,2})
-		.get();
+		.build();
 	
-	auto c_xbb_1_02 = dbcsr::tensor_create_template<3>(c_xbb_0_12)
+	auto c_xbb_1_02 = dbcsr::tensor<3>::create_template(*c_xbb_0_12)
 		.name("c_xbb_1_02")
 		.map1({1}).map2({0,2})
-		.get();
+		.build();
 			
 	int nbatches_x = eri_batched->nbatches(0);
 	int nbatches_b = eri_batched->nbatches(2);
@@ -80,13 +80,13 @@ dbcsr::sbtensor<3,double> dfitting::compute(dbcsr::sbtensor<3,double> eri_batche
 	
 	auto c_xbb_batched = dbcsr::btensor_create<3>()
 		.name(m_mol->name() + "_c_xbb_batched")
-		.pgrid(spgrid3_xbb)
+		.set_pgrid(spgrid3_xbb)
 		.blk_sizes(xbb)
 		.batch_dims(bdims)
 		.blk_map(blkmaps)
 		.btensor_type(mytype)
 		.print(LOG.global_plev())
-		.get();
+		.build();
 	
 	auto& con = TIME.sub("Contraction");
 	auto& reo = TIME.sub("Reordering");

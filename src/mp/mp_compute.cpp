@@ -111,11 +111,11 @@ void mpmod::compute() {
 	//                        PGRIDS
 	//==================================================================
 	
-	auto spgrid2 = dbcsr::create_pgrid<2>(m_world.comm()).get();
+	auto spgrid2 = dbcsr::pgrid<2>::create(m_world.comm()).build();
 	
 	std::array<int,3> xbb_sizes = {dfnbf, nbf, nbf};
 	
-	auto spgrid3_xbb = dbcsr::create_pgrid<3>(m_world.comm()).tensor_dims(xbb_sizes).get();
+	auto spgrid3_xbb = dbcsr::pgrid<3>::create(m_world.comm()).tensor_dims(xbb_sizes).build();
 	
 	//==================================================================
 	//                        INTEGRALS

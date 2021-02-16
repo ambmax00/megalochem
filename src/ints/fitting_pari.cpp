@@ -66,13 +66,13 @@ dbcsr::sbtensor<3,double> dfitting::compute_pari(dbcsr::shared_matrix<double> s_
 	
 	std::array<int,3> xbbsizes = {1,nbf,nbf};
 	
-	auto spgrid2 = dbcsr::create_pgrid<2>(m_world.comm()).get();
+	auto spgrid2 = dbcsr::pgrid<2>::create(m_world.comm()).build();
 	
-	auto spgrid3_xbb =dbcsr::create_pgrid<3>(m_world.comm()).get();
+	auto spgrid3_xbb =dbcsr::pgrid<3>::create(m_world.comm()).build();
 	
-	auto spgrid2_self = dbcsr::create_pgrid<2>(MPI_COMM_SELF).get();
+	auto spgrid2_self = dbcsr::pgrid<2>::create(MPI_COMM_SELF).build();
 	
-	auto spgrid3_self = dbcsr::create_pgrid<3>(MPI_COMM_SELF).get();
+	auto spgrid3_self = dbcsr::pgrid<3>::create(MPI_COMM_SELF).build();
 		
 	LOG.os<>("Grid size: ", m_world.nprow(), " ", m_world.npcol(), '\n');
 	
@@ -84,45 +84,45 @@ dbcsr::sbtensor<3,double> dfitting::compute_pari(dbcsr::shared_matrix<double> s_
 	
 	auto c_xbb_batched = dbcsr::btensor_create<3,double>()
 		.name("cpari_xbb_batched")
-		.pgrid(spgrid3_xbb)
+		.set_pgrid(spgrid3_xbb)
 		.blk_sizes(xbb)
 		.blk_map(blkmaps)
 		.batch_dims(bdims)
 		.btensor_type(mytype)
 		.print(1)
-		.get();
+		.build();
 		
-	auto c_xbb_global = dbcsr::tensor_create<3,double>()
+	auto c_xbb_global = dbcsr::tensor<3>::create()
 		.name("fitting coefficients")
-		.pgrid(spgrid3_xbb)
+		.set_pgrid(*spgrid3_xbb)
 		.blk_sizes(xbb)
 		.map1({0}).map2({1,2})
-		.get();
+		.build();
 		
-	auto c_xbb_local = dbcsr::tensor_create<3,double>()
+	auto c_xbb_local = dbcsr::tensor<3>::create()
 		.name("c_xbb_local")
-		.pgrid(spgrid3_self)
+		.set_pgrid(*spgrid3_self)
 		.map1({0}).map2({1,2})
 		.blk_sizes(xbb)
-		.get();
+		.build();
 		
-	auto c_xbb_AB = dbcsr::tensor_create<3,double>()
+	auto c_xbb_AB = dbcsr::tensor<3>::create()
 		.name("c_xbb_AB")
-		.pgrid(spgrid3_self)
+		.set_pgrid(*spgrid3_self)
 		.map1({0}).map2({1,2})
 		.blk_sizes(xbb)
-		.get();
+		.build();
 		
 	auto eri_local = 
-		dbcsr::tensor_create_template<3,double>(c_xbb_local)
-		.name("eri_local").get();
+		dbcsr::tensor<3>::create_template(*c_xbb_local)
+		.name("eri_local").build();
 	
-	auto inv_local = dbcsr::tensor_create<2,double>()
+	auto inv_local = dbcsr::tensor<2>::create()
 		.name("inv_local")
-		.pgrid(spgrid2_self)
+		.set_pgrid(*spgrid2_self)
 		.map1({0}).map2({1})
 		.blk_sizes(xx)
-		.get();
+		.build();
 	
 	arrvec<int,3> blkidx = c_xbb_local->blks_local();
 	arrvec<int,3> blkoffsets = c_xbb_local->blk_offsets();
@@ -254,8 +254,8 @@ dbcsr::sbtensor<3,double> dfitting::compute_pari(dbcsr::shared_matrix<double> s_
 			Eigen::MatrixXd alphaBeta = Eigen::MatrixXd::Zero(m,m);
 
 #if 0
-			auto met = dbcsr::tensor_create_template<2,double>(inv_local)
-				.name("metric").get();
+			auto met = dbcsr::tensor<2>::create_template(**inv_local)
+				.name("metric").build();
 				
 			met->reserve_all();
 #endif		

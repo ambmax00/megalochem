@@ -147,7 +147,7 @@ void MVP_AORISOSADC2::init() {
 	LOG.os<1>("Computing intermediates.\n");
 	compute_intermeds();
 	
-	m_spgrid2 = dbcsr::create_pgrid<2>(m_world.comm()).get();
+	m_spgrid2 = dbcsr::pgrid<2>::create(m_world.comm()).build();
 	
 	t_init.finish();
 	TIME.finish();
@@ -633,90 +633,90 @@ std::tuple<dbcsr::sbtensor<3,double>,dbcsr::sbtensor<3,double>>
 	int nbas = m_mol->c_basis()->nbf();
 	int no_chol = L_bo->nfullcols_total();
 	
-	auto spgrid2 = dbcsr::create_pgrid<2>(m_world.comm())
-		.get();
+	auto spgrid2 = dbcsr::pgrid<2>::create(m_world.comm())
+		.build();
 	
 	std::array<int,3> dims_xob_chol = {nxbas,no_chol,nbas};
 	
-	auto spgrid_xob_chol = dbcsr::create_pgrid<3>(m_world.comm())
+	auto spgrid_xob_chol = dbcsr::pgrid<3>::create(m_world.comm())
 		.tensor_dims(dims_xob_chol)
-		.get();
+		.build();
 	
 	auto J_xob_batched = dbcsr::btensor_create<3>()
 		.name("J_xob_batched")
-		.pgrid(spgrid_xob_chol)
+		.set_pgrid(spgrid_xob_chol)
 		.blk_sizes(xob_chol)
 		.blk_map(blkmaps)
 		.batch_dims(bdims)
 		.btensor_type(m_btype)
 		.print(LOG.global_plev())
-		.get();
+		.build();
 			
 	auto eri_xob_batched = dbcsr::btensor_create<3>()
 		.name("eri_xov_batched")
-		.pgrid(spgrid_xob_chol)
+		.set_pgrid(spgrid_xob_chol)
 		.blk_sizes(xob_chol)
 		.blk_map(blkmaps)
 		.batch_dims(bdims)
 		.btensor_type(m_btype)
 		.print(LOG.global_plev())
-		.get();
+		.build();
 		
-	auto L_bo_01 = dbcsr::tensor_create<2>()
+	auto L_bo_01 = dbcsr::tensor<2>::create()
 		.name("L_bo_01")
-		.pgrid(spgrid2)
+		.set_pgrid(*spgrid2)
 		.blk_sizes(bo_chol)
 		.map1({0})
 		.map2({1})
-		.get();
+		.build();
 		
-	auto pv_bb_01 = dbcsr::tensor_create<2>()
+	auto pv_bb_01 = dbcsr::tensor<2>::create()
 		.name("pv_bb_01")
-		.pgrid(spgrid2)
+		.set_pgrid(*spgrid2)
 		.blk_sizes(bb)
 		.map1({0})
 		.map2({1})
-		.get();
+		.build();
 		
-	auto HT_xob_02_1 = dbcsr::tensor_create<3,double>()
+	auto HT_xob_02_1 = dbcsr::tensor<3>::create()
 		.name("HT_02_1")
-		.pgrid(spgrid_xob_chol)
+		.set_pgrid(*spgrid_xob_chol)
 		.blk_sizes(xob_chol)
 		.map1({0,2})
 		.map2({1})
-		.get();
+		.build();
 		
-	auto HT_xob_01_2 = dbcsr::tensor_create<3,double>()
+	auto HT_xob_01_2 = dbcsr::tensor<3>::create()
 		.name("HT_01_2")
-		.pgrid(spgrid_xob_chol)
+		.set_pgrid(*spgrid_xob_chol)
 		.blk_sizes(xob_chol)
 		.map1({0,1})
 		.map2({2})
-		.get();
+		.build();
 		
-	auto FT_xob_01_2 = dbcsr::tensor_create<3,double>()
+	auto FT_xob_01_2 = dbcsr::tensor<3>::create()
 		.name("FT_01_2")
-		.pgrid(spgrid_xob_chol)
+		.set_pgrid(*spgrid_xob_chol)
 		.blk_sizes(xob_chol)
 		.map1({0,1})
 		.map2({2})
-		.get();
+		.build();
 		
-	auto FT_xob_02_1 = dbcsr::tensor_create<3,double>()
+	auto FT_xob_02_1 = dbcsr::tensor<3>::create()
 		.name("FT_1_02")
-		.pgrid(spgrid_xob_chol)
+		.set_pgrid(*spgrid_xob_chol)
 		.blk_sizes(xob_chol)
 		.map1({0,2})
 		.map2({1})
-		.get();
+		.build();
 		
-	auto J_xob_02_1 = dbcsr::tensor_create<3,double>()
+	auto J_xob_02_1 = dbcsr::tensor<3>::create()
 		.name("J_02_1")
-		.pgrid(spgrid_xob_chol)
+		.set_pgrid(*spgrid_xob_chol)
 		.blk_sizes(xob_chol)
 		.map1({0,2})
 		.map2({1})
-		.get();
+		.build();
 	
 	dbcsr::copy_matrix_to_tensor(*L_bo, *L_bo_01);
 	dbcsr::copy_matrix_to_tensor(*pv_bb, *pv_bb_01);
@@ -763,21 +763,21 @@ std::tuple<dbcsr::sbtensor<3,double>,dbcsr::sbtensor<3,double>>
 	SL_bo->release();
 	SPv_bb->release();
 	
-	auto up_ob_01 = dbcsr::tensor_create<2>()
+	auto up_ob_01 = dbcsr::tensor<2>::create()
 		.name("u particle 01")
-		.pgrid(spgrid2)
+		.set_pgrid(*spgrid2)
 		.blk_sizes(ob_chol)
 		.map1({0})
 		.map2({1})
-		.get();
+		.build();
 		
-	auto uh_bb_01 = dbcsr::tensor_create<2>()
+	auto uh_bb_01 = dbcsr::tensor<2>::create()
 		.name("u hole 01")
-		.pgrid(spgrid2)
+		.set_pgrid(*spgrid2)
 		.blk_sizes(bb)
 		.map1({0})
 		.map2({1})
-		.get();
+		.build();
 	
 	dbcsr::copy_matrix_to_tensor(*up_ob, *up_ob_01);
 	dbcsr::copy_matrix_to_tensor(*uh_bb, *uh_bb_01);
@@ -917,31 +917,31 @@ std::tuple<dbcsr::shared_tensor<2,double>,dbcsr::shared_tensor<2,double>>
 	auto FT_xbb_0_12 = m_eri3c2e_batched->get_template("FT_xbb_0_12",
 		vec<int>{0}, vec<int>{1,2});
 	
-	auto V_xx_01 = dbcsr::tensor_create<2,double>()
+	auto V_xx_01 = dbcsr::tensor<2>::create()
 		.name("v_xx_01")
-		.pgrid(m_spgrid2)
+		.set_pgrid(*m_spgrid2)
 		.blk_sizes(xx)
 		.map1({0})
 		.map2({1})
-		.get();
+		.build();
 		
-	auto FA_xx_01 = dbcsr::tensor_create_template<2,double>(
+	auto FA_xx_01 = dbcsr::tensor<2>::create_template(*
 		V_xx_01)
 		.name("FA_xx_01")
-		.get();
+		.build();
 		
-	auto FB_xx_01 = dbcsr::tensor_create_template<2,double>(
+	auto FB_xx_01 = dbcsr::tensor<2>::create_template(*
 		V_xx_01)
 		.name("FB_xx_01")
-		.get();
+		.build();
 		
-	auto L_bo_01 = dbcsr::tensor_create<2,double>()
+	auto L_bo_01 = dbcsr::tensor<2>::create()
 		.name("L_bo_01")
-		.pgrid(m_spgrid2)
+		.set_pgrid(*m_spgrid2)
 		.blk_sizes(bo_chol)
 		.map1({0})
 		.map2({1})
-		.get();
+		.build();
 	
 	dbcsr::copy_matrix_to_tensor(*m_v_xx, *V_xx_01);
 	dbcsr::copy_matrix_to_tensor(*L_bo, *L_bo_01);
@@ -1070,10 +1070,10 @@ std::tuple<dbcsr::shared_tensor<2,double>,dbcsr::shared_tensor<2,double>>
 	dbcsr::print(*FB_xx_01);
 #endif
 	
-	auto temp = dbcsr::tensor_create_template<2,double>(
+	auto temp = dbcsr::tensor<2>::create_template(*
 		V_xx_01)
 		.name("temp")
-		.get();
+		.build();
 	
 	auto transform = [&](auto& F) {
 		
@@ -1219,13 +1219,13 @@ std::tuple<smat,smat> MVP_AORISOSADC2::compute_sigma_2e_ilap_OB(
 	arrvec<int,3> xob_chol = {x,o_chol,b};
 	arrvec<int,2> bb = {b,b};
 	
-	auto L_bo_01 = dbcsr::tensor_create<2,double>()
+	auto L_bo_01 = dbcsr::tensor<2>::create()
 		.name("L_bo_01")
-		.pgrid(m_spgrid2)
+		.set_pgrid(*m_spgrid2)
 		.blk_sizes(bo_chol)
 		.map1({0})
 		.map2({1})
-		.get();
+		.build();
 	
 	dbcsr::copy_matrix_to_tensor(*L_bo, *L_bo_01);
 	
@@ -1233,8 +1233,8 @@ std::tuple<smat,smat> MVP_AORISOSADC2::compute_sigma_2e_ilap_OB(
 	int nbas = m_mol->c_basis()->nbf();
 	int no_chol = L_bo->nfullcols_total();
 	
-	auto spgrid2 = dbcsr::create_pgrid<2>(m_world.comm())
-		.get();
+	auto spgrid2 = dbcsr::pgrid<2>::create(m_world.comm())
+		.build();
 	
 	std::array<int,3> dims_xob_chol = {nxbas,no_chol,nbas};
 	
@@ -1244,33 +1244,33 @@ std::tuple<smat,smat> MVP_AORISOSADC2::compute_sigma_2e_ilap_OB(
 	int nobatches = I_xob_batched->nbatches(1);
 	int nbbatches = I_xob_batched->nbatches(2);
 	
-	auto sig_pre_E1_bb_01 = dbcsr::tensor_create<2,double>()
+	auto sig_pre_E1_bb_01 = dbcsr::tensor<2>::create()
 		.name("sigmaE1_HT")
-		.pgrid(m_spgrid2)
+		.set_pgrid(*m_spgrid2)
 		.blk_sizes(bb)
 		.map1({0}).map2({1})
-		.get();
+		.build();
 		
-	auto sig_pre_E2_ob_01 = dbcsr::tensor_create<2,double>()
+	auto sig_pre_E2_ob_01 = dbcsr::tensor<2>::create()
 		.name("sigmaE2_HT")
-		.pgrid(m_spgrid2)
+		.set_pgrid(*m_spgrid2)
 		.blk_sizes(ob_chol)
 		.map1({0}).map2({1})
-		.get();
+		.build();
 	
-	auto HT_xob_1_02 = dbcsr::tensor_create<3,double>()
+	auto HT_xob_1_02 = dbcsr::tensor<3>::create()
 		.name("HT_xob_1_02")
-		.pgrid(spgrid_xob_chol)
+		.set_pgrid(*spgrid_xob_chol)
 		.blk_sizes(xob_chol)
 		.map1({1}).map2({0,2})
-		.get();
+		.build();
 		
-	auto HT_xob_01_2 = dbcsr::tensor_create<3,double>()
+	auto HT_xob_01_2 = dbcsr::tensor<3>::create()
 		.name("HT_xob_1_02")
-		.pgrid(spgrid_xob_chol)
+		.set_pgrid(*spgrid_xob_chol)
 		.blk_sizes(xob_chol)
 		.map1({0,1}).map2({2})
-		.get();
+		.build();
 		
 	auto I_xob_02_1 = I_xob_batched->get_template("I_xob_02_1", 
 		vec<int>{0,2}, vec<int>{1});
@@ -1585,95 +1585,95 @@ std::tuple<dbcsr::sbtensor<3,double>,dbcsr::sbtensor<3,double>>
 	int no_chol = L_bo->nfullcols_total();
 	int nv_chol = L_bv->nfullcols_total();
 	
-	auto spgrid2 = dbcsr::create_pgrid<2>(m_world.comm())
-		.get();
+	auto spgrid2 = dbcsr::pgrid<2>::create(m_world.comm())
+		.build();
 	
 	std::array<int,3> dims_xov_chol = {nxbas,no_chol,nv_chol};
 	std::array<int,3> dims_xob_chol = {nxbas,no_chol,nbas};
 	
-	auto spgrid_xov_chol = dbcsr::create_pgrid<3>(m_world.comm())
+	auto spgrid_xov_chol = dbcsr::pgrid<3>::create(m_world.comm())
 		.tensor_dims(dims_xov_chol)
-		.get();
+		.build();
 		
-	auto spgrid_xob_chol = dbcsr::create_pgrid<3>(m_world.comm())
+	auto spgrid_xob_chol = dbcsr::pgrid<3>::create(m_world.comm())
 		.tensor_dims(dims_xob_chol)
-		.get();
+		.build();
 	
 	auto J_xov_batched = dbcsr::btensor_create<3>()
 		.name("J_xov_batched")
-		.pgrid(spgrid_xov_chol)
+		.set_pgrid(spgrid_xov_chol)
 		.blk_sizes(xov_chol)
 		.blk_map(blkmaps)
 		.batch_dims(bdims)
 		.btensor_type(m_btype)
 		.print(LOG.global_plev())
-		.get();
+		.build();
 			
 	auto eri_xov_batched = dbcsr::btensor_create<3>()
 		.name("eri_xov_batched")
-		.pgrid(spgrid_xov_chol)
+		.set_pgrid(spgrid_xov_chol)
 		.blk_sizes(xov_chol)
 		.blk_map(blkmaps)
 		.batch_dims(bdims)
 		.btensor_type(m_btype)
 		.print(LOG.global_plev())
-		.get();
+		.build();
 		
-	auto L_bo_01 = dbcsr::tensor_create<2>()
+	auto L_bo_01 = dbcsr::tensor<2>::create()
 		.name("L_bo_01")
-		.pgrid(spgrid2)
+		.set_pgrid(*spgrid2)
 		.blk_sizes(bo_chol)
 		.map1({0})
 		.map2({1})
-		.get();
+		.build();
 		
-	auto L_bv_01 = dbcsr::tensor_create<2>()
+	auto L_bv_01 = dbcsr::tensor<2>::create()
 		.name("L_bv_01")
-		.pgrid(spgrid2)
+		.set_pgrid(*spgrid2)
 		.blk_sizes(bv_chol)
 		.map1({0})
 		.map2({1})
-		.get();
+		.build();
 		
-	auto HT_xob_02_1 = dbcsr::tensor_create<3,double>()
+	auto HT_xob_02_1 = dbcsr::tensor<3>::create()
 		.name("HT_02_1")
-		.pgrid(spgrid_xob_chol)
+		.set_pgrid(*spgrid_xob_chol)
 		.blk_sizes(xob_chol)
 		.map1({0,2})
 		.map2({1})
-		.get();
+		.build();
 		
-	auto HT_xob_01_2 = dbcsr::tensor_create<3,double>()
+	auto HT_xob_01_2 = dbcsr::tensor<3>::create()
 		.name("HT_01_2")
-		.pgrid(spgrid_xob_chol)
+		.set_pgrid(*spgrid_xob_chol)
 		.blk_sizes(xob_chol)
 		.map1({0,1})
 		.map2({2})
-		.get();
+		.build();
 		
-	auto FT_xov_01_2 = dbcsr::tensor_create<3,double>()
+	auto FT_xov_01_2 = dbcsr::tensor<3>::create()
 		.name("FT_01_2")
-		.pgrid(spgrid_xov_chol)
+		.set_pgrid(*spgrid_xov_chol)
 		.blk_sizes(xov_chol)
 		.map1({0,1})
 		.map2({2})
-		.get();
+		.build();
 		
-	auto FT_xov_0_12 = dbcsr::tensor_create<3,double>()
+	auto FT_xov_0_12 = dbcsr::tensor<3>::create()
 		.name("FT_0_12")
-		.pgrid(spgrid_xov_chol)
+		.set_pgrid(*spgrid_xov_chol)
 		.blk_sizes(xov_chol)
 		.map1({0})
 		.map2({1,2})
-		.get();
+		.build();
 		
-	auto J_xov_0_12 = dbcsr::tensor_create<3,double>()
+	auto J_xov_0_12 = dbcsr::tensor<3>::create()
 		.name("J_0_12")
-		.pgrid(spgrid_xov_chol)
+		.set_pgrid(*spgrid_xov_chol)
 		.blk_sizes(xov_chol)
 		.map1({0})
 		.map2({1,2})
-		.get();
+		.build();
 	
 	dbcsr::copy_matrix_to_tensor(*L_bo, *L_bo_01);
 	dbcsr::copy_matrix_to_tensor(*L_bv, *L_bv_01);
@@ -1723,21 +1723,21 @@ std::tuple<dbcsr::sbtensor<3,double>,dbcsr::sbtensor<3,double>>
 	SL_bo->release();
 	SL_bv->release();
 	
-	auto up_ob_01 = dbcsr::tensor_create<2>()
+	auto up_ob_01 = dbcsr::tensor<2>::create()
 		.name("u particle 01")
-		.pgrid(spgrid2)
+		.set_pgrid(*spgrid2)
 		.blk_sizes(ob_chol)
 		.map1({0})
 		.map2({1})
-		.get();
+		.build();
 		
-	auto uh_bv_01 = dbcsr::tensor_create<2>()
+	auto uh_bv_01 = dbcsr::tensor<2>::create()
 		.name("u hole 01")
-		.pgrid(spgrid2)
+		.set_pgrid(*spgrid2)
 		.blk_sizes(bv_chol)
 		.map1({0})
 		.map2({1})
-		.get();
+		.build();
 	
 	dbcsr::copy_matrix_to_tensor(*up_ob, *up_ob_01);
 	dbcsr::copy_matrix_to_tensor(*uh_bv, *uh_bv_01);
@@ -1861,23 +1861,23 @@ std::tuple<dbcsr::shared_tensor<2,double>,dbcsr::shared_tensor<2,double>>
 	
 	arrvec<int,2> xx = {x,x};
 	
-	auto V_xx_01 = dbcsr::tensor_create<2,double>()
+	auto V_xx_01 = dbcsr::tensor<2>::create()
 		.name("v_xx_01")
-		.pgrid(m_spgrid2)
+		.set_pgrid(*m_spgrid2)
 		.blk_sizes(xx)
 		.map1({0})
 		.map2({1})
-		.get();
+		.build();
 		
-	auto FA_xx_01 = dbcsr::tensor_create_template<2,double>(
+	auto FA_xx_01 = dbcsr::tensor<2>::create_template(*
 		V_xx_01)
 		.name("FA_xx_01")
-		.get();
+		.build();
 		
-	auto FB_xx_01 = dbcsr::tensor_create_template<2,double>(
+	auto FB_xx_01 = dbcsr::tensor<2>::create_template(*
 		V_xx_01)
 		.name("FB_xx_01")
-		.get();
+		.build();
 	
 	dbcsr::copy_matrix_to_tensor(*m_v_xx, *V_xx_01);
 	
@@ -1919,10 +1919,10 @@ std::tuple<dbcsr::shared_tensor<2,double>,dbcsr::shared_tensor<2,double>>
 	dbcsr::print(*FB_xx_01);
 #endif
 	
-	auto temp = dbcsr::tensor_create_template<2,double>(
+	auto temp = dbcsr::tensor<2>::create_template(*
 		V_xx_01)
 		.name("temp")
-		.get();
+		.build();
 	
 	auto transform = [&](auto& F) {
 		
@@ -2057,21 +2057,21 @@ std::tuple<smat,smat> MVP_AORISOSADC2::compute_sigma_2e_ilap_OV(
 	arrvec<int,3> xob_chol = {x,o_chol,b};
 	arrvec<int,3> xvb_chol = {x,v_chol,b};
 	
-	auto L_bo_01 = dbcsr::tensor_create<2,double>()
+	auto L_bo_01 = dbcsr::tensor<2>::create()
 		.name("L_bo_01")
-		.pgrid(m_spgrid2)
+		.set_pgrid(*m_spgrid2)
 		.blk_sizes(bo_chol)
 		.map1({0})
 		.map2({1})
-		.get();
+		.build();
 		
-	auto L_bv_01 = dbcsr::tensor_create<2,double>()
+	auto L_bv_01 = dbcsr::tensor<2>::create()
 		.name("L_bv_01")
-		.pgrid(m_spgrid2)
+		.set_pgrid(*m_spgrid2)
 		.blk_sizes(bv_chol)
 		.map1({0})
 		.map2({1})
-		.get();
+		.build();
 			
 	dbcsr::copy_matrix_to_tensor(*L_bo, *L_bo_01);
 	dbcsr::copy_matrix_to_tensor(*L_bv, *L_bv_01);
@@ -2081,67 +2081,67 @@ std::tuple<smat,smat> MVP_AORISOSADC2::compute_sigma_2e_ilap_OV(
 	int no_chol = L_bo->nfullcols_total();
 	int nv_chol = L_bv->nfullcols_total();
 	
-	auto spgrid2 = dbcsr::create_pgrid<2>(m_world.comm())
-		.get();
+	auto spgrid2 = dbcsr::pgrid<2>::create(m_world.comm())
+		.build();
 	
 	std::array<int,3> dims_xob_chol = {nxbas,no_chol,nbas};
 	std::array<int,3> dims_xvb_chol = {nxbas,nv_chol,nbas};
 	
 	auto spgrid_xov_chol = I_xov_batched->spgrid();
 		
-	auto spgrid_xob_chol = dbcsr::create_pgrid<3>(m_world.comm())
+	auto spgrid_xob_chol = dbcsr::pgrid<3>::create(m_world.comm())
 		.tensor_dims(dims_xob_chol)
-		.get();
+		.build();
 		
-	auto spgrid_xvb_chol = dbcsr::create_pgrid<3>(m_world.comm())
+	auto spgrid_xvb_chol = dbcsr::pgrid<3>::create(m_world.comm())
 		.tensor_dims(dims_xvb_chol)
-		.get();
+		.build();
 	
 	int nxbatches = I_xov_batched->nbatches(0);
 	int nobatches = I_xov_batched->nbatches(1);
 	int nvbatches = I_xov_batched->nbatches(2);
 	
-	auto sigmaE1_HT_01 = dbcsr::tensor_create<2,double>()
+	auto sigmaE1_HT_01 = dbcsr::tensor<2>::create()
 		.name("sigmaE1_HT")
-		.pgrid(m_spgrid2)
+		.set_pgrid(*m_spgrid2)
 		.blk_sizes(bv_chol)
 		.map1({0}).map2({1})
-		.get();
+		.build();
 		
-	auto sigmaE2_HT_01 = dbcsr::tensor_create<2,double>()
+	auto sigmaE2_HT_01 = dbcsr::tensor<2>::create()
 		.name("sigmaE2_HT")
-		.pgrid(m_spgrid2)
+		.set_pgrid(*m_spgrid2)
 		.blk_sizes(ob_chol)
 		.map1({0}).map2({1})
-		.get();
+		.build();
 	
-	auto HT_xob_1_02 = dbcsr::tensor_create<3,double>()
+	auto HT_xob_1_02 = dbcsr::tensor<3>::create()
 		.name("HT_xob_1_02")
-		.pgrid(spgrid_xob_chol)
+		.set_pgrid(*spgrid_xob_chol)
 		.blk_sizes(xob_chol)
 		.map1({1}).map2({0,2})
-		.get();
+		.build();
 		
-	auto HT_xob_01_2 = dbcsr::tensor_create<3,double>()
+	auto HT_xob_01_2 = dbcsr::tensor<3>::create()
 		.name("HT_xob_1_02")
-		.pgrid(spgrid_xob_chol)
+		.set_pgrid(*spgrid_xob_chol)
 		.blk_sizes(xob_chol)
 		.map1({0,1}).map2({2})
-		.get();
+		.build();
 		
-	auto HT_xvb_1_02 = dbcsr::tensor_create<3,double>()
+	auto HT_xvb_1_02 = dbcsr::tensor<3>::create()
 		.name("HT_xob_1_02")
-		.pgrid(spgrid_xvb_chol)
+		.set_pgrid(*spgrid_xvb_chol)
 		.blk_sizes(xvb_chol)
 		.map1({1}).map2({0,2})
-		.get();
+		.build();
 		
-	auto HT_xvb_01_2 = dbcsr::tensor_create<3,double>()
+	auto HT_xvb_01_2 = dbcsr::tensor<3>::create()
 		.name("HT_xob_1_02")
-		.pgrid(spgrid_xvb_chol)
+		.set_pgrid(*spgrid_xvb_chol)
 		.blk_sizes(xvb_chol)
 		.map1({0,1}).map2({2})
-		.get();
+		.build();
 	
 	m_eri3c2e_batched->decompress_init({0}, vec<int>{1}, vec<int>{0,2});
 	I_xov_batched->decompress_init({0}, vec<int>{0,1}, vec<int>{2});

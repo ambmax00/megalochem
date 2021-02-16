@@ -18,7 +18,7 @@ std::pair<smatd,smatd> aoloader::invert(smatd in) {
 	
 	
 	auto linv = chol.L_inv(m);
-	auto inv_sqrt = dbcsr::transpose(linv).get();
+	auto inv_sqrt = dbcsr::transpose(linv).build();
 	auto inv = chol.inverse(m);
 	*/
 	
@@ -51,7 +51,7 @@ void aoloader::compute() {
 	dbcsr::shared_pgrid<3> spgrid3;
 	dbcsr::shared_pgrid<4> spgrid4;
 	
-	spgrid2 = dbcsr::create_pgrid<2>(m_world.comm()).get();
+	spgrid2 = dbcsr::pgrid<2>::create(m_world.comm()).build();
 	m_reg.insert(key::pgrid2, spgrid2);
 	m_to_keep[static_cast<int>(key::pgrid2)] = true;
 	
@@ -60,15 +60,15 @@ void aoloader::compute() {
 	if (m_mol->c_dfbasis()) {
 		int naux = m_mol->c_dfbasis()->nbf();
 		std::array<int,3> pdims3 = {naux,nbf,nbf};
-		spgrid3 = dbcsr::create_pgrid<3>(m_world.comm())
-			.tensor_dims(pdims3).get();
+		spgrid3 = dbcsr::pgrid<3>::create(m_world.comm())
+			.tensor_dims(pdims3).build();
 		m_reg.insert(key::pgrid3,spgrid3);
 		m_to_keep[static_cast<int>(key::pgrid3)] = true;
 	}
 	
 	std::array<int,4> pdims4 = {nbf,nbf,nbf,nbf};
-	spgrid4 = dbcsr::create_pgrid<4>(m_world.comm())
-		.tensor_dims(pdims4).get();
+	spgrid4 = dbcsr::pgrid<4>::create(m_world.comm())
+		.tensor_dims(pdims4).build();
 	m_reg.insert(key::pgrid4,spgrid4);
 	m_to_keep[static_cast<int>(key::pgrid4)] = true;
 	
@@ -234,20 +234,20 @@ void aoloader::compute() {
 		
 		auto eri_batched = dbcsr::btensor_create<4>()
 			.name(m_mol->name() + "_eri_batched")
-			.pgrid(spgrid4)
+			.set_pgrid(spgrid4)
 			.blk_sizes(bbbb)
 			.blk_map(blkmaps)
 			.batch_dims(bdims)
 			.btensor_type(dbcsr::btype::core)
 			.print(LOG.global_plev())
-			.get();
+			.build();
 			
-		auto eris_gen = dbcsr::tensor_create<4,double>()
+		auto eris_gen = dbcsr::tensor<4>::create()
 			.name("eris_4")
-			.pgrid(spgrid4)
+			.set_pgrid(*spgrid4)
 			.map1({0,1}).map2({2,3})
 			.blk_sizes(bbbb)
-			.get();
+			.build();
 		
 		vec<int> map1 = {0,1};
 		vec<int> map2 = {2,3};
@@ -344,20 +344,20 @@ void aoloader::compute() {
 		
 		auto eri_batched = dbcsr::btensor_create<3>()
 			.name(m_mol->name() + "_eri_batched")
-			.pgrid(spgrid3)
+			.set_pgrid(spgrid3)
 			.blk_sizes(xbb)
 			.batch_dims(bdims)
 			.btensor_type(mytype)
 			.blk_map(blkmaps)
 			.print(LOG.global_plev())
-			.get();
+			.build();
 			
-		auto eris_gen = dbcsr::tensor_create<3,double>()
+		auto eris_gen = dbcsr::tensor<3>::create()
 			.name("eris_3")
-			.pgrid(spgrid3)
+			.set_pgrid(*spgrid3)
 			.map1({0}).map2({1,2})
 			.blk_sizes(xbb)
-			.get();
+			.build();
 		
 		eri_batched->set_generator(genfunc);
 

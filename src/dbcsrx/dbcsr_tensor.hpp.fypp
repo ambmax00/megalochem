@@ -132,9 +132,9 @@ ${_MAKE_BUILDER_CLASS('dist_t', 'create', list, True)}$
 	
 		m_dist_ptr = nullptr;
 		m_nd_dists = p.p_nd_dists;
-        m_comm = p.p_set_pgrid.get().comm();
+        m_comm = p.p_set_pgrid.comm();
 	
-		c_dbcsr_t_distribution_new(&m_dist_ptr, p.set_pgrid.get().m_pgrid_ptr,
+		c_dbcsr_t_distribution_new(&m_dist_ptr, p.p_set_pgrid.m_pgrid_ptr,
                 ${datasize('m_nd_dists',0,idim)}$
                 #:if idim != MAXDIM
                 ,
@@ -216,7 +216,7 @@ public:
 #:set list = [ &
 	['name', 'std::string', _REQ, _VAL],&
 	['set_dist','dist_t<N>', _OPT, _REF],&
-	['set_pgrid', 'shared_pgrid<N>', _OPT, _REF],&
+	['set_pgrid', 'pgrid<N>', _OPT, _REF],&
 	['map1', 'vec<int>', _REQ, _VAL],&
 	['map2', 'vec<int>', _REQ, _VAL],&
 	['blk_sizes', 'arrvec<int,N>', _REQ, _VAL]]
@@ -232,10 +232,10 @@ ${_MAKE_BUILDER_CLASS('tensor', 'create', list, True)}$
 		void* dist_ptr = nullptr;
 		std::shared_ptr<dist_t<M>> distn;
 		
-		if (p.p_ndist) {
+		if (p.p_set_dist) {
 			
-			dist_ptr = p.p_ndist->get().m_dist_ptr;
-            m_comm = p.p_ndist->get().m_comm;
+			dist_ptr = p.p_set_dist->get().m_dist_ptr;
+            m_comm = p.p_set_dist->get().m_comm;
 			
 		} else {
 			
@@ -248,7 +248,7 @@ ${_MAKE_BUILDER_CLASS('tensor', 'create', list, True)}$
 			}
 			
 			distn = dist_t<M>::create()
-					.set_pgrid(p.p_set_pgrid)
+					.set_pgrid(p.p_set_pgrid->get())
 					.nd_dists(distvecs)
 					.build();
 				
@@ -260,7 +260,7 @@ ${_MAKE_BUILDER_CLASS('tensor', 'create', list, True)}$
 		c_dbcsr_t_create_new(&m_tensor_ptr, p.p_name.c_str(), dist_ptr, 
 						p.p_map1.data(), p.p_map1.size(),
 						p.p_map2.data(), p.p_map2.size(), &m_data_type, 
-						${datasizeptr('p.p_blk_sizes', 0, idim)}$
+						${datasize('p.p_blk_sizes', 0, idim)}$
                         #:if idim != MAXDIM
                         ,
                         #:endif
@@ -344,6 +344,7 @@ ${_MAKE_BUILDER_CLASS('tensor', 'create_matrix', list, True, init_list)}$
        return out;
    
    }
+
 #:endfor
 
 #:set vars = ['blks_local', 'proc_dist', 'blk_sizes', 'blk_offsets']

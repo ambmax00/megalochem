@@ -16,12 +16,13 @@ void EXACT_J::init() {
 	int nbf = std::accumulate(b.begin(),b.end(),0);
 	std::array<int,3> tsizes = {nbf,nbf,1};
 	
-	m_spgrid_bbd = dbcsr::create_pgrid<3>(m_world.comm()).tensor_dims(tsizes).get();
+	m_spgrid_bbd = dbcsr::pgrid<3>::create(m_world.comm()).tensor_dims(tsizes).build();
 	
-	m_J_bbd = dbcsr::tensor_create<3>().name("J_bbd").pgrid(m_spgrid_bbd)
-		.map1({0,1}).map2({2}).blk_sizes(bbd).get();
+	m_J_bbd = dbcsr::tensor<3>::create().name("J_bbd").set_pgrid(*m_spgrid_bbd)
+		.map1({0,1}).map2({2}).blk_sizes(bbd).build();
 	
-	m_ptot_bbd = dbcsr::tensor_create_template<3>(m_J_bbd).name("p dummy").get();
+	m_ptot_bbd = dbcsr::tensor<3>::create_template(*m_J_bbd)
+		.name("p dummy").build();
 		
 }
 
@@ -36,12 +37,13 @@ void EXACT_K::init() {
 	int nbf = std::accumulate(b.begin(),b.end(),0);
 	std::array<int,3> tsizes = {nbf,nbf,1};
 	
-	m_spgrid_bbd = dbcsr::create_pgrid<3>(m_world.comm()).tensor_dims(tsizes).get();
+	m_spgrid_bbd = dbcsr::pgrid<3>::create(m_world.comm()).tensor_dims(tsizes).build();
 	
-	m_K_bbd = dbcsr::tensor_create<3>().name("K dummy").pgrid(m_spgrid_bbd)
-		.map1({0,1}).map2({2}).blk_sizes(bbd).get();
+	m_K_bbd = dbcsr::tensor<3>::create().name("K dummy").set_pgrid(*m_spgrid_bbd)
+		.map1({0,1}).map2({2}).blk_sizes(bbd).build();
 	
-	m_p_bbd = dbcsr::tensor_create_template<3>(m_K_bbd).name("p dummy").get();
+	m_p_bbd = dbcsr::tensor<3>::create_template(*m_K_bbd)
+		.name("p dummy").build();
 	
 	
 }	

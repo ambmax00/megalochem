@@ -18,14 +18,14 @@ void LLMP_MEM_Z::init() {
 		.matrix_type(dbcsr::type::no_symmetry)
 		.build();
 	
-	m_spgrid2 = dbcsr::create_pgrid<2>(m_world.comm()).get();
+	m_spgrid2 = dbcsr::pgrid<2>::create(m_world.comm()).build();
 	
-	m_zmat_01 = dbcsr::tensor_create<2,double>()
-		.pgrid(m_spgrid2)
+	m_zmat_01 = dbcsr::tensor<2>::create()
+		.set_pgrid(*m_spgrid2)
 		.name("zmat_0_1")
 		.map1({0}).map2({1})
 		.blk_sizes(xx)
-		.get();
+		.build();
 		
 }
 
@@ -61,17 +61,17 @@ void LLMP_MEM_Z::compute() {
 	
 	// ======= TAKE CARE OF MATRIX STUFF ============
 	
-	m_locc_01 = dbcsr::tensor_create<2,double>()
+	m_locc_01 = dbcsr::tensor<2>::create()
 		.name("locc_01")
-		.pgrid(m_spgrid2)
+		.set_pgrid(*m_spgrid2)
 		.map1({0}).map2({1})
-		.blk_sizes(bo).get();
+		.blk_sizes(bo).build();
 		
-	m_pvir_01 = dbcsr::tensor_create<2,double>()
+	m_pvir_01 = dbcsr::tensor<2>::create()
 		.name("pvir_01")
-		.pgrid(m_spgrid2)
+		.set_pgrid(*m_spgrid2)
 		.map1({0}).map2({1})
-		.blk_sizes(bb).get();
+		.blk_sizes(bb).build();
 		
 	//copy over
 	dbcsr::copy_matrix_to_tensor(*m_locc, *m_locc_01);
@@ -80,41 +80,41 @@ void LLMP_MEM_Z::compute() {
 	
 	auto spgrid3_xbb = m_eri3c2e_batched->spgrid();
 		
-	auto spgrid3_xob = dbcsr::create_pgrid<3>(m_world.comm())
-		.tensor_dims(xobsizes).get();
+	auto spgrid3_xob = dbcsr::pgrid<3>::create(m_world.comm())
+		.tensor_dims(xobsizes).build();
 	
-	auto b_xob_1_02 = dbcsr::tensor_create<3,double>()
-		.pgrid(spgrid3_xob)
+	auto b_xob_1_02 = dbcsr::tensor<3>::create()
+		.set_pgrid(*spgrid3_xob)
 		.name("b_xob_1_02")
 		.map1({1}).map2({0,2})
-		.blk_sizes(xob).get();
+		.blk_sizes(xob).build();
 		
 	auto b_xob_2_01 = 
-		dbcsr::tensor_create_template<3,double>(b_xob_1_02)
-		.name("b_xob_2_01").map1({2}).map2({0,1}).get();
+		dbcsr::tensor<3>::create_template(*b_xob_1_02)
+		.name("b_xob_2_01").map1({2}).map2({0,1}).build();
 		
 	auto b2_xob_2_01 = 
-		dbcsr::tensor_create_template<3,double>(b_xob_1_02)
-		.name("b2_xob_2_01").map1({2}).map2({0,1}).get(); 
+		dbcsr::tensor<3>::create_template(*b_xob_1_02)
+		.name("b2_xob_2_01").map1({2}).map2({0,1}).build(); 
 		
 	auto b2_xob_1_02 = 
-		dbcsr::tensor_create_template<3,double>(b_xob_1_02)
-		.name("b2_xob_1_02").map1({1}).map2({0,2}).get();
+		dbcsr::tensor<3>::create_template(*b_xob_1_02)
+		.name("b2_xob_1_02").map1({1}).map2({0,2}).build();
 	
-	auto eri_1_02 = dbcsr::tensor_create<3,double>()
+	auto eri_1_02 = dbcsr::tensor<3>::create()
 		.name("eri_1_02")
-		.pgrid(spgrid3_xbb)
+		.set_pgrid(*spgrid3_xbb)
 		.blk_sizes(xbb)
 		.map1({1}).map2({0,2})
-		.get();
+		.build();
 	
 	auto b2_xbb_1_02 = 
-		dbcsr::tensor_create_template<3,double>(eri_1_02)
-		.name("b2_xbb_1_02").map1({1}).map2({0,2}).get();
+		dbcsr::tensor<3>::create_template(*eri_1_02)
+		.name("b2_xbb_1_02").map1({1}).map2({0,2}).build();
 	
 	auto b2_xbb_0_12 =  
-		dbcsr::tensor_create_template<3,double>(eri_1_02)
-		.name("b2_xbb_0_12").map1({0}).map2({1,2}).get();
+		dbcsr::tensor<3>::create_template(*eri_1_02)
+		.name("b2_xbb_0_12").map1({0}).map2({1,2}).build();
 	
 	time_reo_int1.start();
 	m_eri3c2e_batched->decompress_init({0}, vec<int>{0}, vec<int>{1,2});
@@ -329,14 +329,14 @@ void LLMP_ASYM_Z::init() {
 		.matrix_type(dbcsr::type::no_symmetry)
 		.build();
 	
-	m_spgrid2 = dbcsr::create_pgrid<2>(m_world.comm()).get();
+	m_spgrid2 = dbcsr::pgrid<2>::create(m_world.comm()).build();
 	
-	m_zmat_01 = dbcsr::tensor_create<2,double>()
-		.pgrid(m_spgrid2)
+	m_zmat_01 = dbcsr::tensor<2>::create()
+		.set_pgrid(*m_spgrid2)
 		.name("zmat_0_1")
 		.map1({0}).map2({1})
 		.blk_sizes(xx)
-		.get();
+		.build();
 		
 }
 
@@ -371,43 +371,43 @@ void LLMP_ASYM_Z::compute() {
 	
 	// ======= TAKE CARE OF MATRIX STUFF ============
 	
-	m_locc_01 = dbcsr::tensor_create<2,double>()
+	m_locc_01 = dbcsr::tensor<2>::create()
 		.name("locc_01")
-		.pgrid(m_spgrid2)
+		.set_pgrid(*m_spgrid2)
 		.map1({0}).map2({1})
-		.blk_sizes(bo).get();
+		.blk_sizes(bo).build();
 		
-	m_pvir_01 = dbcsr::tensor_create<2,double>()
+	m_pvir_01 = dbcsr::tensor<2>::create()
 		.name("pvir_01")
-		.pgrid(m_spgrid2)
+		.set_pgrid(*m_spgrid2)
 		.map1({0}).map2({1})
-		.blk_sizes(bb).get();
+		.blk_sizes(bb).build();
 		
 	//copy over
 	dbcsr::copy_matrix_to_tensor(*m_locc, *m_locc_01);
 	
 	// ============= TAKE CARE OF TENSOR STUFF =============
 	
-	auto spgrid3_xob = dbcsr::create_pgrid<3>(m_world.comm())
-		.tensor_dims(xobsizes).get();
+	auto spgrid3_xob = dbcsr::pgrid<3>::create(m_world.comm())
+		.tensor_dims(xobsizes).build();
 	
-	auto b_xob_1_02 = dbcsr::tensor_create<3,double>()
-		.pgrid(spgrid3_xob)
+	auto b_xob_1_02 = dbcsr::tensor<3>::create()
+		.set_pgrid(*spgrid3_xob)
 		.name("b_xob_1_02")
 		.map1({1}).map2({0,2})
-		.blk_sizes(xob).get();
+		.blk_sizes(xob).build();
 		
 	auto b_xob_2_01 = 
-		dbcsr::tensor_create_template<3,double>(b_xob_1_02)
-		.name("b_xob_2_01").map1({2}).map2({0,1}).get();
+		dbcsr::tensor<3>::create_template(*b_xob_1_02)
+		.name("b_xob_2_01").map1({2}).map2({0,1}).build();
 		
 	auto b2_xob_2_01 = 
-		dbcsr::tensor_create_template<3,double>(b_xob_1_02)
-		.name("b2_xob_2_01").map1({2}).map2({0,1}).get(); 
+		dbcsr::tensor<3>::create_template(*b_xob_1_02)
+		.name("b2_xob_2_01").map1({2}).map2({0,1}).build(); 
 		
 	auto b2_xob_1_02 = 
-		dbcsr::tensor_create_template<3,double>(b_xob_1_02)
-		.name("b2_xob_1_02").map1({1}).map2({0,2}).get();
+		dbcsr::tensor<3>::create_template(*b_xob_1_02)
+		.name("b2_xob_1_02").map1({1}).map2({0,2}).build();
 	
 	auto b2_xbb_1_02 = m_t3c2e_right_batched->get_template(
 		"b2_xbb_1_02", vec<int>{1}, vec<int>{0,2});

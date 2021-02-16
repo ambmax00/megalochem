@@ -84,8 +84,8 @@ dbcsr::shared_matrix<double> adcmod::compute_diag_1() {
 	arrvec<int,4> oovb = {o,o,v,b};
 	arrvec<int,4> oovv = {o,o,v,v};
 	
-	dbcsr::shared_pgrid<2> spgrid2 = dbcsr::create_pgrid<2>(m_world.comm()).get();
-	dbcsr::shared_pgrid<4> spgrid4 = dbcsr::create_pgrid<4>(m_world.comm()).get();
+	dbcsr::shared_pgrid<2> spgrid2 = dbcsr::pgrid<2>::create(m_world.comm()).build();
+	dbcsr::shared_pgrid<4> spgrid4 = dbcsr::pgrid<4>::create(m_world.comm()).build();
 	
 	int nbatches = m_opt.get<int>("nbatches_b", ADC_NBATCHES_B);
 	std::array<int,4> bdims = {nbatches,nbatches,nbatches,nbatches};
@@ -94,104 +94,104 @@ dbcsr::shared_matrix<double> adcmod::compute_diag_1() {
 	
 	auto eri4c2e_direct = dbcsr::btensor_create<4>()
 			.name("eri4c2e_direct")
-			.pgrid(spgrid4)
+			.set_pgrid(spgrid4)
 			.blk_sizes(bbbb)
 			.batch_dims(bdims)
 			.btensor_type(dbcsr::btype::direct)
 			.blk_map(blkmap)
 			.print(LOG.global_plev())
-			.get();
+			.build();
 			
-	auto eri_bbbb = dbcsr::tensor_create<4>()
-		.pgrid(spgrid4)
+	auto eri_bbbb = dbcsr::tensor<4>::create()
+		.set_pgrid(*spgrid4)
 		.name("T_bbbb")
 		.blk_sizes(bbbb)
 		.map1({0}).map2({1,2,3})
-		.get();
+		.build();
 			
-	auto T_obbb = dbcsr::tensor_create<4>()
-		.pgrid(spgrid4)
+	auto T_obbb = dbcsr::tensor<4>::create()
+		.set_pgrid(*spgrid4)
 		.name("T_obbb")
 		.blk_sizes(obbb)
 		.map1({0}).map2({1,2,3})
-		.get();
+		.build();
 		
-	auto T_obbb_2 = dbcsr::tensor_create<4>()
-		.pgrid(spgrid4)
+	auto T_obbb_2 = dbcsr::tensor<4>::create()
+		.set_pgrid(*spgrid4)
 		.name("T_obbb_2")
 		.blk_sizes(obbb)
 		.map1({0}).map2({1,2,3})
-		.get();
+		.build();
 		
-	auto T_obob = dbcsr::tensor_create<4>()
-		.pgrid(spgrid4)
+	auto T_obob = dbcsr::tensor<4>::create()
+		.set_pgrid(*spgrid4)
 		.name("T_obob")
 		.blk_sizes(obob)
 		.map1({2}).map2({0,1,3})
-		.get();
+		.build();
 		
-	auto T_oobb = dbcsr::tensor_create<4>()
-		.pgrid(spgrid4)
+	auto T_oobb = dbcsr::tensor<4>::create()
+		.set_pgrid(*spgrid4)
 		.name("T_oobb")
 		.blk_sizes(oobb)
 		.map1({1}).map2({0,2,3})
-		.get();
+		.build();
 		
-	auto T_obob_tot = dbcsr::tensor_create<4>()
-		.pgrid(spgrid4)
+	auto T_obob_tot = dbcsr::tensor<4>::create()
+		.set_pgrid(*spgrid4)
 		.name("T_obob")
 		.blk_sizes(obob)
 		.map1({1}).map2({0,2,3})
-		.get();
+		.build();
 	
-	auto T_oobb_tot = dbcsr::tensor_create<4>()
-		.pgrid(spgrid4)
+	auto T_oobb_tot = dbcsr::tensor<4>::create()
+		.set_pgrid(*spgrid4)
 		.name("T_oobb")
 		.blk_sizes(oobb)
 		.map1({2}).map2({0,1,3})
-		.get();
+		.build();
 	
-	auto T_ovob = dbcsr::tensor_create<4>()
-		.pgrid(spgrid4)
+	auto T_ovob = dbcsr::tensor<4>::create()
+		.set_pgrid(*spgrid4)
 		.name("T_ovob")
 		.blk_sizes(ovob)
 		.map1({0,1,2}).map2({3})
-		.get();
+		.build();
 		
-	auto T_oovb = dbcsr::tensor_create<4>()
-		.pgrid(spgrid4)
+	auto T_oovb = dbcsr::tensor<4>::create()
+		.set_pgrid(*spgrid4)
 		.name("T_oovb")
 		.blk_sizes(oovb)
 		.map1({0,1,3}).map2({2})
-		.get();
+		.build();
 		
-	auto T_ovov = dbcsr::tensor_create<4>()
-		.pgrid(spgrid4)
+	auto T_ovov = dbcsr::tensor<4>::create()
+		.set_pgrid(*spgrid4)
 		.name("T_ovov")
 		.blk_sizes(ovov)
 		.map1({0,1,2}).map2({3})
-		.get();
+		.build();
 		
-	auto T_oovv = dbcsr::tensor_create<4>()
-		.pgrid(spgrid4)
+	auto T_oovv = dbcsr::tensor<4>::create()
+		.set_pgrid(*spgrid4)
 		.name("T_oovv")
 		.blk_sizes(oovv)
 		.map1({0,1,2}).map2({3})
-		.get();
+		.build();
 		
-	auto T_ovov_tot = dbcsr::tensor_create<4>()
-		.pgrid(spgrid4)
+	auto T_ovov_tot = dbcsr::tensor<4>::create()
+		.set_pgrid(*spgrid4)
 		.name("T_ovov")
 		.blk_sizes(ovov)
 		.map1({0,1,2}).map2({3})
-		.get();
+		.build();
 		
-	auto T_oovv_tot = dbcsr::tensor_create<4>()
-		.pgrid(spgrid4)
+	auto T_oovv_tot = dbcsr::tensor<4>::create()
+		.set_pgrid(*spgrid4)
 		.name("T_oovv")
 		.blk_sizes(oovv)
 		.map1({0,1,2}).map2({3})
-		.get();
+		.build();
 		
 	auto d_iaia = dbcsr::matrix<>::create()
 		.set_world(m_world)
@@ -209,19 +209,19 @@ dbcsr::shared_matrix<double> adcmod::compute_diag_1() {
 		.matrix_type(dbcsr::type::no_symmetry)
 		.build();
 		
-	auto c_bo_01 = dbcsr::tensor_create<2>()
+	auto c_bo_01 = dbcsr::tensor<2>::create()
 		.name("c_bo")
-		.pgrid(spgrid2)
+		.set_pgrid(*spgrid2)
 		.map1({0}).map2({1})
 		.blk_sizes(bo)
-		.get();
+		.build();
 		
-	auto c_bv_01 = dbcsr::tensor_create<2>()
+	auto c_bv_01 = dbcsr::tensor<2>::create()
 		.name("c_bv")
-		.pgrid(spgrid2)
+		.set_pgrid(*spgrid2)
 		.map1({0}).map2({1})
 		.blk_sizes(bv)
-		.get();
+		.build();
 		
 	auto c_bo = m_hfwfn->c_bo_A();
 	auto c_bv = m_hfwfn->c_bv_A();

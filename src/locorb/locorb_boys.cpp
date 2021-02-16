@@ -17,7 +17,7 @@ smat transform(smat c, smat dip) {
 		.row_blk_sizes(b)
 		.col_blk_sizes(m)
 		.matrix_type(dbcsr::type::no_symmetry)
-		.get();
+		.build();
 		
 	auto dip_mm = dbcsr::create<double>()
 		.name("dip_mm")
@@ -25,7 +25,7 @@ smat transform(smat c, smat dip) {
 		.row_blk_sizes(m)
 		.col_blk_sizes(m)
 		.matrix_type(dbcsr::type::no_symmetry)
-		.get();
+		.build();
 		
 	dbcsr::multiply('N', 'N', *dip, *c, *temp)
 		.filter_eps(dbcsr::global::filter_eps)
@@ -45,9 +45,9 @@ smat compute_D(smat dip_x, smat dip_y, smat dip_z) {
 	auto diag_y = dip_y->get_diag();
 	auto diag_z = dip_z->get_diag();
 	
-	auto copy_x = dbcsr::copy(dip_x).get();
-	auto copy_y = dbcsr::copy(dip_y).get();
-	auto copy_z = dbcsr::copy(dip_z).get();
+	auto copy_x = dbcsr::copy(dip_x).build();
+	auto copy_y = dbcsr::copy(dip_y).build();
+	auto copy_z = dbcsr::copy(dip_z).build();
 	
 	copy_x->scale(diag_x, "right");
 	copy_y->scale(diag_y, "right");

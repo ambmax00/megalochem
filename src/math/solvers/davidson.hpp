@@ -650,7 +650,7 @@ public:
 			// r(i) = (sig(i) - omega(i+1) * u(i))/||u(i)||
 			auto r_ov = dbcsr::copy<double>(*sig_ov)
 				.name("r_ov")
-				.get();
+				.build();
 				
 			r_ov->add(1.0, -current_omega, *b_ov);
 			r_ov->scale(1.0/sqrt(bdot));
@@ -664,7 +664,7 @@ public:
 			// compute update b = r/diag
 			auto dinv_ov = dbcsr::create_template<double>(*r_ov)
 				.name("dinv")
-				.get();
+				.build();
 			
 			dinv_ov->reserve_all();
 			//dinv_ov->set(current_omega);
@@ -674,11 +674,11 @@ public:
 			
 			auto u_ov = dbcsr::create_template<double>(*r_ov)
 				.name("Non-extrapolated update vector")
-				.get();
+				.build();
 				
 			auto uerr_ov = dbcsr::create_template<double>(*r_ov)
 				.name("Error update vector")
-				.get();
+				.build();
 			
 			u_ov->hadamard_product(*r_ov, *dinv_ov);
 			
@@ -697,14 +697,14 @@ public:
 				uerr_ov->add(0.0, 1.0, *u_ov);
 				uerr_ov->add(1.0, -1.0, *prev_u);
 				
-				prev_u = dbcsr::copy(*u_ov).get();
+				prev_u = dbcsr::copy(*u_ov).build();
 						
 				dsolver.compute_extrapolation_parameters(prev_u, uerr_ov, ii);
 				
 				// get new update
 				auto new_u_ov = dbcsr::create_template<double>(*u_ov)
 					.name("Extrapolated update vector")
-					.get();
+					.build();
 			
 				dsolver.extrapolate(new_u_ov, ii);
 			

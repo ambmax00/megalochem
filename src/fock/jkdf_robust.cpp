@@ -18,58 +18,58 @@ void DFROBUST_K::init() {
 	arrvec<int,2> xx = {x,x};
 	arrvec<int,3> xbb = {x,b,b};
 		
-	m_spgrid2 = dbcsr::create_pgrid<2>(m_world.comm()).get();
+	m_spgrid2 = dbcsr::pgrid<2>::create(m_world.comm()).build();
 	auto spgrid3 = m_eri3c2e_batched->spgrid();
 	
-	m_K_01 = dbcsr::tensor_create<2,double>().pgrid(m_spgrid2).name("K_01")
-		.map1({0}).map2({1}).blk_sizes(bb).get();
+	m_K_01 = dbcsr::tensor<2>::create().set_pgrid(*m_spgrid2).name("K_01")
+		.map1({0}).map2({1}).blk_sizes(bb).build();
 		
-	m_p_bb = dbcsr::tensor_create_template<2,double>(m_K_01)
-			.name("p_bb_0_1").map1({0}).map2({1}).get();
+	m_p_bb = dbcsr::tensor<2>::create_template(*m_K_01)
+			.name("p_bb_0_1").map1({0}).map2({1}).build();
 	
-	m_v_xx_01 = dbcsr::tensor_create<2>()
+	m_v_xx_01 = dbcsr::tensor<2>::create()
 		.name("s_xx_01")
-		.pgrid(m_spgrid2)
+		.set_pgrid(*m_spgrid2)
 		.map1({0}).map2({1})
 		.blk_sizes(xx)
-		.get();
+		.build();
 		
-	m_cbar_xbb_01_2 = dbcsr::tensor_create<3,double>()
+	m_cbar_xbb_01_2 = dbcsr::tensor<3>::create()
 		.name("cbar_xbb_01_2")
-		.pgrid(spgrid3)
+		.set_pgrid(*spgrid3)
 		.map1({0,1}).map2({2})
 		.blk_sizes(xbb)
-		.get();
+		.build();
 		
 	m_cbar_xbb_02_1 = 
-		dbcsr::tensor_create_template<3,double>(m_cbar_xbb_01_2)
+		dbcsr::tensor<3>::create_template(*m_cbar_xbb_01_2)
 		.name("cbar_xbb_02_1")
 		.map1({0,2}).map2({1})
-		.get();
+		.build();
 		
 	m_cbar_xbb_0_12 = 
-		dbcsr::tensor_create_template<3,double>(m_cbar_xbb_01_2)
+		dbcsr::tensor<3>::create_template(*m_cbar_xbb_01_2)
 		.name("cbar_xbb_0_12")
 		.map1({0}).map2({1,2})
-		.get();
+		.build();
 		
 	m_cfit_xbb_01_2 = 
-		dbcsr::tensor_create_template<3,double>(m_cbar_xbb_01_2)
+		dbcsr::tensor<3>::create_template(*m_cbar_xbb_01_2)
 		.name("cfit_xbb_01_2")
 		.map1({0,1}).map2({2})
-		.get();
+		.build();
 		
 	m_cpq_xbb_0_12 = 
-		dbcsr::tensor_create_template<3,double>(m_cbar_xbb_01_2)
+		dbcsr::tensor<3>::create_template(*m_cbar_xbb_01_2)
 		.name("cpq_xbb_0_12")
 		.map1({0}).map2({1,2})
-		.get();
+		.build();
 		
 	m_cpq_xbb_02_1 = 
-		dbcsr::tensor_create_template<3,double>(m_cbar_xbb_01_2)
+		dbcsr::tensor<3>::create_template(*m_cbar_xbb_01_2)
 		.name("cpq_xbb_02_1")
 		.map1({0,2}).map2({1})
-		.get();
+		.build();
 	
 }
 
@@ -83,13 +83,13 @@ void DFROBUST_K::compute_K() {
 	[&] (dbcsr::smat_d& p_bb, dbcsr::smat_d& k_bb, std::string x) {
 		
 		// c_bar(X,n,l) = c_fit(X,n,s) * P(s,l)
-		auto k_1 = dbcsr::tensor_create_template<2>(m_K_01)
+		auto k_1 = dbcsr::tensor<2>::create_template(*m_K_01)
 			.name("k_1")
-			.get();
+			.build();
 			
-		auto k_2 = dbcsr::tensor_create_template<2>(m_K_01)
+		auto k_2 = dbcsr::tensor<2>::create_template(*m_K_01)
 			.name("k_2")
-			.get();
+			.build();
 			
 		dbcsr::copy_matrix_to_tensor(*p_bb, *m_p_bb);
 		

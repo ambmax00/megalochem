@@ -26,30 +26,34 @@ void DF_J::init() {
 	std::array<int,2> tsizes2 = {xnbf,1};
 	std::array<int,3> tsizes3 = {nbf,nbf,1};
 	
-	m_spgrid2 = dbcsr::create_pgrid<2>(m_world.comm()).get();
+	m_spgrid2 = dbcsr::pgrid<2>::create(m_world.comm()).build();
 	
-	m_spgrid_xd = dbcsr::create_pgrid<2>(m_world.comm())
-		.tensor_dims(tsizes2).get();
+	m_spgrid_xd = dbcsr::pgrid<2>::create(m_world.comm())
+		.tensor_dims(tsizes2).build();
 		
-	m_spgrid_bbd = dbcsr::create_pgrid<3>(m_world.comm())
-		.tensor_dims(tsizes3).get();
+	m_spgrid_bbd = dbcsr::pgrid<3>::create(m_world.comm())
+		.tensor_dims(tsizes3).build();
 	
-	m_gp_xd = dbcsr::tensor_create<2>().name("gp_xd").pgrid(m_spgrid_xd)
-		.map1({0}).map2({1}).blk_sizes(xd).get();
+	m_gp_xd = dbcsr::tensor<2>::create().name("gp_xd").set_pgrid(*m_spgrid_xd)
+		.map1({0}).map2({1}).blk_sizes(xd).build();
 		
-	m_gq_xd = dbcsr::tensor_create_template<2>(m_gp_xd).name("gq_xd").get();
+	m_gq_xd = dbcsr::tensor<2>::create_template(*m_gp_xd).name("gq_xd")
+		.build();
 	
-	m_J_bbd = dbcsr::tensor_create<3>().name("J_bbd").pgrid(m_spgrid_bbd)
-		.map1({0,1}).map2({2}).blk_sizes(bbd).get();
+	m_J_bbd = dbcsr::tensor<3>::create()
+		.name("J_bbd")
+		.set_pgrid(*m_spgrid_bbd)
+		.map1({0,1}).map2({2}).blk_sizes(bbd).build();
 	
-	m_ptot_bbd = dbcsr::tensor_create_template<3>(m_J_bbd).name("ptot_bbd").get();
+	m_ptot_bbd = dbcsr::tensor<3>::create_template(*m_J_bbd)
+		.name("ptot_bbd").build();
 	
-	m_v_inv_01 = dbcsr::tensor_create<2,double>()
+	m_v_inv_01 = dbcsr::tensor<2>::create()
 		.name("inv")
-		.pgrid(m_spgrid2)
+		.set_pgrid(*m_spgrid2)
 		.blk_sizes(xx)
 		.map1({0}).map2({1})
-		.get();
+		.build();
 	
 }
 
@@ -193,13 +197,13 @@ void DFMO_K::init() {
 	arrvec<int,2> bb = {b,b};
 	arrvec<int,2> xx = {x,x};
 	
-	m_spgrid2 = dbcsr::create_pgrid<2>(m_world.comm()).get();
+	m_spgrid2 = dbcsr::pgrid<2>::create(m_world.comm()).build();
 	
-	m_K_01 = dbcsr::tensor_create<2>().pgrid(m_spgrid2).name("K_01")
-		.map1({0}).map2({1}).blk_sizes(bb).get();
+	m_K_01 = dbcsr::tensor<2>::create().set_pgrid(*m_spgrid2).name("K_01")
+		.map1({0}).map2({1}).blk_sizes(bb).build();
 	
-	m_v_invsqrt_01 = dbcsr::tensor_create<2>().pgrid(m_spgrid2).name("s_xx_invsqrt")
-		.map1({0}).map2({1}).blk_sizes(xx).get();
+	m_v_invsqrt_01 = dbcsr::tensor<2>::create().set_pgrid(*m_spgrid2).name("s_xx_invsqrt")
+		.map1({0}).map2({1}).blk_sizes(xx).build();
 	dbcsr::copy_matrix_to_tensor(*m_v_invsqrt, *m_v_invsqrt_01);
 			
 }
@@ -271,28 +275,28 @@ void DFMO_K::compute_K() {
 		std::array<int,3> tsizes3 = {xnbf,nocc,nbf};
 		
 		dbcsr::shared_pgrid<2> grid2 =
-			dbcsr::create_pgrid<2>(m_world.comm()).tensor_dims(tsizes2).get();
+			dbcsr::pgrid<2>::create(m_world.comm()).tensor_dims(tsizes2).build();
 			
 		dbcsr::shared_pgrid<3> grid3 =
-			dbcsr::create_pgrid<3>(m_world.comm()).tensor_dims(tsizes3).get();
+			dbcsr::pgrid<3>::create(m_world.comm()).tensor_dims(tsizes3).build();
 		
-		m_c_bm = dbcsr::tensor_create<2,double>().pgrid(grid2)
+		m_c_bm = dbcsr::tensor<2>::create().set_pgrid(*grid2)
 			.name("c_bm_" + x + "_0_1").map1({0}).map2({1})
-			.blk_sizes(bm).get();
+			.blk_sizes(bm).build();
 			
 		dbcsr::copy_matrix_to_tensor(*c_bm, *m_c_bm);
 							
-		m_HT1_xmb_02_1 = dbcsr::tensor_create<3,double>().name("HT1_xmb_02_1_" + x)
-			.pgrid(grid3).map1({0,2}).map2({1}).blk_sizes(xmb).get();
+		m_HT1_xmb_02_1 = dbcsr::tensor<3>::create().name("HT1_xmb_02_1_" + x)
+			.set_pgrid(*grid3).map1({0,2}).map2({1}).blk_sizes(xmb).build();
 			
-		m_HT1_xmb_0_12 = dbcsr::tensor_create_template<3>(m_HT1_xmb_02_1)
-			.name("HT1_xmb_0_12_" + x).map1({0}).map2({1,2}).get();
+		m_HT1_xmb_0_12 = dbcsr::tensor<3>::create_template(*m_HT1_xmb_02_1)
+			.name("HT1_xmb_0_12_" + x).map1({0}).map2({1,2}).build();
 			
-		m_HT2_xmb_0_12 = dbcsr::tensor_create_template<3>(m_HT1_xmb_02_1)
-			.name("HT2_xmb_0_12_" + x).map1({0}).map2({1,2}).get();
+		m_HT2_xmb_0_12 = dbcsr::tensor<3>::create_template(*m_HT1_xmb_02_1)
+			.name("HT2_xmb_0_12_" + x).map1({0}).map2({1,2}).build();
 			
-		m_HT2_xmb_01_2 = dbcsr::tensor_create_template<3>(m_HT1_xmb_02_1)
-			.name("HT2_xmb_01_2_" + x).map1({0,1}).map2({2}).get();
+		m_HT2_xmb_01_2 = dbcsr::tensor<3>::create_template(*m_HT1_xmb_02_1)
+			.name("HT2_xmb_01_2_" + x).map1({0,1}).map2({2}).build();
 		
 		int64_t nze_HTI = 0;
 		
@@ -367,8 +371,8 @@ void DFMO_K::compute_K() {
 			reo2.finish();
 			
 			auto HT2_xmb_01_2_copy = 
-				dbcsr::tensor_create_template<3,double>(m_HT2_xmb_01_2)
-				.name("HT2_xmb_01_2_copy").get();
+				dbcsr::tensor<3>::create_template(*m_HT2_xmb_01_2)
+				.name("HT2_xmb_01_2_copy").build();
 				
 			dbcsr:copy(*m_HT2_xmb_01_2, *HT2_xmb_01_2_copy).perform();
 			
@@ -453,24 +457,24 @@ void DFAO_K::init() {
 	
 	arrvec<int,2> bb = {b,b};
 	
-	m_spgrid2 = dbcsr::create_pgrid<2>(m_world.comm()).get();
+	m_spgrid2 = dbcsr::pgrid<2>::create(m_world.comm()).build();
 	
-	m_cbar_xbb_01_2 = dbcsr::tensor_create<3,double>()
+	m_cbar_xbb_01_2 = dbcsr::tensor<3>::create()
 		.name("Cbar_xbb_01_2")
-		.pgrid(m_spgrid3_xbb)
+		.set_pgrid(*m_spgrid3_xbb)
 		.blk_sizes(xbb)
 		.map1({0,1}).map2({2})
-		.get();
+		.build();
 	
 	m_cbar_xbb_1_02 = 
-		dbcsr::tensor_create_template<3>(m_cbar_xbb_01_2)
-		.name("Cbar_xbb_1_02").map1({1}).map2({0,2}).get();
+		dbcsr::tensor<3>::create_template(*m_cbar_xbb_01_2)
+		.name("Cbar_xbb_1_02").map1({1}).map2({0,2}).build();
 	
-	m_K_01 = dbcsr::tensor_create<2,double>().pgrid(m_spgrid2).name("K_01")
-		.map1({0}).map2({1}).blk_sizes(bb).get();
+	m_K_01 = dbcsr::tensor<2>::create().set_pgrid(*m_spgrid2).name("K_01")
+		.map1({0}).map2({1}).blk_sizes(bb).build();
 		
-	m_p_bb = dbcsr::tensor_create_template<2,double>(m_K_01)
-			.name("p_bb_0_1").map1({0}).map2({1}).get();
+	m_p_bb = dbcsr::tensor<2>::create_template(*m_K_01)
+			.name("p_bb_0_1").map1({0}).map2({1}).build();
 
 }
 
@@ -633,58 +637,58 @@ void DFMEM_K::init() {
 	arrvec<int,2> xx = {x,x};
 	
 	m_spgrid3_xbb = m_eri3c2e_batched->spgrid();
-	m_spgrid2 = dbcsr::create_pgrid<2>(m_world.comm()).get();
+	m_spgrid2 = dbcsr::pgrid<2>::create(m_world.comm()).build();
 	
-	m_cbar_xbb_01_2 = dbcsr::tensor_create<3,double>()
+	m_cbar_xbb_01_2 = dbcsr::tensor<3>::create()
 		.name("Cbar_xbb_01_2")
-		.pgrid(m_spgrid3_xbb)
+		.set_pgrid(*m_spgrid3_xbb)
 		.blk_sizes(xbb)
 		.map1({0,1}).map2({2})
-		.get();
+		.build();
 		
 	m_cbar_xbb_02_1 = 
-		dbcsr::tensor_create_template<3>(m_cbar_xbb_01_2)
+		dbcsr::tensor<3>::create_template(*m_cbar_xbb_01_2)
 		.name("Cbar_xbb_0_12")
 		.map1({0,2}).map2({1})
-		.get();
+		.build();
 		
 	m_c_xbb_02_1 = 
-		dbcsr::tensor_create_template<3>(m_cbar_xbb_01_2)
+		dbcsr::tensor<3>::create_template(*m_cbar_xbb_01_2)
 		.name("c_xbb_02_1")
 		.map1({0,2}).map2({1})
-		.get();
+		.build();
 	
 	m_cpq_xbb_0_12 =
-		dbcsr::tensor_create_template<3>(m_cbar_xbb_01_2)
+		dbcsr::tensor<3>::create_template(*m_cbar_xbb_01_2)
 		.name("cbarpq_xbb_0_12")
 		.map1({0}).map2({1,2})
-		.get();
+		.build();
 		
 	m_cpq_xbb_01_2 = 
-		dbcsr::tensor_create_template<3>(m_cbar_xbb_01_2)
+		dbcsr::tensor<3>::create_template(*m_cbar_xbb_01_2)
 		.name("cpq_xbb_02_1")
 		.map1({0,1}).map1({2})
-		.get();
+		.build();
 	
-	m_K_01 = dbcsr::tensor_create<2,double>()
-		.pgrid(m_spgrid2)
+	m_K_01 = dbcsr::tensor<2>::create()
+		.set_pgrid(*m_spgrid2)
 		.name("K_01")
 		.map1({0}).map2({1})
 		.blk_sizes(bb)
-		.get();
+		.build();
 		
-	m_p_bb = dbcsr::tensor_create_template<2,double>(m_K_01)
+	m_p_bb = dbcsr::tensor<2>::create_template(*m_K_01)
 			.name("p_bb_0_1")
 			.map1({0})
 			.map2({1})
-			.get();
+			.build();
 			
-	m_v_xx_01 = dbcsr::tensor_create<2,double>()
+	m_v_xx_01 = dbcsr::tensor<2>::create()
 		.name("v_xx_01")
-		.pgrid(m_spgrid2)
+		.set_pgrid(*m_spgrid2)
 		.blk_sizes(xx)
 		.map1({0}).map2({1})
-		.get();
+		.build();
 		
 }
 
@@ -860,21 +864,21 @@ void DFLMO_K::init() {
 	arrvec<int,2> bb = {b,b};
 	arrvec<int,2> xx = {x,x};
 	
-	m_spgrid2 = dbcsr::create_pgrid<2>(m_world.comm()).get();
+	m_spgrid2 = dbcsr::pgrid<2>::create(m_world.comm()).build();
 	
-	m_K_01 = dbcsr::tensor_create<2,double>()
-		.pgrid(m_spgrid2)
+	m_K_01 = dbcsr::tensor<2>::create()
+		.set_pgrid(*m_spgrid2)
 		.name("K_01")
 		.map1({0}).map2({1})
 		.blk_sizes(bb)
-		.get();
+		.build();
 		
-	m_v_xx_01 = dbcsr::tensor_create<2,double>()
-		.pgrid(m_spgrid2)
+	m_v_xx_01 = dbcsr::tensor<2>::create()
+		.set_pgrid(*m_spgrid2)
 		.name("K_01")
 		.map1({0}).map2({1})
 		.blk_sizes(xx)
-		.get();
+		.build();
 		
 }
 
@@ -938,61 +942,61 @@ void DFLMO_K::compute_K() {
 		arrvec<int,3> xbm = {x,b,o};
 		arrvec<int,2> bm = {b,o};
 		
-		auto spgrid2_bm = dbcsr::create_pgrid<2>(m_world.comm())
+		auto spgrid2_bm = dbcsr::pgrid<2>::create(m_world.comm())
 			.tensor_dims(dims2)
-			.get();
+			.build();
 		
-		auto spgrid3_xbm = dbcsr::create_pgrid<3>(m_world.comm())
+		auto spgrid3_xbm = dbcsr::pgrid<3>::create(m_world.comm())
 			.tensor_dims(dims3)
-			.get();
+			.build();
 			
-		auto c_bm_01 = dbcsr::tensor_create<2,double>()
+		auto c_bm_01 = dbcsr::tensor<2>::create()
 			.name("c_bm_01")
-			.pgrid(spgrid2_bm)
+			.set_pgrid(*spgrid2_bm)
 			.blk_sizes(bm)
 			.map1({0})
 			.map2({1})
-			.get();
+			.build();
 			
-		auto ht_xbm_0_12 = dbcsr::tensor_create<3,double>()
+		auto ht_xbm_0_12 = dbcsr::tensor<3>::create()
 			.name("ht_xbm_0_12")
-			.pgrid(spgrid3_xbm)
+			.set_pgrid(*spgrid3_xbm)
 			.blk_sizes(xbm)
 			.map1({0})
 			.map2({1,2})
-			.get();
+			.build();
 			
-		auto ht_xbm_01_2 = dbcsr::tensor_create<3,double>()
+		auto ht_xbm_01_2 = dbcsr::tensor<3>::create()
 			.name("ht_xbm_01_2")
-			.pgrid(spgrid3_xbm)
+			.set_pgrid(*spgrid3_xbm)
 			.blk_sizes(xbm)
 			.map1({0,1})
 			.map2({2})
-			.get();
+			.build();
 			
-		auto ht_xbm_02_1 = dbcsr::tensor_create<3,double>()
+		auto ht_xbm_02_1 = dbcsr::tensor<3>::create()
 			.name("ht_xbm_02_1")
-			.pgrid(spgrid3_xbm)
+			.set_pgrid(*spgrid3_xbm)
 			.blk_sizes(xbm)
 			.map1({0,2})
 			.map2({1})
-			.get();
+			.build();
 			
-		auto htfit_xbm_0_12 = dbcsr::tensor_create<3,double>()
+		auto htfit_xbm_0_12 = dbcsr::tensor<3>::create()
 			.name("htfit_xbm_0_12")
-			.pgrid(spgrid3_xbm)
+			.set_pgrid(*spgrid3_xbm)
 			.blk_sizes(xbm)
 			.map1({0})
 			.map2({1,2})
-			.get();
+			.build();
 			
-		auto htfit_xbm_02_1 = dbcsr::tensor_create<3,double>()
+		auto htfit_xbm_02_1 = dbcsr::tensor<3>::create()
 			.name("ht_xbm_02_1")
-			.pgrid(spgrid3_xbm)
+			.set_pgrid(*spgrid3_xbm)
 			.blk_sizes(xbm)
 			.map1({0,2})
 			.map2({1})
-			.get();
+			.build();
 		
 		auto L_bm = chol.L(b,o);
 		
@@ -1181,81 +1185,81 @@ void DFLMO_K::compute_K() {
 		arrvec<int,2> bm = {b,o};
 		arrvec<int,2> mb = {o,b};
 		
-		auto spgrid2_bm = dbcsr::create_pgrid<2>(m_world.comm())
+		auto spgrid2_bm = dbcsr::pgrid<2>::create(m_world.comm())
 			//.tensor_dims(dims2)
-			.get();
+			.build();
 		
-		auto spgrid2_mb = dbcsr::create_pgrid<2>(m_world.comm())
+		auto spgrid2_mb = dbcsr::pgrid<2>::create(m_world.comm())
 			//.tensor_dims(dims2t)
-			.get();
+			.build();
 		
-		auto spgrid3_xbm = dbcsr::create_pgrid<3>(m_world.comm())
+		auto spgrid3_xbm = dbcsr::pgrid<3>::create(m_world.comm())
 			.tensor_dims(dims3)
-			.get();
+			.build();
 			
-		auto u_bm_01 = dbcsr::tensor_create<2,double>()
+		auto u_bm_01 = dbcsr::tensor<2>::create()
 			.name("u_bm_01")
-			.pgrid(spgrid2_bm)
+			.set_pgrid(*spgrid2_bm)
 			.blk_sizes(bm)
 			.map1({0})
 			.map2({1})
-			.get();
+			.build();
 			
-		auto vt_mb_01 = dbcsr::tensor_create<2,double>()
+		auto vt_mb_01 = dbcsr::tensor<2>::create()
 			.name("vt_mb_01")
-			.pgrid(spgrid2_mb)
+			.set_pgrid(*spgrid2_mb)
 			.blk_sizes(mb)
 			.map1({0})
 			.map2({1})
-			.get();
+			.build();
 			
-		auto htu_xbm_01_2 = dbcsr::tensor_create<3,double>()
+		auto htu_xbm_01_2 = dbcsr::tensor<3>::create()
 			.name("htu_xbm_01_2")
-			.pgrid(spgrid3_xbm)
+			.set_pgrid(*spgrid3_xbm)
 			.blk_sizes(xbm)
 			.map1({0,1})
 			.map2({2})
-			.get();
+			.build();
 			
-		auto htu_xbm_02_1 = dbcsr::tensor_create<3,double>()
+		auto htu_xbm_02_1 = dbcsr::tensor<3>::create()
 			.name("htu_xbm_02_1")
-			.pgrid(spgrid3_xbm)
+			.set_pgrid(*spgrid3_xbm)
 			.blk_sizes(xbm)
 			.map1({0,2})
 			.map2({1})
-			.get();
+			.build();
 			
-		auto htv_xbm_0_12 = dbcsr::tensor_create<3,double>()
+		auto htv_xbm_0_12 = dbcsr::tensor<3>::create()
 			.name("htv_xbm_0_12")
-			.pgrid(spgrid3_xbm)
+			.set_pgrid(*spgrid3_xbm)
 			.blk_sizes(xbm)
 			.map1({0})
 			.map2({1,2})
-			.get();
+			.build();
 			
-		auto htv_xbm_01_2 = dbcsr::tensor_create<3,double>()
+		auto htv_xbm_01_2 = dbcsr::tensor<3>::create()
 			.name("htv_xbm_01_2")
-			.pgrid(spgrid3_xbm)
+			.set_pgrid(*spgrid3_xbm)
 			.blk_sizes(xbm)
 			.map1({0,1})
 			.map2({2})
-			.get();
+			.build();
 			
-		auto htvfit_xbm_02_1 = dbcsr::tensor_create<3,double>()
+		auto htvfit_xbm_02_1 = dbcsr::tensor<3>::create()
 			.name("htvfit_xbm_02_1")
-			.pgrid(spgrid3_xbm)
+			.set_pgrid(*spgrid3_xbm)
 			.blk_sizes(xbm)
 			.map1({0,2})
 			.map2({1})
-			.get();
+			.build();
 			
-		auto htvfit_xbm_0_12 = dbcsr::tensor_create<3,double>()
+		auto htvfit_xbm_0_12 = dbcsr::tensor<3>::create()
 			.name("htvfit_xbm_0_12")
-			.pgrid(spgrid3_xbm)
+			.set_pgrid(*spgrid3_xbm)
 			.blk_sizes(xbm)
 			.map1({0})
 			.map2({1,2})
-			.get();
+			.build();
 		
 		auto U_bm = solver.U(b,o);
 		auto Vt_mb = solver.Vt(o,b);
