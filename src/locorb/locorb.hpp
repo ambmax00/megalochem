@@ -47,8 +47,8 @@ public:
 		dbcsr::shared_matrix<double> s_bb, dbcsr::shared_matrix<double> l_bm)
 	{
 		
-		auto temp = dbcsr::create_template<double>(*c_bm)
-			.name("temp").get();
+		auto temp = dbcsr::matrix<>::create_template(*c_bm)
+			.name("temp").build();
 		
 		auto w = c_bm->get_world();
 		auto m = c_bm->col_blk_sizes();

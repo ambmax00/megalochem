@@ -189,10 +189,10 @@ smat MVP_AORISOSADC2::compute_sigma_1(smat& jmat, smat& kmat) {
 	auto j = u_transform(jmat, 'T', m_c_bo, 'N', m_c_bv);
 	auto k = u_transform(kmat, 'T', m_c_bo, 'N', m_c_bv);
 	
-	smat sig_ao = dbcsr::create_template<double>(*jmat)
+	smat sig_ao = dbcsr::matrix<>::create_template(*jmat)
 		.name("sig_ao")
 		.matrix_type(dbcsr::type::no_symmetry)
-		.get();
+		.build();
 	
 	sig_ao->add(0.0, 1.0, *jmat);
 	sig_ao->add(1.0, 1.0, *kmat);
@@ -283,11 +283,11 @@ void MVP_AORISOSADC2::compute_intermeds() {
 		.matrix_type(dbcsr::type::no_symmetry)
 		.build();
 		
-	auto i_oo_tmp = dbcsr::create_template(*m_i_oo)
-		.name("i_oo_temp").get();
+	auto i_oo_tmp = dbcsr::matrix<>::create_template(*m_i_oo)
+		.name("i_oo_temp").build();
 		
-	auto i_vv_tmp = dbcsr::create_template(*m_i_vv)
-		.name("i_vv_temp").get();
+	auto i_vv_tmp = dbcsr::matrix<>::create_template(*m_i_vv)
+		.name("i_vv_temp").build();
 	
 	for (int ilap = 0; ilap != m_nlap; ++ilap) {
 		
@@ -388,8 +388,8 @@ void MVP_AORISOSADC2::compute_intermeds() {
 	dbcsr::multiply('N', 'N', *i_vb, *m_c_bv, *m_i_vv)
 			.perform();
 			
-	auto i_oo_tr = dbcsr::transpose(*m_i_oo).get();
-	auto i_vv_tr = dbcsr::transpose(*m_i_vv).get();
+	auto i_oo_tr = dbcsr::matrix<>::transpose(*m_i_oo).build();
+	auto i_vv_tr = dbcsr::matrix<>::transpose(*m_i_vv).build();
 	
 	m_i_oo->add(1.0, 1.0, *i_oo_tr);
 	m_i_vv->add(1.0, 1.0, *i_vv_tr);
@@ -413,9 +413,9 @@ smat MVP_AORISOSADC2::compute_sigma_2a(smat& u_ia) {
 	LOG.os<1>("==== Computing ADC(2) SIGMA 2A ====\n");
 	
 	// sig_2a = i_vv_ab * u_ib
-	auto sig_2a = dbcsr::create_template<double>(*u_ia)
+	auto sig_2a = dbcsr::matrix<>::create_template(*u_ia)
 		.name("sig_2a")
-		.get();
+		.build();
 		
 	dbcsr::multiply('N', 'T', *u_ia, *m_i_vv, *sig_2a).perform();
 	
@@ -433,9 +433,9 @@ smat MVP_AORISOSADC2::compute_sigma_2b(smat& u_ia) {
 	LOG.os<1>("==== Computing ADC(2) SIGMA 2B ====\n");
 	
 	// sig_2b = i_oo_ij * u_ja
-	auto sig_2b = dbcsr::create_template<double>(*u_ia)
+	auto sig_2b = dbcsr::matrix<>::create_template(*u_ia)
 		.name("sig_2b")
-		.get();
+		.build();
 		
 	dbcsr::multiply('N', 'N', *m_i_oo, *u_ia, *sig_2b).perform();
 	
@@ -462,12 +462,12 @@ smat MVP_AORISOSADC2::compute_sigma_2c(smat& jmat, smat& kmat) {
 	
 	LOG.os<1>("==== Computing ADC(2) SIGMA 2C ====\n");
 	 		
-	auto I_ao = dbcsr::create_template<double>(*jmat)
-		.name("I_ao").get();
-	auto jmat_t = dbcsr::transpose(*jmat)
-		.get();
-	auto kmat_t = dbcsr::transpose(*kmat)
-		.get();
+	auto I_ao = dbcsr::matrix<>::create_template(*jmat)
+		.name("I_ao").build();
+	auto jmat_t = dbcsr::matrix<>::transpose(*jmat)
+		.build();
+	auto kmat_t = dbcsr::matrix<>::transpose(*kmat)
+		.build();
 	
 	I_ao->add(0.0, 1.0, *jmat_t);
 	I_ao->add(1.0, 1.0, *kmat_t);
@@ -533,10 +533,10 @@ smat MVP_AORISOSADC2::compute_sigma_2d(smat& u_ia) {
 	 
 	LOG.os<1>("==== Computing ADC(2) SIGMA 2D ====\n");
 	 
-	auto I_ao = dbcsr::create_template<double>(*m_s_bb)
+	auto I_ao = dbcsr::matrix<>::create_template(*m_s_bb)
 		.name("I_ao")
 		.matrix_type(dbcsr::type::no_symmetry)
-		.get();
+		.build();
 	 
 	for (int ilap = 0; ilap != m_nlap; ++ilap) {
 		
@@ -573,8 +573,8 @@ smat MVP_AORISOSADC2::compute_sigma_2d(smat& u_ia) {
 	auto jmat = m_jbuilder->get_J();
 	auto kmat = m_kbuilder->get_K_A();
 	
-	auto jmat_trans = dbcsr::transpose(*jmat).get();
-	auto kmat_trans = dbcsr::transpose(*kmat).get();
+	auto jmat_trans = dbcsr::matrix<>::transpose(*jmat).build();
+	auto kmat_trans = dbcsr::matrix<>::transpose(*kmat).build();
 	
 	jmat_trans->add(1.0, 1.0, *kmat_trans);
 	
@@ -723,14 +723,14 @@ std::tuple<dbcsr::sbtensor<3,double>,dbcsr::sbtensor<3,double>>
 	
 	// Form transformed u vectors
 	
-	auto SL_bo = dbcsr::create_template(*L_bo)
+	auto SL_bo = dbcsr::matrix<>::create_template(*L_bo)
 		.name("SL_bo")
-		.get();
+		.build();
 		
-	auto SPv_bb = dbcsr::create_template(*pv_bb)
+	auto SPv_bb = dbcsr::matrix<>::create_template(*pv_bb)
 		.matrix_type(dbcsr::type::no_symmetry)
 		.name("SPv_bb")
-		.get();
+		.build();
 	
 	auto up_ob = dbcsr::matrix<>::create()
 		.set_world(m_world)
@@ -1476,8 +1476,8 @@ smat MVP_AORISOSADC2::compute_sigma_2e_OB(smat& u_ao, double omega) {
 		.matrix_type(dbcsr::type::no_symmetry)
 		.build();
 		
-	auto sigma_2e_B = dbcsr::create_template<double>(*sigma_2e_A)
-		.name("sigma_2e_B").get();
+	auto sigma_2e_B = dbcsr::matrix<>::create_template(*sigma_2e_A)
+		.name("sigma_2e_B").build();
 
 	// Loop
 	for (int ilap = 0; ilap != m_nlap; ++ilap) {
@@ -1684,13 +1684,13 @@ std::tuple<dbcsr::sbtensor<3,double>,dbcsr::sbtensor<3,double>>
 	
 	// Form transformed u vectors
 	
-	auto SL_bo = dbcsr::create_template(*L_bo)
+	auto SL_bo = dbcsr::matrix<>::create_template(*L_bo)
 		.name("SL_bo")
-		.get();
+		.build();
 		
-	auto SL_bv = dbcsr::create_template(*L_bv)
+	auto SL_bv = dbcsr::matrix<>::create_template(*L_bv)
 		.name("SL_bv")
-		.get();
+		.build();
 	
 	auto up_ob = dbcsr::matrix<>::create()
 		.set_world(m_world)
@@ -2308,13 +2308,13 @@ std::tuple<smat,smat> MVP_AORISOSADC2::compute_sigma_2e_ilap_OV(
 		dbcsr::multiply('N', 'T', *m_c_bv, *m_c_bv, *Pv_bb)
 			.perform();
 			
-		auto SC_bo = dbcsr::create_template<double>(*m_c_bo)
+		auto SC_bo = dbcsr::matrix<>::create_template(*m_c_bo)
 			.name("SC_bo")
-			.get();
+			.build();
 			
-		auto SC_bv = dbcsr::create_template<double>(*m_c_bv)
+		auto SC_bv = dbcsr::matrix<>::create_template(*m_c_bv)
 			.name("SC_bo")
-			.get();
+			.build();
 		
 		dbcsr::multiply('N', 'N', *m_s_bb, *m_c_bo, *SC_bo)
 			.perform();
@@ -2391,8 +2391,8 @@ smat MVP_AORISOSADC2::compute_sigma_2e_OV(smat& u_ao, double omega) {
 		.matrix_type(dbcsr::type::no_symmetry)
 		.build();
 		
-	auto sigma_2e_B = dbcsr::create_template<double>(*sigma_2e_A)
-		.name("sigma_2e_B").get();
+	auto sigma_2e_B = dbcsr::matrix<>::create_template(*sigma_2e_A)
+		.name("sigma_2e_B").build();
 
 	// Loop
 	for (int ilap = 0; ilap != m_nlap; ++ilap) {

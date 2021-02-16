@@ -65,8 +65,8 @@ void DF_J::compute_J() {
 	
 	// copy over density
 	
-	auto ptot = dbcsr::create_template<double>(*m_p_A)
-		.name("ptot").get();
+	auto ptot = dbcsr::matrix<>::create_template(*m_p_A)
+		.name("ptot").build();
 	
 	if (m_p_A && !m_p_B) {
 		ptot->copy_in(*m_p_A);

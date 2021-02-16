@@ -1151,7 +1151,7 @@ void pivinc_cd::compute(std::optional<int> force_rank) {
 	Lredist->complete_redistribute(*L_reo1);
 	Lredist->filter(dbcsr::global::filter_eps);
 	
-	auto mat_copy = dbcsr::copy(*m_mat_in).get();
+	auto mat_copy = dbcsr::matrix<>::copy(*m_mat_in).build();
 	dbcsr::multiply('N', 'T', *Lredist, *Lredist, *mat_copy)
 		.alpha(-1.0)
 		.beta(1.0)

@@ -20,9 +20,9 @@ MatrixX<T,StorageOrder> matrix_to_eigen(matrix<T>& mat_in) {
 	int prow = -1;
 	int pcol = -1;
 	
-	auto mat_copy = dbcsr::copy(mat_in)
+	auto mat_copy = dbcsr::matrix<T>::copy(mat_in)
 			.name("Copy of " + mat_in.name())
-			.get();
+			.build();
 	decltype(mat_copy) mat_desym;
 	
 	if (mat_copy->has_symmetry()) {

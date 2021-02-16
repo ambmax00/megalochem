@@ -663,7 +663,7 @@ adcmod::canon_lmo adcmod::get_canon_nto(dbcsr::shared_matrix<double> u_ia,
 	
 	LOG.os<>("-- Computing SVD decomposition of u_ia\n"); 
 	
-	auto u_ia_copy = dbcsr::copy(*u_ia).get();
+	auto u_ia_copy = dbcsr::matrix<>::copy(*u_ia).build();
 	
 	double norm = 1.0/sqrt(u_ia->dot(*u_ia));
 	u_ia_copy->scale(norm);

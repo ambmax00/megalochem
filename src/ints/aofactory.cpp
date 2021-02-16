@@ -594,7 +594,7 @@ public:
 	
 	std::array<dbcsr::shared_matrix<double>,3> compute_xyz(std::array<int,3> O) {
 		
-		auto ints_x = dbcsr::matrix<double>::create()
+		auto ints_x = dbcsr::matrix<>::create()
 			.name(m_intname + "_x")
 			.set_world(m_world)
 			.row_blk_sizes(m_tensor_sizes[0])
@@ -602,13 +602,13 @@ public:
 			.matrix_type(dbcsr::type::symmetric)
 			.build();
 			
-		auto ints_y = dbcsr::create_template<double>(*ints_x)
+		auto ints_y = dbcsr::matrix<>::create_template(*ints_x)
 			.name(m_intname + "_y")
-			.get();
+			.build();
 			
-		auto ints_z = dbcsr::create_template<double>(*ints_x)
+		auto ints_z = dbcsr::matrix<>::create_template(*ints_x)
 			.name(m_intname + "_z")
-			.get();
+			.build();
 			
 		ints_x->reserve_sym();
 		ints_y->reserve_sym();

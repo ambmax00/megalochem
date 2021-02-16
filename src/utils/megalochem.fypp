@@ -153,7 +153,8 @@ $: ", ".join(["m_" + name + "(p.p_" + name + ")" &
 	for name,type,reqopt,refval in params])
 #:enddef
 
-#:def _MAKE_PARAM_STRUCT(structname, params)
+#:def _MAKE_PARAM_STRUCT(structname, params1, params2 = [])
+#:set params = params1 + params2
 private:
 	struct ${structname}$_pack {
 	#:for name,type,reqopt,refval in params
@@ -162,7 +163,8 @@ private:
 	};
 #:enddef
 
-#:def _MAKE_BUILDER_MEMBERS(structname,params)
+#:def _MAKE_BUILDER_MEMBERS(structname,params1, params2 = [])
+#:set params = params1 + params2
 private:
 	#:for name,type,reqopt,refval in params
 		${_TYPE_BUILDER(type,refval)}$ c_${name}$;
@@ -189,12 +191,24 @@ public:
 #:endfor
 #:enddef
 
-#:def _MAKE_BUILDER_CLASS(classname, structname, params, pointer)
+#:def _BUILDER_INIT_CONSTRUCTOR(list) 
+$: ", ".join([_TYPE_SIMPLE(type,refval) + " i_" + name &
+	for name,type,reqopt,refval in list])
+#:enddef
+
+#:def _BUILDER_INIT_LIST(list) 
+#{if len(list) != 0}# : #{endif}#
+$: ", ".join(["c_" + name + "(i_" + name + ")" &
+	for name,type,reqopt,refval in list])
+#:enddef
+
+#:def _MAKE_BUILDER_CLASS(classname, structname, params, pointer, init_list = [])
+#:set full_list = params + init_list
 private:
 	
 	class ${structname}$_base {
 	private:
-	#:for name,type,reqopt,refval in params
+	#:for name,type,reqopt,refval in full_list
 		${_TYPE_BUILDER(type,refval)}$ c_${name}$;
 	#:endfor 
 	
@@ -207,7 +221,8 @@ private:
 		}
 	#:endfor
 		
-		${structname}$_base() = default;
+		${structname}$_base(${_BUILDER_INIT_CONSTRUCTOR(init_list)}$) 
+		${_BUILDER_INIT_LIST(init_list)}$ {};
 		~${structname}$_base() {}
  
 	#:if pointer == True
@@ -217,7 +232,7 @@ private:
 	#:endif
 		build() {
 	
-			#:for name,type,reqopt,refval in params
+			#:for name,type,reqopt,refval in full_list
 			#:if reqopt == "required"
 			if (!c_${name}$) {
 				throw std::runtime_error(
@@ -227,12 +242,12 @@ private:
 			#:endfor
 			
 			${structname}$_pack p = {
-			#:for ii in range(0,len(params))
+			#:for ii in range(0,len(full_list))
 			#:set delim = ','
-			#:if ii == len(params) - 1
+			#:if ii == len(full_list) - 1
 				#:set delim = ''
 			#:endif
-			#:set name,type,reqopt,reval = params[ii]
+			#:set name,type,reqopt,reval = full_list[ii]
 			#:if reqopt == "required"
 				*c_${name}$${delim}$
 			#:else
@@ -253,10 +268,11 @@ private:
 	};
 	
 public:
-
-	static ${structname}$_base ${structname}$() { return ${structname}$_base(); }
-
 	
+	template <typename ...Params>
+	static ${structname}$_base ${structname}$(Params&&... params) { 
+		return ${structname}$_base(std::forward<Params>(params)...); 
+	}
 
 #:enddef
 #:endmute

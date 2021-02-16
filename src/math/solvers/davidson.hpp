@@ -111,7 +111,7 @@ public:
 		
 		for (auto ptr : guess) {
 			
-			auto copy = dbcsr::copy(*ptr).get();
+			auto copy = dbcsr::matrix<>::copy(*ptr).build();
 			m_vecs.push_back(copy);
 			
 		}
@@ -275,7 +275,8 @@ public:
 			// ======= Compute all residuals r_k ========
 			
 			std::vector<smat> residuals(m_nroots);
-			smat temp = dbcsr::create_template<double>(*m_vecs[0]).name("temp").get();
+			smat temp = dbcsr::matrix<>::create_template(*m_vecs[0])
+				.name("temp").build();
 			double max_err = 0;
 			
 			int start_root = (m_block) ? 0 : m_nroots - 1;
@@ -283,7 +284,8 @@ public:
 			for (int iroot = start_root; iroot != m_nroots; ++iroot) {
 			//int iroot = m_nroots - 1;
 			
-				smat r_k = dbcsr::create_template<double>(*m_vecs[0]).name("temp").get();
+				smat r_k = dbcsr::matrix<>::create_template(*m_vecs[0])
+					.name("temp").build();
 				
 				for (int i = 0; i != m_subspace; ++i) {
 					
@@ -363,7 +365,8 @@ public:
 				LOG.os<1>("Computing for root ", iroot, '\n');
 				LOG.os<1>("Computing preconditioner.\n");
 				
-				smat D = dbcsr::create_template(*residuals[iroot]).name("D").get();
+				smat D = dbcsr::matrix<>::create_template(*residuals[iroot])
+					.name("D").build();
 				
 				D->reserve_all();
 				
@@ -378,8 +381,8 @@ public:
 				}
 				
 				// form new vector
-				smat d_k = dbcsr::create_template(*residuals[iroot])
-					.name("d_k").get();
+				smat d_k = dbcsr::matrix<>::create_template(*residuals[iroot])
+					.name("d_k").build();
 				
 				// d(k)_ia = D(k)_ia * q(k)_ia
 								
@@ -396,8 +399,11 @@ public:
 				// b_new = d_k - sum_j proj_bi(d_k)
 				// where proj_b(v) = dot(b,v)/dot(b,b)
 				
-				smat bnew = dbcsr::create_template(*d_k).name("b_" + std::to_string(m_subspace)).get();
-				smat temp2 = dbcsr::create_template(*d_k).name("temp2").get();
+				smat bnew = dbcsr::matrix<>::create_template(*d_k)
+					.name("b_" + std::to_string(m_subspace)).build();
+					
+				smat temp2 = dbcsr::matrix<>::create_template(*d_k)
+					.name("temp2").build();
 				
 				//dbcsr::copy(d_k, bnew).perform();
 				bnew->copy_in(*d_k);
@@ -448,7 +454,8 @@ public:
 		m_eigvals.resize(m_nroots);
 		std::copy(evals.data(), evals.data() + m_nroots, m_eigvals.data());
 				
-		smat temp3 = dbcsr::create_template<double>(*m_vecs[0]).name("temp3").get();
+		smat temp3 = dbcsr::matrix<>::create_template(*m_vecs[0])
+			.name("temp3").build();
 		
 		m_ritzvecs.clear();
 		
@@ -467,14 +474,14 @@ public:
 		LOG.os<1>("Collapsing subspace...\n");
 				
 		std::vector<smat> new_vecs;
-		smat tempx = dbcsr::create_template<double>(*m_vecs[0])
-			.name("tempx").get();
+		smat tempx = dbcsr::matrix<>::create_template(*m_vecs[0])
+			.name("tempx").build();
 		
 		for (int k = 0; k != m_nroots; ++k) {
 		
-			smat x_k = dbcsr::create_template(*m_vecs[0])
+			smat x_k = dbcsr::matrix<>::create_template(*m_vecs[0])
 				.name("new_guess_"+std::to_string(k))
-				.get(); 
+				.build(); 
 			
 			for (int i = 0; i < m_subspace; ++i) {
 											
@@ -728,9 +735,9 @@ public:
 				
 			// compute residual
 			// r(i) = (sig(i) - omega(i+1) * u(i))/||u(i)||
-			auto r_ov = dbcsr::copy<double>(*sig_ov)
+			auto r_ov = dbcsr::matrix<>::copy(*sig_ov)
 				.name("r_ov")
-				.get();
+				.build();
 				
 			r_ov->add(1.0, -current_omega, *b_ov);
 			//r_ov->scale(1.0/sqrt(b_ov->dot(*b_ov)));
@@ -742,13 +749,13 @@ public:
 			if (r_norm < 1e-5) break;
 			
 			// compute update
-			auto u_ov = dbcsr::create_template<double>(*sig_ov)
+			auto u_ov = dbcsr::matrix<>::create_template(*sig_ov)
 				.name("update vector")
-				.get();
+				.build();
 			
-			auto div = dbcsr::create_template<double>(*sig_ov)
+			auto div = dbcsr::matrix<>::create_template(*sig_ov)
 				.name("divisor")
-				.get();
+				.build();
 			
 			div->reserve_all();
 			div->set(current_omega);
@@ -759,8 +766,8 @@ public:
 			
 			// store vectors
 			
-			auto u_copy = dbcsr::copy(*u_ov).get();
-			auto g_copy = dbcsr::copy(*b_ov).get();
+			auto u_copy = dbcsr::matrix<>::copy(*u_ov).build();
+			auto g_copy = dbcsr::matrix<>::copy(*b_ov).build();
 			g_copy->add(1.0,1.0,*u_copy);
 			
 			errvecs.push_back(u_copy);
@@ -806,9 +813,9 @@ public:
 			Eigen::VectorXd c = evecs.col(pos);
 			
 			// compute new trial vector
-			auto bnew = dbcsr::create_template<double>(*b_ov)
+			auto bnew = dbcsr::matrix<>::create_template(*b_ov)
 				.name("b_new")
-				.get();
+				.build();
 				
 			for (int ii = 0; ii != iiter+1; ++ii) {
 				bnew->add(1.0, c(ii), *trialvecs[ii]);

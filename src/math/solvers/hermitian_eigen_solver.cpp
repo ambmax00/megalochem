@@ -98,7 +98,7 @@ void hermitian_eigen_solver::compute() {
 
 smatrix hermitian_eigen_solver::inverse() {
 	
-	auto eigvec_copy = dbcsr::copy<double>(*m_eigvec).get();
+	auto eigvec_copy = dbcsr::matrix<>::copy(*m_eigvec).build();
 	
 	//dbcsr::print(eigvec_copy);
 	
@@ -113,10 +113,10 @@ smatrix hermitian_eigen_solver::inverse() {
 	
 	//dbcsr::print(eigvec_copy);
 	
-	auto inv = dbcsr::create_template<double>(*m_mat_in)
+	auto inv = dbcsr::matrix<>::create_template(*m_mat_in)
 		.name(m_mat_in->name() + "^-1")
 		.matrix_type(dbcsr::type::symmetric)
-		.get();
+		.build();
 	
 	dbcsr::multiply('N', 'T', *eigvec_copy, *m_eigvec, *inv).perform(); 
 	
@@ -128,7 +128,8 @@ smatrix hermitian_eigen_solver::inverse() {
 
 smatrix hermitian_eigen_solver::inverse_sqrt() {
 	
-	auto eigvec_copy = dbcsr::copy<double>(*m_eigvec).get();
+	auto eigvec_copy = dbcsr::matrix<>::copy(*m_eigvec)
+		.build();
 	
 	//dbcsr::print(eigvec_copy);
 	
@@ -140,10 +141,10 @@ smatrix hermitian_eigen_solver::inverse_sqrt() {
 	
 	//dbcsr::print(eigvec_copy);
 	
-	auto inv = dbcsr::create_template<double>(*m_mat_in)
+	auto inv = dbcsr::matrix<>::create_template(*m_mat_in)
 		.name(m_mat_in->name() + "^-1/2")
 		.matrix_type(dbcsr::type::symmetric)
-		.get();
+		.build();
 	
 	dbcsr::multiply('N', 'T', *eigvec_copy, *m_eigvec, *inv).perform(); 
 	

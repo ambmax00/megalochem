@@ -205,22 +205,22 @@ void mpmod::compute() {
 	
 	// matrices and tensors
 	
-	auto c_occ_exp = dbcsr::create_template(*c_occ)
-		.name("Scaled Occ Coeff").get();
+	auto c_occ_exp = dbcsr::matrix<>::create_template(*c_occ)
+		.name("Scaled Occ Coeff").build();
 		
-	auto c_vir_exp = dbcsr::create_template(*c_vir)
-		.name("Scaled Vir Coeff").get();
+	auto c_vir_exp = dbcsr::matrix<>::create_template(*c_vir)
+		.name("Scaled Vir Coeff").build();
 		
-	auto pseudo_occ = dbcsr::create_template(*s_bb)
-		.name("Pseudo Density (OCC)").get();
+	auto pseudo_occ = dbcsr::matrix<>::create_template(*s_bb)
+		.name("Pseudo Density (OCC)").build();
 		
-	auto pseudo_vir = dbcsr::create_template(*s_bb)
-		.name("Pseudo Density (VIR)").get();
+	auto pseudo_vir = dbcsr::matrix<>::create_template(*s_bb)
+		.name("Pseudo Density (VIR)").build();
 		
-	auto ztilde_XX = dbcsr::create_template(*metric_matrix)
+	auto ztilde_XX = dbcsr::matrix<>::create_template(*metric_matrix)
 		.name("ztilde_xx")
 		.matrix_type(dbcsr::type::no_symmetry)
-		.get();
+		.build();
 		
 	double mp2_energy = 0.0;
 	
@@ -300,9 +300,9 @@ void mpmod::compute() {
 		
 		#ifdef _ORTHOGONALIZE
 		
-		auto c_occ_ortho = dbcsr::create_template<double>(*c_occ_exp)
+		auto c_occ_ortho = dbcsr::matrix<>::create_template(*c_occ_exp)
 			.name("c_occ_ortho")
-			.get();
+			.build();
 			
 		dbcsr::multiply('N', 'N', *Sllt_inv_bb, *c_occ_exp, *c_occ_ortho)
 			.perform();
@@ -339,9 +339,9 @@ void mpmod::compute() {
 		#ifdef _ORTHOGONALIZE
 	
 		auto L_bu_ortho = chol.L(b, u);
-		auto L_bu = dbcsr::create_template<double>(*L_bu_ortho)
+		auto L_bu = dbcsr::matrix<>::create_template(*L_bu_ortho)
 			.name("L_bu")
-			.get();
+			.build();
 			
 		dbcsr::multiply('N', 'N', *Sllt_bb, *L_bu_ortho, *L_bu)
 			.perform();
@@ -392,7 +392,8 @@ void mpmod::compute() {
 		
 		int nblks = x.size();
 		
-		auto ztilde_XX_t = dbcsr::transpose(*ztilde_XX).get();
+		auto ztilde_XX_t = dbcsr::matrix<>::transpose(*ztilde_XX)
+			.build();
 			
 		//dbcsr::print(*Ztilde_XX);
 		//dbcsr::print(*Ztilde_XX_t);
@@ -404,8 +405,8 @@ void mpmod::compute() {
 		const int jsize = loc_cols.size();
 
 #pragma omp parallel for collapse(2) reduction(+:sum)
-		for (int i = 0; i != isize; ++i) {
-			for (int j = 0; j != jsize; ++j) {
+		for (int i = 0; i < isize; ++i) {
+			for (int j = 0; j < jsize; ++j) {
 		//for (auto iblk : loc_rows) {
 		//	for (auto jblk : loc_cols) {
 				int iblk = loc_rows[i];

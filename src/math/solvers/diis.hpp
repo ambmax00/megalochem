@@ -52,7 +52,7 @@ public:
 			bool reduce = false;
 			if (m_delta.size() >= m_max) reduce = true;
 			
-			auto err_copy = dbcsr::copy(*err).get();
+			auto err_copy = dbcsr::matrix<>::copy(*err).build();
 			
 			m_delta.push_back(err_copy);
 			
@@ -70,8 +70,8 @@ public:
 			if (reduce) m_delta.erase(to_erase);
 			
 			// make a copy, put it into trialvecs
-			auto m_in = dbcsr::create_template(*T)
-				.name("Trial Vec " + iter).get();
+			auto m_in = dbcsr::matrix<>::create_template(*T)
+				.name("Trial Vec " + iter).build();
 			m_in->copy_in(*T);
 			
 			m_trialvecs.push_back(m_in);

@@ -47,7 +47,7 @@ public:
 		auto& c_bm = (dim == 'O') ? m_c_bo : m_c_bv;
 		auto& eps_m = (dim == 'O') ? m_eps_occ : m_eps_vir;
 		
-		auto c_bm_scaled = dbcsr::copy(*c_bm).get();
+		auto c_bm_scaled = dbcsr::matrix<>::copy(*c_bm).build();
 		auto eps_scaled = eps_m;
 		
 		double xpt = m_xpoints[ilap];
@@ -90,9 +90,9 @@ public:
 	
 		int max_rank = coeff->nfullcols_total();
 		
-		auto coeff_ortho = dbcsr::create_template<double>(*coeff)
+		auto coeff_ortho = dbcsr::matrix<>::create_template(*coeff)
 			.name("co_ortho")
-			.get();
+			.build();
 		
 		dbcsr::multiply('N', 'N', *m_s_sqrt, *coeff, *coeff_ortho)
 			.perform();
@@ -122,9 +122,9 @@ public:
 		
 		//util::plot(L_bu_ortho, 1e-5, filename_ortho);
 		
-		auto L_bu = dbcsr::create_template<double>(*L_bu_ortho)
+		auto L_bu = dbcsr::matrix<>::create_template(*L_bu_ortho)
 			.name("L_bu")
-			.get();
+			.build();
 			
 		dbcsr::multiply('N', 'N', *m_s_invsqrt, *L_bu_ortho, *L_bu)
 			.perform();

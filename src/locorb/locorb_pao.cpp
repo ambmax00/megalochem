@@ -8,14 +8,14 @@ namespace locorb {
 
 std::pair<smat_d,smat_d> mo_localizer::compute_pao(smat_d c_bm, smat_d s_bb) {
 	
-	auto l_bb = dbcsr::create_template<double>(*s_bb)
+	auto l_bb = dbcsr::matrix<>::create_template(*s_bb)
 		.name("u_bb")
 		.matrix_type(dbcsr::type::no_symmetry)
-		.get();
+		.build();
 		
-	auto u_bm = dbcsr::create_template<double>(*c_bm)
+	auto u_bm = dbcsr::matrix<>::create_template(*c_bm)
 		.name("u_bm")
-		.get();
+		.build();
 		
 	dbcsr::multiply('N', 'N', *s_bb, *c_bm, *u_bm).perform();
 	dbcsr::multiply('N', 'T', *c_bm, *u_bm, *l_bb).perform();
@@ -148,9 +148,9 @@ std::tuple<smat_d, smat_d, std::vector<double>>
 	
 	LOG.os<>("PAO 4\n");
 	
-	auto cortho_bm = dbcsr::create_template<double>(*c_bm)
+	auto cortho_bm = dbcsr::matrix<>::create_template(*c_bm)
 		.name("c_ortho")
-		.get();
+		.build();
 	
 	auto q_pm = dbcsr::matrix<>::create()
 		.name("q_pm")

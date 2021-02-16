@@ -155,9 +155,10 @@ void aoloader::compute() {
 		auto cinv = p.first;
 		
 		smatd temp = 
-			dbcsr::create_template<double>(*c)
+			dbcsr::matrix<>::create_template(*c)
 			.name("temp")
-			.matrix_type(dbcsr::type::no_symmetry).get();
+			.matrix_type(dbcsr::type::no_symmetry)
+			.build();
 			
 		dbcsr::multiply('N', 'N', *e, *cinv, *temp).perform();
 		dbcsr::multiply('N', 'N', *temp, *e, *c).perform();

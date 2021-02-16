@@ -269,9 +269,9 @@ void hfmod::compute_guess() {
 				.matrix_type(dbcsr::type::symmetric)
 				.build();
 				
-			auto pB = dbcsr::create_template<double>(*pA)
+			auto pB = dbcsr::matrix<>::create_template(*pA)
 				.name("p_bb_B")
-				.get();
+				.build();
 				
 			dbcsr::multiply('N', 'T', *coA, *coA, *pA).perform();
 			if (coB) dbcsr::multiply('N', 'T', *coB, *coB, *pB).perform();
@@ -281,8 +281,8 @@ void hfmod::compute_guess() {
 			
 			if (coB) {
 			
-				auto pscaled = dbcsr::copy<double>(*pA)
-					.name(at_smol->name() + "_density").get();
+				auto pscaled = dbcsr::matrix<>::copy(*pA)
+					.name(at_smol->name() + "_density").build();
 				pscaled->add(0.5, 0.5, *pB);
 				locdensitymap[Z] = dbcsr::matrix_to_eigen(*pscaled);
 				
