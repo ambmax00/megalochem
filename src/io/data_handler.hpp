@@ -262,8 +262,8 @@ public:
 	>
 	void write(std::string vname, T* data, std::vector<hsize_t> dims, int wrank = 0) {
 		
-		auto strtype = H5Tcopy (H5T_C_S1);
-		auto status = H5Tset_size (strtype, _max_strlength);
+		auto strtype = H5Tcopy(H5T_C_S1);
+		auto status = H5Tset_size(strtype, _max_strlength);
 		
 		auto space = H5Screate_simple(dims.size(),dims.data(),NULL);
 				
@@ -338,6 +338,45 @@ public:
 		H5Sclose(space);
 		
 		return data_array<T>{std::move(dims), std::move(buf)};
+		
+	}
+	
+	template <typename T,
+		std::enable_if_t<(std::is_same<T,std::string>::value), bool> = true
+	>
+	data_array<T> read(std::string name) {
+		
+		hid_t dataset = H5Dopen(_file_id, name.c_str(), H5P_DEFAULT);
+		hid_t space = H5Dget_space(dataset);
+		
+		int rank = H5Sget_simple_extent_ndims(space);
+		
+		std::vector<hsize_t> dims(rank);
+		auto status = H5Sget_simple_extent_dims(space, dims.data(), NULL);
+		
+		hid_t data_plist = H5Pcreate(H5P_DATASET_XFER);
+		H5Pset_dxpl_mpio(data_plist, H5FD_MPIO_COLLECTIVE);
+	
+		hsize_t ntot = std::accumulate(dims.begin(), dims.end(), 1,
+			std::multiplies<hsize_t>());
+	
+		std::vector<T> outbuf(ntot);
+		std::vector<fixed_string> readbuf(ntot);
+	
+		auto strtype = H5Tcopy(H5T_C_S1);
+		status = H5Tset_size(strtype, _max_strlength);
+	
+		auto err = H5Dread(dataset, strtype, H5S_ALL, H5S_ALL, 
+			data_plist, readbuf.data());
+		
+		H5Dclose(dataset);
+		H5Sclose(space);
+		
+		for (hsize_t ii = 0; ii != ntot; ++ii) {
+			outbuf[ii] = readbuf[ii].data;
+		}
+		
+		return data_array<T>{std::move(dims), std::move(outbuf)};
 		
 	}
 	
