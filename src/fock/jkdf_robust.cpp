@@ -121,7 +121,7 @@ void DFROBUST_K::compute_K() {
 					ybounds
 				};  
 			
-				dbcsr::contract(*m_v_xx_01, *cfit_xbb_0_12, *m_cpq_xbb_0_12)
+				dbcsr::contract(1.0, *m_v_xx_01, *cfit_xbb_0_12, 0.0, *m_cpq_xbb_0_12)
 					.bounds1(ybds)
 					.bounds2(xbds)
 					.perform("XY, Ynl -> Xnl");
@@ -171,7 +171,7 @@ void DFROBUST_K::compute_K() {
 					sigbounds
 				};
 				
-				dbcsr::contract(*m_cfit_xbb_01_2, *m_p_bb, *m_cbar_xbb_01_2)
+				dbcsr::contract(1.0, *m_cfit_xbb_01_2, *m_p_bb, 0.0, *m_cbar_xbb_01_2)
 					.bounds2(xnbds)
 					.bounds3(sbds)
 					.filter(dbcsr::global::filter_eps)
@@ -195,16 +195,14 @@ void DFROBUST_K::compute_K() {
 					sigbounds
 				};
 				
-				dbcsr::contract(*eri_xbb_02_1, *m_cbar_xbb_02_1, *k_1)
+				dbcsr::contract(1.0, *eri_xbb_02_1, *m_cbar_xbb_02_1, 1.0, *k_1)
 					.bounds1(xsbds)
-					.beta(1.0)
 					.perform("Xns, Xms -> mn");
 				
 				// form k_2
 				
-				dbcsr::contract(*m_cpq_xbb_02_1, *m_cbar_xbb_02_1, *k_2)
+				dbcsr::contract(1.0, *m_cpq_xbb_02_1, *m_cbar_xbb_02_1, 1.0, *k_2)
 					.bounds1(xsbds)
-					.beta(1.0)
 					.perform("Xns, Xms -> mn");
 					
 				m_cbar_xbb_02_1->clear();

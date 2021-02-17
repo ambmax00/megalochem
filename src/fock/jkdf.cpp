@@ -113,8 +113,8 @@ void DF_J::compute_J() {
 			m_eri3c2e_batched->bounds(2, inu)
 		};
 		
-		dbcsr::contract(*eri_0_12, *m_ptot_bbd, *m_gp_xd)
-			.bounds1(bounds1).beta(1.0)
+		dbcsr::contract(1.0, *eri_0_12, *m_ptot_bbd, 1.0, *m_gp_xd)
+			.bounds1(bounds1)
 			.filter(dbcsr::global::filter_eps)
 			.perform("XMN, MN_ -> X_");
 					
@@ -131,7 +131,7 @@ void DF_J::compute_J() {
 	
 	dbcsr::copy_matrix_to_tensor(*m_v_inv, *m_v_inv_01);
 	
-	dbcsr::contract(*m_gp_xd, *m_v_inv_01, *m_gq_xd)
+	dbcsr::contract(1.0, *m_gp_xd, *m_v_inv_01, 0.0, *m_gq_xd)
 		.filter(dbcsr::global::filter_eps).perform("X_, XY -> Y_");
 	
 	m_v_inv_01->clear();
@@ -158,8 +158,8 @@ void DF_J::compute_J() {
 			m_eri3c2e_batched->bounds(2, inu)
 		};
 	
-		dbcsr::contract(*m_gq_xd, *eri_0_12, *m_J_bbd)
-			.bounds3(bounds3).beta(1.0)
+		dbcsr::contract(1.0, *m_gq_xd, *eri_0_12, 1.0, *m_J_bbd)
+			.bounds3(bounds3)
 			.filter(dbcsr::global::filter_eps / nbatches)
 			.perform("X_, XMN -> MN_");
 					
@@ -334,8 +334,9 @@ void DFMO_K::compute_K() {
 				};
 				
 				con1.start();
-				dbcsr::contract(*eri_xbb_02_1,*m_c_bm,*m_HT1_xmb_02_1)
-					.bounds2(xn_bounds).bounds3(o_tbounds).beta(1.0)
+				dbcsr::contract(1.0, *eri_xbb_02_1, *m_c_bm, 
+					1.0, *m_HT1_xmb_02_1)
+					.bounds2(xn_bounds).bounds3(o_tbounds)
 					.filter(dbcsr::global::filter_eps / m_eri3c2e_batched->nbatches(2))
 					.perform("XMN, Mi -> XiN");
 				con1.finish();
@@ -359,7 +360,8 @@ void DFMO_K::compute_K() {
 			};
 			
 			con2.start();
-			dbcsr::contract(*m_HT1_xmb_0_12,*m_v_invsqrt_01,*m_HT2_xmb_0_12)
+			dbcsr::contract(1.0, *m_HT1_xmb_0_12, *m_v_invsqrt_01, 
+				0.0, *m_HT2_xmb_0_12)
 				.bounds2(nu_o_bounds)
 				.filter(dbcsr::global::filter_eps)
 				.perform("XiN, XY -> YiN");
@@ -393,8 +395,9 @@ void DFMO_K::compute_K() {
 				};
 					
 				con3.start();
-				dbcsr::contract(*m_HT2_xmb_01_2,*HT2_xmb_01_2_copy,*m_K_01)
-					.bounds1(x_o_bounds).beta(1.0)
+				dbcsr::contract(1.0, *m_HT2_xmb_01_2, *HT2_xmb_01_2_copy, 
+					1.0, *m_K_01)
+					.bounds1(x_o_bounds)
 					.filter(dbcsr::global::filter_eps/
 						m_eri3c2e_batched->nbatches(0))
 					.perform("XiM, XiN -> MN"); 
@@ -538,7 +541,7 @@ void DFAO_K::compute_K() {
 				};
 			
 				con_1_batch.start();
-				dbcsr::contract(*eri_01_2, *m_p_bb, *m_cbar_xbb_01_2)
+				dbcsr::contract(1.0, *eri_01_2, *m_p_bb, 0.0, *m_cbar_xbb_01_2)
 					.bounds2(xm_bounds)
 					.bounds3(n_bounds)
 					.filter(dbcsr::global::filter_eps)
@@ -578,8 +581,8 @@ void DFAO_K::compute_K() {
 				};
 			
 				con_2_batch.start();
-				dbcsr::contract(*c_xbb_1_02, *m_cbar_xbb_1_02, *m_K_01)
-					.bounds1(xs_bounds).beta(1.0)
+				dbcsr::contract(1.0, *c_xbb_1_02, *m_cbar_xbb_1_02, 1.0, 
+					*m_K_01).bounds1(xs_bounds)
 					.filter(dbcsr::global::filter_eps / m_eri3c2e_batched->nbatches(2))
 					.perform("XNS, XMS -> MN");
 				con_2_batch.finish();
@@ -748,7 +751,7 @@ void DFMEM_K::compute_K() {
 				};
 				
 				con_1.start();
-				dbcsr::contract(*m_v_xx_01, *c_xbb_0_12, *m_cpq_xbb_0_12)
+				dbcsr::contract(1.0, *m_v_xx_01, *c_xbb_0_12, 0.0, *m_cpq_xbb_0_12)
 					.bounds1(ybds)
 					.bounds2(xbds)
 					.filter(dbcsr::global::filter_eps)
@@ -781,7 +784,8 @@ void DFMEM_K::compute_K() {
 				};
 				
 				con_2.start();
-				dbcsr::contract(*m_cpq_xbb_01_2, *m_p_bb, *m_cbar_xbb_01_2)
+				dbcsr::contract(1.0, *m_cpq_xbb_01_2, *m_p_bb, 0.0, 
+					*m_cbar_xbb_01_2)
 					.bounds2(xmbds)
 					.bounds3(sbds)
 					.filter(dbcsr::global::filter_eps)
@@ -813,10 +817,10 @@ void DFMEM_K::compute_K() {
 				};
 				
 				con_3.start();
-				dbcsr::contract(*m_c_xbb_02_1, *m_cbar_xbb_02_1, *m_K_01)
+				dbcsr::contract(1.0, *m_c_xbb_02_1, *m_cbar_xbb_02_1, 
+					1.0, *m_K_01)
 					.bounds1(xsbds)
 					.filter(dbcsr::global::filter_eps/nxbatches)
-					.beta(1.0)
 					.perform("Xns, Xms -> mn");
 				con_3.finish();
 					
@@ -1034,11 +1038,11 @@ void DFLMO_K::compute_K() {
 					obds
 				};
 				
-				dbcsr::contract(*eri3c2e_01_2, *c_bm_01, *ht_xbm_01_2)
+				dbcsr::contract(1.0, *eri3c2e_01_2, *c_bm_01, 1.0, 
+					*ht_xbm_01_2)
 					.bounds1(nu_bounds)
 					.bounds3(i_bounds)
 					.filter(dbcsr::global::filter_eps/nbbatches)
-					.beta(1.0)
 					.perform("Xmn, ni -> Xmi");
 					
 			}
@@ -1068,11 +1072,11 @@ void DFLMO_K::compute_K() {
 				};
 				
 				time_htfit.start();
-				dbcsr::contract(*m_v_xx_01, *ht_xbm_0_12, *htfit_xbm_0_12)
+				dbcsr::contract(1.0, *m_v_xx_01, *ht_xbm_0_12, 1.0, 
+					*htfit_xbm_0_12)
 					.bounds2(x_bounds)
 					.bounds3(mi_bounds)
 					.filter(dbcsr::global::filter_eps)
-					.beta(1.0)
 					.perform("XY, Ymi -> Xmi");
 				time_htfit.finish();
 				
@@ -1101,11 +1105,11 @@ void DFLMO_K::compute_K() {
 				};
 				
 				time_formk.start();
-				dbcsr::contract(*ht_xbm_02_1, *htfit_xbm_02_1, *m_K_01)
+				dbcsr::contract(1.0, *ht_xbm_02_1, *htfit_xbm_02_1, 
+					1.0, *m_K_01)
 					.bounds1(xi_bounds)
 					.move(true)
 					.filter(dbcsr::global::filter_eps/nxbatches)
-					.beta(1.0)
 					.perform("Xmi, Xni -> nm");
 				time_formk.finish();
 				
@@ -1321,20 +1325,18 @@ void DFLMO_K::compute_K() {
 				};
 				
 				time_htuint.start();
-				dbcsr::contract(*eri3c2e_01_2, *vt_mb_01, *htv_xbm_01_2)
+				dbcsr::contract(1.0, *eri3c2e_01_2, *vt_mb_01, 1.0, *htv_xbm_01_2)
 					.bounds1(nu_bounds)
 					.bounds3(i_bounds)
 					.filter(dbcsr::global::filter_eps/nbbatches)
-					.beta(1.0)
 					.perform("Xmn, in -> Xmi");
 				time_htuint.finish();
 				
 				time_htvint.start();
-				dbcsr::contract(*eri3c2e_01_2, *u_bm_01, *htu_xbm_01_2)
+				dbcsr::contract(1.0, *eri3c2e_01_2, *u_bm_01, 1.0, *htu_xbm_01_2)
 					.bounds1(nu_bounds)
 					.bounds3(i_bounds)
 					.filter(dbcsr::global::filter_eps/nbbatches)
-					.beta(1.0)
 					.perform("Xmn, ni -> Xmi");
 				time_htvint.finish();
 				
@@ -1372,7 +1374,7 @@ void DFLMO_K::compute_K() {
 				};
 				
 				time_htvfit.start();
-				dbcsr::contract(*m_v_xx_01, *htv_xbm_0_12, *htvfit_xbm_0_12)
+				dbcsr::contract(1.0, *m_v_xx_01, *htv_xbm_0_12, 0.0, *htvfit_xbm_0_12)
 					.bounds2(x_bounds)
 					.bounds3(mi_bounds)
 					.filter(dbcsr::global::filter_eps)
@@ -1397,10 +1399,10 @@ void DFLMO_K::compute_K() {
 					obds
 				};
 					
-				dbcsr::contract(*htu_xbm_02_1, *htvfit_xbm_02_1, *m_K_01)
+				dbcsr::contract(1.0, *htu_xbm_02_1, *htvfit_xbm_02_1, 
+					1.0, *m_K_01)
 					.bounds1(xi_bounds)
 					.filter(dbcsr::global::filter_eps/nxbatches)
-					.beta(1.0)
 					.perform("Xmi, Xni -> mn");
 					
 				htvfit_xbm_02_1->clear();

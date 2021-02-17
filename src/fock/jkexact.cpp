@@ -87,8 +87,8 @@ void EXACT_J::compute_J() {
 				m_eri4c2e_batched->bounds(3, inu)
 			};
 			
-			dbcsr::contract(*m_ptot_bbd, *eri_01_23, *m_J_bbd)
-				.bounds1(ls_bounds).beta(1.0).perform("LS_, MNLS -> MN_");
+			dbcsr::contract(1.0, *m_ptot_bbd, *eri_01_23, 1.0, *m_J_bbd)
+				.bounds1(ls_bounds).perform("LS_, MNLS -> MN_");
 				
 		}
 	}
@@ -135,8 +135,7 @@ void EXACT_K::compute_K() {
 					m_eri4c2e_batched->bounds(3, inu)
 				};
 				
-				dbcsr::contract(*m_p_bbd, *eri_02_13, *m_K_bbd)
-					.alpha(-1.0).beta(1.0)
+				dbcsr::contract(-1.0, *m_p_bbd, *eri_02_13, 1.0, *m_K_bbd)
 					.bounds1(ls_bounds).perform("LS_, MLNS -> MN_");
 					
 			}

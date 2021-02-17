@@ -372,13 +372,12 @@ dbcsr::sbtensor<3,double> dfitting::compute_pari(dbcsr::shared_matrix<double> s_
 							 
 			inv_local->filter(dbcsr::global::filter_eps);
 			
-			dbcsr::contract(*inv_local, *eri_local, *c_xbb_AB)
+			dbcsr::contract(1.0, *inv_local, *eri_local, 0.0, *c_xbb_AB)
 				.filter(dbcsr::global::filter_eps)
 				.perform("XY, YMN -> XMN");
 		
 #if 0	
-			dbcsr::contract(*met, *c_xbb_AB, *eri_local)
-				.alpha(-1.0).beta(1.0)
+			dbcsr::contract(-1.0, *met, *c_xbb_AB, 1.0, *eri_local)
 				.filter(dbcsr::global::filter_eps)
 				.perform("XY, YMN -> XMN");
 				

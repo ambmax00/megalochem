@@ -22,13 +22,14 @@ template <int N, typename T>
 class tensor_copy_base {
 
     #:set list = [ &
-        ['order','vec<int>','optional','val'],&
-        ['sum','bool','optional','val'],&
-        ['bounds','vec<vec<int>>', 'optional', 'ref'],&
-        ['move_data','bool','optional','val']]
-    ${make_param('tensor_copy_base',list)}$
+        ['order','vec<int>', _OPT, _VAL],&
+        ['sum','bool', _OPT, _VAL],&
+        ['bounds','vec<vec<int>>', _OPT, _REF],&
+        ['move_data','bool', _OPT, _VAL]]
         
 private:
+
+${_MAKE_BUILDER_MEMBERS('tensor_copy', list)}$
 
     tensor<N,T>& c_t_in;
     tensor<N,T>& c_t_out;
@@ -38,8 +39,8 @@ public:
     tensor_copy_base(tensor<N,T>& t1, tensor<N,T>& t2) : c_t_in(t1), c_t_out(t2) {}
     
     void perform() {
-        
-        int* fbounds = (c_bounds) ? unfold_bounds<int>(*c_bounds) : nullptr;
+            
+        int* fbounds = (c_bounds) ? unfold_bounds<int>(c_bounds->get()) : nullptr;
         
         c_dbcsr_t_copy(c_t_in.m_tensor_ptr, N, c_t_out.m_tensor_ptr,
             (c_order) ? c_order->data() : nullptr, 
@@ -65,47 +66,50 @@ copy(tensortype& t1, tensortype& t2) {
 template <int N1, int N2, int N3, typename T>
 class contract_base {
 
-    #:set list = [ &
-        ['alpha','T','optional','val'],&
-        ['beta', 'T', 'optional', 'val'],&
-        ['con1', 'vec<int>', 'required', 'val'],&
-        ['ncon1', 'vec<int>', 'required', 'val'],&
-        ['con2', 'vec<int>', 'required', 'val'],&
-        ['ncon2', 'vec<int>', 'required', 'val'],&
-        ['map1', 'vec<int>', 'required', 'val'],&
-        ['map2', 'vec<int>', 'required', 'val'],&
-        ['bounds1','vec<vec<int>>','optional','ref'],&
-        ['bounds2','vec<vec<int>>','optional','ref'],&
-        ['bounds3','vec<vec<int>>','optional','ref'],&
-        ['filter','double','optional','val'],&
-        ['flop','long long int','optional','ref'],&
-        ['move','bool','optional','val'],&
-        ['retain_sparsity','bool','optional','val'],&
-        ['print','bool','optional','val'],&
-        ['log','bool','optional','val']]
-    ${make_param('contract_base',list)}$
+#:set list = [ &
+	['con1', 'vec<int>', _REQ, _VAL],&
+	['ncon1', 'vec<int>', _REQ, _VAL],&
+	['con2', 'vec<int>', _REQ, _VAL],&
+	['ncon2', 'vec<int>', _REQ, _VAL],&
+	['map1', 'vec<int>', _REQ, _VAL],&
+	['map2', 'vec<int>', _REQ, _VAL],&
+	['bounds1','vec<vec<int>>', _OPT, _REF],&
+	['bounds2','vec<vec<int>>', _OPT, _REF],&
+	['bounds3','vec<vec<int>>', _OPT, _REF],&
+	['filter','double', _OPT, _VAL],&
+	['flop','long long int', _OPT, _REF],&
+	['move','bool', _OPT, _VAL],&
+	['retain_sparsity','bool', _OPT, _VAL],&
+	['print','bool', _OPT, _VAL],&
+	['log','bool', _OPT, _VAL]]
+
+${_MAKE_BUILDER_MEMBERS('contract', list)}$
 
 private:
 
     dbcsr::tensor<N1,T>& c_t1;
     dbcsr::tensor<N2,T>& c_t2;
     dbcsr::tensor<N3,T>& c_t3;
+    T c_alpha, c_beta;
     
 public:
     
-    contract_base(dbcsr::tensor<N1,T>& t1, dbcsr::tensor<N2,T>& t2, dbcsr::tensor<N3,T>& t3) 
-        : c_t1(t1), c_t2(t2), c_t3(t3) {}
+    contract_base(T alpha, dbcsr::tensor<N1,T>& t1, dbcsr::tensor<N2,T>& t2, 
+		T beta, dbcsr::tensor<N3,T>& t3) 
+        : c_alpha(alpha), c_beta(beta), c_t1(t1), c_t2(t2), c_t3(t3) {}
     
     void perform() {
+    
+		${_CHECK_REQUIRED('tensor_contract', '', list)}$ 
         
-        int* f_b1 = (c_bounds1) ? unfold_bounds<int>(*c_bounds1) : nullptr;
-        int* f_b2 = (c_bounds2) ? unfold_bounds<int>(*c_bounds2) : nullptr;
-        int* f_b3 = (c_bounds3) ? unfold_bounds<int>(*c_bounds3) : nullptr;
+        int* f_b1 = (c_bounds1) ? unfold_bounds<int>(c_bounds1->get()) : nullptr;
+        int* f_b2 = (c_bounds2) ? unfold_bounds<int>(c_bounds2->get()) : nullptr;
+        int* f_b3 = (c_bounds3) ? unfold_bounds<int>(c_bounds3->get()) : nullptr;
         
         if (
-			(c_bounds1 && c_bounds1->size() != c_con1->size()) ||
-			(c_bounds2 && c_bounds2->size() != c_ncon1->size()) ||
-			(c_bounds3 && c_bounds3->size() != c_ncon2->size()) 
+			(c_bounds1 && c_bounds1->get().size() != c_con1->size()) ||
+			(c_bounds2 && c_bounds2->get().size() != c_ncon1->size()) ||
+			(c_bounds3 && c_bounds3->get().size() != c_ncon2->size()) 
 		){
 			throw std::runtime_error("Wrong bound dimensions.");
 		}
@@ -117,9 +121,9 @@ public:
         int* unit_nr = (c_print) ? ((*c_print) ? &out : nullptr) : nullptr;  
         
         c_dbcsr_t_contract_r_dp(
-            (c_alpha) ? *c_alpha : 1,
+            c_alpha,
             c_t1.m_tensor_ptr, c_t2.m_tensor_ptr,
-            (c_beta) ? *c_beta : 0,
+            c_beta,
             c_t3.m_tensor_ptr, 
             c_con1->data(), c_con1->size(), 
             c_ncon1->data(), c_ncon1->size(),
@@ -130,7 +134,7 @@ public:
             f_b1, f_b2, f_b3,
             nullptr, nullptr, nullptr, nullptr, 
             (c_filter) ? &*c_filter : nullptr,
-            (c_flop) ? &*c_flop : nullptr,
+            (c_flop) ? &(c_flop->get()) : nullptr,
             (c_move) ? &*c_move : nullptr,
             (c_retain_sparsity) ? &*c_retain_sparsity : nullptr,
             unit_nr, (c_log) ? &*c_log : nullptr);
@@ -342,14 +346,14 @@ public:
 };
 
 template <int N1, int N2, int N3, typename T>
-contract_base(tensor<N1,T>& t1, tensor<N2,T>& t2, tensor<N3,T>& t3) 
+contract_base(T alpha, tensor<N1,T>& t1, tensor<N2,T>& t2, T beta, tensor<N3,T>& t3) 
 -> contract_base<tensor<N1,T>::dim,tensor<N2,T>::dim,tensor<N3,T>::dim, T>;
 
-template <typename tensor1, typename tensor2, typename tensor3>
+template <typename tensor1, typename tensor2, typename tensor3, typename T>
 inline contract_base<tensor1::dim,tensor2::dim,tensor3::dim,typename tensor1::value_type> 
-contract(tensor1& t1, tensor2& t2, tensor3& t3) 
+contract(T alpha, tensor1& t1, tensor2& t2, T beta, tensor3& t3) 
 {
-	return contract_base(t1,t2,t3);
+	return contract_base(alpha,t1,t2,beta,t3);
 }
 
 template <typename T = double>

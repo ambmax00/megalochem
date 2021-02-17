@@ -126,7 +126,7 @@ dbcsr::sbtensor<3,double> dfitting::compute(dbcsr::sbtensor<3,double> eri_batche
 				};
 
 				con.start();
-				dbcsr::contract(*inv, *eri_0_12, *c_xbb_0_12)
+				dbcsr::contract(1.0, *inv, *eri_0_12, 0.0, *c_xbb_0_12)
 					.bounds2(b2).bounds3(b3)
 					.filter(dbcsr::global::filter_eps)
 					.perform("XY, YMN -> XMN");

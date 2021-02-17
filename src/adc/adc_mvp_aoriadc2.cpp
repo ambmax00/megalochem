@@ -806,7 +806,7 @@ std::tuple<dbcsr::sbtensor<3,double>,dbcsr::sbtensor<3,double>>
 			m_eri3c2e_batched->full_bounds(2)
 		};
 		
-		dbcsr::contract(*eri_02_1, *L_bo_01, *HT_xob_02_1)
+		dbcsr::contract(1.0, *eri_02_1, *L_bo_01, 0.0, *HT_xob_02_1)
 			.bounds2(xn_bounds)
 			.filter(dbcsr::global::filter_eps)
 			.perform("Xmn, mi -> Xin");
@@ -820,7 +820,7 @@ std::tuple<dbcsr::sbtensor<3,double>,dbcsr::sbtensor<3,double>>
 			eri_xob_batched->full_bounds(1)
 		};
 		
-		dbcsr::contract(*HT_xob_01_2, *pv_bb_01, *FT_xob_01_2)
+		dbcsr::contract(1.0, *HT_xob_01_2, *pv_bb_01, 0.0, *FT_xob_01_2)
 			.bounds2(xo_bounds)
 			.filter(dbcsr::global::filter_eps)
 			.perform("Xin, nm -> Xim");
@@ -831,10 +831,9 @@ std::tuple<dbcsr::sbtensor<3,double>,dbcsr::sbtensor<3,double>>
 			
 		eri_xob_batched->compress({ix}, FT_xob_02_1);
 		
-		dbcsr::contract(*HT_xob_01_2, *uh_bb_01, *FT_xob_01_2)
+		dbcsr::contract(1.0, *HT_xob_01_2, *uh_bb_01, 0.0, *FT_xob_01_2)
 			.bounds2(xo_bounds)
 			.filter(dbcsr::global::filter_eps)
-			.alpha(1.0)
 			.perform("Xim, mn -> Xin");
 		
 		HT_xob_01_2->clear();
@@ -843,7 +842,7 @@ std::tuple<dbcsr::sbtensor<3,double>,dbcsr::sbtensor<3,double>>
 			.move_data(true)
 			.perform();
 		
-		dbcsr:contract(*eri_02_1, *up_ob_01, *HT_xob_02_1)
+		dbcsr:contract(1.0, *eri_02_1, *up_ob_01, 0.0, *HT_xob_02_1)
 			.bounds2(xn_bounds)
 			.filter(dbcsr::global::filter_eps)
 			.perform("Xmn, im -> Xin");
@@ -852,8 +851,7 @@ std::tuple<dbcsr::sbtensor<3,double>,dbcsr::sbtensor<3,double>>
 			.move_data(true)
 			.perform();
 		
-		dbcsr::contract(*HT_xob_01_2, *pv_bb_01, *FT_xob_01_2)
-			.alpha(-1.0)
+		dbcsr::contract(-1.0, *HT_xob_01_2, *pv_bb_01, 0.0, *FT_xob_01_2)
 			.filter(dbcsr::global::filter_eps)
 			.bounds2(xo_bounds)
 			.perform("Xin, nm -> Xim");
@@ -1019,7 +1017,7 @@ std::tuple<dbcsr::shared_tensor<2,double>,dbcsr::shared_tensor<2,double>>
 				m_eri3c2e_batched->bounds(0,ix)
 			};
 			
-			dbcsr::contract(*eri_xob_02_1, *L_bo_01, *FT_xbb_02_1)
+			dbcsr::contract(1.0, *eri_xob_02_1, *L_bo_01, 0.0, *FT_xbb_02_1)
 				.bounds2(xn_bounds)
 				.filter(dbcsr::global::filter_eps)
 				.retain_sparsity(true)
@@ -1029,16 +1027,15 @@ std::tuple<dbcsr::shared_tensor<2,double>,dbcsr::shared_tensor<2,double>>
 				.move_data(true)
 				.perform();
 				
-			dbcsr::contract(*FT_xbb_0_12, *eri_xbb_0_12, *FA_xx_01)
+			dbcsr::contract(1.0, *FT_xbb_0_12, *eri_xbb_0_12, 1.0, *FA_xx_01)
 				.bounds1(mn_bounds)
 				.bounds2(x_bounds)
-				.beta(1.0)
 				.perform("Xmn, Ymn -> XY");
 				
 			FT_xbb_0_12->clear();
 			FT_xbb_02_1->reserve(res);
 			
-			dbcsr::contract(*J_xob_02_1, *L_bo_01, *FT_xbb_02_1)
+			dbcsr::contract(1.0, *J_xob_02_1, *L_bo_01, 0.0, *FT_xbb_02_1)
 				.bounds2(xn_bounds)
 				.filter(dbcsr::global::filter_eps)
 				.retain_sparsity(true)
@@ -1048,10 +1045,9 @@ std::tuple<dbcsr::shared_tensor<2,double>,dbcsr::shared_tensor<2,double>>
 				.move_data(true)
 				.perform();
 				
-			dbcsr::contract(*FT_xbb_0_12, *eri_xbb_0_12, *FB_xx_01)
+			dbcsr::contract(1.0, *FT_xbb_0_12, *eri_xbb_0_12, 1.0, *FB_xx_01)
 				.bounds1(mn_bounds)
 				.bounds2(x_bounds)
-				.beta(1.0)
 				.perform("Xmn, Ymn -> XY");
 				
 			FT_xbb_0_12->clear();
@@ -1077,10 +1073,10 @@ std::tuple<dbcsr::shared_tensor<2,double>,dbcsr::shared_tensor<2,double>>
 	
 	auto transform = [&](auto& F) {
 		
-		dbcsr::contract(*V_xx_01, *F, *temp)
+		dbcsr::contract(1.0, *V_xx_01, *F, 0.0, *temp)
 			.perform("XY, YZ -> XZ");
 		
-		dbcsr::contract(*temp, *V_xx_01, *F)
+		dbcsr::contract(1.0, *temp, *V_xx_01, 0.0, *F)
 			.perform("XY, YZ -> XZ");
 			
 	};
@@ -1157,18 +1153,16 @@ dbcsr::sbtensor<3,double> MVP_AORISOSADC2::compute_I_OB(dbcsr::sbtensor<3,double
 				bbds
 			};
 			
-			dbcsr::contract(*F_A, *R_0_12, *I_xob_0_12)
+			dbcsr::contract(1.0, *F_A, *R_0_12, 1.0, *I_xob_0_12)
 				.bounds2(xbounds)
 				.bounds3(kabounds)
 				.filter(dbcsr::global::filter_eps)
-				.beta(1.0)
 				.perform("XY, Yka -> Xka");
 				
-			dbcsr::contract(*F_B, *eri_0_12, *I_xob_0_12)
+			dbcsr::contract(1.0, *F_B, *eri_0_12, 1.0, *I_xob_0_12)
 				.bounds2(xbounds)
 				.bounds3(kabounds)
 				.filter(dbcsr::global::filter_eps)
-				.beta(1.0)
 				.perform("YX, Yka -> Xka");
 								
 		}
@@ -1300,7 +1294,7 @@ std::tuple<smat,smat> MVP_AORISOSADC2::compute_sigma_2e_ilap_OB(
 				};
 			
 				// form cbar
-				dbcsr::contract(*eri_1_02, *L_bo_01, *HT_xob_1_02)
+				dbcsr::contract(1.0, *eri_1_02, *L_bo_01, 0.0, *HT_xob_1_02)
 					.bounds2(xmbounds)
 					//.print(LOG.global_plev() >= 3)
 					.filter(dbcsr::global::filter_eps/nxbatches)
@@ -1318,12 +1312,11 @@ std::tuple<smat,smat> MVP_AORISOSADC2::compute_sigma_2e_ilap_OB(
 				};
 				
 				// form sig_A
-				dbcsr::contract(*I_xob_01_2, *HT_xob_01_2, *sig_pre_E1_bb_01)
+				dbcsr::contract(1.0, *I_xob_01_2, *HT_xob_01_2, 1.0, *sig_pre_E1_bb_01)
 					.bounds1(xobounds)
 					.bounds3(mbounds)
 					//.print(LOG.global_1plev() >= 3)
 					.filter(dbcsr::global::filter_eps/nxbatches)
-					.beta(1.0)
 					.perform("Xin, Xim -> mn");
 				
 				HT_xob_01_2->clear();
@@ -1339,9 +1332,8 @@ std::tuple<smat,smat> MVP_AORISOSADC2::compute_sigma_2e_ilap_OB(
 					.bounds(xob_bds)
 					.perform();
 		
-				dbcsr::contract(*I_xob_02_1, *eri_1_02, *sig_pre_E2_ob_01)
+				dbcsr::contract(1.0, *I_xob_02_1, *eri_1_02, 1.0, *sig_pre_E2_ob_01)
 					.bounds1(xmbounds)
-					.beta(1.0)
 					.perform("Xin, Xmn -> im");
 				
 				I_xob_02_1->clear();
@@ -1764,7 +1756,7 @@ std::tuple<dbcsr::sbtensor<3,double>,dbcsr::sbtensor<3,double>>
 			m_eri3c2e_batched->full_bounds(2)
 		};
 		
-		dbcsr::contract(*eri_02_1, *L_bo_01, *HT_xob_02_1)
+		dbcsr::contract(1.0, *eri_02_1, *L_bo_01, 0.0, *HT_xob_02_1)
 			.bounds2(xn_bounds)
 			.filter(dbcsr::global::filter_eps)
 			.perform("Xmn, mi -> Xin");
@@ -1778,7 +1770,7 @@ std::tuple<dbcsr::sbtensor<3,double>,dbcsr::sbtensor<3,double>>
 			eri_xov_batched->full_bounds(1)
 		};
 		
-		dbcsr::contract(*HT_xob_01_2, *L_bv_01, *FT_xov_01_2)
+		dbcsr::contract(1.0, *HT_xob_01_2, *L_bv_01, 0.0, *FT_xov_01_2)
 			.bounds2(xo_bounds)
 			.filter(dbcsr::global::filter_eps)
 			.perform("Xin, na -> Xia");
@@ -1789,10 +1781,9 @@ std::tuple<dbcsr::sbtensor<3,double>,dbcsr::sbtensor<3,double>>
 			
 		eri_xov_batched->compress({ix}, FT_xov_0_12);
 		
-		dbcsr::contract(*HT_xob_01_2, *uh_bv_01, *FT_xov_01_2)
+		dbcsr::contract(1.0, *HT_xob_01_2, *uh_bv_01, 0.0, *FT_xov_01_2)
 			.bounds2(xo_bounds)
 			.filter(dbcsr::global::filter_eps)
-			.alpha(1.0)
 			.perform("Xim, ma -> Xia");
 		
 		HT_xob_01_2->clear();
@@ -1801,7 +1792,7 @@ std::tuple<dbcsr::sbtensor<3,double>,dbcsr::sbtensor<3,double>>
 			.move_data(true)
 			.perform();
 		
-		dbcsr:contract(*eri_02_1, *up_ob_01, *HT_xob_02_1)
+		dbcsr:contract(1.0, *eri_02_1, *up_ob_01, 0.0, *HT_xob_02_1)
 			.bounds2(xn_bounds)
 			.filter(dbcsr::global::filter_eps)
 			.perform("Xmn, im -> Xin");
@@ -1810,8 +1801,7 @@ std::tuple<dbcsr::sbtensor<3,double>,dbcsr::sbtensor<3,double>>
 			.move_data(true)
 			.perform();
 		
-		dbcsr::contract(*HT_xob_01_2, *L_bv_01, *FT_xov_01_2)
-			.alpha(-1.0)
+		dbcsr::contract(-1.0, *HT_xob_01_2, *L_bv_01, 0.0, *FT_xov_01_2)
 			.filter(dbcsr::global::filter_eps)
 			.bounds2(xo_bounds)
 			.perform("Xin, na -> Xia");
@@ -1905,14 +1895,12 @@ std::tuple<dbcsr::shared_tensor<2,double>,dbcsr::shared_tensor<2,double>>
 		auto eri_0_12 = eri_xov_batched->get_work_tensor();
 		auto J_0_12 = J_xov_batched->get_work_tensor();
 		
-		dbcsr::contract(*eri_0_12, *eri_0_12, *FA_xx_01)
+		dbcsr::contract(1.0, *eri_0_12, *eri_0_12, 1.0, *FA_xx_01)
 			.bounds1(ov_bounds)
-			.beta(1.0)
 			.perform("Xia, Yia -> XY");
 			
-		dbcsr::contract(*J_0_12, *eri_0_12, *FB_xx_01)
+		dbcsr::contract(1.0, *J_0_12, *eri_0_12, 1.0, *FB_xx_01)
 			.bounds1(ov_bounds)
-			.beta(1.0)
 			.perform("Xia, Yia -> XY");
 	
 	}
@@ -1929,10 +1917,10 @@ std::tuple<dbcsr::shared_tensor<2,double>,dbcsr::shared_tensor<2,double>>
 	
 	auto transform = [&](auto& F) {
 		
-		dbcsr::contract(*V_xx_01, *F, *temp)
+		dbcsr::contract(1.0, *V_xx_01, *F, 0.0, *temp)
 			.perform("XY, YZ -> XZ");
 		
-		dbcsr::contract(*temp, *V_xx_01, *F)
+		dbcsr::contract(1.0, *temp, *V_xx_01, 0.0, *F)
 			.perform("XY, YZ -> XZ");
 			
 	};
@@ -1998,18 +1986,16 @@ dbcsr::sbtensor<3,double> MVP_AORISOSADC2::compute_I_OV(dbcsr::sbtensor<3,double
 				vbds
 			};
 			
-			dbcsr::contract(*F_A, *R_0_12, *I_xov_0_12)
+			dbcsr::contract(1.0, *F_A, *R_0_12, 1.0, *I_xov_0_12)
 				.bounds2(xbounds)
 				.bounds3(kabounds)
 				.filter(dbcsr::global::filter_eps)
-				.beta(1.0)
 				.perform("XY, Yka -> Xka");
 				
-			dbcsr::contract(*F_B, *eri_0_12, *I_xov_0_12)
+			dbcsr::contract(1.0, *F_B, *eri_0_12, 1.0, *I_xov_0_12)
 				.bounds2(xbounds)
 				.bounds3(kabounds)
 				.filter(dbcsr::global::filter_eps)
-				.beta(1.0)
 				.perform("YX, Yka -> Xka");
 								
 		}
@@ -2173,7 +2159,7 @@ std::tuple<smat,smat> MVP_AORISOSADC2::compute_sigma_2e_ilap_OV(
 				};
 				
 				// form cbar
-				dbcsr::contract(*eri_1_02, *L_bo_01, *HT_xob_1_02)
+				dbcsr::contract(1.0, *eri_1_02, *L_bo_01, 0.0, *HT_xob_1_02)
 					.bounds2(xmbounds)
 					.bounds3(obounds)
 					//.print(LOG.global_plev() >= 3)
@@ -2188,11 +2174,10 @@ std::tuple<smat,smat> MVP_AORISOSADC2::compute_sigma_2e_ilap_OV(
 				};
 				
 				// form sig_A
-				dbcsr::contract(*I_xov_01_2, *HT_xob_01_2, *sigmaE1_HT_01)
+				dbcsr::contract(1.0, *I_xov_01_2, *HT_xob_01_2, 1.0, *sigmaE1_HT_01)
 					.bounds1(xobounds)
 					//.print(LOG.global_plev() >= 3)
 					.filter(dbcsr::global::filter_eps/nxbatches)
-					.beta(1.0)
 					.perform("Xia, Xim -> ma");
 				
 				HT_xob_01_2->clear();
@@ -2233,7 +2218,7 @@ std::tuple<smat,smat> MVP_AORISOSADC2::compute_sigma_2e_ilap_OV(
 				};
 				
 				// form cbar
-				dbcsr::contract(*eri_1_02, *L_bv_01, *HT_xvb_1_02)
+				dbcsr::contract(1.0, *eri_1_02, *L_bv_01, 0.0, *HT_xvb_1_02)
 					.bounds2(xmbounds)
 					.bounds3(vbounds)
 					//.print(LOG.global_plev() >= 3)
@@ -2248,12 +2233,11 @@ std::tuple<smat,smat> MVP_AORISOSADC2::compute_sigma_2e_ilap_OV(
 				};
 				
 				// form sig_A
-				dbcsr::contract(*I_xov_02_1, *HT_xvb_01_2, *sigmaE2_HT_01)
+				dbcsr::contract(1.0, *I_xov_02_1, *HT_xvb_01_2, 1.0, *sigmaE2_HT_01)
 					.bounds1(xvbounds)
 					//.print(LOG.global_plev() >= 3)
 					.filter(dbcsr::global::filter_eps 
 						/ m_eri3c2e_batched->nbatches(0))
-					.beta(1.0)
 					.perform("Xia, Xam -> im");
 				
 				HT_xvb_01_2->clear();

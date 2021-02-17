@@ -386,7 +386,8 @@ dbcsr::sbtensor<3,double> dfitting::compute_qr_new(dbcsr::shared_matrix<double> 
 			
 			// 3. Contract
 						
-			dbcsr::contract(*s_xx_inv_local, *ovlp_xbb_local, *prs_xbb_local)
+			dbcsr::contract(1.0, *s_xx_inv_local, *ovlp_xbb_local, 
+				0.0, *prs_xbb_local)
 				.filter(T)
 				.bounds3(mn_bounds)
 				.perform("XY, Ymn -> Xmn");

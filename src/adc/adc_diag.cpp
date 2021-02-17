@@ -321,10 +321,9 @@ dbcsr::shared_matrix<double> adcmod::compute_diag_1() {
 						nu_bds, sig_bds, lam_bds
 					};
 				
-					dbcsr::contract(*eri_bbbb, *c_bo_01, *T_obbb)
+					dbcsr::contract(1.0, *eri_bbbb, *c_bo_01, 1.0, *T_obbb)
 						.bounds1(m_bds)
 						.bounds2(nsl_bds)
-						.beta(1.0)
 						.filter(dbcsr::global::filter_eps)
 						.perform("mnsl, mi -> insl");
 					
@@ -386,14 +385,14 @@ dbcsr::shared_matrix<double> adcmod::compute_diag_1() {
 					.order(order_idx)
 					.perform();
 				
-				dbcsr::contract(*T_obbb, *c_bo_01, *T_obob)
+				dbcsr::contract(1.0, *T_obbb, *c_bo_01, 0.0, *T_obob)
 					.filter(dbcsr::global::filter_eps)
 					.bounds1(s_bds)
 					.bounds2(inl_bds)
 					.retain_sparsity(true)
 					.perform("insl, sj -> injl");
 					
-				dbcsr::contract(*T_obbb_2, *c_bo_01, *T_oobb)
+				dbcsr::contract(1.0, *T_obbb_2, *c_bo_01, 0.0, *T_oobb)
 					.filter(dbcsr::global::filter_eps)
 					.bounds1(s_bds)
 					.bounds2(inl_bds)
@@ -427,18 +426,16 @@ dbcsr::shared_matrix<double> adcmod::compute_diag_1() {
 				lam_bds
 			};
 					
-			dbcsr::contract(*T_obob_tot, *c_bv_01, *T_ovob)
+			dbcsr::contract(1.0, *T_obob_tot, *c_bv_01, 1.0, *T_ovob)
 				.filter(dbcsr::global::filter_eps)
 				.bounds1(n_bds)
 				.bounds2(ijl_bds)
-				.beta(1.0)
 				.perform("injl, na -> iajl");
 				
-			dbcsr::contract(*T_oobb_tot, *c_bv_01, *T_oovb)
+			dbcsr::contract(1.0, *T_oobb_tot, *c_bv_01, 1.0, *T_oovb)
 				.filter(dbcsr::global::filter_eps)
 				.bounds1(n_bds)
 				.bounds2(ijl_bds)
-				.beta(1.0)
 				.perform("ijnl, na -> ijal");
 				
 			T_obob_tot->clear();
@@ -450,7 +447,7 @@ dbcsr::shared_matrix<double> adcmod::compute_diag_1() {
 			lam_bds
 		};
 		
-		dbcsr::contract(*T_ovob, *c_bv_01, *T_ovov)
+		dbcsr::contract(1.0, *T_ovob, *c_bv_01, 0.0, *T_ovov)
 			.retain_sparsity(true)
 			.bounds1(l_bds)
 			.perform("iaju, ub -> iajb");
@@ -460,7 +457,7 @@ dbcsr::shared_matrix<double> adcmod::compute_diag_1() {
 			//.move_data(true)
 			.perform();
 			
-		dbcsr::contract(*T_oovb, *c_bv_01, *T_oovv)
+		dbcsr::contract(1.0, *T_oovb, *c_bv_01, 0.0, *T_oovv)
 			.retain_sparsity(true)
 			.bounds1(l_bds)
 			.perform("ijau, ub -> ijab");

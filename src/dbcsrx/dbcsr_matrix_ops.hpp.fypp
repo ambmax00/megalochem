@@ -40,7 +40,7 @@ public:
     ~multiply_base() {}
 
     void perform() {
-        
+            
         c_dbcsr_multiply(m_transa, m_transb, 
                         m_alpha, m_A.m_matrix_ptr, m_B.m_matrix_ptr,
                         m_beta, m_C.m_matrix_ptr,

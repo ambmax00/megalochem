@@ -170,7 +170,7 @@ void LLMP_FULL_Z::compute() {
 		//dbcsr::print(*eri_1_02);
 	    
 	    time_tran1.start();
-	    dbcsr::contract(*m_locc_01, *eri_1_02, *b_xob_1_02)
+	    dbcsr::contract(1.0, *m_locc_01, *eri_1_02, 0.0, *b_xob_1_02)
 			.bounds3(x_nu_bounds).perform("mi, Xmn -> Xin");
 	    time_tran1.finish();
 	    
@@ -206,7 +206,7 @@ void LLMP_FULL_Z::compute() {
 			//dbcsr::print(*b_xob_2_01);
 			
 			time_tran2.start();
-			dbcsr::contract(*m_pvir_01, *b_xob_2_01, *b2_xob_2_01)
+			dbcsr::contract(1.0, *m_pvir_01, *b_xob_2_01, 0.0, *b2_xob_2_01)
 				.bounds2(nu_bounds).bounds3(x_u_bounds)
 				.filter(dbcsr::global::filter_eps)
 				.perform("Nn, Xin -> XiN");
@@ -262,7 +262,7 @@ void LLMP_FULL_Z::compute() {
 			//dbcsr::print(*b2_xob_1_02);
 											
 			time_tran3.start();
-			dbcsr::contract(*m_locc_01, *b2_xob_1_02, *b2_xbb_1_02)
+			dbcsr::contract(1.0, *m_locc_01, *b2_xob_1_02, 0.0, *b2_xbb_1_02)
 				.bounds3(x_nu_bounds)
 				.retain_sparsity(force_sparsity)
 				.perform("Mi, XiN -> XMN");
@@ -355,8 +355,7 @@ void LLMP_FULL_Z::compute() {
 			LOG.os<1>("-- Forming Z.\n");
 			
 			time_formz.start();
-			dbcsr::contract(*z_xbb_0_12, *eri_0_12, *m_zmat_01)
-				.beta(1.0)
+			dbcsr::contract(1.0, *z_xbb_0_12, *eri_0_12, 1.0, *m_zmat_01)
 				.bounds1(mn_bounds)
 				.bounds2(x_bounds)
 				.filter(dbcsr::global::filter_eps)
@@ -561,7 +560,7 @@ void LL_Z::compute() {
 		//dbcsr::print(*eri_1_02);
 	    
 	    time_tran1.start();
-	    dbcsr::contract(*m_locc_01, *eri_1_02, *b_xob_1_02)
+	    dbcsr::contract(1.0, *m_locc_01, *eri_1_02, 0.0, *b_xob_1_02)
 			.bounds3(x_nu_bounds).perform("mi, Xmn -> Xin");
 	    time_tran1.finish();
 	    
@@ -597,7 +596,7 @@ void LL_Z::compute() {
 			//dbcsr::print(*b_xob_2_01);
 			
 			time_tran2.start();
-			dbcsr::contract(*m_pvir_01, *b_xob_2_01, *b2_xob_2_01)
+			dbcsr::contract(1.0, *m_pvir_01, *b_xob_2_01, 0.0, *b2_xob_2_01)
 				.bounds2(nu_bounds).bounds3(x_u_bounds)
 				.filter(dbcsr::global::filter_eps)
 				.perform("Nn, Xin -> XiN");
@@ -653,7 +652,7 @@ void LL_Z::compute() {
 			//dbcsr::print(*b2_xob_1_02);
 											
 			time_tran3.start();
-			dbcsr::contract(*m_locc_01, *b2_xob_1_02, *b2_xbb_1_02)
+			dbcsr::contract(1.0, *m_locc_01, *b2_xob_1_02, 0.0, *b2_xbb_1_02)
 				.bounds3(x_nu_bounds)
 				.retain_sparsity(force_sparsity)
 				.perform("Mi, XiN -> XMN");
@@ -746,8 +745,7 @@ void LL_Z::compute() {
 			LOG.os<1>("-- Forming Z.\n");
 			
 			time_formz.start();
-			dbcsr::contract(*z_xbb_0_12, *eri_0_12, *m_zmat_01)
-				.beta(1.0)
+			dbcsr::contract(1.0, *z_xbb_0_12, *eri_0_12, 1.0, *m_zmat_01)
 				.bounds1(mn_bounds)
 				.bounds2(x_bounds)
 				.filter(dbcsr::global::filter_eps)
