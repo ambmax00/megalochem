@@ -364,8 +364,7 @@ void MVP_AORISOSADC2::compute_intermeds() {
 		
 		LOG.os<1>("Forming partly-transformed intermediates.\n");
 		
-		dbcsr::multiply('T', 'N', *c_bo_scaled, *ko_ilap, *i_ob)
-			.beta(1.0)
+		dbcsr::multiply('T', 'N', 1.0, *c_bo_scaled, *ko_ilap, 1.0, *i_ob)
 			.perform();
 			
 		k_inter->set_density_alpha(po);
@@ -373,8 +372,7 @@ void MVP_AORISOSADC2::compute_intermeds() {
 		
 		auto kv_ilap = k_inter->get_K_A();
 			
-		dbcsr::multiply('T', 'N', *c_bv_scaled, *kv_ilap, *i_vb)
-			.beta(1.0)
+		dbcsr::multiply('T', 'N', 1.0, *c_bv_scaled, *kv_ilap, 1.0, *i_vb)
 			.perform();
 			
 		t_intermeds_2.finish();
@@ -383,9 +381,9 @@ void MVP_AORISOSADC2::compute_intermeds() {
 	
 	LOG.os<1>("Forming fully transformed intermediates.\n");
 	
-	dbcsr::multiply('N', 'N', *i_ob, *m_c_bo, *m_i_oo)
+	dbcsr::multiply('N', 'N', 1.0, *i_ob, *m_c_bo, 0.0, *m_i_oo)
 			.perform();
-	dbcsr::multiply('N', 'N', *i_vb, *m_c_bv, *m_i_vv)
+	dbcsr::multiply('N', 'N', 1.0, *i_vb, *m_c_bv, 0.0, *m_i_vv)
 			.perform();
 			
 	auto i_oo_tr = dbcsr::matrix<>::transpose(*m_i_oo).build();
@@ -417,7 +415,8 @@ smat MVP_AORISOSADC2::compute_sigma_2a(smat& u_ia) {
 		.name("sig_2a")
 		.build();
 		
-	dbcsr::multiply('N', 'T', *u_ia, *m_i_vv, *sig_2a).perform();
+	dbcsr::multiply('N', 'T', 1.0, *u_ia, *m_i_vv, 0.0, *sig_2a)
+		.perform();
 	
 	t_sig.finish();
 	
@@ -437,7 +436,8 @@ smat MVP_AORISOSADC2::compute_sigma_2b(smat& u_ia) {
 		.name("sig_2b")
 		.build();
 		
-	dbcsr::multiply('N', 'N', *m_i_oo, *u_ia, *sig_2b).perform();
+	dbcsr::multiply('N', 'N', 1.0, *m_i_oo, *u_ia, 0.0, *sig_2b)
+		.perform();
 	
 	t_sig.finish();
 	
@@ -748,16 +748,16 @@ std::tuple<dbcsr::sbtensor<3,double>,dbcsr::sbtensor<3,double>>
 		.matrix_type(dbcsr::type::no_symmetry)
 		.build();
 		
-	dbcsr::multiply('N', 'N', *m_s_bb, *L_bo, *SL_bo)
+	dbcsr::multiply('N', 'N', 1.0, *m_s_bb, *L_bo, 0.0, *SL_bo)
 		.perform();
 		
-	dbcsr::multiply('N', 'N', *m_s_bb, *pv_bb, *SPv_bb)
+	dbcsr::multiply('N', 'N', 1.0, *m_s_bb, *pv_bb, 0.0, *SPv_bb)
 		.perform();
 		
-	dbcsr::multiply('T', 'N', *SL_bo, *u_ao, *up_ob)
+	dbcsr::multiply('T', 'N', 1.0, *SL_bo, *u_ao, 0.0, *up_ob)
 		.perform();
 		
-	dbcsr::multiply('N', 'N', *u_ao, *SPv_bb, *uh_bb)
+	dbcsr::multiply('N', 'N', 1.0, *u_ao, *SPv_bb, 0.0, *uh_bb)
 		.perform();
 		
 	SL_bo->release();
@@ -1404,13 +1404,13 @@ std::tuple<smat,smat> MVP_AORISOSADC2::compute_sigma_2e_ilap_OB(
 			.matrix_type(dbcsr::type::no_symmetry)
 			.build();
 			
-		dbcsr::multiply('N', 'N', *m_s_bb, *m_c_bv, *SC_bv)
+		dbcsr::multiply('N', 'N', 1.0, *m_s_bb, *m_c_bv, 0.0, *SC_bv)
 			.perform();
 			
-		dbcsr::multiply('N', 'N', *m_s_bb, *m_c_bo, *SC_bo)
+		dbcsr::multiply('N', 'N', 1.0, *m_s_bb, *m_c_bo, 0.0, *SC_bo)
 			.perform();
 			
-		dbcsr::multiply('T', 'N', *L_bo, *SC_bo, *LSC_co)
+		dbcsr::multiply('T', 'N', 1.0, *L_bo, *SC_bo, 0.0, *LSC_co)
 			.perform();
 			
 		auto sigmaE1_ia = u_transform(sig_pre_E1_bb, 'T', m_c_bo, 'N', SC_bv);
@@ -1711,16 +1711,16 @@ std::tuple<dbcsr::sbtensor<3,double>,dbcsr::sbtensor<3,double>>
 		.matrix_type(dbcsr::type::no_symmetry)
 		.build();
 		
-	dbcsr::multiply('N', 'N', *m_s_bb, *L_bo, *SL_bo)
+	dbcsr::multiply('N', 'N', 1.0, *m_s_bb, *L_bo, 0.0, *SL_bo)
 		.perform();
 		
-	dbcsr::multiply('N', 'N', *m_s_bb, *L_bv, *SL_bv)
+	dbcsr::multiply('N', 'N', 1.0, *m_s_bb, *L_bv, 0.0, *SL_bv)
 		.perform();
 		
-	dbcsr::multiply('T', 'N', *SL_bo, *u_ao, *up_ob)
+	dbcsr::multiply('T', 'N', 1.0, *SL_bo, *u_ao, 0.0, *up_ob)
 		.perform();
 		
-	dbcsr::multiply('N', 'N', *u_ao, *SL_bv, *uh_bv)
+	dbcsr::multiply('N', 'N', 1.0, *u_ao, *SL_bv, 0.0, *uh_bv)
 		.perform();
 		
 	SL_bo->release();
@@ -2308,10 +2308,10 @@ std::tuple<smat,smat> MVP_AORISOSADC2::compute_sigma_2e_ilap_OV(
 			.matrix_type(dbcsr::type::symmetric)
 			.build();
 			
-		dbcsr::multiply('N', 'T', *m_c_bo, *m_c_bo, *Po_bb)
+		dbcsr::multiply('N', 'T', 1.0, *m_c_bo, *m_c_bo, 0.0, *Po_bb)
 			.perform();
 			
-		dbcsr::multiply('N', 'T', *m_c_bv, *m_c_bv, *Pv_bb)
+		dbcsr::multiply('N', 'T', 1.0, *m_c_bv, *m_c_bv, 0.0, *Pv_bb)
 			.perform();
 			
 		auto SC_bo = dbcsr::matrix<>::create_template(*m_c_bo)
@@ -2322,10 +2322,10 @@ std::tuple<smat,smat> MVP_AORISOSADC2::compute_sigma_2e_ilap_OV(
 			.name("SC_bo")
 			.build();
 		
-		dbcsr::multiply('N', 'N', *m_s_bb, *m_c_bo, *SC_bo)
+		dbcsr::multiply('N', 'N', 1.0, *m_s_bb, *m_c_bo, 0.0, *SC_bo)
 			.perform();
 			
-		dbcsr::multiply('N', 'N', *m_s_bb, *m_c_bv, *SC_bv)
+		dbcsr::multiply('N', 'N', 1.0, *m_s_bb, *m_c_bv, 0.0, *SC_bv)
 			.perform();
 			
 		auto sigmaE1_bb = u_transform(sigmaE1_HT, 'N', Po_bb, 'T', L_bv);

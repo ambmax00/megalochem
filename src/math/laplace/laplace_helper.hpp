@@ -77,7 +77,7 @@ public:
 			.matrix_type(dbcsr::type::symmetric)
 			.build();
 			
-		dbcsr::multiply('N', 'T', *c_bm, *c_bm, *p_bb)
+		dbcsr::multiply('N', 'T', 1.0, *c_bm, *c_bm, 0.0, *p_bb)
 			.perform();
 		
 		return p_bb;
@@ -94,7 +94,7 @@ public:
 			.name("co_ortho")
 			.build();
 		
-		dbcsr::multiply('N', 'N', *m_s_sqrt, *coeff, *coeff_ortho)
+		dbcsr::multiply('N', 'N', 1.0, *m_s_sqrt, *coeff, 0.0, *coeff_ortho)
 			.perform();
 			
 		auto p_ortho = get_density(coeff_ortho);
@@ -126,7 +126,7 @@ public:
 			.name("L_bu")
 			.build();
 			
-		dbcsr::multiply('N', 'N', *m_s_invsqrt, *L_bu_ortho, *L_bu)
+		dbcsr::multiply('N', 'N', 1.0, *m_s_invsqrt, *L_bu_ortho, 0.0, *L_bu)
 			.perform();
 			
 		//util::plot(L_bu, 1e-5, filename);

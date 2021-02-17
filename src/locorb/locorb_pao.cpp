@@ -17,8 +17,8 @@ std::pair<smat_d,smat_d> mo_localizer::compute_pao(smat_d c_bm, smat_d s_bb) {
 		.name("u_bm")
 		.build();
 		
-	dbcsr::multiply('N', 'N', *s_bb, *c_bm, *u_bm).perform();
-	dbcsr::multiply('N', 'T', *c_bm, *u_bm, *l_bb).perform();
+	dbcsr::multiply('N', 'N', 1.0, *s_bb, *c_bm, 0.0, *u_bm).perform();
+	dbcsr::multiply('N', 'T', 1.0, *c_bm, *u_bm, 0.0, *l_bb).perform();
 	
 	return std::make_pair<smat_d,smat_d>(
 		std::move(l_bb), std::move(u_bm)
@@ -170,13 +170,13 @@ std::tuple<smat_d, smat_d, std::vector<double>>
 		
 	LOG.os<>("PAO 5\n");
 	
-	dbcsr::multiply('N', 'N', *s_inv_pp, *s_pb, *temp_pb)
+	dbcsr::multiply('N', 'N', 1.0, *s_inv_pp, *s_pb, 0.0, *temp_pb)
 		.perform();
 	
-	dbcsr::multiply('N', 'N', *s_sqrt_bb, *c_bm, *cortho_bm)
+	dbcsr::multiply('N', 'N', 1.0, *s_sqrt_bb, *c_bm, 0.0, *cortho_bm)
 		.perform();
 	
-	dbcsr::multiply('N', 'N', *temp_pb, *cortho_bm, *q_pm)
+	dbcsr::multiply('N', 'N', 1.0, *temp_pb, *cortho_bm, 0.0, *q_pm)
 		.perform();
 	
 	//dbcsr::print(*q_pm);
@@ -232,10 +232,10 @@ std::tuple<smat_d, smat_d, std::vector<double>>
 	f_mm->reserve_diag_blocks();
 	f_mm->set_diag(eps_m);
 	
-	dbcsr::multiply('N', 'N', *vt_rm, *f_mm, *f_ht_rm)
+	dbcsr::multiply('N', 'N', 1.0, *vt_rm, *f_mm, 0.0, *f_ht_rm)
 		.perform();
 		
-	dbcsr::multiply('N', 'T', *f_ht_rm, *vt_rm, *f_rr)
+	dbcsr::multiply('N', 'T', 1.0, *f_ht_rm, *vt_rm, 0.0, *f_rr)
 		.perform();
 		
 	math::hermitian_eigen_solver hermsolver(f_rr, 'V', LOG.global_plev());
@@ -269,7 +269,7 @@ std::tuple<smat_d, smat_d, std::vector<double>>
 		.matrix_type(dbcsr::type::no_symmetry)
 		.build();
 		
-	dbcsr::multiply('T', 'N', *vt_rm, *T_rs, *T_ms)
+	dbcsr::multiply('T', 'N', 1.0, *vt_rm, *T_rs, 0.0, *T_ms)
 		.perform();
 		
 	// new MO coefficient matrix:
@@ -282,7 +282,7 @@ std::tuple<smat_d, smat_d, std::vector<double>>
 		.matrix_type(dbcsr::type::no_symmetry)
 		.build();
 		
-	dbcsr::multiply('N', 'N', *c_bm, *T_ms, *c_bs).perform();
+	dbcsr::multiply('N', 'N', 1.0, *c_bm, *T_ms, 0.0, *c_bs).perform();
 	
 	// compute truncated canonical MO coefficient matrix
 	// Ctrunc_ps = X_pp * U_pr * T_rs

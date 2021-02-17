@@ -118,7 +118,8 @@ smatrix hermitian_eigen_solver::inverse() {
 		.matrix_type(dbcsr::type::symmetric)
 		.build();
 	
-	dbcsr::multiply('N', 'T', *eigvec_copy, *m_eigvec, *inv).perform(); 
+	dbcsr::multiply('N', 'T', 1.0, *eigvec_copy, *m_eigvec, 0.0, *inv)
+		.perform(); 
 	
 	//eigvec_copy.release();
 	
@@ -146,7 +147,8 @@ smatrix hermitian_eigen_solver::inverse_sqrt() {
 		.matrix_type(dbcsr::type::symmetric)
 		.build();
 	
-	dbcsr::multiply('N', 'T', *eigvec_copy, *m_eigvec, *inv).perform(); 
+	dbcsr::multiply('N', 'T', 1.0, *eigvec_copy, *m_eigvec, 0.0, *inv)
+		.perform(); 
 	
 	//eigvec_copy.release();
 	

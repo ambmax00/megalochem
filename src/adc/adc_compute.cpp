@@ -772,11 +772,13 @@ adcmod::canon_lmo adcmod::get_canon_nto(dbcsr::shared_matrix<double> u_ia,
 		
 	LOG.os<>("-- Forming final NTO coefficient matrices\n"); 
 
-	dbcsr::multiply('N', 'N', *uortho_ot, *canon_tt, *trans_ot).perform();
-	dbcsr::multiply('T', 'N', *vtortho_sv, *canon_ss, *trans_vs).perform();
+	dbcsr::multiply('N', 'N', 1.0, *uortho_ot, *canon_tt, 0.0, *trans_ot)
+		.perform();
+	dbcsr::multiply('T', 'N', 1.0, *vtortho_sv, *canon_ss, 0.0, 
+		*trans_vs).perform();
 	
-	dbcsr::multiply('N', 'N', *c_bo, *trans_ot, *c_bt).perform();
-	dbcsr::multiply('N', 'N', *c_bv, *trans_vs, *c_bs).perform();
+	dbcsr::multiply('N', 'N', 1.0, *c_bo, *trans_ot, 0.0, *c_bt).perform();
+	dbcsr::multiply('N', 'N', 1.0, *c_bv, *trans_vs, 0.0, *c_bs).perform();
 
 	auto print = [&](auto v) {
 		for (auto d : v) {

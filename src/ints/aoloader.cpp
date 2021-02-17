@@ -160,8 +160,8 @@ void aoloader::compute() {
 			.matrix_type(dbcsr::type::no_symmetry)
 			.build();
 			
-		dbcsr::multiply('N', 'N', *e, *cinv, *temp).perform();
-		dbcsr::multiply('N', 'N', *temp, *e, *c).perform();
+		dbcsr::multiply('N', 'N', 1.0, *e, *cinv, 0.0, *temp).perform();
+		dbcsr::multiply('N', 'N', 1.0, *temp, *e, 0.0, *c).perform();
 		
 		m_reg.insert(key::erfc_xx,c);
 		

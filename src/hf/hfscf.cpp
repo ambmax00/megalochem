@@ -240,10 +240,10 @@ dbcsr::shared_matrix<double> hfmod::compute_errmat(
 	
 	//DO E = FPS - SPF
 	
-	dbcsr::multiply('N','N',*F_x,*P_x,*e_1).perform();
-	dbcsr::multiply('N','N',*e_1,*S,*e_1).perform();
-	dbcsr::multiply('N','N',*S,*P_x,*e_2).alpha(-1.0).perform();
-	dbcsr::multiply('N','N',*e_2,*F_x,*e_1).beta(1.0).perform();
+	dbcsr::multiply('N','N',1.0,*F_x,*P_x,0.0,*e_1).perform();
+	dbcsr::multiply('N','N',1.0,*e_1,*S,0.0,*e_1).perform();
+	dbcsr::multiply('N','N',-1.0,*S,*P_x,0.0,*e_2).perform();
+	dbcsr::multiply('N','N',1.0,*e_2,*F_x,1.0,*e_1).perform();
 	
 	e_2->release();
 	

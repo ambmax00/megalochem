@@ -61,8 +61,8 @@ public:
 			.matrix_type(dbcsr::type::no_symmetry)
 			.build();
 		
-		dbcsr::multiply('N', 'N', *s_bb, *c_bm, *temp).perform();
-		dbcsr::multiply('T', 'N', *l_bm, *temp, *u_mm).perform();
+		dbcsr::multiply('N', 'N', 1.0, *s_bb, *c_bm, 0.0, *temp).perform();
+		dbcsr::multiply('T', 'N', 1.0, *l_bm, *temp, 0.0, *u_mm).perform();
 		
 		return u_mm;
 		

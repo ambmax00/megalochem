@@ -170,7 +170,7 @@ dbcsr::shared_matrix<double> SVD::inverse() {
 	
 	//dbcsr::print(*U);
 	
-	dbcsr::multiply('T', 'T', *Vt, *U, *out).perform();
+	dbcsr::multiply('T', 'T', 1.0, *Vt, *U, 0.0, *out).perform();
 	
 	//dbcsr::print(*out);
 	
@@ -182,7 +182,7 @@ dbcsr::shared_matrix<double> SVD::inverse() {
 		.matrix_type(dbcsr::type::no_symmetry)
 		.build();
 		
-	dbcsr::multiply('N', 'N', *m_mat_in, *out, *ide).perform();
+	dbcsr::multiply('N', 'N', 1.0, *m_mat_in, *out, 0.0, *ide).perform();
 	
 	//dbcsr::print(*ide);
 	
@@ -193,9 +193,8 @@ dbcsr::shared_matrix<double> SVD::inverse() {
 		.matrix_type(dbcsr::type::no_symmetry)
 		.build();
 	
-	dbcsr::multiply('N', 'N', *ide, *m_mat_in, *ide1).perform();
+	dbcsr::multiply('N', 'N', 1.0, *ide, *m_mat_in, 0.0, *ide1).perform();
 	
-	std::cout << "THIS" << std::endl;
 	//dbcsr::print(*m_mat_in);
 	//dbcsr::print(*ide1);
 	

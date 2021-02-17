@@ -10,41 +10,40 @@ template <typename T>
 class multiply_base {
 
 #:set list = [ &
-    ['alpha', 'T', 'optional', 'val'],&
-    ['beta', 'T', 'optional', 'val'],&
-    ['first_row', 'int', 'optional', 'val'],&
-    ['last_row', 'int', 'optional', 'val'],&
-    ['first_col', 'int', 'optional', 'val'],&
-    ['last_col', 'int', 'optional', 'val'],&
-    ['first_k', 'int', 'optional', 'val'],&
-    ['last_k', 'int', 'optional', 'val'],&
-    ['retain_sparsity', 'bool', 'optional', 'val'],&
-    ['filter_eps', 'double', 'optional', 'val'],&
-    ['flop', 'long long int', 'optional', 'ref']] 
+    ['first_row', 'int', _OPT, _VAL],&
+    ['last_row', 'int', _OPT, _VAL],&
+    ['first_col', 'int', _OPT, _VAL],&
+    ['last_col', 'int', _OPT, _VAL],&
+    ['first_k', 'int', _OPT, _VAL],&
+    ['last_k', 'int', _OPT, _VAL],&
+    ['retain_sparsity', 'bool', _OPT, _VAL],&
+    ['filter_eps', 'double', _OPT, _VAL],&
+    ['flop', 'long long int', _OPT, _REF]] 
     
-    ${make_param('multiply_base',list)}$
+${_MAKE_BUILDER_MEMBERS('multiply', list)}$
     
 private:
 
     char m_transa, m_transb;
+    T m_alpha, m_beta;
     matrix<T>& m_A; 
     matrix<T>& m_B; 
     matrix<T>& m_C;
     
 public:
 
-    multiply_base(char transa, char transb, matrix<T>& A, matrix<T>& B, matrix<T>& C) :
-        m_transa(transa), m_transb(transb), m_A(A), m_B(B), m_C(C) {}
+    multiply_base(char transa, char transb, T alpha, matrix<T>& A, matrix<T>& B, 
+		T beta, matrix<T>& C) :
+        m_transa(transa), m_transb(transb), m_alpha(alpha), m_A(A), 
+        m_B(B), m_beta(beta), m_C(C) {}
     
     ~multiply_base() {}
 
     void perform() {
         
         c_dbcsr_multiply(m_transa, m_transb, 
-                        (c_alpha) ? *c_alpha : (T)1.0, 
-                        m_A.m_matrix_ptr, m_B.m_matrix_ptr,
-                        (c_beta) ? *c_beta : T(),
-                        m_C.m_matrix_ptr,
+                        m_alpha, m_A.m_matrix_ptr, m_B.m_matrix_ptr,
+                        m_beta, m_C.m_matrix_ptr,
                         (c_first_row) ? &*c_first_row : nullptr,
                         (c_last_row) ? &*c_last_row : nullptr,
                         (c_first_col) ? &*c_first_col : nullptr,
@@ -53,17 +52,19 @@ public:
                         (c_last_k) ? &*c_last_k : nullptr,
                         (c_retain_sparsity) ? &*c_retain_sparsity : nullptr,
                         (c_filter_eps) ? &*c_filter_eps : nullptr, 
-                        (c_flop) ? &*c_flop : nullptr);
+                        (c_flop) ? &(c_flop->get()) : nullptr);
     }
 
 };
 
 template <typename T>
-multiply_base(char transa, char transb, matrix<T>& A, matrix<T>& B, matrix<T>& C) -> multiply_base<typename matrix<T>::value_type>;
+multiply_base(char transa, char transb, T alpha, matrix<T>& A, matrix<T>& B, 
+	T beta, matrix<T>& C) -> multiply_base<typename matrix<T>::value_type>;
 
 template <typename T>
-inline auto multiply(char transa, char transb, matrix<T>& A, matrix<T>& B, matrix<T>& C) -> multiply_base<T> {
-	return multiply_base(transa,transb,A,B,C);
+inline auto multiply(char transa, char transb, T alpha, matrix<T>& A, 
+	matrix<T>& B, T beta, matrix<T>& C) -> multiply_base<T> {
+	return multiply_base(transa,transb,alpha,A,B,beta,C);
 }
 
 } // end nmespace

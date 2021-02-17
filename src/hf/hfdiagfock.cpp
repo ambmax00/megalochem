@@ -24,13 +24,13 @@ void hfmod::diag_fock() {
 		auto XFX = dbcsr::matrix<>::create_template(*f_bb)
 			.name("XFX").build();
 		
-		dbcsr::multiply('N','N',*f_bb,*m_x_bb,*FX).perform();
+		dbcsr::multiply('N','N',1.0,*f_bb,*m_x_bb,0.0,*FX).perform();
 		
 		//dbcsr::print(*f_bb);
 		
 		//dbcsr::print(FX);
 		
-		dbcsr::multiply('T','N',*m_x_bb,*FX,*XFX).perform(); 
+		dbcsr::multiply('T','N',1.0,*m_x_bb,*FX,0.0,*XFX).perform(); 
 		
 		FX->release();
 		
@@ -66,7 +66,7 @@ void hfmod::diag_fock() {
 		*c_bm = std::move(*new_c_bm); 
 	
 		//Transform back
-		dbcsr::multiply('N','N',*m_x_bb,*c_bm_x,*c_bm).perform();
+		dbcsr::multiply('N','N',1.0,*m_x_bb,*c_bm_x,0.0,*c_bm).perform();
 		
 		if (LOG.global_plev() >= 2) 
 			dbcsr::print(*c_bm);
@@ -85,7 +85,9 @@ void hfmod::diag_fock() {
 		if (x == "B") limit = m_mol->nocc_beta() - 1;
 		
 		
-		dbcsr::multiply('N', 'T', *c_bm, *c_bm, *p_bb).first_k(0).last_k(limit).perform();
+		dbcsr::multiply('N', 'T', 1.0, *c_bm, *c_bm, 0.0, *p_bb)
+			.first_k(0).last_k(limit)
+			.perform();
 		
 		if (LOG.global_plev() >= 2) 
 			dbcsr::print(*p_bb);
@@ -233,7 +235,9 @@ void hfmod::compute_virtual_density() {
 		//std::cout << emat << std::endl;
 		
 		//std::cout << "BOUNDS" << lobound << " " << upbound << std::endl;
-		dbcsr::multiply('N','T',*c_bm,*c_bm,*pv_bb).first_k(lobound).last_k(upbound).perform();
+		dbcsr::multiply('N','T',1.0,*c_bm,*c_bm,0.0,*pv_bb)
+			.first_k(lobound).last_k(upbound)
+			.perform();
 		//std::cout << "OUT" << std::endl;
 		
 		if (LOG.global_plev() >= 2) 

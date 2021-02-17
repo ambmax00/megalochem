@@ -273,8 +273,10 @@ void hfmod::compute_guess() {
 				.name("p_bb_B")
 				.build();
 				
-			dbcsr::multiply('N', 'T', *coA, *coA, *pA).perform();
-			if (coB) dbcsr::multiply('N', 'T', *coB, *coB, *pB).perform();
+			dbcsr::multiply('N', 'T', 1.0, *coA, *coA, 0.0, *pA)
+				.perform();
+			if (coB) dbcsr::multiply('N', 'T', 1.0, *coB, *coB, 0.0, *pB)
+				.perform();
 			
 			//std::cout << "PA on rank: " << myrank << std::endl;
 			//dbcsr::print(*pA);

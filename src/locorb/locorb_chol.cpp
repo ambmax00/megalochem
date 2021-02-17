@@ -19,7 +19,7 @@ std::pair<smat_d,smat_d>
 		.matrix_type(dbcsr::type::symmetric)
 		.build();
 		
-	dbcsr::multiply('N', 'T', *c_bm, *c_bm, *p_bb).perform();
+	dbcsr::multiply('N', 'T', 1.0, *c_bm, *c_bm, 0.0, *p_bb).perform();
 	
 	math::pivinc_cd piv(p_bb, 0);
 	

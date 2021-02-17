@@ -37,7 +37,8 @@ void orthogonalizer::compute() {
 		.matrix_type(dbcsr::type::symmetric)
 		.build();
 		
-	dbcsr::multiply('N', 'T', *eigvec_copy, *eigvecs, *m_mat_out).perform(); 
+	dbcsr::multiply('N', 'T', 1.0, *eigvec_copy, *eigvecs, 0.0, *m_mat_out)
+		.perform(); 
 			
 }
 	

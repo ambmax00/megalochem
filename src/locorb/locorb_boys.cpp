@@ -27,11 +27,11 @@ smat transform(smat c, smat dip) {
 		.matrix_type(dbcsr::type::no_symmetry)
 		.build();
 		
-	dbcsr::multiply('N', 'N', *dip, *c, *temp)
+	dbcsr::multiply('N', 'N', 1.0, *dip, *c, 0.0, *temp)
 		.filter_eps(dbcsr::global::filter_eps)
 		.perform();
 		
-	dbcsr::multiply('T', 'N', *c, *temp, *dip_mm)
+	dbcsr::multiply('T', 'N', 1.0, *c, *temp, 0.0, *dip_mm)
 		.filter_eps(dbcsr::global::filter_eps)
 		.perform();
 		

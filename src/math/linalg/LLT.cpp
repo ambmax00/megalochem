@@ -108,7 +108,8 @@ dbcsr::shared_matrix<double> LLT::inverse(vec<int> blksizes) {
 		.matrix_type(dbcsr::type::symmetric)
 		.build();
 	
-	dbcsr::multiply('T', 'N', *Linv, *Linv, *out).perform();
+	dbcsr::multiply('T', 'N', 1.0, *Linv, *Linv, 0.0, *out)
+		.perform();
 	
 	return out;
 	

@@ -907,9 +907,7 @@ void pivinc_cd::compute(std::optional<int> force_rank) {
 		ui->copy_in(*cvec0);
 				
 		// b) form Utilde
-		dbcsr::multiply('N', 'T', *ui, *ui, *U)
-			.alpha(-1.0/U_II)
-			.beta(1.0)
+		dbcsr::multiply('N', 'T', -1.0/U_II, *ui, *ui, 1.0, *U)
 			.filter_eps(filter_eps)
 			.first_row(I+1)
 			.first_col(I+1)
@@ -1152,9 +1150,7 @@ void pivinc_cd::compute(std::optional<int> force_rank) {
 	Lredist->filter(dbcsr::global::filter_eps);
 	
 	auto mat_copy = dbcsr::matrix<>::copy(*m_mat_in).build();
-	dbcsr::multiply('N', 'T', *Lredist, *Lredist, *mat_copy)
-		.alpha(-1.0)
-		.beta(1.0)
+	dbcsr::multiply('N', 'T', -1.0, *Lredist, *Lredist, 1.0, *mat_copy)
 		.filter_eps(dbcsr::global::filter_eps)
 		.perform();
 	

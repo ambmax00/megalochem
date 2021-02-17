@@ -304,22 +304,22 @@ void mpmod::compute() {
 			.name("c_occ_ortho")
 			.build();
 			
-		dbcsr::multiply('N', 'N', *Sllt_inv_bb, *c_occ_exp, *c_occ_ortho)
-			.perform();
+		dbcsr::multiply('N', 'N', 1.0, *Sllt_inv_bb, *c_occ_exp, 0.0, 
+			*c_occ_ortho).perform();
 				
-		dbcsr::multiply('N', 'T', *c_occ_ortho, *c_occ_ortho, *pseudo_occ)
-			.alpha(pow(omega,0.25)).perform();
+		dbcsr::multiply('N', 'T', pow(omega,0.25), *c_occ_ortho, *c_occ_ortho, 
+			0.0, *pseudo_occ).perform();
 			
 		#else 
 		
-		dbcsr::multiply('N', 'T', *c_occ_exp, *c_occ_exp, *pseudo_occ)
-			.alpha(pow(omega,0.25)).perform();
+		dbcsr::multiply('N', 'T', pow(omega,0.25), *c_occ_exp, *c_occ_exp, 
+			0.0, *pseudo_occ).perform();
 			
 		#endif
 		
-		dbcsr::multiply('N', 'T', *c_vir_exp, *c_vir_exp, *pseudo_vir)
-			.alpha(pow(omega,0.25)).perform();
-		
+		dbcsr::multiply('N', 'T', pow(omega,0.25), *c_vir_exp, *c_vir_exp, 
+			0.0, *pseudo_vir).perform();
+				
 		pseudotime.finish();
 		
 		//=============== CHOLESKY DECOMPOSITION =======================
@@ -343,7 +343,7 @@ void mpmod::compute() {
 			.name("L_bu")
 			.build();
 			
-		dbcsr::multiply('N', 'N', *Sllt_bb, *L_bu_ortho, *L_bu)
+		dbcsr::multiply('N', 'N', 1.0, *Sllt_bb, *L_bu_ortho, 0.0, *L_bu)
 			.perform();
 			
 		#else 
@@ -375,8 +375,10 @@ void mpmod::compute() {
 		
 		// multiply
 		LOG.os<1>("Ztilde = Z * Jinv\n");
-		dbcsr::multiply('N', 'N', *Z_XX, *metric_matrix, *ztilde_XX)
-			.filter_eps(dbcsr::global::filter_eps).perform();
+		dbcsr::multiply('N', 'N', 1.0, *Z_XX, *metric_matrix, 0.0, 
+			*ztilde_XX)
+			.filter_eps(dbcsr::global::filter_eps)
+			.perform();
 		
 		formZtilde.finish();
 		
