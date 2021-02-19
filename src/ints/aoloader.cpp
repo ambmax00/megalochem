@@ -226,8 +226,8 @@ void aoloader::compute() {
 		auto b = m_mol->dims().b();
 		arrvec<int,4> bbbb = {b,b,b,b};
 		
-		int nbatches_b = m_opt.get<int>("nbatches_x", 5);
-		std::array<int,4> bdims = {nbatches_b,nbatches_b,nbatches_b,nbatches_b};
+		std::array<int,4> bdims = {m_nbatches_b, m_nbatches_b,
+				m_nbatches_b, m_nbatches_b};
 		
 		auto blkmap_b = m_mol->c_basis()->block_to_atom(m_mol->atoms());
 		arrvec<int,4> blkmaps = {blkmap_b, blkmap_b, blkmap_b, blkmap_b};
@@ -238,7 +238,7 @@ void aoloader::compute() {
 			.blk_sizes(bbbb)
 			.blk_maps(blkmaps)
 			.batch_dims(bdims)
-			.btensor_type(dbcsr::btype::core)
+			.btensor_type(m_btype_eris)
 			.print(LOG.global_plev())
 			.build();
 			
@@ -325,17 +325,12 @@ void aoloader::compute() {
 		m_aofac->ao_3c2e_setup(m);
 		auto genfunc = m_aofac->get_generator(scr);
 		
-		std::string eris_mem = m_opt.get<std::string>("eris", "core");
-		dbcsr::btype mytype = dbcsr::get_btype(eris_mem);
-		
-		int nbatches_x = m_opt.get<int>("nbatches_x", 5);
-		int nbatches_b = m_opt.get<int>("nbatches_b", 5);
-		
 		auto b = m_mol->dims().b();
 		auto x = m_mol->dims().x();
 		arrvec<int,3> xbb = {x,b,b};
 		
-		std::array<int,3> bdims = {nbatches_x,nbatches_b,nbatches_b};
+		std::array<int,3> bdims = {m_nbatches_x, m_nbatches_b,
+				m_nbatches_b};
 		
 		auto blkmap_b = m_mol->c_basis()->block_to_atom(m_mol->atoms());
 		auto blkmap_x = m_mol->c_dfbasis()->block_to_atom(m_mol->atoms());
@@ -347,7 +342,7 @@ void aoloader::compute() {
 			.set_pgrid(spgrid3)
 			.blk_sizes(xbb)
 			.batch_dims(bdims)
-			.btensor_type(mytype)
+			.btensor_type(m_btype_eris)
 			.blk_maps(blkmaps)
 			.print(LOG.global_plev())
 			.build();
@@ -376,7 +371,7 @@ void aoloader::compute() {
 				bounds[2] = eri_batched->full_blk_bounds(2);
 				
 				t_calc.start();
-				if (mytype != dbcsr::btype::direct) m_aofac->ao_3c_fill(eris_gen,bounds,scr);
+				if (m_btype_eris != dbcsr::btype::direct) m_aofac->ao_3c_fill(eris_gen,bounds,scr);
 				t_calc.finish();
 				eris_gen->filter(dbcsr::global::filter_eps);
 				t_compress.start();
@@ -427,10 +422,7 @@ void aoloader::compute() {
 		auto eri_batched = m_reg.get<sbt3>(k_eri);
 		auto inv = m_reg.get<smatd>(k_inv);
 		
-		auto intermedtype = dbcsr::get_btype(
-			m_opt.get<std::string>("intermeds", "core"));
-		
-		auto c_xbb_batched = dfit.compute(eri_batched, inv, intermedtype);
+		auto c_xbb_batched = dfit.compute(eri_batched, inv, m_btype_intermeds);
 						
 		if (comp(key::dfit_coul_xbb)) m_reg.insert(key::dfit_coul_xbb, c_xbb_batched);
 		if (comp(key::dfit_erfc_xbb)) m_reg.insert(key::dfit_erfc_xbb, c_xbb_batched);
@@ -451,14 +443,10 @@ void aoloader::compute() {
 		auto m_xx = m_reg.get<smatd>(key::coul_xx);
 		auto scr = m_reg.get<ints::shared_screener>(key::scr_xbb);
 		
-		int nbatches_x = m_opt.get<int>("nbatches_x", 5);
-		int nbatches_b = m_opt.get<int>("nbatches_b", 5);
-		std::string type_str = m_opt.get<std::string>("intermeds", "core");
-		auto mytype = dbcsr::get_btype(type_str);
+		std::array<int,3> bdims = {m_nbatches_x, m_nbatches_b,
+			m_nbatches_b};
 		
-		std::array<int,3> bdims = {nbatches_x,nbatches_b,nbatches_b};
-		
-		auto c_xbb_pari = dfit.compute_pari(m_xx, scr, bdims, mytype);
+		auto c_xbb_pari = dfit.compute_pari(m_xx, scr, bdims, m_btype_intermeds);
 				
 		m_reg.insert(key::pari_xbb, c_xbb_pari);
 	
@@ -473,10 +461,7 @@ void aoloader::compute() {
 		auto& time = TIME.sub("Density fitting coefficients (QR)");
 		time.start();
 		
-		int nbatches_x = m_opt.get<int>("nbatches_x", 5);
-		int nbatches_b = m_opt.get<int>("nbatches_b", 5);
-		
-		std::array<int,3> bdims = {nbatches_x, nbatches_b, nbatches_b};
+		std::array<int,3> bdims = {m_nbatches_x, m_nbatches_b, m_nbatches_b};
 		
 		//auto eri_batched = m_reg.get<sbt3>(key::coul_xbb);
 		auto m_xx = m_reg.get<smatd>(key::coul_xx);
@@ -484,7 +469,7 @@ void aoloader::compute() {
 		auto scr = m_reg.get<ints::shared_screener>(key::scr_xbb);
 		
 		auto c_xbb_qr = dfit.compute_qr_new(s_xx_inv, m_xx, spgrid3, scr, 
-			bdims, dbcsr::btype::core, true);
+			bdims, m_btype_intermeds, true);
 		m_reg.insert(key::qr_xbb, c_xbb_qr);
 		
 		auto mat = dfit.compute_idx(c_xbb_qr);
@@ -505,10 +490,7 @@ void aoloader::compute() {
 		auto qr_batched = m_reg.get<sbt3>(ints::key::qr_xbb);
 		auto v = m_reg.get<smatd>(ints::key::coul_xx);
 		
-		auto intermedtype = dbcsr::get_btype(
-			m_opt.get<std::string>("intermeds", "core"));
-		
-		auto c_xbb_batched = dfit.compute(qr_batched, v, intermedtype);
+		auto c_xbb_batched = dfit.compute(qr_batched, v, m_btype_intermeds);
 						
 		m_reg.insert(key::dfit_qr_xbb, c_xbb_batched);
 		
@@ -530,10 +512,7 @@ void aoloader::compute() {
 		auto pari_batched = m_reg.get<sbt3>(ints::key::pari_xbb);
 		auto v = m_reg.get<smatd>(ints::key::coul_xx);
 		
-		auto intermedtype = dbcsr::get_btype(
-			m_opt.get<std::string>("intermeds", "core"));
-		
-		auto c_xbb_batched = dfit.compute(pari_batched, v, intermedtype);
+		auto c_xbb_batched = dfit.compute(pari_batched, v, m_btype_intermeds);
 						
 		m_reg.insert(key::dfit_pari_xbb, c_xbb_batched);
 		

@@ -47,6 +47,9 @@ void LLMP_FULL_Z::init() {
 		.btensor_type(m_intermeds)
 		.print(LOG.global_plev())
 		.build();
+	
+	LOG.os<1>("Computing shellpir info...\n");
+	m_shellpair_info = get_shellpairs(m_eri3c2e_batched);
 		
 }
 

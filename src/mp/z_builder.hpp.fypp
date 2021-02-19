@@ -10,6 +10,7 @@
 #include <Eigen/Core>
 #include "utils/mpi_time.hpp"
 #include "desc/molecule.hpp"
+#include "ints/aoloader.hpp"
 
 namespace mp {
 
@@ -246,6 +247,117 @@ ${_MAKE_BUILDER_CLASS('LLMP_ASYM_Z', 'create', list, True)}$
 	~LLMP_ASYM_Z() override {}
 	
 };
+
+inline void load_zints(zmethod zmet, ints::metric metr, ints::aoloader& ao) {
+	
+	// set J
+	ao.request(ints::key::scr_xbb,true);
+	
+	switch (metr) {
+		case ints::metric::coulomb: {
+			ao.request(ints::key::coul_xx, false);
+			ao.request(ints::key::coul_xx_inv, true);
+			ao.request(ints::key::coul_xbb, true);
+			break;
+		}
+		case ints::metric::erfc_coulomb: {
+			ao.request(ints::key::erfc_xx, false);
+			ao.request(ints::key::erfc_xx_inv, true);
+			ao.request(ints::key::erfc_xbb, true);
+			break;
+		}
+		case ints::metric::qr_fit: {
+			ao.request(ints::key::coul_xx, true);
+			ao.request(ints::key::ovlp_xx, false);
+			ao.request(ints::key::ovlp_xx_inv, false);
+			ao.request(ints::key::qr_xbb, true);
+			break;
+		}
+		default: {
+			throw std::runtime_error("Invalid metric for z builder");
+		}
+	}
+}
+
+#:set list = [&
+	['set_world', 'dbcsr::world', _REQ, _VAL],&
+	['molecule', 'desc::shared_molecule', _REQ, _VAL],&
+	['method', 'zmethod', _REQ, _VAL],&
+	['aoloader', 'ints::aoloader', _REQ, _REF],&
+	['print', 'int', _OPT, _VAL],&
+	['btype_intermeds', 'dbcsr::btype', _OPT, _VAL],& 
+	['metric', 'ints::metric', _REQ, _VAL]]
+
+class create_z_base {
+
+	${_MAKE_BUILDER_MEMBERS('create_z', list)}$
+	
+public:
+
+	create_z_base() {}
+	
+	std::shared_ptr<Z> build() {
+	
+		${_CHECK_REQUIRED('create_z_base', '', list)}$
+
+		auto aoreg = (*c_aoloader).get().get_registry();
+		
+		int nprint = (c_print) ? *c_print : 0;
+	
+		dbcsr::sbtensor<3,double> eri3c2e_batched;
+		
+		switch (*c_metric) {
+			case ints::metric::coulomb: {
+				eri3c2e_batched = aoreg
+					.get<dbcsr::sbtensor<3,double>>(ints::key::coul_xbb);
+				break;
+			}
+			case ints::metric::erfc_coulomb: {
+				eri3c2e_batched = aoreg
+					.get<dbcsr::sbtensor<3,double>>(ints::key::erfc_xbb);	
+				break;
+			}
+			case ints::metric::qr_fit: {
+				eri3c2e_batched = aoreg
+					.get<dbcsr::sbtensor<3,double>>(ints::key::qr_xbb);
+				break;
+			}
+			default: {
+				throw std::runtime_error("Invalid metric for z builder.");
+			}
+		}
+		
+		std::shared_ptr<Z> zbuilder;
+		
+		if (c_method == zmethod::llmp_full) {
+		
+			zbuilder = LLMP_FULL_Z::create()
+				.world(c_set_world)
+				.molecule(c_molecule)
+				.print((c_print) ? *c_print : 0)
+				.eri3c2e_batched(eri3c2e_batched)
+				.intermeds((c_btype_intermeds) ? 
+					*c_btype_intermeds : dbcsr::btype::core)
+				.build();
+			
+		} else if (c_method == zmethod::llmp_mem) {
+			
+			zbuilder = LLMP_MEM_Z::create()
+				.world(c_set_world)
+				.molecule(c_molecule)
+				.print((c_print) ? *c_print : 0)
+				.eri3c2e_batched(eri3c2e_batched)
+				.build();
+			
+		}
+		
+		return zbuilder;
+		
+	}
+	
+};
+
+inline create_z_base create_z() { return create_z_base(); }
 
 } // end namespace
 

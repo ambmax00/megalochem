@@ -120,62 +120,78 @@ void mpmod::compute() {
 	//==================================================================
 	//                        INTEGRALS
 	//==================================================================
+	
+	// integral machine
+	
+	std::optional<int> nbatches_b_opt = m_opt.present("nbatches_b") ? 
+		std::make_optional<int>(m_opt.get<int>("nbatches_b")) : 
+		std::nullopt;
+		
+	std::optional<int> nbatches_x_opt = m_opt.present("nbatches_x") ? 
+		std::make_optional<int>(m_opt.get<int>("nbatches_x")) : 
+		std::nullopt;
+		
+	std::optional<dbcsr::btype> btype_e = m_opt.present("eris") ?
+		std::make_optional<dbcsr::btype>(dbcsr::get_btype(m_opt.get<std::string>("eris"))) :
+		std::nullopt;
+		
+	std::optional<dbcsr::btype> btype_i = m_opt.present("intermeds") ?
+		std::make_optional<dbcsr::btype>(dbcsr::get_btype(m_opt.get<std::string>("intermeds"))) :
+		std::nullopt;
+	
+	std::shared_ptr<ints::aoloader> ao
+		= ints::aoloader::create()
+		.set_world(m_world)
+		.molecule(mol)
+		.print(LOG.global_plev())
+		.nbatches_b(nbatches_b_opt)
+		.nbatches_x(nbatches_x_opt)
+		.btype_eris(btype_e)
+		.btype_intermeds(btype_i)
+		.build();
 
-	std::string metric_str = m_opt.get<std::string>("df_metric", MP_METRIC);
-	ints::metric coulmet = ints::str_to_metric(metric_str);
-	
-	ints::aoloader aoload(m_world, m_hfwfn->mol(), m_opt);
-	
-	if (coulmet == ints::metric::coulomb) {
+	auto zmeth = str_to_zmethod(
+		m_opt.get<std::string>("build_Z", MP_BUILD_Z));
 		
-		aoload.request(ints::key::coul_xx, false);
-		aoload.request(ints::key::coul_xx_inv, true);
-		aoload.request(ints::key::scr_xbb, true);
-		aoload.request(ints::key::coul_xbb, true);
-		
-	} else if (coulmet == ints::metric::erfc_coulomb) {
-		
-		aoload.request(ints::key::erfc_xx, false);
-		aoload.request(ints::key::coul_xx, false);
-		aoload.request(ints::key::erfc_xx_inv, true);
-		aoload.request(ints::key::scr_xbb, true);
-		aoload.request(ints::key::erfc_xbb, true);
-		
-	} else if (coulmet == ints::metric::qr_fit) {
-		
-		aoload.request(ints::key::coul_xx, true);
-		aoload.request(ints::key::ovlp_xx, false);
-		aoload.request(ints::key::ovlp_xx_inv, false);
-		aoload.request(ints::key::scr_xbb, true);
-		aoload.request(ints::key::qr_xbb, true);
-		
-	}
+	auto zmetr = ints::str_to_metric(
+		m_opt.get<std::string>("metric", MP_METRIC));
 	
 	#ifdef _ORTHOGONALIZE
-	aoload.request(ints::key::ovlp_bb, true);
+	ao->request(ints::key::ovlp_bb, true);
 	#endif
-
-	aoload.compute();
-	auto aoreg = aoload.get_registry();
 	
-	dbcsr::sbtensor<3,double> eri3c2e_batched;
+	load_zints(zmeth, zmetr, *ao);
+
+	ao->compute();
+	
+	auto zbuilder = create_z()
+		.set_world(m_world)
+		.molecule(mol)
+		.print(LOG.global_plev())
+		.aoloader(*ao)
+		.method(zmeth)
+		.metric(zmetr)
+		.build();
+	
+	auto& aoreg = ao->get_registry();
 	dbcsr::shared_matrix<double> metric_matrix;
 	
-	if (coulmet == ints::metric::coulomb) {
+	switch (zmetr) {
+		case ints::metric::coulomb:
+			metric_matrix = aoreg.get<dbcsr::shared_matrix<double>>(
+				ints::key::coul_xx_inv);
+			break;	
+				
+		case ints::metric::erfc_coulomb:
+			metric_matrix = aoreg.get<dbcsr::shared_matrix<double>>(
+				ints::key::erfc_xx_inv);
+			break;
 		
-		eri3c2e_batched = aoreg.get<dbcsr::sbtensor<3,double>>(ints::key::coul_xbb);
-		metric_matrix = aoreg.get<dbcsr::shared_matrix<double>>(ints::key::coul_xx_inv);
-		
-	} else if (coulmet == ints::metric::erfc_coulomb) {
-		
-		eri3c2e_batched = aoreg.get<dbcsr::sbtensor<3,double>>(ints::key::erfc_xbb);
-		metric_matrix = aoreg.get<dbcsr::shared_matrix<double>>(ints::key::erfc_xx_inv);
-		
-	} else if (coulmet == ints::metric::qr_fit) {
-		
-		eri3c2e_batched = aoreg.get<dbcsr::sbtensor<3,double>>(ints::key::qr_xbb);
-		metric_matrix = aoreg.get<dbcsr::shared_matrix<double>>(ints::key::coul_xx);
-		
+		case ints::metric::qr_fit:
+			metric_matrix = aoreg.get<dbcsr::shared_matrix<double>>(
+				ints::key::coul_xx);
+			break;
+			
 	}
 	
 	#ifdef _ORTHOGONALIZE
@@ -190,11 +206,6 @@ void mpmod::compute() {
 	auto Sllt_inv_bb = lltsolver.L_inv(b);
 	s_bb->release();
 	#endif
-	
-	spinfotime.start();
-	SMatrixXi spinfo = nullptr;
-	spinfo = get_shellpairs(eri3c2e_batched);
-	spinfotime.finish();
 	
 	//==================================================================
 	//                         SETUP OTHER TENSORS
@@ -227,42 +238,9 @@ void mpmod::compute() {
 	//==================================================================
 	//                          SETUP Z BUILDER 
 	//==================================================================
-	
-	std::string zmethod_str = m_opt.get<std::string>("build_Z", MP_BUILD_Z);
-	std::string intermeds_str = m_opt.get<std::string>("intermeds", MP_INTERMEDS);
-	
-	auto zmeth = str_to_zmethod(zmethod_str);
-	auto intermeds = dbcsr::get_btype(intermeds_str);
-	
-	std::shared_ptr<Z> zbuilder;
-	
-	if (zmeth == zmethod::llmp_full) {
 		
-		zbuilder = LLMP_FULL_Z::create()
-			.world(m_world)
-			.molecule(m_hfwfn->mol())
-			.print(LOG.global_plev())
-			.eri3c2e_batched(eri3c2e_batched)
-			.intermeds(intermeds)
-			.build();
-		
-	} else if (zmeth == zmethod::llmp_mem) {
-		
-		zbuilder = LLMP_MEM_Z::create()
-			.world(m_world)
-			.molecule(m_hfwfn->mol())
-			.print(LOG.global_plev())
-			.eri3c2e_batched(eri3c2e_batched)
-			.build();
-		
-	}
-	
-	if (zbuilder == nullptr) throw std::runtime_error("Invalid z builder!");
-	
 	zbuilder->init();
-	
-	zbuilder->set_shellpair_info(spinfo);
-	
+		
 	//==================================================================
 	//                      BEGIN LAPLACE QUADRATURE
 	//==================================================================
@@ -455,7 +433,7 @@ void mpmod::compute() {
 	
 	TIME.finish();
 	
-	aoload.print_info();
+	ao->print_info();
 	zbuilder->print_info();
 	TIME.print_info();
 		

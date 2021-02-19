@@ -1,7 +1,5 @@
 #include "hf/hfmod.hpp"
 #include "hf/hfdefaults.hpp"
-#include "fock/fockmod.hpp"
-#include "ints/aofactory.hpp"
 #include "math/linalg/orthogonalizer.hpp"
 #include "math/solvers/diis.hpp"
 
@@ -120,6 +118,34 @@ hfmod::hfmod(dbcsr::world w, desc::shared_molecule mol, desc::options opt)
 		
 	}
 	
+	// integral machine
+	
+	std::optional<int> nbatches_b = m_opt.present("nbatches_b") ? 
+		std::make_optional<int>(m_opt.get<int>("nbatches_b")) : 
+		std::nullopt;
+		
+	std::optional<int> nbatches_x = m_opt.present("nbatches_x") ? 
+		std::make_optional<int>(m_opt.get<int>("nbatches_x")) : 
+		std::nullopt;
+		
+	std::optional<dbcsr::btype> btype_e = m_opt.present("eris") ?
+		std::make_optional<dbcsr::btype>(dbcsr::get_btype(m_opt.get<std::string>("eris"))) :
+		std::nullopt;
+		
+	std::optional<dbcsr::btype> btype_i = m_opt.present("intermeds") ?
+		std::make_optional<dbcsr::btype>(dbcsr::get_btype(m_opt.get<std::string>("intermeds"))) :
+		std::nullopt;
+	
+	m_aoloader = ints::aoloader::create()
+		.set_world(m_world)
+		.molecule(m_mol)
+		.print(LOG.global_plev())
+		.nbatches_b(nbatches_b)
+		.nbatches_x(nbatches_x)
+		.btype_eris(btype_e)
+		.btype_intermeds(btype_i)
+		.build();
+	
 }
 
 hfmod::~hfmod() {}
@@ -202,6 +228,95 @@ void hfmod::one_electron() {
 	LOG.os<>("Done with 1 electron integrals.\n");
 	
 }
+
+void hfmod::two_electron() {
+	
+	LOG.os<>("Forming two-electron integrals...\n");
+	auto& TIME_2e = TIME.sub("Two-Electron Integrals");
+	
+	fock::jmethod jmeth = fock::str_to_jmethod(
+		m_opt.get<std::string>("build_J"));
+		
+	fock::kmethod kmeth = fock::str_to_kmethod(
+		m_opt.get<std::string>("build_K"));
+		
+	ints::metric metr = ints::str_to_metric(
+		m_opt.get<std::string>("metric", HF_METRIC));
+	
+	fock::load_jints(jmeth, metr, *m_aoloader);
+	fock::load_kints(kmeth, metr, *m_aoloader);
+	
+	m_aoloader->compute();
+	
+	std::optional<int> nocc_batches = (m_opt.present("occ_nbatches")) ?
+		m_opt.get<int>("occ_nbatches") : 1;
+	
+	m_jbuilder = fock::create_j()
+		.set_world(m_world)
+		.molecule(m_mol)
+		.print(LOG.global_plev())
+		.aoloader(*m_aoloader)
+		.method(jmeth)
+		.metric(metr)
+		.build();
+	
+	m_kbuilder = fock::create_k()
+		.set_world(m_world)
+		.molecule(m_mol)
+		.print(LOG.global_plev())
+		.aoloader(*m_aoloader)
+		.method(kmeth)
+		.metric(metr)
+		.occ_nbatches(nocc_batches)
+		.build();
+		
+	m_jbuilder->init();
+	m_kbuilder->init();
+	
+	LOG.os<>("Done with 2 electron integrals.\n");
+	
+}
+
+void hfmod::form_fock(bool SAD_iter, int rank) {
+	
+	LOG.os<>("Forming Fock matrix...\n");
+	auto& TIME_2e = TIME.sub("Computing Fock matrix");
+	
+	m_jbuilder->set_density_alpha(m_p_bb_A);
+	m_jbuilder->set_density_beta(m_p_bb_B);
+	m_jbuilder->set_coeff_alpha(m_c_bm_A);
+	m_jbuilder->set_coeff_beta(m_c_bm_B);
+	
+	m_kbuilder->set_density_alpha(m_p_bb_A);
+	m_kbuilder->set_density_beta(m_p_bb_B);
+	m_kbuilder->set_coeff_alpha(m_c_bm_A);
+	m_kbuilder->set_coeff_beta(m_c_bm_B);
+	
+	m_jbuilder->set_SAD(SAD_iter,rank);
+	m_kbuilder->set_SAD(SAD_iter,rank);
+	
+	m_jbuilder->compute_J();
+	m_kbuilder->compute_K();
+	
+	auto j_bb = m_jbuilder->get_J();
+	auto k_bb_A = m_kbuilder->get_K_A();
+	auto k_bb_B = m_kbuilder->get_K_B();
+	
+	m_f_bb_A->clear();
+	m_f_bb_A->add(1.0, 1.0, *m_core_bb);
+	m_f_bb_A->add(1.0, 1.0, *j_bb);
+	m_f_bb_A->add(1.0, 1.0, *k_bb_A);
+	
+	if (m_f_bb_B) {
+		m_f_bb_B->clear();
+		m_f_bb_A->add(1.0, 1.0, *m_core_bb);
+		m_f_bb_B->add(1.0, 1.0, *j_bb);
+		m_f_bb_B->add(1.0, 1.0, *k_bb_B);
+	}
+	
+	LOG.os<>("Done with forming Fock matrix.\n");
+	
+}
 	
 void hfmod::compute_scf_energy() {		
 	
@@ -261,6 +376,9 @@ void hfmod::compute() {
 	// first, get one-electron integrals...
 	one_electron();
 	
+	// then, get two-electron integrals
+	two_electron();
+	
 	// form the guess
 	compute_guess();
 	
@@ -273,16 +391,6 @@ void hfmod::compute() {
 	int dmax = m_opt.get<int>("diis_max_vecs", HF_DIIS_MAX_VECS);
 	int dmin = m_opt.get<int>("diis_min_vecs", HF_DIIS_MIN_VECS);
 	int dstart = m_opt.get<int>("diis_start", HF_DIIS_START);
-	
-	fock::fockmod fbuilder(m_world, m_mol, m_opt);
-	
-	fbuilder.set_density_alpha(m_p_bb_A);
-	fbuilder.set_density_beta(m_p_bb_B);
-	fbuilder.set_coeff_alpha(m_c_bm_A);
-	fbuilder.set_coeff_beta(m_c_bm_B);
-	fbuilder.set_core(m_core_bb);
-	
-	fbuilder.init();
 	
 	math::diis_helper<2> diis_A(m_world.comm(),dstart, dmin, dmax, (LOG.global_plev() >= 2) ? true : false );
 	math::diis_helper<2> diis_B(m_world.comm(),dstart, dmin, dmax, (LOG.global_plev() >= 2) ? true : false );
@@ -319,11 +427,8 @@ void hfmod::compute() {
 		bool SAD_iter = ((iter == 0) && (m_guess == "SAD" || m_guess == "SADNO")) ? true : false;
 		int rank = ((iter == 0) && (m_guess == "SAD" || m_guess == "SADNO")) ? m_SAD_rank : 0;
 		
-		fbuilder.compute(SAD_iter,rank);
+		form_fock(SAD_iter,rank);
 						
-		m_f_bb_A = fbuilder.get_f_A();
-		m_f_bb_B = fbuilder.get_f_B();
-		
 		// compute error, do diis, compute energy
 		
 		e_A = compute_errmat(m_f_bb_A, m_p_bb_A, m_s_bb, "A");
@@ -397,8 +502,9 @@ void hfmod::compute() {
 	TIME.finish();
 	
 	TIME.print_info();
-	fbuilder.print_info();
-		
+	m_jbuilder->print_info();
+	m_kbuilder->print_info();
+	
 }
 
 } // end namespace

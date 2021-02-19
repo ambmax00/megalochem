@@ -6,6 +6,8 @@
 #include "hf/hf_wfn.hpp"
 #include <dbcsr_conversions.hpp>
 #include "utils/mpi_time.hpp"
+#include "fock/jkbuilder.hpp"
+#include "ints/aofactory.hpp"
 
 #include <mpi.h>
 #include <memory>
@@ -57,8 +59,14 @@ private:
 	
 	svector<double> m_eps_A, m_eps_B;
 	
+	std::shared_ptr<ints::aoloader> m_aoloader;
+	std::shared_ptr<fock::J> m_jbuilder;
+	std::shared_ptr<fock::K> m_kbuilder;
+	
 	void compute_nucrep();
 	void one_electron();
+	void two_electron();
+	void form_fock(bool SAD_iter, int rank);
 	
 	void compute_guess();
 	dbcsr::shared_matrix<double> compute_errmat(dbcsr::shared_matrix<double>& F, 

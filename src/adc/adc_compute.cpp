@@ -816,7 +816,7 @@ adcmod::canon_lmo adcmod::get_canon_pao(dbcsr::shared_matrix<double> u_ia,
 	
 	locorb::mo_localizer moloc(m_world, m_hfwfn->mol());
 	
-	auto reg = m_ao.get_registry();
+	auto reg = m_aoloader->get_registry();
 	auto s_bb = reg.get<dbcsr::shared_matrix<double>>(ints::key::ovlp_bb);
 	
 	auto [c_br, u_or, eps_r] = moloc.compute_truncated_pao(c_bo, s_bb, eps_o, basis_blks, nullptr);

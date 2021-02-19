@@ -1,6 +1,8 @@
 #ifndef AOLOADER_H
 #define AOLOADER_H
 
+#:include "megalochem.fypp"
+
 #include <dbcsr_common.hpp>
 #include "ints/aofactory.hpp"
 #include "ints/screening.hpp"
@@ -41,14 +43,18 @@ enum class key {
 };
 	
 class aoloader {
-private:	
+private:
 	
 	dbcsr::world m_world;
-	desc::options m_opt;
+	desc::shared_molecule m_mol;
+	dbcsr::btype m_btype_eris;
+	dbcsr::btype m_btype_intermeds;
+	int m_nbatches_b;
+	int m_nbatches_x;
+	
 	util::mpi_log LOG;
 	util::mpi_time TIME;
-	desc::shared_molecule m_mol;
-
+	
 	util::key_registry<key> m_reg;
 
 	std::array<bool,static_cast<const int>(key::NUM_KEYS)> m_to_compute;
@@ -63,10 +69,27 @@ private:
 
 public:
 
-	aoloader(dbcsr::world w, desc::shared_molecule smol, desc::options opt) :
-		m_world(w), m_opt(opt), m_mol(smol),
-		LOG(w.comm(), opt.get<int>("print",0)),
-		TIME(w.comm(), "AO-loader") 
+#:set list = [&
+	['set_world', 'dbcsr::world', _REQ, _VAL],&
+	['molecule', 'desc::shared_molecule', _REQ, _VAL],&
+	['print', 'int', _OPT, _VAL],&
+	['nbatches_b', 'int', _OPT, _VAL],&
+	['nbatches_x', 'int', _OPT, _VAL],&
+	['btype_eris', 'dbcsr::btype', _OPT, _VAL],&
+	['btype_intermeds', 'dbcsr::btype', _OPT, _VAL]]
+
+${_MAKE_PARAM_STRUCT('create', list)}$
+${_MAKE_BUILDER_CLASS('aoloader', 'create', list, True)}$
+
+	aoloader(create_pack&& p) :
+		m_world(p.p_set_world), m_mol(p.p_molecule),
+		LOG(p.p_set_world.comm(), (p.p_print) ? *p.p_print : 0),
+		TIME(p.p_set_world.comm(), "AO-loader"),
+		m_btype_eris((p.p_btype_eris) ? *p.p_btype_eris : dbcsr::btype::core),
+		m_btype_intermeds((p.p_btype_intermeds) ? *p.p_btype_intermeds 
+			: dbcsr::btype::core),
+		m_nbatches_b((p.p_nbatches_b) ? *p.p_nbatches_b : 5),
+		m_nbatches_x((p.p_nbatches_x) ? *p.p_nbatches_x : 5)
 	{
 		for (auto& a : m_to_compute) a = false;		
 		for (auto& a : m_to_keep) a = false;

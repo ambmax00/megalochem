@@ -9,13 +9,19 @@ set(SOURCES
 	fitting.cpp
 	fitting_pari.cpp
 	fitting_qr.cpp
-	aoloader.hpp
 	aoloader.cpp
 )
 
-set_source_files_properties(fitting_qr.cpp PROPERTIES COMPILE_FLAGS -fno-math-errno)
+set(FYPP_SOURCES
+        aoloader.hpp.fypp
+)
+
+add_fypp_sources(HEADERS chem_ints_fypp ${FYPP_SOURCES})
 
 add_library(chem_ints ${SOURCES})
+add_dependencies(chem_ints chem_ints_fypp)
+
+set_source_files_properties(fitting_qr.cpp PROPERTIES COMPILE_FLAGS -fno-math-errno)
 
 target_include_directories(
 	chem_ints

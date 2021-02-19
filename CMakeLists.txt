@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.14 FATAL_ERROR)
+cmake_minimum_required(VERSION 3.17 FATAL_ERROR)
 
 project(chem)
 enable_language(Fortran CXX)
@@ -8,7 +8,6 @@ set(CMAKE_CXX_STANDARD 17)
 
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} ${CMAKE_SOURCE_DIR}/cmake/modules)
 
-set(FYPP_INCLUDE_DIR ${CMAKE_SOURCE_DIR}/src/utils)
 include(fypp_sources)
 
 find_package(Eigen3 REQUIRED NO_MODULE)

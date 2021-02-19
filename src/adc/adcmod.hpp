@@ -30,7 +30,7 @@ private:
 	util::mpi_time TIME;
 	util::mpi_log LOG;
 	
-	ints::aoloader m_ao;
+	std::shared_ptr<ints::aoloader> m_aoloader;
 	
 	dbcsr::shared_pgrid<2> m_spgrid2;
 	dbcsr::shared_pgrid<2> m_spgrid2_bo;

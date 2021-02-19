@@ -26,6 +26,9 @@ void LLMP_MEM_Z::init() {
 		.map1({0}).map2({1})
 		.blk_sizes(xx)
 		.build();
+	
+	LOG.os<1>("Computing shellpir info...\n");
+	m_shellpair_info = get_shellpairs(m_eri3c2e_batched);
 		
 }
 

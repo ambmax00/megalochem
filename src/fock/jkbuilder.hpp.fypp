@@ -590,7 +590,7 @@ inline void load_kints(kmethod kmet, ints::metric metr, ints::aoloader& ao) {
 }
 
 #:set list = [&
-	['world', 'dbcsr::world', _REQ, _VAL],&
+	['set_world', 'dbcsr::world', _REQ, _VAL],&
 	['molecule', 'desc::shared_molecule', _REQ, _VAL],&
 	['method', 'jmethod', _REQ, _VAL],&
 	['aoloader', 'ints::aoloader', _REQ, _REF],&
@@ -619,7 +619,7 @@ public:
 			auto eris = aoreg.get<dbcsr::sbtensor<4,double>>(ints::key::coul_bbbb);
 			
 			jbuilder = EXACT_J::create()
-				.world(*c_world)
+				.world(*c_set_world)
 				.molecule(*c_molecule)
 				.print(nprint)
 				.eri4c2e_batched(eris)
@@ -653,7 +653,7 @@ public:
 			}
 			
 			jbuilder = DF_J::create()
-				.world(*c_world)
+				.world(*c_set_world)
 				.molecule(*c_molecule)
 				.print(nprint)
 				.eri3c2e_batched(eris)
@@ -671,7 +671,7 @@ public:
 inline create_j_base create_j() { return create_j_base(); }
 
 #:set list = [&
-	['world', 'dbcsr::world', _REQ, _VAL],&
+	['set_world', 'dbcsr::world', _REQ, _VAL],&
 	['molecule', 'desc::shared_molecule', _REQ, _VAL],&
 	['method', 'kmethod', _REQ, _VAL],&
 	['aoloader', 'ints::aoloader', _REQ, _REF],&
@@ -703,7 +703,7 @@ public:
 			auto eris = aoreg.get<dbcsr::sbtensor<4,double>>(ints::key::coul_bbbb);
 			
 			kbuilder = EXACT_K::create()
-				.world(*c_world)
+				.world(*c_set_world)
 				.molecule(*c_molecule)
 				.print(nprint)
 				.eri4c2e_batched(eris)
@@ -734,7 +734,7 @@ public:
 			}
 			
 			kbuilder = DFAO_K::create()
-				.world(*c_world)
+				.world(*c_set_world)
 				.molecule(*c_molecule)
 				.print(nprint)
 				.eri3c2e_batched(eris)
@@ -747,7 +747,7 @@ public:
 			auto invsqrt = aoreg.get<dbcsr::shared_matrix<double>>(ints::key::coul_xx_invsqrt);
 			
 			kbuilder = DFMO_K::create()
-				.world(*c_world)
+				.world(*c_set_world)
 				.molecule(*c_molecule)
 				.print(nprint)
 				.eri3c2e_batched(eris)
@@ -781,7 +781,7 @@ public:
 			
 			if (*c_method == kmethod::dfmem) {
 				kbuilder = DFMEM_K::create()
-					.world(*c_world)
+					.world(*c_set_world)
 					.molecule(*c_molecule)
 					.print(nprint)
 					.eri3c2e_batched(eris)
@@ -790,7 +790,7 @@ public:
 					
 			} else {
 				kbuilder = DFLMO_K::create()
-					.world(*c_world)
+					.world(*c_set_world)
 					.molecule(*c_molecule)
 					.print(nprint)
 					.eri3c2e_batched(eris)
@@ -807,7 +807,7 @@ public:
 			auto v_xx = aoreg.get<dbcsr::shared_matrix<double>>(ints::key::coul_xx);
 			
 			kbuilder = DFROBUST_K::create()
-				.world(*c_world)
+				.world(*c_set_world)
 				.molecule(*c_molecule)
 				.print(nprint)
 				.eri3c2e_batched(eris)

@@ -172,15 +172,17 @@ private:
 	
 public:
 	#:for name,type,reqopt,refval in params
+		template <typename T>
 		inline ${structname}$_base& 
-		${name}$(${_TYPE_SIMPLE(type,refval)}$ i_${name}$) {
-			c_${name}$.emplace(i_${name}$);
+		${name}$(T&& param) {
+			c_${name}$ = param;
+			//c_${name}$.emplace(std::forward<Params>(params)...);
 			return *this;
 		}
 	#:endfor
 #:enddef
 
-#:def _CHECK_REQUIRED(classname, structname, params) 
+#:def _CHECK_REQUIRED(classname, structname, params)
 #:for name,type,reqopt,refval in params
 	#:if reqopt == "required"
 	if (!c_${name}$) {
@@ -214,9 +216,11 @@ private:
 	
 	public:
 	#:for name,type,reqopt,refval in params
+		template <typename T>
 		inline ${structname}$_base& 
-		${name}$(${_TYPE_SIMPLE(type,refval)}$ i_${name}$) {
-			c_${name}$.emplace(i_${name}$);
+		${name}$(T&& param) {
+			c_${name}$ = param;
+			//c_${name}$.emplace(std::forward<Params>(params)...);
 			return *this;
 		}
 	#:endfor

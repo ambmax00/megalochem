@@ -14,7 +14,6 @@ adcmod::adcmod(dbcsr::world w, hf::shared_hf_wfn hfref, desc::options& opt) :
 	m_hfwfn(hfref), 
 	m_opt(opt), 
 	m_world(w),
-	m_ao(w, hfref->mol(), opt),
 	LOG(w.comm(), m_opt.get<int>("print", ADC_PRINT_LEVEL)),
 	TIME(w.comm(), "ADC Module", LOG.global_plev())
 {
@@ -30,6 +29,32 @@ adcmod::adcmod(dbcsr::world w, hf::shared_hf_wfn hfref, desc::options& opt) :
 	auto dfbasis = std::make_shared<desc::cluster_basis>(
 		dfbasname, atoms, splitmethod, nsplit, augmented);
 	m_hfwfn->mol()->set_cluster_dfbasis(dfbasis);
+	
+	std::optional<int> nbatches_b_opt = m_opt.present("nbatches_b") ? 
+		std::make_optional<int>(m_opt.get<int>("nbatches_b")) : 
+		std::nullopt;
+		
+	std::optional<int> nbatches_x_opt = m_opt.present("nbatches_x") ? 
+		std::make_optional<int>(m_opt.get<int>("nbatches_x")) : 
+		std::nullopt;
+		
+	std::optional<dbcsr::btype> btype_e = m_opt.present("eris") ?
+		std::make_optional<dbcsr::btype>(dbcsr::get_btype(m_opt.get<std::string>("eris"))) :
+		std::nullopt;
+		
+	std::optional<dbcsr::btype> btype_i = m_opt.present("intermeds") ?
+		std::make_optional<dbcsr::btype>(dbcsr::get_btype(m_opt.get<std::string>("intermeds"))) :
+		std::nullopt;
+	
+	m_aoloader = ints::aoloader::create()
+		.set_world(m_world)
+		.molecule(m_hfwfn->mol())
+		.print(LOG.global_plev())
+		.nbatches_b(nbatches_b_opt)
+		.nbatches_x(nbatches_x_opt)
+		.btype_eris(btype_e)
+		.btype_intermeds(btype_i)
+		.build();
 	
 	init_ao_tensors();
 	
@@ -54,8 +79,8 @@ void adcmod::init_ao_tensors() {
 	auto kmet_adc1 = fock::str_to_kmethod(kstr_adc1);
 	auto metr_adc1 = ints::str_to_metric(mstr_adc1);
 	
-	fock::load_jints(jmet_adc1, metr_adc1, m_ao);
-	fock::load_kints(kmet_adc1, metr_adc1, m_ao);
+	fock::load_jints(jmet_adc1, metr_adc1, *m_aoloader);
+	fock::load_kints(kmet_adc1, metr_adc1, *m_aoloader);
 	
 	bool do_adc2 = m_opt.get<bool>("do_adc2",ADC_DO_ADC2);
 	
@@ -77,24 +102,24 @@ void adcmod::init_ao_tensors() {
 			
 			auto metr_adc2 = ints::str_to_metric(mstr_adc2);
 		
-			fock::load_jints(jmet_adc2, metr_adc2, m_ao);
-			fock::load_kints(kmet_adc2, metr_adc2, m_ao);
+			fock::load_jints(jmet_adc2, metr_adc2, *m_aoloader);
+			fock::load_kints(kmet_adc2, metr_adc2, *m_aoloader);
 		
 		} else {
 			
-			m_ao.request(ints::key::coul_xx, true);
+			m_aoloader->request(ints::key::coul_xx, true);
 		
 		}	
 		
 		// overlap always needed
-		m_ao.request(ints::key::ovlp_bb, true);
+		m_aoloader->request(ints::key::ovlp_bb, true);
 		
 	}
 	
-	m_ao.request(ints::key::ovlp_bb, true);
+	m_aoloader->request(ints::key::ovlp_bb, true);
 	int nprint = LOG.global_plev();
 
-	m_ao.compute();
+	m_aoloader->compute();
 	
 }
 
@@ -106,10 +131,8 @@ std::shared_ptr<MVP> adcmod::create_adc1() {
 	auto jmeth = fock::str_to_jmethod(m_opt.get<std::string>("adc1/jmethod", ADC_ADC1_JMETHOD));
 	auto kmeth = fock::str_to_kmethod(m_opt.get<std::string>("adc1/kmethod", ADC_ADC1_KMETHOD));
 	auto metr = ints::str_to_metric(m_opt.get<std::string>("adc1/df_metric", ADC_ADC1_DF_METRIC));
-	
-	std::cout << "K: " << m_opt.get<std::string>("adc1/df_metric", ADC_ADC1_DF_METRIC) << std::endl;
-	
-	auto aoreg = m_ao.get_registry();
+		
+	auto aoreg = m_aoloader->get_registry();
 	
 	auto get = [&aoreg](auto& tensor, ints::key aokey) {
 		if (aoreg.present(aokey)) {
@@ -189,7 +212,7 @@ std::shared_ptr<MVP> adcmod::create_adc2(std::optional<canon_lmo> clmo) {
 	int nlap = m_opt.get<int>("adc2/nlap", ADC_ADC2_NLAP);
 	
 	auto metr = ints::str_to_metric(m_opt.get<std::string>("adc2/df_metric", ADC_ADC2_DF_METRIC));
-	auto aoreg = m_ao.get_registry();
+	auto aoreg = m_aoloader->get_registry();
 	
 	auto get = [&aoreg](auto& tensor, ints::key aokey) {
 		if (aoreg.present(aokey)) {
