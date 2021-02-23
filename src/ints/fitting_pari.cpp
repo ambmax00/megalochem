@@ -415,7 +415,6 @@ dbcsr::sbtensor<3,double> dfitting::compute_pari(dbcsr::shared_matrix<double> s_
 	TIME.finish();
 	
 	double occupation = c_xbb_batched->occupation() * 100;
-	LOG.os<>("Occupation of PARI fitting coefficients: ", occupation, "%\n");
 	
 	if (occupation > 100) throw std::runtime_error(
 		"Fitting coefficients occupation more than 100%");

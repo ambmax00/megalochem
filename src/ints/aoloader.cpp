@@ -391,8 +391,7 @@ void aoloader::compute() {
 		
 		double eri_occupation = eri_batched->occupation() * 100;
 		
-		LOG.os<1>("Occupation of 3c2e integrals: ", eri_occupation, "%\n");
-		LOG.os<>("Done computing 3c2e integrals.\n\n");
+		if (LOG.global_plev() > 0) eri_batched->print_info();
 		
 		if (eri_occupation > 100) throw std::runtime_error(
 			"3c2e integrals occupation more than 100%");
@@ -416,9 +415,7 @@ void aoloader::compute() {
 			k_eri = key::erfc_xbb;
 			k_inv = key::erfc_xx_inv;
 		}
-		
-		//LOG.os<1>("Computing fitting coefficients.\n");
-		
+				
 		auto eri_batched = m_reg.get<sbt3>(k_eri);
 		auto inv = m_reg.get<smatd>(k_inv);
 		
@@ -428,6 +425,8 @@ void aoloader::compute() {
 		if (comp(key::dfit_erfc_xbb)) m_reg.insert(key::dfit_erfc_xbb, c_xbb_batched);
 		
 		auto mat = dfit.compute_idx(c_xbb_batched);
+		
+		if (LOG.global_plev() > 0) c_xbb_batched->print_info();
 		
 		time.finish();
 		
@@ -449,6 +448,8 @@ void aoloader::compute() {
 		auto c_xbb_pari = dfit.compute_pari(m_xx, scr, bdims, m_btype_intermeds);
 				
 		m_reg.insert(key::pari_xbb, c_xbb_pari);
+		
+		if (LOG.global_plev() > 0) c_xbb_pari->print_info();
 	
 		time.finish();
 	
@@ -473,6 +474,8 @@ void aoloader::compute() {
 		m_reg.insert(key::qr_xbb, c_xbb_qr);
 		
 		auto mat = dfit.compute_idx(c_xbb_qr);
+		
+		if (LOG.global_plev() > 0) c_xbb_qr->print_info();
 			
 		time.finish();
 	
@@ -496,6 +499,8 @@ void aoloader::compute() {
 		
 		auto mat = dfit.compute_idx(c_xbb_batched);
 		
+		if (LOG.global_plev() > 0) c_xbb_batched->print_info();
+		
 		time.finish();
 		
 	}
@@ -515,6 +520,8 @@ void aoloader::compute() {
 		auto c_xbb_batched = dfit.compute(pari_batched, v, m_btype_intermeds);
 						
 		m_reg.insert(key::dfit_pari_xbb, c_xbb_batched);
+		
+		if (LOG.global_plev() > 0) c_xbb_batched->print_info();
 		
 		time.finish();
 		

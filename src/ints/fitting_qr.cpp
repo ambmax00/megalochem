@@ -732,7 +732,6 @@ dbcsr::sbtensor<3,double> dfitting::compute_qr_new(dbcsr::shared_matrix<double> 
 	c_xbb_batched->compress_finalize();
 	
 	double occupation = c_xbb_batched->occupation() * 100;
-	LOG.os<>("Occupation of QR fitting coefficients: ", occupation, "%\n");
 	
 	if (occupation > 100) throw std::runtime_error(
 		"Fitting coefficients occupation more than 100%");

@@ -155,7 +155,6 @@ dbcsr::sbtensor<3,double> dfitting::compute(dbcsr::sbtensor<3,double> eri_batche
 	//dbcsr::print(*cw);
 	
 	double cfit_occupation = c_xbb_batched->occupation() * 100;
-	LOG.os<1>("Occupancy of c_xbb: ", cfit_occupation, "%\n");
 	
 	if (cfit_occupation > 100) throw std::runtime_error(
 		"Fitting coefficients occupation more than 100%");
