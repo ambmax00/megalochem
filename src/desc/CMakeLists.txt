@@ -15,7 +15,7 @@ set(FYPP_SOURCES
 	molecule.hpp.fypp
 )
 
-add_fypp_sources(HEADERS chem_desc_fypp ${FYPP_SOURCES})
+add_fypp_sources(HEADERS GEN_DIR chem_desc_fypp ${FYPP_SOURCES})
 
 add_library(chem_desc ${SOURCES})
 add_dependencies(chem_desc chem_desc_fypp)

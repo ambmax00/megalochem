@@ -40,7 +40,7 @@ public:
     
     void perform() {
             
-        int* fbounds = (c_bounds) ? unfold_bounds<int>(c_bounds->get()) : nullptr;
+        int* fbounds = (c_bounds) ? unfold_bounds<int>(*c_bounds) : nullptr;
         
         c_dbcsr_t_copy(c_t_in.m_tensor_ptr, N, c_t_out.m_tensor_ptr,
             (c_order) ? c_order->data() : nullptr, 
@@ -102,14 +102,14 @@ public:
     
 		${_CHECK_REQUIRED('tensor_contract', '', list)}$ 
         
-        int* f_b1 = (c_bounds1) ? unfold_bounds<int>(c_bounds1->get()) : nullptr;
-        int* f_b2 = (c_bounds2) ? unfold_bounds<int>(c_bounds2->get()) : nullptr;
-        int* f_b3 = (c_bounds3) ? unfold_bounds<int>(c_bounds3->get()) : nullptr;
+        int* f_b1 = (c_bounds1) ? unfold_bounds<int>(*c_bounds1) : nullptr;
+        int* f_b2 = (c_bounds2) ? unfold_bounds<int>(*c_bounds2) : nullptr;
+        int* f_b3 = (c_bounds3) ? unfold_bounds<int>(*c_bounds3) : nullptr;
         
         if (
-			(c_bounds1 && c_bounds1->get().size() != c_con1->size()) ||
-			(c_bounds2 && c_bounds2->get().size() != c_ncon1->size()) ||
-			(c_bounds3 && c_bounds3->get().size() != c_ncon2->size()) 
+			(c_bounds1 && c_bounds1->size() != c_con1->size()) ||
+			(c_bounds2 && c_bounds2->size() != c_ncon1->size()) ||
+			(c_bounds3 && c_bounds3->size() != c_ncon2->size()) 
 		){
 			throw std::runtime_error("Wrong bound dimensions.");
 		}
@@ -134,7 +134,7 @@ public:
             f_b1, f_b2, f_b3,
             nullptr, nullptr, nullptr, nullptr, 
             (c_filter) ? &*c_filter : nullptr,
-            (c_flop) ? &(c_flop->get()) : nullptr,
+            (c_flop) ? &(*c_flop) : nullptr,
             (c_move) ? &*c_move : nullptr,
             (c_retain_sparsity) ? &*c_retain_sparsity : nullptr,
             unit_nr, (c_log) ? &*c_log : nullptr);

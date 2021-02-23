@@ -10,7 +10,7 @@ set(FYPP_SOURCES
         z_builder.hpp.fypp
 )
 
-add_fypp_sources(HEADERS chem_mp_fypp ${FYPP_SOURCES})
+add_fypp_sources(HEADERS GEN_DIR chem_mp_fypp ${FYPP_SOURCES})
 
 add_library(chem_mp ${SOURCES})
 add_dependencies(chem_mp chem_mp_fypp)

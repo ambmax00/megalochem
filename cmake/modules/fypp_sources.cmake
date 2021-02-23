@@ -9,7 +9,7 @@ if (NOT EXISTS "${GENERATED_DIR}")
 	file(MAKE_DIRECTORY "${GENERATED_DIR}")
 endif()
 
-function (ADD_FYPP_SOURCES OUTVAR FYPP_TARGET) 
+function (ADD_FYPP_SOURCES OUTVAR OUTDIR FYPP_TARGET) 
 	
 	set(outfiles)
 
@@ -26,8 +26,6 @@ function (ADD_FYPP_SOURCES OUTVAR FYPP_TARGET)
 
 		get_filename_component(root "${file}" NAME_WE)
 		get_filename_component(extension "${file}" EXT)
-
-		message("PATH ${GENERATED_SUBDIR}")
 
 		if (${extension} STREQUAL ".hpp.fypp")
 			set(new_extension ".hpp")
@@ -54,6 +52,8 @@ function (ADD_FYPP_SOURCES OUTVAR FYPP_TARGET)
 	endforeach()
 
 	add_custom_target("${FYPP_TARGET}" ALL DEPENDS "${outfiles}")
-	set(OUTVAR "${outfiles}")
+	
+	set(${OUTVAR} ${outfiles} PARENT_SCOPE)
+	set(${OUTDIR} ${GENERATED_SUBDIR} PARENT_SCOPE)
 
 endfunction()

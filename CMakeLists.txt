@@ -39,8 +39,6 @@ get_target_property(DBCSR_INCLUDE_DIRS DBCSR::dbcsr INTERFACE_INCLUDE_DIRECTORIE
 include_directories(
 	${DBCSR_INCLUDE_DIRS} 
 	${MPI_CXX_HEADER_DIR} 
-	#${CMAKE_CURRENT_BINARY_DIR} 
-	#${CMAKE_CURRENT_SOURCE_DIR}
 )
 
 add_subdirectory(src)

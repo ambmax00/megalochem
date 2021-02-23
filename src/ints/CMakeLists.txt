@@ -16,7 +16,7 @@ set(FYPP_SOURCES
         aoloader.hpp.fypp
 )
 
-add_fypp_sources(HEADERS chem_ints_fypp ${FYPP_SOURCES})
+add_fypp_sources(HEADERS GEN_DIR chem_ints_fypp ${FYPP_SOURCES})
 
 add_library(chem_ints ${SOURCES})
 add_dependencies(chem_ints chem_ints_fypp)

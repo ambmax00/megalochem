@@ -610,7 +610,7 @@ public:
 		${_CHECK_REQUIRED('create_j', '', list)}$
 
 		std::shared_ptr<J> jbuilder;
-		auto aoreg = (*c_aoloader).get().get_registry();
+		auto aoreg = c_aoloader->get_registry();
 		
 		int nprint = (c_print) ? *c_print : 0;
 	
@@ -692,7 +692,7 @@ public:
 		${_CHECK_REQUIRED('create_k_base', '', list)}$
 
 		std::shared_ptr<K> kbuilder;
-		auto aoreg = (*c_aoloader).get().get_registry();
+		auto aoreg = c_aoloader->get_registry();
 		
 		int nprint = (c_print) ? *c_print : 0;
 		int nobatches = (c_occ_nbatches) ? *c_occ_nbatches : 1;

@@ -125,7 +125,7 @@ ${_MAKE_BUILDER_CLASS('matrix', 'create', create_list, True)}$
 	matrix(create_pack&& p) : m_matrix_ptr(nullptr) {
 		
 		m_world = (p.p_set_world) ? (*p.p_set_world) : 
-			(*p.p_set_dist).get().m_world;
+			(*p.p_set_dist).m_world;
 		
         dist* dist_ptr = nullptr;
         
@@ -148,7 +148,7 @@ ${_MAKE_BUILDER_CLASS('matrix', 'create', create_list, True)}$
 				
         } else {
         
-            dist_ptr = &(p.p_set_dist->get());
+            dist_ptr = &(*p.p_set_dist);
         
         }
         
@@ -200,12 +200,12 @@ ${_MAKE_BUILDER_CLASS('matrix', 'create_template', list, True, init_list)}$
  
         c_dbcsr_create_template(&m_matrix_ptr, 
 			p.p_name.c_str(), p.p_templet.m_matrix_ptr, 
-			(p.p_set_dist) ? p.p_set_dist->get().m_dist_ptr : nullptr, 
+			(p.p_set_dist) ? p.p_set_dist->m_dist_ptr : nullptr, 
 			(p.p_matrix_type) ? &mat_type : nullptr, 
-			(p.p_row_blk_sizes) ? p.p_row_blk_sizes->get().data() : nullptr,
-			(p.p_row_blk_sizes) ? p.p_row_blk_sizes->get().size() : 0,
-			(p.p_col_blk_sizes) ? p.p_col_blk_sizes->get().data() : nullptr,
-			(p.p_col_blk_sizes) ? p.p_col_blk_sizes->get().size() : 0,
+			(p.p_row_blk_sizes) ? p.p_row_blk_sizes->data() : nullptr,
+			(p.p_row_blk_sizes) ? p.p_row_blk_sizes->size() : 0,
+			(p.p_col_blk_sizes) ? p.p_col_blk_sizes->data() : nullptr,
+			(p.p_col_blk_sizes) ? p.p_col_blk_sizes->size() : 0,
 			(p.p_nze) ? &*p.p_nze : nullptr, &m_data_type, 
 			(p.p_reuse_arrays) ? &*p.p_reuse_arrays : nullptr, 
 			(p.p_mutable_work) ? &*p.p_mutable_work : nullptr, 
@@ -651,13 +651,13 @@ using shared_matrix = std::shared_ptr<matrix<T>>;
 
 template <typename T>
 class iterator {
-#:set list = [&
+/*#:set list = [&
     ['shared', 'bool', 'optional', 'val'],&
     ['dynamic', 'bool', 'optional', 'val'],&
     ['dynamic_byrows', 'bool', 'optional', 'val'],&
     ['contiguous_ptrs', 'bool', 'optional', 'val'],&
     ['read_only', 'bool', 'optional', 'val']]
-    ${make_param('iterator',list)}$
+*/
 
 private:
     void* m_iter_ptr;
@@ -682,11 +682,12 @@ public:
     void start() {
         
         c_dbcsr_iterator_start(&m_iter_ptr, m_matrix_ptr, 
-                                (c_shared) ? &*c_shared : nullptr, 
+			nullptr, nullptr, nullptr, nullptr, nullptr);
+                                /*(c_shared) ? &*c_shared : nullptr, 
                                 (c_dynamic) ? &*c_dynamic : nullptr, 
                                 (c_dynamic_byrows) ? &*c_dynamic_byrows : nullptr, 
                                 (c_contiguous_ptrs) ? &*c_shared : nullptr, 
-                                (c_read_only) ? &*c_shared : nullptr);
+                                (c_read_only) ? &*c_shared : nullptr);*/
                                 
     }
 

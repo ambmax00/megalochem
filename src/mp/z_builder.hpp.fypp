@@ -300,7 +300,7 @@ public:
 	
 		${_CHECK_REQUIRED('create_z_base', '', list)}$
 
-		auto aoreg = (*c_aoloader).get().get_registry();
+		auto aoreg = c_aoloader->get_registry();
 		
 		int nprint = (c_print) ? *c_print : 0;
 	
@@ -329,7 +329,7 @@ public:
 		
 		std::shared_ptr<Z> zbuilder;
 		
-		if (c_method == zmethod::llmp_full) {
+		if (*c_method == zmethod::llmp_full) {
 		
 			zbuilder = LLMP_FULL_Z::create()
 				.world(c_set_world)
@@ -340,7 +340,7 @@ public:
 					*c_btype_intermeds : dbcsr::btype::core)
 				.build();
 			
-		} else if (c_method == zmethod::llmp_mem) {
+		} else if (*c_method == zmethod::llmp_mem) {
 			
 			zbuilder = LLMP_MEM_Z::create()
 				.world(c_set_world)

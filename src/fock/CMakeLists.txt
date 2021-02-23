@@ -9,7 +9,7 @@ set(FYPP_SOURCES
 	jkbuilder.hpp.fypp
 )
 
-add_fypp_sources(HEADERS chem_fock_fypp ${FYPP_SOURCES})
+add_fypp_sources(HEADERS GEN_DIR chem_fock_fypp ${FYPP_SOURCES})
 
 add_library(chem_fock ${SOURCES})
 add_dependencies(chem_fock chem_fock_fypp)

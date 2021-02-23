@@ -234,13 +234,13 @@ ${_MAKE_BUILDER_CLASS('tensor', 'create', list, True)}$
 		
 		if (p.p_set_dist) {
 			
-			dist_ptr = p.p_set_dist->get().m_dist_ptr;
-            m_comm = p.p_set_dist->get().m_comm;
+			dist_ptr = p.p_set_dist->m_dist_ptr;
+            m_comm = p.p_set_dist->m_comm;
 			
 		} else {
 			
 			arrvec<int,M> distvecs;
-			auto pgrid_dims = p.p_set_pgrid->get().dims();
+			auto pgrid_dims = p.p_set_pgrid->dims();
 			
 			for (int i = 0; i != M; ++i) {
 				distvecs[i] = default_dist(p.p_blk_sizes[i].size(),
@@ -248,7 +248,7 @@ ${_MAKE_BUILDER_CLASS('tensor', 'create', list, True)}$
 			}
 			
 			distn = dist_t<M>::create()
-					.set_pgrid(p.p_set_pgrid->get())
+					.set_pgrid(*p.p_set_pgrid)
 					.nd_dists(distvecs)
 					.build();
 				
@@ -289,7 +289,7 @@ ${_MAKE_BUILDER_CLASS('tensor', 'create_template', list, True, init_list)}$
 		c_dbcsr_t_create_template(p.p_templet.m_tensor_ptr, 
 			&m_tensor_ptr, 
             p.p_name.c_str(), 
-            (p.p_ndist) ? p.p_ndist->get().m_dist_ptr : nullptr,
+            (p.p_ndist) ? p.p_ndist->m_dist_ptr : nullptr,
             (p.p_map1) ? p.p_map1->data() : nullptr,
             (p.p_map1) ? p.p_map1->size() : 0,
             (p.p_map2) ? p.p_map2->data() : nullptr,

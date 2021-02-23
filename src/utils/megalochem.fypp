@@ -93,9 +93,18 @@ $:    ", ".join([name + "(" + ":," * ndim_pre + str(i) + ",:"*ndim_post + ")" fo
 #:endmute
 
 #:if CPLUSPLUS == 0
+
+#ifndef MEGALOCHEM_FYPP_H
+#define MEGALOCHEM_FYPP_H
+
 #include <memory>
 #include <optional>
 #include <functional>
+#include <type_traits>
+#include "utils/optional.hpp"
+
+#endif
+
 #:endif
 
 #:mute
@@ -105,19 +114,15 @@ $:    ", ".join([name + "(" + ":," * ndim_pre + str(i) + ",:"*ndim_post + ")" fo
 #:set _VAL = "val"
 #:set _REF = "ref"
 
-#:def _TYPE_FULL(type,reqopt,refval,wrapper)
+#:def _TYPE_FULL(type,reqopt,refval)
     #:if reqopt == "required" and refval == "ref"
-		#:if not wrapper
 		$:	type + "&"
-		#:else
-		$: "std::reference_wrapper<" + type + ">"
-		#:endif
 	#:elif reqopt == "required" and refval == "val"
 		$: type
 	#:elif reqopt == "optional" and refval == "ref"
-		$: "std::optional<std::reference_wrapper<" + type + ">>"
+		$: "util::optional<" + type + "&>"
 	#:elif reqopt == "optional" and refval == "val"
-		$: "std::optional<" + type + ">"
+		$: "util::optional<" + type + ">"
 	#:else
 		#:stop 'Unknown value in _TYPE_FULL'
 	#:endif
@@ -125,9 +130,9 @@ $:    ", ".join([name + "(" + ":," * ndim_pre + str(i) + ",:"*ndim_post + ")" fo
 
 #:def _TYPE_BUILDER(type,refval)
     #:if refval == "ref"
-	$:	"std::optional<std::reference_wrapper<" + type + ">>"
+	$:	"util::optional<" + type + "&>"
 	#:elif refval == "val"
-	$:	"std::optional<" + type + ">"
+	$:	"util::optional<" + type + ">"
 	#:else
 		#:stop 'Unknown value in _TYPE_BUILDER'
 	#:endif
@@ -158,7 +163,7 @@ $: ", ".join(["m_" + name + "(p.p_" + name + ")" &
 private:
 	struct ${structname}$_pack {
 	#:for name,type,reqopt,refval in params
-		${_TYPE_FULL(type,reqopt,refval,False)}$ p_${name}$;
+		${_TYPE_FULL(type,reqopt,refval)}$ p_${name}$;
 	#:endfor
 	};
 #:enddef
@@ -171,14 +176,16 @@ private:
 	#:endfor 
 	
 public:
+
 	#:for name,type,reqopt,refval in params
-		template <typename T>
+	
 		inline ${structname}$_base& 
-		${name}$(T&& param) {
+		${name}$(${_TYPE_BUILDER(type,refval)}$ param)
+		{
 			c_${name}$ = param;
-			//c_${name}$.emplace(std::forward<Params>(params)...);
 			return *this;
 		}
+		
 	#:endfor
 #:enddef
 
@@ -209,21 +216,7 @@ $: ", ".join(["c_" + name + "(i_" + name + ")" &
 private:
 	
 	class ${structname}$_base {
-	private:
-	#:for name,type,reqopt,refval in full_list
-		${_TYPE_BUILDER(type,refval)}$ c_${name}$;
-	#:endfor 
-	
-	public:
-	#:for name,type,reqopt,refval in params
-		template <typename T>
-		inline ${structname}$_base& 
-		${name}$(T&& param) {
-			c_${name}$ = param;
-			//c_${name}$.emplace(std::forward<Params>(params)...);
-			return *this;
-		}
-	#:endfor
+${_MAKE_BUILDER_MEMBERS(structname,params,init_list)}$
 		
 		${structname}$_base(${_BUILDER_INIT_CONSTRUCTOR(init_list)}$) 
 		${_BUILDER_INIT_LIST(init_list)}$ {};
@@ -255,7 +248,7 @@ private:
 			#:if reqopt == "required"
 				*c_${name}$${delim}$
 			#:else
-				(c_${name}$) ? c_${name}$ : std::nullopt${delim}$
+				(c_${name}$) ? c_${name}$ : util::nullopt${delim}$
 			#:endif
 			#:endfor
 			};

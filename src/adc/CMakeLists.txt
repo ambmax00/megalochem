@@ -12,7 +12,7 @@ set(FYPP_SOURCES
         adc_mvp.hpp.fypp
 )
 
-add_fypp_sources(HEADERS chem_adc_fypp ${FYPP_SOURCES})
+add_fypp_sources(HEADERS GEN_DIR chem_adc_fypp ${FYPP_SOURCES})
 
 add_library(chem_adc ${SOURCES})
 add_dependencies(chem_adc chem_adc_fypp)

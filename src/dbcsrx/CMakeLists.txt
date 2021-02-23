@@ -6,16 +6,16 @@ set(FYPP_SOURCES
 	dbcsr_matrix_ops.hpp.fypp
 	dbcsr_tensor_ops.hpp.fypp
 	fortran_utils.hpp.fypp
+)
+
+set(FYPP_F_SOURCES
 	fortran_utils.f.fypp
 )       
 
-add_fypp_sources(DBCSRX_SRCS dbcsrx_fypp ${FYPP_SOURCES})
+add_fypp_sources(DBCSRX_SRCS DBCSRX_DIR dbcsrx_fypp ${FYPP_SOURCES})
+add_fypp_sources(DBCSRX_F_SRCS DBCSRX_F_DIR dbcsrx_f_fypp ${FYPP_F_SOURCES})
 
-set(FORTRAN_SOURCES
-	${CMAKE_CURRENT_BINARY_DIR}/fortran_utils.f90
-)
-
-add_library(fortran_utils ${FORTRAN_SOURCES})
+add_library(fortran_utils ${DBCSRX_F_SRCS})
 add_library(fortran_utils_c INTERFACE)
 
 target_link_libraries(
@@ -25,7 +25,7 @@ target_link_libraries(
 )
 
 add_library(chem_dbcsrx INTERFACE)
-add_dependencies(chem_dbcsrx dbcsrx_fypp)
+add_dependencies(chem_dbcsrx dbcsrx_fypp dbcsrx_f_fypp)
 
 target_link_libraries(
 	chem_dbcsrx
@@ -42,7 +42,7 @@ target_link_libraries(
 target_include_directories(
 	chem_dbcsrx
 	INTERFACE 
-	${CMAKE_CURRENT_BINARY_DIR}
+	${DBCSRX_DIR}
 	${CMAKE_CURRENT_SOURCE_DIR}
 )
 
