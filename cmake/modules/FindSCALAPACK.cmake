@@ -27,7 +27,8 @@ if ("${BLA_VENDOR}" MATCHES "Intel.*")
 	endif()	
 
 	set(MKLROOT $ENV{MKLROOT})
-
+	set(MKL_ROOT $ENV{MKL_ROOT})
+	
 	if ("${LAPACK_LIBRARIES}" MATCHES ".*intel64_lin.*") 
 		set(IDIR "intel64_lin")
 	else()
@@ -40,6 +41,7 @@ if ("${BLA_VENDOR}" MATCHES "Intel.*")
 		libmkl_scalapack_lp64.so
 		PATHS
 		${MKLROOT}/lib/${IDIR}/
+		${MKL_ROOT}/lib/${IDIR}/
 		${SCALAPACK_DIR}/lib/
 		REQUIRED
 	)
@@ -50,6 +52,7 @@ if ("${BLA_VENDOR}" MATCHES "Intel.*")
 		"libmkl_blacs_${MPI_VENDOR}_lp64.so"
 		PATHS
 		${MKLROOT}/lib/${IDIR}/
+		${MKL_ROOT}/lib/${IDIR}/
 		${SCALAPACK_DIR}/lib/
                 REQUIRED
 	)
