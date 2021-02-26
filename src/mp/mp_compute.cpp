@@ -222,10 +222,15 @@ void mpmod::compute() {
 	auto c_vir_exp = dbcsr::matrix<>::create_template(*c_vir)
 		.name("Scaled Vir Coeff").build();
 		
-	auto pseudo_occ = dbcsr::matrix<>::create_template(*s_bb)
-		.name("Pseudo Density (OCC)").build();
+	auto pseudo_occ = dbcsr::matrix<>::create()
+		.name("Pseudo Density (OCC)")
+		.set_world(m_world)
+		.row_blk_sizes(b)
+		.col_blk_sizes(b)
+		.matrix_type(dbcsr::type::symmetric)
+		.build();
 		
-	auto pseudo_vir = dbcsr::matrix<>::create_template(*s_bb)
+	auto pseudo_vir = dbcsr::matrix<>::create_template(*pseudo_occ)
 		.name("Pseudo Density (VIR)").build();
 		
 	auto ztilde_XX = dbcsr::matrix<>::create_template(*metric_matrix)
