@@ -302,7 +302,7 @@ void LLMP_FULL_Z::compute() {
 	m_eri3c2e_batched->decompress_finalize();
 	m_FT3c2e_batched->compress_finalize();
 	
-	LOG.os<1>("Occupation of FT3c2e: ", m_FT3c2e_batched->occupation()*100, "%\n"); 
+	m_FT3c2e_batched->print_info();
 	
 	LOG.os<1>("Finished batching.\n");
 	
