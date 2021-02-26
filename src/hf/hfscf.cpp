@@ -234,6 +234,8 @@ void hfmod::two_electron() {
 	LOG.os<>("Forming two-electron integrals...\n");
 	auto& TIME_2e = TIME.sub("Two-Electron Integrals");
 	
+	TIME_2e.start();
+	
 	fock::jmethod jmeth = fock::str_to_jmethod(
 		m_opt.get<std::string>("build_J"));
 		
@@ -273,6 +275,8 @@ void hfmod::two_electron() {
 	m_jbuilder->init();
 	m_kbuilder->init();
 	
+	TIME_2e.finish();
+	
 	LOG.os<>("Done with 2 electron integrals.\n");
 	
 }
@@ -281,6 +285,12 @@ void hfmod::form_fock(bool SAD_iter, int rank) {
 	
 	LOG.os<>("Forming Fock matrix...\n");
 	auto& TIME_2e = TIME.sub("Computing Fock matrix");
+	
+	auto pA_copy = dbcsr::matrix<>::copy(*m_p_bb_A).build();
+	pA_copy->filter(dbcsr::global::filter_eps);
+	
+	LOG.os<1>("Ocupation of alpha density matrix: ", pA_copy->occupation(), '\n');
+	pA_copy->release();
 	
 	m_jbuilder->set_density_alpha(m_p_bb_A);
 	m_jbuilder->set_density_beta(m_p_bb_B);
@@ -502,6 +512,8 @@ void hfmod::compute() {
 	TIME.finish();
 	
 	TIME.print_info();
+	m_aoloader->print_info();
+	
 	m_jbuilder->print_info();
 	m_kbuilder->print_info();
 	
