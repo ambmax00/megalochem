@@ -241,7 +241,7 @@ void hfmod::two_electron() {
 		m_opt.get<std::string>("build_K"));
 		
 	ints::metric metr = ints::str_to_metric(
-		m_opt.get<std::string>("metric", HF_METRIC));
+		m_opt.get<std::string>("df_metric", HF_METRIC));
 	
 	fock::load_jints(jmeth, metr, *m_aoloader);
 	fock::load_kints(kmeth, metr, *m_aoloader);
