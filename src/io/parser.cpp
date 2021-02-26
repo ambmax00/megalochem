@@ -285,6 +285,8 @@ desc::options parse_options(json& jdata, MPI_Comm comm, int nprint) {
 		dbcsr::global::filter_eps = assign<double>(jglob, "block_threshold", 1e-9);
 		ints::global::precision = assign<double>(jglob, "integral_precision", 1e-9);
 		ints::global::omega = assign<double>(jglob, "integral_omega", 0.1);
+		ints::global::qr_theta = assign<double>(jglob, "qr_theta", 1e-5);
+		ints::global::qr_rho = assign<double>(jglob, "qr_rho", 40);
 
 	}
 	

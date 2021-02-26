@@ -22,6 +22,8 @@ namespace ints {
 struct global {
 	static inline double precision = std::numeric_limits<double>::epsilon();
 	static inline double omega = 0.1;
+	static inline double qr_theta = 1e-5;
+	static inline double qr_rho = 40;
 };
 
 enum class metric {

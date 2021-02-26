@@ -13,6 +13,8 @@ static const json valid_keys =
 		{"block_threshold", 1e-9}, // block threshold for dbcsr
 		{"integral_precision", 1-12}, // as the name says
 		{"integral_omega", 0.1}, // omega factor for erfc integrals
+		{"qr_theta", 1e-5},
+		{"qr_rho", 40},
 		{"_required", {"none"}}
 	}},
 	{"molecule", {

@@ -35,7 +35,7 @@ std::vector<block_info> get_block_info(desc::cluster_basis& cbas) {
 	
 	return blkinfo;
 	
-}		
+}
 
 dbcsr::sbtensor<3,double> dfitting::compute_qr_new(dbcsr::shared_matrix<double> s_xx_inv, 
 		dbcsr::shared_matrix<double> m_xx, dbcsr::shared_pgrid<3> spgrid3_xbb,
@@ -51,8 +51,8 @@ dbcsr::sbtensor<3,double> dfitting::compute_qr_new(dbcsr::shared_matrix<double> 
 	
 	auto aofac = std::make_shared<aofactory>(m_mol, m_world);
 	
-	double T = 1e-4;
-	double R2 = 40;
+	double T = global::qr_theta;
+	double R2 = global::qr_rho;
 	
 	prep_time.start();
 	
