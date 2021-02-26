@@ -88,6 +88,10 @@ inline vec<vec<int>> make_blk_bounds(std::vector<int> blksizes,
 	return out;
 		
 }
+
+struct btensor_global {
+	static inline bool error_flag = false;
+};
 	
 template <int N, typename T = double, 
 	typename = typename std::enable_if<(N >= 3 && N <= 4)>::type>
@@ -253,19 +257,6 @@ ${_MAKE_BUILDER_CLASS('btensor', 'create', list, True)}$
 			// nbatches
 			
 			m_nbatches_dim[i] = m_blk_bounds[i].size();
-			
-			// check if memory sufficient
-			
-			int nele = std::accumulate(m_blk_sizes[i].begin(),
-				m_blk_sizes[i].end(),0);
-			double nele_per_batch = (double) nele / (double) m_nbatches_dim[i];
-			
-			if (nele_per_batch * sizeof(T) >= 2 * 1e+9) {
-				LOG.os<>(
-					"WARNING: Batch sizes might be too large!\n",
-					"Either increase number of batches, ",
-					"or increase number of MPI processes.\n");
-			}
 			
 		}
 		
@@ -442,12 +433,52 @@ ${_MAKE_BUILDER_CLASS('btensor', 'create_template', list, True, init_list)}$
 		return nbatches;
 	}
 	
+	// check whether batch exceeds 2 GB per process
+	bool fits_in_mem(std::vector<int> dims) {
+		
+		// get total number of batches
+		int64_t ntot = 1;
+		for (int ii = 0; ii != N; ++ii) {
+			
+			ntot *= std::accumulate(m_blk_sizes[ii].begin(),
+				m_blk_sizes[ii].end(),(int64_t)0);
+				
+		}
+				
+		// get number of batches
+		int nbatches = get_nbatches(dims);
+				
+		int64_t ntot_per_proc_batch = (ntot / (int64_t)m_mpisize) / 
+			(int64_t) nbatches;
+					
+		
+		if (ntot_per_proc_batch * sizeof(T) >= 2 * 1e+9) {
+			if (!btensor_global::error_flag) { 
+				LOG.os<>(
+					"!!!!!!!! WARNING !!!!!!!! \n"
+					"Batch sizes might be too large for this or other tensors!\n"
+					"This can lead to failure at random points in the program,\n"
+					"or give wrong results if it completes!\n"
+					"Either increase number of batches,\n"
+					"or increase number of MPI processes.\n");
+			}
+			btensor_global::error_flag = true;
+			return false;
+		}
+		
+		return true;
+		
+	}
+		
+	
 	void compress_init(std::initializer_list<int> dim_list, vec<int> map1, vec<int> map2) 
 	{
 		
 		LOG.os<1>("Initializing compression for ", m_name, "...\n");
 		
 		vec<int> dims = dim_list;
+		
+		fits_in_mem(dims);
 		
 		m_wrview.nbatches = 1;
 		m_wrview.dims = dims;
@@ -1160,6 +1191,8 @@ ${_MAKE_BUILDER_CLASS('btensor', 'create_template', list, True, init_list)}$
 	{
 		
 		vec<int> dims = dims_list;
+		
+		fits_in_mem(dims);
 		
 		LOG.os<1>("Initializing decompression for ", m_name, "...\n");
 		
