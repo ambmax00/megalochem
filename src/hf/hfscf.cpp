@@ -505,6 +505,7 @@ void hfmod::compute() {
 	
 	LOG.os<>("Done with SCF cycle. Took ", iter, " iterations.\n");
 	LOG.scientific();
+	LOG.setprecision(12);
 	LOG.os<>("Final SCF energy: ", m_scf_energy, '\n');
 	LOG.os<>("Total energy: ", m_scf_energy + m_nuc_energy, '\n');
 	LOG.reset();
