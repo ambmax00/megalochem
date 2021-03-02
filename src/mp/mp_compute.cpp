@@ -432,10 +432,12 @@ void mpmod::compute() {
 		
 	}
 	
-	//mp2_energy *= c_os;
+	mp2_energy *= c_os;
 	
+	LOG.setprecision(12);
 	LOG.os<>("Final MP2 energy: ", mp2_energy, '\n');
-	
+	LOG.reset();
+
 	TIME.finish();
 	
 	ao->print_info();

@@ -953,9 +953,7 @@ private:
 	int _local_rank;
 	int _local_size;
 	
-	// global counter
-	MPI_Win _global_win;
-	int64_t* _global_counter;
+	int64_t _global_counter;
 	
 	// local mutex
 	MPI_Win _local_mtx_win;
@@ -987,6 +985,37 @@ private:
 		return (*_local_counter == TERMINATE);
 	}
 	
+	void communicate_0() {
+		
+		MPI_Status status;
+		int flag = 0;
+		
+		MPI_Iprobe(MPI_ANY_SOURCE, 0, _global_comm, &flag, &status);
+			
+		if (flag) {
+			
+			_DPRINT("Got request from " + std::to_string(status.MPI_SOURCE));
+			
+			int64_t ntasks_requested;
+			MPI_Recv(&ntasks_requested, 1, MPI_LONG_LONG, status.MPI_SOURCE,
+				0, _global_comm, MPI_STATUS_IGNORE);
+			
+			int64_t return_counter = (_global_counter < _ntasks) ?
+				_global_counter : TERMINATE;
+				
+			int64_t last_task = (return_counter + ntasks_requested <= _ntasks) ? 
+				return_counter + ntasks_requested : _ntasks;
+				
+			_global_counter += ntasks_requested;
+			
+			int64_t buffer[2] = {return_counter, last_task};
+			
+			MPI_Send(buffer, 2, MPI_LONG_LONG, status.MPI_SOURCE, 1, _global_comm);
+			
+		}
+		
+	}
+			
 	void fetch_tasks() {
 				
 		_DPRINT("Fetching tasks");
@@ -999,31 +1028,26 @@ private:
 				
 			_DPRINT("Requesting " + std::to_string(nrequests))
 			
-			MPI_Win_lock(MPI_LOCK_SHARED, 0, MPI_MODE_NOCHECK, _global_win);
-			MPI_Fetch_and_op(&nrequests, &ncounter, MPI_LONG_LONG, 0, 0,
-				MPI_SUM, _global_win);
-			MPI_Win_unlock(0, _global_win);
-				
-			int64_t last_task = (ncounter + nrequests <= _ntasks) ? 
-				ncounter + nrequests : _ntasks;
-				
-			_DPRINT("NCOUNTER: " + std::to_string(ncounter))
-				
-			ncounter = (ncounter >= _ntasks) ? TERMINATE : ncounter;
+			MPI_Send(&_local_size, 1, MPI_LONG_LONG, 0, 0, _global_comm);
 			
-			_DPRINT("NCOUNTER/UBOUND: " + std::to_string(ncounter) +  "/" 
+			int64_t buffer[2]; 
+			
+			MPI_Recv(buffer, 2, MPI_LONG_LONG, 0, 1, _global_comm, MPI_STATUS_IGNORE);
+			
+			int64_t counter = buffer[0];
+			int64_t last_task = buffer[1];
+											
+			_DPRINT("NCOUNTER/UBOUND: " + std::to_string(counter) +  "/" 
 				+ std::to_string(last_task));
 				
-			std::atomic_store(_local_counter, ncounter);
+			std::atomic_store(_local_counter, counter);
 			std::atomic_store(_local_ubound, last_task); 
 			
 			_local_mtx->unlock();
 			
 		} else {
 			
-			while (local_queue_empty() && !terminate()) {
-				// flush rank 0 to ensure RMA progress ?
-			}
+			while (local_queue_empty() && !terminate()) {}
 			
 		}
 							
@@ -1042,13 +1066,19 @@ public:
 	basic_scheduler(MPI_Comm comm, int64_t ntasks, std::function<void(int64_t)>& executer) 
 		: _global_comm(comm), _executer(executer), _ntasks(ntasks),
 		_global_size(0), _global_rank(-1),
-		_local_size(0), _local_rank(-1)
+		_local_size(0), _local_rank(-1),
+		_global_counter(0)
 	{
 		
 		// create communicators
-		
+		MPI_Comm_dup(comm, &_global_comm);
+
 		MPI_Comm_size(_global_comm, &_global_size);
 		MPI_Comm_rank(_global_comm, &_global_rank);
+		
+		if (_global_size < 2) {
+			throw std::runtime_error("Scheduler needs 2 or more processes.");
+		}
 		
 		int color = _global_rank % 2;
 		int split = _global_rank / 2;
@@ -1060,18 +1090,6 @@ public:
 		
 		MPI_Comm_size(_local_comm, &_local_size);
 		MPI_Comm_rank(_local_comm, &_local_rank);
-		
-		// allocate global window
-		MPI_Win_allocate(sizeof(int64_t), sizeof(int64_t),
-			MPI_INFO_NULL, _global_comm, &_global_counter, &_global_win);
-			
-		// initialize ...
-		if (_global_rank == 0) {
-			MPI_Win_lock(MPI_LOCK_EXCLUSIVE, 0, 0, _global_win);
-			int64_t zero(0);
-			MPI_Put(&zero, 1, MPI_LONG_LONG, 0, 0, 1, MPI_LONG_LONG, _global_win); 
-			MPI_Win_unlock(0, _global_win);
-		}
 		
 		// allocate shared windows
 		// ... for mutex
@@ -1120,20 +1138,6 @@ public:
 		
 		_ntasks_completed = 0;
 		
-		/*auto poll_function = [this]() {
-			while (!terminate()) {
-				MPI_Win_lock(MPI_LOCK_SHARED, 0, MPI_MODE_NOCHECK, _global_win);
-				MPI_Win_unlock(0, _global_win);
-				std::this_thread::sleep_for(std::chrono::milliseconds(1000));
-				std::cout << "HELLO" << std::endl;
-			}
-		};
-		
-		if (_global_rank == 0) {
-			_poll_thread = new std::thread(poll_function);
-			_poll_thread->detach();
-		}*/		
-		
 		if (_global_rank != 0) {
 		
 			while (true) {
@@ -1162,8 +1166,7 @@ public:
 			
 			while (true) {
 				
-				MPI_Win_lock(MPI_LOCK_SHARED, 0, MPI_MODE_NOCHECK, _global_win);
-				MPI_Win_unlock(0, _global_win);
+				communicate_0();
 				if (terminate()) break;
 				
 			}
@@ -1180,8 +1183,7 @@ public:
 		while (!flag) {
 			MPI_Test(&barrier_request, &flag, MPI_STATUS_IGNORE);
 			if (_global_rank == 0) {
-				MPI_Win_lock(MPI_LOCK_SHARED, 0, MPI_MODE_NOCHECK, _global_win);
-				MPI_Win_unlock(0, _global_win);
+				communicate_0();
 			}
 		}	
 		
@@ -1199,7 +1201,7 @@ public:
 		
 	
 	~basic_scheduler() {
-		MPI_Win_free(&_global_win);
+		MPI_Comm_free(&_global_comm);
 		MPI_Win_free(&_local_mtx_win);
 		MPI_Win_free(&_local_atomic_win);
 		MPI_Comm_free(&_local_comm);
