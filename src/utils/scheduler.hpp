@@ -997,7 +997,7 @@ private:
 			_DPRINT("Got request from " + std::to_string(status.MPI_SOURCE));
 			
 			int64_t ntasks_requested;
-			MPI_Recv(&ntasks_requested, 1, MPI_LONG_LONG, status.MPI_SOURCE,
+			MPI_Recv(&ntasks_requested, 1, MPI_INT64_T, status.MPI_SOURCE,
 				0, _global_comm, MPI_STATUS_IGNORE);
 			
 			int64_t return_counter = (_global_counter < _ntasks) ?
@@ -1010,7 +1010,7 @@ private:
 			
 			int64_t buffer[2] = {return_counter, last_task};
 			
-			MPI_Send(buffer, 2, MPI_LONG_LONG, status.MPI_SOURCE, 1, _global_comm);
+			MPI_Send(buffer, 2, MPI_INT64_T, status.MPI_SOURCE, 1, _global_comm);
 			
 		}
 		
@@ -1028,11 +1028,11 @@ private:
 				
 			_DPRINT("Requesting " + std::to_string(nrequests))
 			
-			MPI_Send(&_local_size, 1, MPI_LONG_LONG, 0, 0, _global_comm);
+			MPI_Send(&_local_size, 1, MPI_INT64_T, 0, 0, _global_comm);
 			
 			int64_t buffer[2]; 
 			
-			MPI_Recv(buffer, 2, MPI_LONG_LONG, 0, 1, _global_comm, MPI_STATUS_IGNORE);
+			MPI_Recv(buffer, 2, MPI_INT64_T, 0, 1, _global_comm, MPI_STATUS_IGNORE);
 			
 			int64_t counter = buffer[0];
 			int64_t last_task = buffer[1];
@@ -1134,6 +1134,8 @@ public:
 	
 	void run() {
 		
+		MPI_Barrier(_global_comm);
+		
 		_DPRINT("STARTING RUN WITH NTASKS = " + std::to_string(_ntasks))
 		
 		_ntasks_completed = 0;
@@ -1185,15 +1187,20 @@ public:
 			if (_global_rank == 0) {
 				communicate_0();
 			}
-		}	
+		}
+		
+		_DPRINT("EXITED LOOP");	
 		
 		// check for consistency
-		MPI_Allreduce(MPI_IN_PLACE, &_ntasks_completed, 1, MPI_LONG_LONG,
-			MPI_SUM, _global_comm);
+		//MPI_Allreduce(MPI_IN_PLACE, &_ntasks_completed, 1, MPI_INT64_T,
+			//MPI_SUM, _global_comm);
 						
 		if (_global_rank == 0 && _ntasks_completed != _ntasks) {
 			throw std::runtime_error("Scheduler: Not all tasks were executed!!");
 		}
+		
+		MPI_Barrier(_global_comm);
+		
 		
 		_DPRINT("DONE WITH RUN")
 
