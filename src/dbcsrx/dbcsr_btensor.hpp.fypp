@@ -1914,16 +1914,15 @@ ${_MAKE_BUILDER_CLASS('btensor', 'create_template', list, True, init_list)}$
 		
 		int64_t tot = std::accumulate(full.begin(),full.end(),(int64_t)1,
 			std::multiplies<int64_t>());
-			
-		if (m_mpirank == 0) {
-			
-			std::cout << "Sparsity info of batch tensor " << m_name << std::endl;
-			std::cout << "-- Block occupation: " << (double)m_nzetot / (double) tot
-				<< std::endl;
-			std::cout << "-- Number of non-zero elements: " << (double)m_nzetot << std::endl;
-			std::cout << "-- Total number of elements (dense): " << (double)tot << std::endl;
-			
-		}
+		
+		LOG.setprecision(12);
+		
+		LOG.os<>("Sparsity info of batch tensor ", m_name, '\n',
+			"-- Block occupation: ", (double)m_nzetot / (double) tot, '\n',
+			"-- Number of non-zero elements: ", (double)m_nzetot, '\n',
+			"-- Total number of elements (dense): ", (double)tot, '\n');
+		
+		LOG.reset();
 		
 	}		
 	

@@ -643,6 +643,21 @@ ${_MAKE_BUILDER_CLASS('tensor', 'create_matrix', list, True, init_list)}$
 		return (double)nze/(double)tote;
 		
 	}
+	
+	double long_sum() {
+	
+		long long int num_nze;
+		T* data = this->data(num_nze);
+		
+		double local_sum = std::accumulate(data, data + num_nze, 0.0);
+		double total_sum = 0.0;
+		
+		MPI_Allreduce(&local_sum, &total_sum, 1, MPI_DOUBLE, MPI_SUM, m_comm);
+		
+		return total_sum;
+		
+	}
+		
     
     void scale(T factor) {
         c_dbcsr_t_scale(m_tensor_ptr, factor);
