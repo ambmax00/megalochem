@@ -1191,13 +1191,13 @@ public:
 		
 		_DPRINT("EXITED LOOP");	
 		
-		// check for consistency
-		//MPI_Allreduce(MPI_IN_PLACE, &_ntasks_completed, 1, MPI_INT64_T,
-			//MPI_SUM, _global_comm);
+		/* check for consistency
+		MPI_Allreduce(MPI_IN_PLACE, &_ntasks_completed, 1, MPI_INT64_T,
+			MPI_SUM, _global_comm);
 						
 		if (_global_rank == 0 && _ntasks_completed != _ntasks) {
 			throw std::runtime_error("Scheduler: Not all tasks were executed!!");
-		}
+		}*/
 		
 		MPI_Barrier(_global_comm);
 		

@@ -94,6 +94,13 @@ dbcsr::sbtensor<3,double> dfitting::compute_qr_new(dbcsr::shared_matrix<double> 
 		.map1({0}).map2({1,2})
 		.build();
 		
+	auto c_xbb_task = dbcsr::tensor<3>::create()
+		.name("c_xbb_task")
+		.set_pgrid(*spgrid3_local)
+		.blk_sizes(xbb)
+		.map1({0}).map2({1,2})
+		.build();
+		
 	auto ovlp_xbb_local = dbcsr::tensor<3>::create()
 		.name("eri_local")
 		.set_pgrid(*spgrid3_local)
@@ -317,14 +324,6 @@ dbcsr::sbtensor<3,double> dfitting::compute_qr_new(dbcsr::shared_matrix<double> 
 		/* =============================================================
 		 *            TASK FUNCTION FOR SCHEDULER 
 		 * ============================================================*/
-		
-		auto check = [](auto& tensor_in) {
-			if (tensor_in->num_nze() > 1.9E+9) {
-				std::cout << "Tensor " << 
-					tensor_in->name() << " getting critical."
-					<< std::endl;
-			}
-		};  
 		 
 		std::function<void(int64_t)> task_func = [&](int64_t itask) 
 		{
@@ -400,12 +399,6 @@ dbcsr::sbtensor<3,double> dfitting::compute_qr_new(dbcsr::shared_matrix<double> 
 				.perform("XY, Ymn -> Xmn");
 			
 			ovlp_xbb_local->clear();
-			
-			std::cout << "NZE(1): " << ovlp_xbb_local->num_nze() << std::endl;
-			std::cout << "NZE(2): " << prs_xbb_local->num_nze() << std::endl;
-			
-			check(ovlp_xbb_local);
-			check(prs_xbb_local);
 			
 			ovlp_time.finish();
 			
@@ -537,9 +530,7 @@ dbcsr::sbtensor<3,double> dfitting::compute_qr_new(dbcsr::shared_matrix<double> 
 				aofac->ao_3c_fill_idx(eri_local, coul_blk_idx, nullptr);
 			
 				coul_time.finish();
-				
-				check(eri_local);
-			
+							
 				//dbcsr::print(*eri_local);
 			
 				// how many x functions?
@@ -677,7 +668,7 @@ dbcsr::sbtensor<3,double> dfitting::compute_qr_new(dbcsr::shared_matrix<double> 
 					}
 				}
 			
-				c_xbb_local->reserve(cfit_idx);
+				c_xbb_task->reserve(cfit_idx);
 				
 				poff = 0;
 				moff = 0;
@@ -697,7 +688,7 @@ dbcsr::sbtensor<3,double> dfitting::compute_qr_new(dbcsr::shared_matrix<double> 
 										blk(pp,mm,nn) = c_eigen(pp + poff, 
 											mm + moff + (nn+noff)*mstride);
 							}}}
-							c_xbb_local->put_block(idx, blk);
+							c_xbb_task->put_block(idx, blk);
 							noff += b[inu];
 						}
 						noff = 0;
@@ -707,8 +698,12 @@ dbcsr::sbtensor<3,double> dfitting::compute_qr_new(dbcsr::shared_matrix<double> 
 					poff += x[ip];
 				}
 				
-				std::cout << "NZE(3): " << c_xbb_local->num_nze() << std::endl;
-				check(c_xbb_local);
+				c_xbb_task->filter(dbcsr::global::filter_eps);
+				
+				dbcsr::copy(*c_xbb_task, *c_xbb_local)
+					.move_data(true)
+					.sum(true)
+					.perform();
 				
 				move_time.finish();
 			
@@ -734,11 +729,8 @@ dbcsr::sbtensor<3,double> dfitting::compute_qr_new(dbcsr::shared_matrix<double> 
 		//dbcsr::print(*c_xbb_local);
 	
 		comp_time.start();
-		
-		std::cout << "FINAL: " << c_xbb_local->num_nze() << std::endl;
-		
+				
 		dbcsr::copy_local_to_global(*c_xbb_local, *c_xbb_global);
-		c_xbb_global->filter(dbcsr::global::filter_eps);
 		
 		c_xbb_local->clear();
 		//dbcsr::print(*c_xbb_global);
