@@ -11,27 +11,24 @@ using sbt4 = dbcsr::sbtensor<4,double>;
 	
 std::pair<smatd,smatd> aoloader::invert(smatd in) {
 	
-	/*
+	auto m = in->row_blk_sizes();
+	
 	math::LLT chol(in, LOG.global_plev());
 	chol.compute();
 	
-	
-	
 	auto linv = chol.L_inv(m);
-	auto inv_sqrt = dbcsr::transpose(linv).build();
+	auto inv_sqrt = dbcsr::matrix<double>::transpose(*linv).build();
 	auto inv = chol.inverse(m);
-	*/
 	
-	auto m = in->row_blk_sizes();
-	
+	/*	
 	math::hermitian_eigen_solver herm(in, 'V', true);
 	herm.compute();
 	
 	auto inv = herm.inverse();
-	auto invsqrt = herm.inverse_sqrt();
+	auto invsqrt = herm.inverse_sqrt();*/
 
 	return std::make_pair<smatd,smatd>(
-		std::move(inv),std::move(invsqrt));
+		std::move(inv),std::move(inv_sqrt));
 	
 }
 
