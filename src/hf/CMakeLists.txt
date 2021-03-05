@@ -14,5 +14,4 @@ target_link_libraries(
 	chem_math_linalg
 	chem_math_solvers
 	chem_fock
-	${HDF5_LIBRARIES}
 )

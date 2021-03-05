@@ -83,7 +83,7 @@ public:
 };
 
 using shared_hf_wfn = std::shared_ptr<hf_wfn>;
-
+/*
 inline void write_hfwfn(std::string name, hf_wfn& hfwfn, filio::data_handler& dh) {
 	
 	dh.open(filio::access_mode::rdwr);
@@ -207,7 +207,7 @@ inline shared_hf_wfn read_hfwfn(std::string name, desc::shared_molecule mol,
 		
 	return hfwfn;
 	
-}		
+}	*/	
 
 }
 	

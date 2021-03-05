@@ -7,7 +7,7 @@
 #include <dbcsr_conversions.hpp>
 #include <dbcsr_matrix_ops.hpp>
 #include "io/parser.hpp"
-#include "io/data_handler.hpp"
+//#include "io/data_handler.hpp"
 #include "hf/hfmod.hpp"
 #include "mp/mpmod.hpp"
 #include "adc/adcmod.hpp"
@@ -75,7 +75,7 @@ int main(int argc, char** argv) {
 	std::string hdf5file = filename + ".hdf5";
 	std::string hdf5backup = filename + ".back.hdf5";
 	
-	filio::data_handler *dh, *dh_back;
+	/*filio::data_handler *dh, *dh_back;
 	
 	if (std::filesystem::exists(hdf5file)) {
 		if (wrd.rank() == 0 && std::filesystem::exists(hdf5backup))
@@ -88,7 +88,7 @@ int main(int argc, char** argv) {
 	}
 	
 	dh = new filio::data_handler(hdf5file, filio::create_mode::truncate, 
-		comm);
+		comm);*/
 	
 	LOG.os<>("Running ", wrd.size(), " MPI processes with ", omp_get_max_threads(), " threads each.\n\n");
 	
@@ -116,7 +116,7 @@ int main(int argc, char** argv) {
 	auto mol = filio::parse_molecule(data,comm,0);
 	auto opt = filio::parse_options(data,comm,0);
 	
-	desc::write_molecule("molecule", *mol, *dh);
+	//desc::write_molecule("molecule", *mol, *dh);
 	
 	if (wrd.rank() == 0) {
 		opt.print();
@@ -134,13 +134,13 @@ int main(int argc, char** argv) {
 	
 		myhf.compute();
 		myhfwfn = myhf.wfn();
-		hf::write_hfwfn("hf_wfn", *myhfwfn, *dh);
+		//hf::write_hfwfn("hf_wfn", *myhfwfn, *dh);
 		
 	} else {
 		
 		LOG.os<>("Reading HF info from files...\n");
-		myhfwfn = hf::read_hfwfn("hf_wfn", mol, wrd, *dh_back);
-		hf::write_hfwfn("hf_wfn", *myhfwfn, *dh);
+		//myhfwfn = hf::read_hfwfn("hf_wfn", mol, wrd, *dh_back);
+		//hf::write_hfwfn("hf_wfn", *myhfwfn, *dh);
 		LOG.os<>("Done.\n");
 		
 	}
