@@ -1,10 +1,13 @@
 #ifndef DBCSR_TENSOR_HPP
 #define DBCSR_TENSOR_HPP
 
-#:include "megalochem.fypp"
+#ifndef TEST_MACRO
 #include <dbcsr_common.hpp>
 #include <dbcsr_matrix.hpp>
 #include <dbcsr_tensor.h>
+#endif
+
+#include "utils/ppdirs.hpp"
 
 namespace dbcsr {
 
@@ -21,18 +24,17 @@ protected:
 	
 public:
 
-#:set list = [ &
-        ['map1', 'vec<int>', _OPT, _VAL],&
-        ['map2', 'vec<int>', _OPT, _VAL],&
-        ['tensor_dims', 'arr<int,N>', _OPT, _VAL],&
-        ['nsplit', 'int', _OPT, _VAL],&
-        ['dimsplit', 'int', _OPT, _VAL]]
+#define PGRID_PARAMS (\
+	((util::optional<vec<int>>), map1),\
+	((util::optional<vec<int>>), map2),\
+	((util::optional<arr<int,N>>), tensor_dims),\
+	((util::optional<int>), dimsplit))
+	
+#define PGRID_INIT (\
+	((MPI_Comm), comm))
 
-#:set init_list = [&
-	['comm', 'MPI_Comm', _REQ, _VAL]]
-    
-${_MAKE_PARAM_STRUCT('create', list, init_list)}$
-${_MAKE_BUILDER_CLASS('pgrid', 'create', list, True, init_list)}$
+	MAKE_PARAM_STRUCT(create, PGRID_PARAMS, PGRID_INIT)
+	MAKE_BUILDER_CLASS(pgrid, create, PGRID_PARAMS, PGRID_INIT)
     
     pgrid(create_pack&& p) {
 		
@@ -119,30 +121,38 @@ public:
 	
 	dist_t() : m_dist_ptr(nullptr) {}
 
-#:set list = [ &
-        ['set_pgrid', 'pgrid<N>', _REQ, _REF],&
-        ['nd_dists', 'arrvec<int,N>', _REQ, _REF]]
-    
-${_MAKE_PARAM_STRUCT('create', list)}$
-${_MAKE_BUILDER_CLASS('dist_t', 'create', list, True)}$
+#define DIST_T_PLIST (\
+	((pgrid<N>&), set_pgrid),\
+	((arrvec<int,N>&), nd_dists))
+	
+	MAKE_PARAM_STRUCT(create, DIST_T_PLIST, ())
+	MAKE_BUILDER_CLASS(dist_t, create, DIST_T_PLIST, ())
 
-#:for idim in range(2,MAXDIM+1)
-    template<int M = N, typename std::enable_if<M == ${idim}$,int>::type = 0>
-	dist_t(create_pack&& p)	{
+#define DATASIZE(x,n) \
+	x[n].data(), x[n].size()
 	
-		m_dist_ptr = nullptr;
-		m_nd_dists = p.p_nd_dists;
-        m_comm = p.p_set_pgrid.comm();
+#define DATASIZE0(x,n) \
+	nullptr, 0
 	
-		c_dbcsr_t_distribution_new(&m_dist_ptr, p.p_set_pgrid.m_pgrid_ptr,
-                ${datasize('m_nd_dists',0,idim)}$
-                #:if idim != MAXDIM
-                ,
-                #:endif
-                ${datasize0(MAXDIM-idim)}$);
-                                   
+#define NARR (3,2,1,0)
+
+#define DIST_CONSTRUCTOR(x,idim) \
+	template<int M = N, typename std::enable_if<M == idim,int>::type = 0> \
+	dist_t(create_pack&& p)	{ \
+		\
+		m_dist_ptr = nullptr; \
+		m_nd_dists = p.p_nd_dists; \
+        m_comm = p.p_set_pgrid.comm(); \
+		\
+		c_dbcsr_t_distribution_new(&m_dist_ptr, p.p_set_pgrid.m_pgrid_ptr, \
+				REPEAT_SECOND(DATASIZE, m_nd_dists, 0, idim, (,), ()) \
+				REPEAT_SECOND(ECHO_NONE, UNUSED, 0, CAT(GET_,idim) NARR, (), (,)) \
+                REPEAT_SECOND(DATASIZE0, UNUSED, 0, CAT(GET_,idim) NARR, (,), ()) \
+        ); \
+        \
 	}
-#:endfor
+
+	REPEAT_FIRST(DIST_CONSTRUCTOR, UNUSED, 2, 3, (), ())
 	
 	dist_t(dist_t<N>& rhs) = delete;
 		
@@ -842,5 +852,7 @@ typedef shared_tensor<${idim}$,${type}$> shared_tensor${idim}$_${suffix}$;
 #:endfor
 
 } // end namespace
+
+#endif
 
 #endif

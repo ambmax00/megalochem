@@ -1,7 +1,9 @@
 #ifndef DBCSR_COMMON_HPP
 #define DBCSR_COMMON_HPP
 
-#:include "megalochem.fypp"
+#define MAXDIM 4
+
+#ifndef TEST_MACRO
 
 #include <dbcsr.h>
 #include <vector>
@@ -16,7 +18,9 @@
 #include <iostream>
 #include <fortran_utils.hpp>
 
-#include "utils/optional.hpp"
+#endif
+
+#include "utils/ppdirs.hpp"
 
 // ----------------------------------------
 //               typedefs                 
@@ -470,46 +474,35 @@ public:
 		return m_data[id]; 
 	}
 
-#:def make_idx(n)
-    #:if n == 0
-        i_0
-    #:else
-        + i_${n}$
-        #:for i in range(0,n)
-            * m_size[${i}$]
-        #:endfor
-    #:endif
-#:enddef
+#define MSIZE(x,n) \
+	m_size[ n ]
 
-#:for idim in range(2,MAXDIM+1)
-    template <typename D = T, int M = N>
-    typename std::enable_if<M == ${idim}$, D&>::type
-    operator()(
-    #:for n in range(0,idim)
-        int i_${n}$
-        #:if n < idim-1
-        ,
-        #:endif
-    #:endfor
-    ) {
-    return m_data[
-    #:for n in range(0,idim)
-        ${make_idx(n)}$
-    #:endfor
-        ];
-    }
-#:endfor
+#define ARRAYINDEX(var,n) \
+	CAT(i_, n) REPEAT_THIRD(ECHO_NONE, UNUSED, 0, n, (), (*)) \
+	REPEAT_THIRD(MSIZE, UNUSED, 1, n, (*), ())  
 
-#:for idim in range(2,MAXDIM+1)
-	template <typename D = T, int M = N> 
-	typename std::enable_if<M == ${idim}$, void>::type
-	reshape(D* data, std::array<int,2> sizes, vec<int>& map1, vec<int>& map2) {
-	
-		fortran_reshape_${idim}$d(data, sizes.data(), m_data,
-			m_size.data(), map1.data(), map1.size(), map2.data(), map2.size());
-
+#define OPERATOR(var,n) \
+	template <typename D = T, int M = N> \
+    typename std::enable_if<M == n, D&>::type \
+    operator()(REPEAT_SECOND(CAT, int i_, 0, n, (,), ())) {\
+		return m_data[ \
+		REPEAT_SECOND(ARRAYINDEX, UNUSED, 0, n, (+), ()) \
+		];\
 	}
-#:endfor
+			  
+    REPEAT_FIRST(OPERATOR, UNUSED, 2, 3, (), ())
+    
+#define RESHAPE(var,n) \
+	template <typename D = T, int M = N> \
+	typename std::enable_if<M == n, void>::type \
+	reshape(D* data, std::array<int,2> sizes, vec<int>& map1, vec<int>& map2) { \
+	\
+		CAT(fortran_reshape_, n)(data, sizes.data(), m_data, \
+			m_size.data(), map1.data(), map1.size(), map2.data(), map2.size()); \
+	\
+	}
+
+	REPEAT_FIRST(RESHAPE, UNUSED, 2, 3, (), ())
 	
 	void fill_rand(T a, T b) {
 		
