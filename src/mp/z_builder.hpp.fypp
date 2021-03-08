@@ -267,6 +267,7 @@ inline void load_zints(zmethod zmet, ints::metric metr, ints::aoloader& ao) {
 			break;
 		}
 		case ints::metric::qr_fit: {
+			ao.request(ints::key::ovlp_bb, false);
 			ao.request(ints::key::coul_xx, true);
 			ao.request(ints::key::ovlp_xx, false);
 			ao.request(ints::key::ovlp_xx_inv, false);

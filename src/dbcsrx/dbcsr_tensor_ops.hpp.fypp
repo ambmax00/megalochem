@@ -170,9 +170,9 @@ public:
         int* unit_nr = (c_print) ? ((*c_print) ? &out : nullptr) : nullptr;  
         
         c_dbcsr_t_contract_index_r_dp(
-            (c_alpha) ? *c_alpha : 1,
+            c_alpha,
             c_t1.m_tensor_ptr, c_t2.m_tensor_ptr,
-            (c_beta) ? *c_beta : 0,
+            c_beta,
             c_t3.m_tensor_ptr, 
             c_con1->data(), c_con1->size(), 
             c_ncon1->data(), c_ncon1->size(),

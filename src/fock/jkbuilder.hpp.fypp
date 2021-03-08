@@ -482,6 +482,7 @@ inline void load_jints(jmethod jmet, ints::metric metr, ints::aoloader& ao) {
 			ao.request(ints::key::erfc_xx_inv, true);
 			ao.request(ints::key::erfc_xbb, true);
 		} else if (metr == ints::metric::qr_fit) {
+			ao.request(ints::key::ovlp_bb, false);
 			ao.request(ints::key::coul_xx, true);
 			ao.request(ints::key::ovlp_xx, false);
 			ao.request(ints::key::ovlp_xx_inv, false);
@@ -520,6 +521,7 @@ inline void load_kints(kmethod kmet, ints::metric metr, ints::aoloader& ao) {
 		} else if (metr == ints::metric::qr_fit) {
 			ao.request(ints::key::coul_xx, true);
 			ao.request(ints::key::ovlp_xx, false);
+			ao.request(ints::key::ovlp_bb, false);
 			ao.request(ints::key::ovlp_xx_inv, false);
 			ao.request(ints::key::qr_xbb, true);
 			ao.request(ints::key::dfit_qr_xbb, true);
@@ -561,6 +563,7 @@ inline void load_kints(kmethod kmet, ints::metric metr, ints::aoloader& ao) {
 			
 		} else if (metr == ints::metric::qr_fit) {
 			ao.request(ints::key::coul_xx, true);
+			ao.request(ints::key::ovlp_bb, false);
 			ao.request(ints::key::ovlp_xx, false);
 			ao.request(ints::key::ovlp_xx_inv, false);
 			ao.request(ints::key::qr_xbb, true);
