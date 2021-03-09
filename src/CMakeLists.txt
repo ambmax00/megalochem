@@ -14,6 +14,19 @@ add_subdirectory(mp)
 add_subdirectory(adc)
 add_subdirectory(locorb)
 
+set(PRE_CONFIGURE_FILE "git.hpp.in") 
+set(POST_CONFIGURE_FILE "${CMAKE_CURRENT_BINARY_DIR}/git.hpp")
+
+include(../cmake/modules/git_watcher.cmake)
+
+add_library(git INTERFACE)
+target_include_directories(
+	git
+	INTERFACE
+	"${CMAKE_CURRENT_BINARY_DIR}"
+)
+add_dependencies(git check_git)
+
 add_executable(
         chem
         main.cpp

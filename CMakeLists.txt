@@ -46,6 +46,7 @@ add_subdirectory(src)
 target_link_libraries(
 	chem
 	PUBLIC
+	git
 	chem_dbcsrx
 	chem_io
 	MPI::MPI_CXX	
@@ -57,6 +58,7 @@ target_link_libraries(
 target_link_libraries(
         chem_test
         PUBLIC
+	git
         chem_dbcsrx
         chem_io
         MPI::MPI_CXX

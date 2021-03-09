@@ -14,6 +14,7 @@
 #include "utils/mpi_time.hpp"
 #include "utils/unique.hpp"
 #include "extern/scalapack.hpp"
+#include "git.hpp"
 
 #include <filesystem>
 #include <chrono>
@@ -61,7 +62,9 @@ int main(int argc, char** argv) {
 #endif
 
 	LOG.os<>("Authors: \n \t M. A. Ambroise\n\n");
-	
+	LOG.os<>("Commit: ", GitMetadata::CommitSHA1(), '\n'); 
+
+
 	std::string filename(argv[1]);
 	std::string workdir(argv[2]);
 	
