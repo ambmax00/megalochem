@@ -9,6 +9,12 @@
 
 #include "utils/ppdirs.hpp"
 
+#define MAXDIM 4
+
+#define DATASIZE(x,n) \
+	(n < N) ? x[n].data() : nullptr, \
+	(n < N) ? x[n].size() : 0
+
 namespace dbcsr {
 
 template <int N, typename>
@@ -127,32 +133,18 @@ public:
 	
 	MAKE_PARAM_STRUCT(create, DIST_T_PLIST, ())
 	MAKE_BUILDER_CLASS(dist_t, create, DIST_T_PLIST, ())
-
-#define DATASIZE(x,n) \
-	x[n].data(), x[n].size()
 	
-#define DATASIZE0(x,n) \
-	nullptr, 0
-	
-#define NARR (3,2,1,0)
-
-#define DIST_CONSTRUCTOR(x,idim) \
-	template<int M = N, typename std::enable_if<M == idim,int>::type = 0> \
-	dist_t(create_pack&& p)	{ \
-		\
-		m_dist_ptr = nullptr; \
-		m_nd_dists = p.p_nd_dists; \
-        m_comm = p.p_set_pgrid.comm(); \
-		\
-		c_dbcsr_t_distribution_new(&m_dist_ptr, p.p_set_pgrid.m_pgrid_ptr, \
-				REPEAT_SECOND(DATASIZE, m_nd_dists, 0, idim, (,), ()) \
-				REPEAT_SECOND(ECHO_NONE, UNUSED, 0, CAT(GET_,idim) NARR, (), (,)) \
-                REPEAT_SECOND(DATASIZE0, UNUSED, 0, CAT(GET_,idim) NARR, (,), ()) \
-        ); \
-        \
+	dist_t(create_pack&& p)	{ 
+		
+		m_dist_ptr = nullptr; 
+		m_nd_dists = p.p_nd_dists; 
+        m_comm = p.p_set_pgrid.comm(); 
+		
+		c_dbcsr_t_distribution_new(&m_dist_ptr, p.p_set_pgrid.m_pgrid_ptr, 
+				REPEAT_FIRST(DATASIZE, m_nd_dists, 0, MAXDIM, (,), ())
+        ); 
+        
 	}
-
-	REPEAT_FIRST(DIST_CONSTRUCTOR, UNUSED, 2, 3, (), ())
 	
 	dist_t(dist_t<N>& rhs) = delete;
 		
@@ -223,19 +215,17 @@ public:
 //                             CONSTRUCTORS
 // =====================================================================
 
-#:set list = [ &
-	['name', 'std::string', _REQ, _VAL],&
-	['set_dist','dist_t<N>', _OPT, _REF],&
-	['set_pgrid', 'pgrid<N>', _OPT, _REF],&
-	['map1', 'vec<int>', _REQ, _VAL],&
-	['map2', 'vec<int>', _REQ, _VAL],&
-	['blk_sizes', 'arrvec<int,N>', _REQ, _VAL]]
+#define TENSOR_CREATE_PLIST (\
+	((std::string), name),\
+	((util::optional<dist_t<N>&>), set_dist),\
+	((util::optional<pgrid<N>&>), set_pgrid),\
+	((vec<int>), map1),\
+	((vec<int>), map2),\
+	((arrvec<int,N>), blk_sizes))
 	
-${_MAKE_PARAM_STRUCT('create', list)}$
-${_MAKE_BUILDER_CLASS('tensor', 'create', list, True)}$
-	
-#:for idim in range(2,MAXDIM+1)
-	
+	MAKE_PARAM_STRUCT(create, TENSOR_CREATE_PLIST, ())
+	MAKE_BUILDER_CLASS(tensor, create, TENSOR_CREATE_PLIST, ())
+
 	template<int M = N, typename std::enable_if<${idim}$ == M,int>::type = 0>
 	tensor(create_pack&& p) {
 		 
@@ -268,29 +258,26 @@ ${_MAKE_BUILDER_CLASS('tensor', 'create', list, True)}$
 		}
 
 		c_dbcsr_t_create_new(&m_tensor_ptr, p.p_name.c_str(), dist_ptr, 
-						p.p_map1.data(), p.p_map1.size(),
-						p.p_map2.data(), p.p_map2.size(), &m_data_type, 
-						${datasize('p.p_blk_sizes', 0, idim)}$
-                        #:if idim != MAXDIM
-                        ,
-                        #:endif
-                        ${datasize0(MAXDIM-idim)}$);
-							
+			p.p_map1.data(), p.p_map1.size(),
+			p.p_map2.data(), p.p_map2.size(), &m_data_type,
+			REPEAT_FIRST(DATASIZE, p.p_blk_sizes, 0, MAXDIM, (,), ())
+		);
+						
 	}
 	
-#:endfor
+#define TENSOR_TEMPLATE_PLIST (\
+	((tensor<N,T>&), templet))
+	
+#define TENSOR_TEMPLATE_ILIST (\
+	((std::string), name),\
+	((util::optional<dist_t<N>&>), ndist),\
+	((util::optional<vec<int>>), map1),\
+	((util::optional<vec<int>>), map2))
 
-#:set init_list = [&
-	['templet', 'tensor<N,T>', _REQ, _REF]]
-
-#:set list = [ &
-	['name', 'std::string', _REQ, _VAL],&
-	['ndist', 'dist_t<N>', _OPT, _REF],&
-	['map1', 'vec<int>', _OPT, _VAL],&
-	['map2', 'vec<int>', _OPT, _VAL]]
-
-${_MAKE_PARAM_STRUCT('create_template', list, init_list)}$
-${_MAKE_BUILDER_CLASS('tensor', 'create_template', list, True, init_list)}$
+	MAKE_PARAM_STRUCT(create_template, TENSOR_TEMPLATE_PLIST,
+		TENSOR_TEMPLATE_ILIST)
+	MAKE_BUILDER_CLASS(tensor, create_template, TENSOR_TEMPLATE_PLIST,
+		TENSOR_TEMPLATE_ILIST)
     
 	tensor(create_template_pack&& p) {
    
@@ -308,15 +295,17 @@ ${_MAKE_BUILDER_CLASS('tensor', 'create_template', list, True, init_list)}$
             		
 	}
 
-#:set init_list = [ &
-	['matrix_in', 'matrix<T>', _REQ, _REF]]
-
-#:set list = [ &
-	['name', 'std::string', _OPT, _VAL],&
-	['order', 'vec<int>', _OPT, _VAL]]
+#define TENSOR_CREATE_MATRIX_ILIST (\
+	((matrix<T>&), matrix_in))
 	
-${_MAKE_PARAM_STRUCT('create_matrix', list, init_list)}$
-${_MAKE_BUILDER_CLASS('tensor', 'create_matrix', list, True, init_list)}$
+#define TENSOR_CREATE_MATRIX_PLIST (\
+	((util::optional<std::string>), name),\
+	((util::optional<vec<int>>), order))
+	
+	MAKE_PARAM_STRUCT(create_template, TENSOR_CREATE_MATRIX_PLIST,
+		TENSOR_TEMPLATE_ILIST)
+	MAKE_BUILDER_CLASS(tensor, create_template, TENSOR_CREATE_MATRIX_PLIST,
+		TENSOR_CREATE_MATRIX_ILIST)
     
     tensor(create_matrix_pack&& p) {
    
@@ -328,6 +317,8 @@ ${_MAKE_BUILDER_CLASS('tensor', 'create_matrix', list, True, init_list)}$
 			(p.p_name) ? p.p_name->c_str() : nullptr);
             		
 	}
+	
+#if 0
     
 // =====================================================================
 //                             GET INFO
