@@ -15,6 +15,12 @@
 
 namespace ints {
 	
+static constexpr bool use_qr = true;
+static constexpr int chunk_size = 2;
+static constexpr double radius_eps = 1e-16;
+static constexpr double radius_step = 0.2;
+static constexpr int radius_max_step = 10000;	
+
 struct block_info {
 	double alpha;
 	double radius;
@@ -24,7 +30,7 @@ struct block_info {
 std::vector<block_info> get_block_info(desc::cluster_basis& cbas) {
 	
 	std::vector<block_info> blkinfo(cbas.size());
-	auto radii = cbas.radii(1e-8, 0.2, 1000);
+	auto radii = cbas.radii(radius_eps, radius_step, radius_max_step);
 	auto min_alphas = cbas.min_alpha();
 	
 	for (int ic = 0; ic != cbas.size(); ++ic) {
@@ -37,10 +43,11 @@ std::vector<block_info> get_block_info(desc::cluster_basis& cbas) {
 	
 }
 
-dbcsr::sbtensor<3,double> dfitting::compute_qr_new(dbcsr::shared_matrix<double> s_xx_inv, 
-		dbcsr::shared_matrix<double> m_xx, dbcsr::shared_pgrid<3> spgrid3_xbb,
-		shared_screener scr_s, std::array<int,3> bdims, dbcsr::btype mytype, 
-		bool atomic)
+dbcsr::sbtensor<3,double> dfitting::compute_qr_new(
+	dbcsr::shared_matrix<double> s_bb, dbcsr::shared_matrix<double> s_xx_inv, 
+	dbcsr::shared_matrix<double> m_xx, dbcsr::shared_pgrid<3> spgrid3_xbb,
+	shared_screener scr_s, std::array<int,3> bdims, dbcsr::btype mytype, 
+	bool atomic)
 {
 	
 	TIME.start();
@@ -51,8 +58,8 @@ dbcsr::sbtensor<3,double> dfitting::compute_qr_new(dbcsr::shared_matrix<double> 
 	
 	auto aofac = std::make_shared<aofactory>(m_mol, m_world);
 	
-	double T = global::qr_theta;
-	double R2 = global::qr_rho;
+	double qr_theta = global::qr_theta;
+	double qr_rho = global::qr_rho;
 	
 	prep_time.start();
 	
@@ -70,12 +77,11 @@ dbcsr::sbtensor<3,double> dfitting::compute_qr_new(dbcsr::shared_matrix<double> 
 	arrvec<int,2> xx = {x,x};
 	arrvec<int,3> xbb = {x,b,b};
 	
-	
-	
 	// =========== ALLOCATE TENSORS ====================================
 	
 	auto blkmap_b = m_mol->c_basis()->block_to_atom(m_mol->atoms());
 	auto blkmap_x = m_mol->c_dfbasis()->block_to_atom(m_mol->atoms());
+	auto blktype_b = m_mol->c_basis()->types();
 	
 	auto spgrid2_local = dbcsr::pgrid<2>::create(MPI_COMM_SELF).build();
 	auto spgrid3_local = dbcsr::pgrid<3>::create(MPI_COMM_SELF).build();
@@ -147,11 +153,12 @@ dbcsr::sbtensor<3,double> dfitting::compute_qr_new(dbcsr::shared_matrix<double> 
 	auto s_xx_local_mat = dbcsr::eigen_to_matrix(s_xx_inv_eigen, single_world, 
 		"temp", x, x, dbcsr::type::symmetric);
 	dbcsr::copy_matrix_to_tensor(*s_xx_local_mat, *s_xx_inv_local);
-	s_xx_inv_local->filter(T);
+	s_xx_inv_local->filter(dbcsr::global::filter_eps);
 	
 	s_xx_inv_eigen.resize(0,0);
 	s_xx_local_mat->release();
 	
+	/* NOT FILTERED BECAUSE IT IS USED IN QR */
 	auto m_xx_eigen = dbcsr::matrix_to_eigen(*m_xx);
 	
 	// =============== CREATE FRAGMENT BLOCKS ==========================
@@ -264,6 +271,8 @@ dbcsr::sbtensor<3,double> dfitting::compute_qr_new(dbcsr::shared_matrix<double> 
 	std::vector<int> blkprev;
 	int ncounter = 0;
 	
+	auto blknorm = dbcsr::block_norms(*s_bb);
+	
 	for (int ibatch_nu = 0; ibatch_nu != c_xbb_batched->nbatches(2); ++ibatch_nu) {
 		
 		LOG.os<>("BATCH: ", ibatch_nu, '\n');
@@ -276,34 +285,20 @@ dbcsr::sbtensor<3,double> dfitting::compute_qr_new(dbcsr::shared_matrix<double> 
 		
 		using task_list = std::vector<std::vector<std::pair<int,int>>>;
 
-		task_list global_tasks;
-		
-		const int chunksize = _CHUNK_SIZE;
+		task_list global_tasks;		
 		
 		std::vector<std::pair<int,int>> chunk;
-		
+				
 		for (int ifrag = 0; ifrag != frag_blocks.size(); ++ifrag) {
 			for (int jfrag = frag_blkbounds[0]; 
 				jfrag != frag_blkbounds[1]+1; ++jfrag) {
+					
+				if (ifrag > jfrag) continue;
 				
 				std::pair<int,int> p = {ifrag, jfrag};
-				bool keep_block = false;
 				
-				// check if blocks overlap
-				for (auto imu : frag_blocks[ifrag]) {
-					for (auto inu : frag_blocks[jfrag]) {
-						double ri = blkinfo_b[imu].radius;
-						double rj = blkinfo_b[inu].radius;
-						auto posi = blkinfo_b[imu].pos;
-						auto posj = blkinfo_b[inu].pos;
-						
-						double d = dist(posi, posj);
-						if (d < ri + rj) keep_block = true;
-					}
-				}
-				
-				if (keep_block) chunk.push_back(p);
-				if (chunk.size() >= chunksize) {
+				chunk.push_back(p);
+				if (chunk.size() >= chunk_size) {
 					global_tasks.push_back(chunk);
 					chunk.clear();
 				}
@@ -325,6 +320,8 @@ dbcsr::sbtensor<3,double> dfitting::compute_qr_new(dbcsr::shared_matrix<double> 
 		 *            TASK FUNCTION FOR SCHEDULER 
 		 * ============================================================*/
 		 
+		std::deque<std::vector<int>> blkbuffer;
+		 
 		std::function<void(int64_t)> task_func = [&](int64_t itask) 
 		{
 			//std::cout << "PROC: " << m_world.rank() << " -> TASK ID: " << itask << std::endl;
@@ -341,9 +338,9 @@ dbcsr::sbtensor<3,double> dfitting::compute_qr_new(dbcsr::shared_matrix<double> 
 			work_time.start();
 			
 			arrvec<int,3> blkidx;
-			int64_t ovlp_nblks = 0;
-			
+						
 			for (auto chunk : global_tasks[itask]) {
+				
 				int ifrag = chunk.first;
 				int jfrag = chunk.second;
 				
@@ -354,37 +351,32 @@ dbcsr::sbtensor<3,double> dfitting::compute_qr_new(dbcsr::shared_matrix<double> 
 						double rj = blkinfo_b[imu].radius;
 						auto posi = blkinfo_b[inu].pos;
 						auto posj = blkinfo_b[imu].pos;
-						
-						if (dist(posi,posj) > ri + rj) continue;
+												
+						if (blktype_b[imu] == blktype_b[inu] &&
+							blknorm(imu,inu) < dbcsr::global::filter_eps) 
+							continue;
 						
 						for (int ix = 0; ix != x.size(); ++ix) {
-							double rx = blkinfo_x[ix].radius;
-							auto posx = blkinfo_x[ix].pos;
-							
-							if (dist(posx,posi) > ri + rx) continue;
 							
 							blkidx[0].push_back(ix);
 							blkidx[1].push_back(imu);
 							blkidx[2].push_back(inu);
-							
-							ovlp_nblks++;
-							
+														
 						}
 					}
 				}
 			}
-			
-			//std::cout << "NBLOCKS: " << ovlp_nblks << std::endl;
 			
 			// 2. Compute 
 			
 			ovlp_time.start();
 			
 			ovlp_xbb_local->reserve(blkidx);
+						
 			aofac->ao_3c1e_ovlp_setup();
 			aofac->ao_3c_fill(ovlp_xbb_local);
-			ovlp_xbb_local->filter(T);
-		
+			ovlp_xbb_local->filter(dbcsr::global::filter_eps);
+			
 			vec<vec<int>> mn_bounds = {
 				c_xbb_batched->full_bounds(1),
 				c_xbb_batched->bounds(2,ibatch_nu)
@@ -392,18 +384,32 @@ dbcsr::sbtensor<3,double> dfitting::compute_qr_new(dbcsr::shared_matrix<double> 
 			
 			// 3. Contract
 						
+			if (ovlp_xbb_local->num_blocks() == 0) {
+				std::cout << "RANK: " << m_world.rank() << "COMPLETE SCREEN" << std::endl;
+				ovlp_time.finish();
+				work_time.finish();
+				return;
+			}
+									
 			dbcsr::contract(1.0, *s_xx_inv_local, *ovlp_xbb_local, 
 				0.0, *prs_xbb_local)
-				.filter(T)
+				.filter(qr_theta)
 				.bounds3(mn_bounds)
 				.perform("XY, Ymn -> Xmn");
 			
 			ovlp_xbb_local->clear();
+						
+			if (prs_xbb_local->num_blocks() == 0) {
+				std::cout << "RANK: " << m_world.rank() << "COMPLETE SCREEN" << std::endl;
+				ovlp_time.finish();
+				work_time.finish();
+				return;
+			}
 			
 			ovlp_time.finish();
-			
+						
 			// === LOOP OVER CHUNKS OF FRAGMENTS 
-			
+						
 			for (auto chunk : global_tasks[itask]) {
 				
 				setup_time.start();
@@ -420,55 +426,59 @@ dbcsr::sbtensor<3,double> dfitting::compute_qr_new(dbcsr::shared_matrix<double> 
 				//	<< std::endl;
 				
 				vec<bool> blk_P_bool(x.size(),false);
-			
-				std::array<int,3> idx = {0,0,0};
-				std::array<int,3> size = {0,0,0};
 				
-						
-				// === get all relevant P functions ==
+				std::array<int,3> idx3 = {0,0,0};
+				std::array<int,3> size3 = {0,0,0};
+				
 				for (auto imu : blk_mu) {
-					for (auto inu : blk_nu) {
-				
-					idx[1] = imu;
-					idx[2] = inu;
+				 for (auto inu : blk_nu) {
+				  for (int ix = 0; ix != x.size(); ++ix) {
+							
+				   idx3 = {ix,imu,inu};
+				   size3 = {x[ix],b[imu],b[inu]};
+				   bool found = true;
 					
-					size[1] = b[imu];
-					size[2] = b[inu];
+				   auto blk3 = prs_xbb_local->get_block(idx3, size3, found);
+				   if (!found) continue;
 				
-					bool keep = false;
+				   auto max_iter = std::max_element(blk3.data(), blk3.data() + blk3.ntot(),
+				      [](double a, double b) {
+				          return fabs(a) < fabs(b);
+				      }
+				   );
+								
+				   if (fabs(*max_iter) > qr_theta) blk_P_bool[ix] = true;
 					
-					for (int ix = 0; ix != x.size(); ++ix) {
-						bool found = false;
-						idx[0] = ix;
-						size[0] = x[ix];
-						auto blk = prs_xbb_local->get_block(idx, size, found);
-						if (!found) continue;
-						
-						auto max_iter = std::max_element(blk.data(), blk.data() + blk.ntot(),
-							[](double a, double b) {
-								return fabs(a) < fabs(b);
-							}
-						);
-						
-						if (fabs(*max_iter) > T) blk_P_bool[ix] = true;
-										
-					}
-				}}
+				}}}
+								
+				//prs_xbb_local->clear();
 			
 				vec<int> blk_P;
 				blk_P.reserve(x.size());
 				for (int ix = 0; ix != x.size(); ++ix) {
 					if (blk_P_bool[ix]) blk_P.push_back(ix);
 				}
-			
-				if (blkprev == blk_P) ncounter++;
-				blkprev = blk_P;
+				
+				
+				// check if in buffer
+				auto blkbuffer_it = std::find(blkbuffer.begin(),
+					blkbuffer.end(), blk_P);
+				if (blkbuffer_it != blkbuffer.end()) {
+					ncounter++;
+				}
+				
+				if (blkbuffer.size() > 10) {
+					blkbuffer.pop_front();
+				}
+				
+				blkbuffer.push_back(blk_P);
 				
 				int nblkp = blk_P.size();
 				//std::cout << "FUNCS: " << nblkp << "/" << x.size() << std::endl;
 			
 				if (nblkp == 0) {
 					setup_time.finish();
+					std::cout << "RANK: " << m_world.rank() << "QRRHO SCREEN" << std::endl;
 					continue;
 				}
 					
@@ -486,7 +496,7 @@ dbcsr::sbtensor<3,double> dfitting::compute_qr_new(dbcsr::shared_matrix<double> 
 						double f = (alpha_x * alpha_p) / (alpha_x + alpha_p)
 							* pow(dist(pos_x, pos_p),2.0);
 							
-						if (f < R2) blk_Q_bool[ix] = true;
+						if (f < qr_rho) blk_Q_bool[ix] = true;
 		
 					}
 				}
@@ -528,6 +538,7 @@ dbcsr::sbtensor<3,double> dfitting::compute_qr_new(dbcsr::shared_matrix<double> 
 				// generate integrals
 				aofac->ao_3c2e_setup(metric::coulomb);
 				aofac->ao_3c_fill_idx(eri_local, coul_blk_idx, nullptr);
+				/* NOT FILTERED BECAUSE IT IS USED IN QR */
 			
 				coul_time.finish();
 							
@@ -699,6 +710,7 @@ dbcsr::sbtensor<3,double> dfitting::compute_qr_new(dbcsr::shared_matrix<double> 
 				}
 				
 				c_xbb_task->filter(dbcsr::global::filter_eps);
+				if (ifrag == jfrag) c_xbb_task->scale(0.5);			
 				
 				dbcsr::copy(*c_xbb_task, *c_xbb_local)
 					.move_data(true)
@@ -719,23 +731,16 @@ dbcsr::sbtensor<3,double> dfitting::compute_qr_new(dbcsr::shared_matrix<double> 
 		
 		tasks.run();
 	
-		// ============== RUN SCHEDULER ================================
-		
-		//util::dynamic_scheduler tasks(m_world.comm(), global_tasks.size(), task_func);
-		//tasks.run();
-						
-		// =============== REDISTRIBUTE BLOCKS AND COMPRESS ============ 
-		
-		//dbcsr::print(*c_xbb_local);
-	
 		comp_time.start();
+		
+		LOG(-1).os<>("Could have skipped: ", ncounter, '\n');
 				
 		dbcsr::copy_local_to_global(*c_xbb_local, *c_xbb_global);
 		
 		c_xbb_local->clear();
-		//dbcsr::print(*c_xbb_global);
 		
 		c_xbb_batched->compress({ibatch_nu}, c_xbb_global);
+		c_xbb_global->clear();
 		
 		comp_time.finish();		
 		
@@ -743,7 +748,61 @@ dbcsr::sbtensor<3,double> dfitting::compute_qr_new(dbcsr::shared_matrix<double> 
 	
 	c_xbb_batched->compress_finalize();
 	
-	double occupation = c_xbb_batched->occupation() * 100;
+	auto& time_desym = TIME.sub("Desymmetrizing tensor");
+	time_desym.start();
+	
+	auto c_xbb_batched_full = dbcsr::btensor<3>::create()
+		.name("cqr_xbb_batched_full")
+		.set_pgrid(spgrid3_xbb)
+		.blk_sizes(xbb)
+		.blk_maps(blkmaps)
+		.batch_dims(bdims)
+		.btensor_type(mytype)
+		.print(0)
+		.build();
+	
+	auto c_xbb_n = c_xbb_batched->get_template("c_xbb_n", {0}, {1,2});
+	auto c_xbb_t = c_xbb_batched->get_template("c_xbb_t", {0}, {1,2});
+	
+	c_xbb_batched_full->compress_init({0}, {0}, {1,2});
+	c_xbb_batched->decompress_init({0}, {0}, {1,2});
+	
+	for (int ix = 0; ix != c_xbb_batched->nbatches(0); ++ix) {
+		
+		c_xbb_batched->decompress({ix});
+		auto c_xbb = c_xbb_batched->get_work_tensor();
+		
+		vec<vec<int>> xbounds = {
+			c_xbb_batched->bounds(0,ix),
+			c_xbb_batched->full_bounds(1),
+			c_xbb_batched->full_bounds(2)
+		};
+		
+		dbcsr::copy(*c_xbb, *c_xbb_n)
+			.bounds(xbounds)
+			.perform();
+			
+		dbcsr::copy(*c_xbb, *c_xbb_t)
+			.bounds(xbounds)
+			.order({0,2,1})
+			.perform();
+			
+		dbcsr::copy(*c_xbb_t, *c_xbb_n)
+			.bounds(xbounds)
+			.sum(true)
+			.move_data(true)
+			.perform();
+			
+		c_xbb_batched_full->compress({ix}, c_xbb_n);
+		
+	}
+	
+	c_xbb_batched->decompress_finalize();
+	c_xbb_batched_full->compress_finalize();
+	
+	time_desym.finish();
+	
+	double occupation = c_xbb_batched_full->occupation() * 100;
 	
 	if (occupation > 100) throw std::runtime_error(
 		"Fitting coefficients occupation more than 100%");
@@ -751,7 +810,7 @@ dbcsr::sbtensor<3,double> dfitting::compute_qr_new(dbcsr::shared_matrix<double> 
 	TIME.finish();
 	TIME.print_info();
 			
-	return c_xbb_batched;
+	return c_xbb_batched_full;
 	
 }
 
