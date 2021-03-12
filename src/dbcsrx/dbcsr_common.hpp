@@ -16,7 +16,6 @@
 #include <random>
 #include <algorithm>
 #include <iostream>
-#include <fortran_utils.hpp>
 
 #endif
 
@@ -53,7 +52,7 @@ typedef index<4> idx4;
 
 template <int N>
 struct is_valid_dim {
-    const static bool value = (N >= 2 && N <= ${MAXDIM}$);
+    const static bool value = (N >= 2 && N <= MAXDIM);
 };
 
 template <typename T> 
@@ -483,8 +482,8 @@ public:
 
 #define OPERATOR(var,n) \
 	template <typename D = T, int M = N> \
-    typename std::enable_if<M == n, D&>::type \
-    operator()(REPEAT_SECOND(CAT, int i_, 0, n, (,), ())) {\
+    	typename std::enable_if<M == n, D&>::type \
+    	operator()(REPEAT_SECOND(CAT, int i_, 0, n, (PPDIRS_COMMA), ())) {\
 		return m_data[ \
 		REPEAT_SECOND(ARRAYINDEX, UNUSED, 0, n, (+), ()) \
 		];\
@@ -496,11 +495,11 @@ public:
 	template <typename D = T, int M = N> \
 	typename std::enable_if<M == n, void>::type \
 	reshape(D* data, std::array<int,2> sizes, vec<int>& map1, vec<int>& map2) { \
-	\
-		CAT(fortran_reshape_, n)(data, sizes.data(), m_data, \
-			m_size.data(), map1.data(), map1.size(), map2.data(), map2.size()); \
-	\
 	}
+	/*	//CAT(fortran_reshape_, n)(data, sizes.data(), m_data, \
+	\	//	m_size.data(), map1.data(), map1.size(), map2.data(), map2.size()); \
+	\
+	}*/
 
 	REPEAT_FIRST(RESHAPE, UNUSED, 2, 3, (), ())
 	

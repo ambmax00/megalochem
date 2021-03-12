@@ -34,6 +34,7 @@ public:
 	((util::optional<vec<int>>), map1),\
 	((util::optional<vec<int>>), map2),\
 	((util::optional<arr<int,N>>), tensor_dims),\
+	((util::optional<int>), nsplit),\
 	((util::optional<int>), dimsplit))
 	
 #define PGRID_INIT (\
@@ -141,7 +142,7 @@ public:
         m_comm = p.p_set_pgrid.comm(); 
 		
 		c_dbcsr_t_distribution_new(&m_dist_ptr, p.p_set_pgrid.m_pgrid_ptr, 
-				REPEAT_FIRST(DATASIZE, m_nd_dists, 0, MAXDIM, (,), ())
+				REPEAT_FIRST(DATASIZE, m_nd_dists, 0, MAXDIM, (PPDIRS_COMMA), ())
         ); 
         
 	}
@@ -225,12 +226,11 @@ public:
 	
 	MAKE_PARAM_STRUCT(create, TENSOR_CREATE_PLIST, ())
 	MAKE_BUILDER_CLASS(tensor, create, TENSOR_CREATE_PLIST, ())
-
-	template<int M = N, typename std::enable_if<${idim}$ == M,int>::type = 0>
+	
 	tensor(create_pack&& p) {
 		 
 		void* dist_ptr = nullptr;
-		std::shared_ptr<dist_t<M>> distn;
+		std::shared_ptr<dist_t<N>> distn;
 		
 		if (p.p_set_dist) {
 			
@@ -239,15 +239,15 @@ public:
 			
 		} else {
 			
-			arrvec<int,M> distvecs;
+			arrvec<int,N> distvecs;
 			auto pgrid_dims = p.p_set_pgrid->dims();
 			
-			for (int i = 0; i != M; ++i) {
+			for (int i = 0; i != N; ++i) {
 				distvecs[i] = default_dist(p.p_blk_sizes[i].size(),
 					pgrid_dims[i], p.p_blk_sizes[i]);
 			}
 			
-			distn = dist_t<M>::create()
+			distn = dist_t<N>::create()
 					.set_pgrid(*p.p_set_pgrid)
 					.nd_dists(distvecs)
 					.build();
@@ -260,15 +260,15 @@ public:
 		c_dbcsr_t_create_new(&m_tensor_ptr, p.p_name.c_str(), dist_ptr, 
 			p.p_map1.data(), p.p_map1.size(),
 			p.p_map2.data(), p.p_map2.size(), &m_data_type,
-			REPEAT_FIRST(DATASIZE, p.p_blk_sizes, 0, MAXDIM, (,), ())
+			REPEAT_FIRST(DATASIZE, p.p_blk_sizes, 0, MAXDIM, (PPDIRS_COMMA), ())
 		);
 						
 	}
 	
-#define TENSOR_TEMPLATE_PLIST (\
+#define TENSOR_TEMPLATE_ILIST (\
 	((tensor<N,T>&), templet))
 	
-#define TENSOR_TEMPLATE_ILIST (\
+#define TENSOR_TEMPLATE_PLIST (\
 	((std::string), name),\
 	((util::optional<dist_t<N>&>), ndist),\
 	((util::optional<vec<int>>), map1),\
@@ -302,9 +302,9 @@ public:
 	((util::optional<std::string>), name),\
 	((util::optional<vec<int>>), order))
 	
-	MAKE_PARAM_STRUCT(create_template, TENSOR_CREATE_MATRIX_PLIST,
-		TENSOR_TEMPLATE_ILIST)
-	MAKE_BUILDER_CLASS(tensor, create_template, TENSOR_CREATE_MATRIX_PLIST,
+	MAKE_PARAM_STRUCT(create_matrix, TENSOR_CREATE_MATRIX_PLIST,
+		TENSOR_CREATE_MATRIX_ILIST)
+	MAKE_BUILDER_CLASS(tensor, create_matrix, TENSOR_CREATE_MATRIX_PLIST,
 		TENSOR_CREATE_MATRIX_ILIST)
     
     tensor(create_matrix_pack&& p) {
@@ -317,12 +317,39 @@ public:
 			(p.p_name) ? p.p_name->c_str() : nullptr);
             		
 	}
-	
-#if 0
     
 // =====================================================================
 //                             GET INFO
 // =====================================================================
+
+
+
+
+
+#define TENSOR_INFO_1 (nblks_total, nfull_total, nblks_local, nfull_local, \
+	pdims, my_ploc)
+	
+#define GEN_TENSOR_INFO_1(x,n) \
+	arr<int,N> ECHO(CAT(GET_,n) TENSOR_INFO_1) () { \
+		arr<int,N> out; \
+		c_dbcsr_t_get_info(m_tensor_ptr, N, \
+			REPEAT_SECOND(ECHO_P, nullptr, 0, SUB(n,1), (PPDIRS_COMMA), (PPDIRS_COMMA)) \
+			out.data(), \
+			REPEAT_SECOND(ECHO_P, nullptr, 0, SUB(LISTSIZE(TENSOR_INFO_1),n), (,), (,)) \
+			REPEAT_SECOND(ECHO_P, 0, 0, MAXDIM, (,), (,)) \
+			REPEAT_SECOND(ECHO_P, 0, 0, MAXDIM, (,), (,)) \
+			REPEAT_SECOND(ECHO_P, nullptr, 0, MAXDIM, (,), (,)) \
+			REPEAT_SECOND(ECHO_P, nullptr, 0, MAXDIM, (,), (,)) \
+			REPEAT_SECOND(ECHO_P, nullptr, 0, MAXDIM, (,), (,)) \
+			REPEAT_SECOND(ECHO_P, nullptr, 0, MAXDIM, (,), (,)) \
+			nullptr, nullptr, nullptr \
+		); \
+		return out; \
+	} \
+			
+	REPEAT_FIRST(GEN_TENSOR_INFO_1, UNUSED, 1, LISTSIZE(TENSOR_INFO_1), (), ())
+
+#if 0
 
 #:set vars = ['nblks_total', 'nfull_total', 'nblks_local', 'nfull_local', 'pdims', 'my_ploc']
 #:for i in range(0,len(vars))
@@ -347,6 +374,90 @@ public:
    }
 
 #:endfor
+
+#endif
+
+#define TENSOR_INFO_2 (blks_local, proc_dist, blk_sizes, blk_offsets) 
+
+#define ECHO_LOC_NBLKS(x,n) \
+	sizes[n] = c_dbcsr_t_nblks_local(m_tensor_ptr,n);
+	
+#define ECHO_TOT_NBLKS(x,n) \
+	sizes[n] = c_dbcsr_t_nblks_total(m_tensor_ptr,n);
+	
+#define ECHO_SIZE(x,i) \
+	sizes[i]
+	
+#define REPEAT_X(x,i) \
+	REPEAT_THIRD(ECHO_P, nullptr, 0, MAXDIM, (,), ())
+	
+#define OUT_DATA(x,i) \
+	out[i].data()
+
+#define GEN_TENSOR_INFO_2_BASE(idim,ivar) \
+	template <int M = N> \
+	typename std::enable_if<M == idim, arrvec<int,N>>::type \
+	ECHO(CAT(GET_,ivar) TENSOR_INFO_2) () { \
+		arrvec<int,N> out; \
+		vec<int> sizes(N); \
+		constexpr char nameleft[] = XSTR(ECHO(CAT(GET_,ivar) TENSOR_INFO_2)); \
+		constexpr char nameright[] = "blks_local"; \
+		if constexpr (nameleft == nameright) { \
+			REPEAT_THIRD(ECHO_LOC_NBLKS, UNUSED, 0, idim, (), ()) \
+		} else { \
+			REPEAT_THIRD(ECHO_TOT_NBLKS, UNUSED, 0, idim, (), ()) \
+		} \
+		\
+		if constexpr (nameleft == nameright) {\
+			c_dbcsr_t_get_info(m_tensor_ptr, N,\
+				REPEAT_SECOND(ECHO_P, nullptr, 0, 6, (,), (,)) \
+				REPEAT_SECOND(ECHO_SIZE, UNUSED, 0, idim, (,), (,)) \
+				REPEAT_SECOND(ECHO_P, 0, 0, SUB(MAXDIM,idim), (,), (,)) \
+				REPEAT_SECOND(ECHO_P, 0, 0, MAXDIM, (,), (,)) \
+				REPEAT_SECOND(REPEAT_X, UNUSED, 0, DEC(ivar), (,), (,)) \
+				REPEAT_SECOND(OUT_DATA, UNUSED, 0, idim, (,), (,)) \
+				REPEAT_SECOND(ECHO_P, nullptr, 0, SUB(MAXDIM,idim), (,), (,)) \
+				REPEAT_SECOND(REPEAT_X, UNUSED, 0, SUB(LISTSIZE(TENSOR_INFO_2),ivar), (,), (,)) \
+				nullptr, nullptr, nullptr); \
+		} else { \
+			c_dbcsr_t_get_info(m_tensor_ptr, N,\
+				REPEAT_SECOND(ECHO_P, nullptr, 0, 6, (,), (,)) \
+				REPEAT_SECOND(ECHO_P, 0, 0, MAXDIM, (,), (,)) \
+				REPEAT_SECOND(ECHO_SIZE, UNUSED, 0, idim, (,), (,)) \
+				REPEAT_SECOND(ECHO_P, 0, 0, SUB(MAXDIM,idim), (,), (,)) \
+				REPEAT_SECOND(REPEAT_X, UNUSED, 0, DEC(ivar), (,), (,)) \
+				REPEAT_SECOND(OUT_DATA, UNUSED, 0, idim, (,), (,)) \
+				REPEAT_SECOND(ECHO_P, nullptr, 0, SUB(MAXDIM,idim), (,), (,)) \
+				REPEAT_SECOND(REPEAT_X, UNUSED, 0, SUB(LISTSIZE(TENSOR_INFO_2),ivar), (,), (,)) \
+				nullptr, nullptr, nullptr); \
+		} \
+		\
+		return out; \
+	}
+			
+				
+			#if 0 
+		
+		 c_dbcsr_t_get_info(m_tensor_ptr, N, ${repeat('nullptr',6)}$,
+            #:if var != 'blks_local'
+                ${repeat('0',MAXDIM)}$,
+            #:endif
+                ${repeatvar('sizes[',0,idim-1,']')}$, ${repeat('0',MAXDIM-idim,',')}$
+            #:if var == 'blks_local'
+                ${repeat('0',MAXDIM)}$,
+            #:endif
+                ${repeat('nullptr',i*MAXDIM,',')}$
+                ${repeatvar('out[',0,idim-1,'].data()')}$, ${repeat('nullptr',MAXDIM-idim,',')}$
+                ${repeat('nullptr',(len(vars)-i-1)*MAXDIM,',')}$
+                nullptr, nullptr, nullptr);
+            
+		#endif
+	
+	REPEAT_FIRST(GEN_TENSOR_INFO_2_BASE, 2, 1, LISTSIZE(TENSOR_INFO_2), (), ())	
+	REPEAT_FIRST(GEN_TENSOR_INFO_2_BASE, 3, 1, LISTSIZE(TENSOR_INFO_2), (), ())	
+	REPEAT_FIRST(GEN_TENSOR_INFO_2_BASE, 4, 1, LISTSIZE(TENSOR_INFO_2), (), ())		
+
+#if 0
 
 #:set vars = ['blks_local', 'proc_dist', 'blk_sizes', 'blk_offsets']
 #:for i in range(0,len(vars))
@@ -391,9 +502,31 @@ public:
     #:endfor
 #:endfor
 
+#endif
+
 // =====================================================================
 //                             GET MAP INFO
 // =====================================================================
+
+#define TENSOR_MAPINFO_1 (ndim_nd, ndim1_2d, ndim2_2d)
+
+#define GEN_TENSOR_MAPINFO_1(x,n) \
+	int GET(TENSOR_MAPINFO_1,n) () { \
+		int c_out; \
+		c_dbcsr_t_get_mapping_info(m_tensor_ptr, N, 0, 0, \
+			REPEAT_SECOND(ECHO_P, nullptr, 0, SUB(n,1), (,), (,)) \
+			&c_out, \
+			REPEAT_SECOND(ECHO_P, nullptr, 0, SUB(LISTSIZE(TENSOR_MAPINFO_1),n), (,), (,)) \
+			REPEAT_SECOND(ECHO_P, nullptr, 0, 10, (,), ()) \
+		); \
+		return c_out; \
+	}
+	
+	REPEAT_FIRST(GEN_TENSOR_MAPINFO_1, UNUSED, 1, LISTSIZE(TENSOR_MAPINFO_1), (), ())
+                      
+
+#if 0
+
 
 #:set vars = ['ndim_nd', 'ndim1_2d', 'ndim2_2d']
 #:for i in range(0,len(vars))
@@ -414,6 +547,52 @@ public:
     }
     
 #:endfor
+
+#endif
+
+#define TENSOR_MAPINFO_2 (\
+	(long long int, dims_2d_i8), (int, dims_2d), (int, dims_nd), (int, dims1_2d), \
+	(int, dims2_2d), (int, map1_2d), (int, map2_2d), (int, map_nd))
+
+#define CONSTEXPR_CHAR(x) \
+	constexpr char CAT(char_,GET_2 x)[] = XSTR(GET_2 x);
+
+#define GEN_TENSOR_MAPINFO_2_BASE(ctype,var,i) \
+	vec< ctype > var() { \
+		int nd_size = N; \
+        int nd_row_size = c_dbcsr_t_ndims_matrix_row(m_tensor_ptr); \
+        int nd_col_size = c_dbcsr_t_ndims_matrix_column(m_tensor_ptr); \
+        \
+        int vsize; \
+        ITERATE_LIST(CONSTEXPR_CHAR, (), (), TENSOR_MAPINFO_2) \
+        if constexpr (CAT(char_,var) == char_dims_2d_i8 || CAT(char_,var) == char_dims_2d) {\
+			vsize = 2; \
+		} else if (CAT(char_,var) == char_dims_nd || CAT(char_,var) == char_map_nd) {\
+			vsize = nd_size;\
+		} else if (CAT(char_,var) == char_dims1_2d || CAT(char_,var) == char_map1_2d) {\
+			vsize = nd_row_size;\
+		} else {\
+			vsize = nd_col_size;\
+		}\
+        vec< ctype > out(vsize); \
+        c_dbcsr_t_get_mapping_info(m_tensor_ptr, N, nd_row_size, nd_col_size, \
+			nullptr, nullptr, nullptr,\
+            REPEAT_SECOND(ECHO_P, nullptr, 0, SUB(i,1), (,), (,)) \
+            out.data(), \
+            REPEAT_SECOND(ECHO_P, nullptr, 0, SUB(LISTSIZE(TENSOR_MAPINFO_2),i), (,), (,)) \
+            nullptr, nullptr \
+        ); \
+        return out; \
+	}
+		
+
+#define GEN_TENSOR_MAPINFO_2(x,i) \
+	GEN_TENSOR_MAPINFO_2_BASE(GET_1 GET(TENSOR_MAPINFO_2,i), \
+		GET_2 GET(TENSOR_MAPINFO_2,i),i) 
+		
+	REPEAT_FIRST(GEN_TENSOR_MAPINFO_2, UNUSED, 1, LISTSIZE(TENSOR_MAPINFO_2), (), ())
+
+#if 0
 
 #:set vars = ['dims_2d_i8', 'dims_2d', 'dims_nd', 'dims1_2d', 'dims2_2d', 'map1_2d', 'map2_2d', 'map_nd']
 #:for i in range(0,len(vars))
@@ -456,6 +635,8 @@ public:
     }
     
 #:endfor
+
+#endif
             
 	tensor() : m_tensor_ptr(nullptr) {}
 		
@@ -476,28 +657,30 @@ public:
 		
 	}
 	
-#:for idim in range(2,MAXDIM+1)
-    template <int M = N>
-    typename std::enable_if<M == ${idim}$>::type
-	reserve(arrvec<int,N>& nzblks) {
-			
-		if (nzblks[0].size() == 0) return;
-		if (!(nzblks[0].size() == nzblks[1].size()
-	#:for n in range(2,idim)
-		&& nzblks[0].size() == nzblks[${n}$].size()
-	#:endfor
-		)) throw std::runtime_error("tensor.reserve : wrong dimensions.");
-		
-		
-		c_dbcsr_t_reserve_blocks_index(m_tensor_ptr, nzblks[0].size(), 
-			${repeatvar('nzblks[',0,idim-1,'].data()')}$
-            #:if idim != MAXDIM
-            ,
-            #:endif
-            ${repeat('nullptr',MAXDIM-idim)}$);
-			
+#define TENSOR_RESERVE_SUB0(x,ii) \
+	nzblks[0].size() == nzblks[ii].size()
+	
+#define TENSOR_RESERVE_SUB1(x,ii) \
+	nzblks[ii].data()
+	
+#define TENSOR_RESERVE(x,idim) \
+	template <int M = N> \
+    typename std::enable_if<M == idim>::type \
+	reserve(arrvec<int,N>& nzblks) { \
+	\
+		if (nzblks[0].size() == 0) return; \
+		if (!(REPEAT_SECOND(TENSOR_RESERVE_SUB0, UNUSED, 0, idim, ( && ), ()))) { \
+			throw std::runtime_error("tensor.reserve : wrong dimensions."); \
+		} \
+		\
+		c_dbcsr_t_reserve_blocks_index(m_tensor_ptr, nzblks[0].size(), \
+			REPEAT_SECOND(TENSOR_RESERVE_SUB1, UNUSED, 0, idim, (,), ()) \
+			REPEAT_SECOND(ECHO_NONE, UNUSED, 0, SUB(MAXDIM,idim), (), (,)) \
+            REPEAT_SECOND(ECHO_P, nullptr, 0, SUB(MAXDIM,idim), (,), ()) \
+        );\
 	}
-#:endfor
+	
+	REPEAT_FIRST(TENSOR_RESERVE, UNUSED, 2, SUB(MAXDIM,1), (), ())
 	
 	void reserve_all() {
 		
@@ -598,10 +781,15 @@ public:
 	
 	std::string name() const {
         char* cstring;
-        c_dbcsr_t_get_info(m_tensor_ptr, N, ${repeat('nullptr',6)}$, 
-							   ${repeat('0',2*MAXDIM)}$,
-                               ${repeat('nullptr',4*MAXDIM)}$,
-                               nullptr, &cstring, nullptr);
+        c_dbcsr_t_get_info(m_tensor_ptr, N, 
+			REPEAT_FIRST(ECHO_P, nullptr, 0, 6, (,), (,))
+			REPEAT_FIRST(ECHO_P, 0, 0, MAXDIM, (,), (,))
+			REPEAT_FIRST(ECHO_P, 0, 0, MAXDIM, (,), (,))
+			REPEAT_FIRST(ECHO_P, 0, 0, MAXDIM, (,), (,))
+			REPEAT_FIRST(ECHO_P, 0, 0, MAXDIM, (,), (,))
+			REPEAT_FIRST(ECHO_P, 0, 0, MAXDIM, (,), (,))
+			REPEAT_FIRST(ECHO_P, 0, 0, MAXDIM, (,), (,))	
+			nullptr, &cstring, nullptr);
 		std::string out(cstring);
 		c_free_string(&cstring);
         return out;
@@ -830,20 +1018,6 @@ void print(tensor<N,T>& t_in) {
     iter.stop();
 }
 
-// typedefs
-#:for idim in range(2,MAXDIM+1)
-#:for i in range(0,4)
-#:set type = typelist[i]
-#:set suffix = typesuffix[i]
-typedef tensor<${idim}$,${type}$> tensor${idim}$_${suffix}$;
-typedef iterator_t<${idim}$,${type}$> iterator_t${idim}$_${suffix}$;
-typedef block<${idim}$,${type}$> block${idim}$_${suffix}$;
-typedef shared_tensor<${idim}$,${type}$> shared_tensor${idim}$_${suffix}$;
-#:endfor
-#:endfor
-
 } // end namespace
-
-#endif
 
 #endif

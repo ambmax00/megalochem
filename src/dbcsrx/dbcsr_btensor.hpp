@@ -1,17 +1,19 @@
 #ifndef DBCSR_BTENSOR_HPP
 #define DBCSR_BTENSOR_HPP
 
+#ifndef TEST_MACRO
 #include <dbcsr_tensor_ops.hpp>
 #include "utils/mpi_time.hpp"
 #include "utils/unique.hpp"
-#:include "megalochem.fypp"
-
 #include <map>
 #include <mpi.h>
 #include <cstdlib>
 #include <memory>
 #include <filesystem>
 #include <functional>
+#endif
+
+#include "utils/ppdirs.hpp"
 
 //#define _CORE_VECTOR
 
@@ -177,18 +179,18 @@ protected:
 public:
 
 	btensor(MPI_Comm comm, int print) : LOG(comm,print) {}	
-	
-#:set list = [&
-	['set_pgrid', 'shared_pgrid<N>', _REQ, _VAL],&
-	['blk_sizes', 'arrvec<int,N>', _REQ, _REF],&
-	['blk_maps', 'arrvec<int,N>', _REQ, _REF],&
-	['batch_dims', 'std::array<int,N>', _REQ, _VAL],&
-	['name', 'std::string', _REQ, _VAL],&
-	['btensor_type', 'dbcsr::btype', _REQ, _VAL],&
-	['print', 'int', _OPT, _VAL]]
 
-${_MAKE_PARAM_STRUCT('create', list)}$
-${_MAKE_BUILDER_CLASS('btensor', 'create', list, True)}$
+#define BTENSOR_CREATE_LIST (\
+	((shared_pgrid<N>), set_pgrid),\
+	((arrvec<int,N>&), blk_sizes),\
+	((arrvec<int,N>&), blk_maps),\
+	((std::array<int,N>), batch_dims),\
+	((std::string), name),\
+	((dbcsr::btype), btensor_type),\
+	((util::optional<int>), print))
+	
+	MAKE_PARAM_STRUCT(create, BTENSOR_CREATE_LIST, ())
+	MAKE_BUILDER_CLASS(btensor, create, BTENSOR_CREATE_LIST, ())
 
 	btensor(create_pack&& p) :
 		m_comm(p.p_set_pgrid->comm()),
@@ -279,18 +281,20 @@ ${_MAKE_BUILDER_CLASS('btensor', 'create', list, True)}$
 	}
 	
 	btensor(const btensor& in) = delete;
-
-#:set init_list = [&
-	['t_in', 'btensor<N,T>', _REQ, _REF]] 
-
-#:set list = [&
-	['name', 'std::string', _REQ, _VAL],&
-	['btensor_type', 'dbcsr::btype', _REQ, _VAL],&
-	['print', 'int', _OPT, _VAL]]
-
-${_MAKE_PARAM_STRUCT('create_template', list, init_list)}$
-${_MAKE_BUILDER_CLASS('btensor', 'create_template', list, True, init_list)}$	
 	
+#define BTENSOR_TEMPLATE_ILIST (\
+	((btensor<N,T>&), t_in))
+	
+#define BTENSOR_TEMPLATE_PLIST (\
+	((std::string), name),\
+	((dbcsr::btype), btensor_type),\
+	((util::optional<int>), print))
+
+	MAKE_PARAM_STRUCT(create_template, BTENSOR_TEMPLATE_PLIST,
+		BTENSOR_TEMPLATE_ILIST)
+	MAKE_BUILDER_CLASS(btensor, create_template, BTENSOR_TEMPLATE_PLIST,
+		BTENSOR_TEMPLATE_ILIST)
+
 	btensor(create_template_pack&& p) :
 		m_comm(p.p_t_in.m_comm),
 		m_name(p.p_name),

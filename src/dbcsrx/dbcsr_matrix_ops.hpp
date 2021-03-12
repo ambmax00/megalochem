@@ -26,7 +26,6 @@ class multiply_base {
 	((util::optional<long long int&>), flop))
     
     MAKE_BUILDER_MEMBERS(multiply, MULT_BASE_LIST)
-    MAKE_BUILDER_SETS(multiply, MULT_BASE_LIST)
         
 private:
 
@@ -37,6 +36,8 @@ private:
     matrix<T>& m_C;
     
 public:
+
+	MAKE_BUILDER_SETS(multiply, MULT_BASE_LIST)
 
     multiply_base(char transa, char transb, T alpha, matrix<T>& A, matrix<T>& B, 
 		T beta, matrix<T>& C) :

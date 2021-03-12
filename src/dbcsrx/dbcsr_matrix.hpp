@@ -288,7 +288,7 @@ public:
 
 	MAKE_PARAM_STRUCT(read, MATRIX_READ_PLIST, ())
 	
-	MAKE_BUILDER_CLASS(matrix, copy, MATRIX_READ_PLIST, ())
+	MAKE_BUILDER_CLASS(matrix, read, MATRIX_READ_PLIST, ())
 
 	matrix(read_pack&& p) {
 				
@@ -549,22 +549,6 @@ public:
        return c_dbcsr_nblkcols_local(m_matrix_ptr);
     }
 
- int nblkrows_total() const {
-       return c_dbcsr_nblkrows_total(m_matrix_ptr);
-    }
-    
-    int nblkcols_total() const {
-       return c_dbcsr_nblkcols_total(m_matrix_ptr);
-    }
-    
-    int nblkrows_local() const {
-       return c_dbcsr_nblkrows_local(m_matrix_ptr);
-    }
-    
-    int nblkcols_local() const {
-       return c_dbcsr_nblkcols_local(m_matrix_ptr);
-    }
-
     std::vector<int> local_rows() const {
 		int size = this->nblkrows_local();
         std::vector<int> out(size,0);
@@ -647,7 +631,7 @@ public:
      
     std::string name() const {
         char* cname;
-        c_dbcsr_get_info(m_matrix_ptr, REPEAT_FIRST(ECHO_P, nullptr, 1, 19, (,), ()), 
+        c_dbcsr_get_info(m_matrix_ptr, REPEAT_FIRST(ECHO_P, nullptr, 1, 19, (PPDIRS_COMMA), ()), 
 			&cname, nullptr, nullptr, nullptr);
         
         std::string out(cname);
@@ -657,7 +641,7 @@ public:
     
     type matrix_type() const {
         char out;
-        c_dbcsr_get_info(m_matrix_ptr, REPEAT_FIRST(ECHO_P, nullptr, 1, 20, (,), ()), 
+        c_dbcsr_get_info(m_matrix_ptr, REPEAT_FIRST(ECHO_P, nullptr, 1, 20, (PPDIRS_COMMA), ()), 
 			&out, nullptr, nullptr);
         return static_cast<type>(out);
     }
@@ -798,7 +782,7 @@ public:
 	}
 
 #define ITER_LIST (\
-	row, col, blk, iblk, blk_p, row_size, col_size, row_offset, col_offset)
+	row, col, iblk, blk_p, row_size, col_size, row_offset, col_offset)
 	
 #define ECHO_FUNC(var) \
 	int var() { return CAT(m_, var); }

@@ -1,5 +1,4 @@
 set(FYPP_SOURCES
-	dbcsr_common.hpp.fypp
 	dbcsr_matrix.hpp.fypp
 	dbcsr_tensor.hpp.fypp
 	dbcsr_btensor.hpp.fypp

@@ -63,22 +63,22 @@ public:
 		LOG(m_world.comm(), nprint),
 		TIME (m_world.comm(), mname) {}
 
-	Z& set_occ_density(dbcsr::smat_d& pocc) {
+	Z& set_occ_density(dbcsr::shared_matrix<double>& pocc) {
 		m_pocc = pocc;
 		return *this;
 	}
 	
-	Z& set_vir_density(dbcsr::smat_d& pvir) {
+	Z& set_vir_density(dbcsr::shared_matrix<double>& pvir) {
 		m_pvir = pvir;
 		return *this;
 	}
 	
-	Z& set_occ_coeff(dbcsr::smat_d& locc) {
+	Z& set_occ_coeff(dbcsr::shared_matrix<double>& locc) {
 		m_locc = locc;
 		return *this;
 	}
 	
-	Z& set_vir_coeff(dbcsr::smat_d& lvir) {
+	Z& set_vir_coeff(dbcsr::shared_matrix<double>& lvir) {
 		m_lvir = lvir;
 		return *this;
 	}

@@ -13,8 +13,8 @@
 #include <memory>
 #include <iostream>
 
-using mat_d = dbcsr::mat_d;
-using smat_d = dbcsr::smat_d;
+using mat_d = dbcsr::matrix<double>;
+using smat_d = dbcsr::shared_matrix<double>;
 
 namespace hf {
 	

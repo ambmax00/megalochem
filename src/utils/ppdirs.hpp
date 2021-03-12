@@ -1,8 +1,14 @@
 #ifndef UTILS_PPDIRS_H
 #define UTILS_PPDIRS_H
 
-#define CAT(a, ...) PRIMITIVE_CAT(a, __VA_ARGS__)
-#define PRIMITIVE_CAT(a, ...) a ## __VA_ARGS__
+#define CAT(a,...) PRIMITIVE_CAT(a,__VA_ARGS__)
+#define PRIMITIVE_CAT(a,...) a##__VA_ARGS__
+
+#define PPDIRS_COMMA ,
+#define PPDIRS_COMMA2() ,
+#define PPDIRS_OP (
+#define PPDIRS_CP )
+#define PPDIRS_SC ;
 
 #define PASTE(x, ...) x ## __VA_ARGS__
 #define EVALUATING_PASTE(x, ...) PASTE(x, __VA_ARGS__)
@@ -291,7 +297,7 @@ print('\n')
 #define _INC_31 32
 #define _INC_32 33
 
-
+#define GET(list,n) CAT(GET_,n) list
 #define GET_1(a_1,...) a_1
 #define GET_2(a_1,a_2,...) a_2
 #define GET_3(a_1,a_2,a_3,...) a_3
@@ -325,6 +331,44 @@ print('\n')
 #define GET_31(a_1,a_2,a_3,a_4,a_5,a_6,a_7,a_8,a_9,a_10,a_11,a_12,a_13,a_14,a_15,a_16,a_17,a_18,a_19,a_20,a_21,a_22,a_23,a_24,a_25,a_26,a_27,a_28,a_29,a_30,a_31,...) a_31
 #define GET_32(a_1,a_2,a_3,a_4,a_5,a_6,a_7,a_8,a_9,a_10,a_11,a_12,a_13,a_14,a_15,a_16,a_17,a_18,a_19,a_20,a_21,a_22,a_23,a_24,a_25,a_26,a_27,a_28,a_29,a_30,a_31,a_32,...) a_32
 
+#define RECURSIVE(FUNC, NSTEPS, ARGS) CAT(_RECURSIVE_, NSTEPS)(FUNC, ARGS)
+#define _RECURSIVE_0(FUNC, ARGS) 
+#define _RECURSIVE_1(FUNC, ARGS) FUNC(ARGS)
+#define _RECURSIVE_2(FUNC, X) FUNC( _RECURSIVE_1(FUNC, X))
+#define _RECURSIVE_3(FUNC, X) FUNC( _RECURSIVE_2(FUNC, X))
+#define _RECURSIVE_4(FUNC, X) FUNC( _RECURSIVE_3(FUNC, X))
+#define _RECURSIVE_5(FUNC, X) FUNC( _RECURSIVE_4(FUNC, X))
+#define _RECURSIVE_6(FUNC, X) FUNC( _RECURSIVE_5(FUNC, X))
+#define _RECURSIVE_7(FUNC, X) FUNC( _RECURSIVE_6(FUNC, X))
+#define _RECURSIVE_8(FUNC, X) FUNC( _RECURSIVE_7(FUNC, X))
+#define _RECURSIVE_9(FUNC, X) FUNC( _RECURSIVE_8(FUNC, X))
+#define _RECURSIVE_10(FUNC, X) FUNC( _RECURSIVE_9(FUNC, X))
+#define _RECURSIVE_11(FUNC, X) FUNC( _RECURSIVE_10(FUNC, X))
+#define _RECURSIVE_12(FUNC, X) FUNC( _RECURSIVE_11(FUNC, X))
+#define _RECURSIVE_13(FUNC, X) FUNC( _RECURSIVE_12(FUNC, X))
+#define _RECURSIVE_14(FUNC, X) FUNC( _RECURSIVE_13(FUNC, X))
+#define _RECURSIVE_15(FUNC, X) FUNC( _RECURSIVE_14(FUNC, X))
+#define _RECURSIVE_16(FUNC, X) FUNC( _RECURSIVE_15(FUNC, X))
+#define _RECURSIVE_17(FUNC, X) FUNC( _RECURSIVE_16(FUNC, X))
+#define _RECURSIVE_18(FUNC, X) FUNC( _RECURSIVE_17(FUNC, X))
+#define _RECURSIVE_19(FUNC, X) FUNC( _RECURSIVE_18(FUNC, X))
+#define _RECURSIVE_20(FUNC, X) FUNC( _RECURSIVE_19(FUNC, X))
+#define _RECURSIVE_21(FUNC, X) FUNC( _RECURSIVE_20(FUNC, X))
+#define _RECURSIVE_22(FUNC, X) FUNC( _RECURSIVE_21(FUNC, X))
+#define _RECURSIVE_23(FUNC, X) FUNC( _RECURSIVE_22(FUNC, X))
+#define _RECURSIVE_24(FUNC, X) FUNC( _RECURSIVE_23(FUNC, X))
+#define _RECURSIVE_25(FUNC, X) FUNC( _RECURSIVE_24(FUNC, X))
+#define _RECURSIVE_26(FUNC, X) FUNC( _RECURSIVE_25(FUNC, X))
+#define _RECURSIVE_27(FUNC, X) FUNC( _RECURSIVE_26(FUNC, X))
+#define _RECURSIVE_28(FUNC, X) FUNC( _RECURSIVE_27(FUNC, X))
+#define _RECURSIVE_29(FUNC, X) FUNC( _RECURSIVE_28(FUNC, X))
+#define _RECURSIVE_30(FUNC, X) FUNC( _RECURSIVE_29(FUNC, X))
+#define _RECURSIVE_31(FUNC, X) FUNC( _RECURSIVE_30(FUNC, X))
+#define _RECURSIVE_32(FUNC, X) FUNC( _RECURSIVE_31(FUNC, X))
+
+#define ADD(X,Y) RECURSIVE(INC, Y, X)
+#define SUB(X,Y) RECURSIVE(DEC, Y, X)
+
 #define ECHO(x) x
 #define ECHO_P(x,n) ECHO(x)
 
@@ -343,10 +387,10 @@ print('\n')
 #define LISTSIZE(list) _LISTSIZE_DETAIL(,UNPAREN list)
 
 #define _BUILDER_MEMBER_BASE(ctype,name)\
-	util::builder_type< UNPAREN ctype >::type CAT(c_, name);\
+	typename util::builder_type< UNPAREN ctype >::type CAT(c_, name);\
 
 #define _BUILDER_SET_BASE(ctype,name)\
-	_create_base& name(util::optional< util::base_type< UNPAREN ctype >::type> \
+	_create_base& name(util::optional< typename util::base_type< UNPAREN ctype >::type> \
 	CAT(i_, name)) { \
 		CAT(c_, name) = std::move(CAT(i_, name));\
 		return *this;\
@@ -425,11 +469,11 @@ print('\n')
 			return std::make_shared< classname >(std::move(p));\
 		}\
 	};\
-	\
-	template <typename ...Types>\
-	static CAT(structname, _base) structname (Types&&... p) {\
+	 \
+	template <typename ...Types> \
+	static CAT(structname, _base) structname (Types&&... p) { \
 		return CAT(structname, _base) (std::forward<Types>(p)...);\
-	};\
+	}
 	
 
 #ifndef TEST_MACRO
@@ -456,14 +500,14 @@ struct builder_type<T, typename std::enable_if<util::is_optional<T>::value>::typ
 	typedef T type;
 };
 
-template <typename T, typename T2=void> struct base_type;
+template <class T, typename T2=void> struct base_type;
 
-template <typename T>
+template <class T>
 struct base_type<T, typename std::enable_if<util::is_optional<T>::value>::type> {
         typedef typename T::value_type type;
 };
 
-template <typename T>
+template <class T>
 struct base_type<T, typename std::enable_if<!util::is_optional<T>::value>::type> {
         typedef T type;
 };

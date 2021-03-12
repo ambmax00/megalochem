@@ -33,8 +33,8 @@ public:
 	
 	dbcsr::shared_matrix<double> inverse();
 	
-	dbcsr::smat_d U(std::vector<int> rowblksizes, std::vector<int> colblksizes);
-	dbcsr::smat_d Vt(std::vector<int> rowblksizes, std::vector<int> colblksizes);
+	dbcsr::shared_matrix<double> U(std::vector<int> rowblksizes, std::vector<int> colblksizes);
+	dbcsr::shared_matrix<double> Vt(std::vector<int> rowblksizes, std::vector<int> colblksizes);
 	std::vector<double> s();
 	
 	int rank() { return m_rank; }

@@ -371,7 +371,7 @@ void mpmod::compute() {
 		
 		LOG.os<1>("Local reduction.\n");
 		
-		dbcsr::iter_d iter(*ztilde_XX);
+		dbcsr::iterator iter(*ztilde_XX);
 		
 		double sum = 0.0;
 		

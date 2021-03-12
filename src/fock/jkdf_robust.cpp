@@ -80,7 +80,8 @@ void DFROBUST_K::compute_K() {
 	dbcsr::copy_matrix_to_tensor(*m_v_xx, *m_v_xx_01);
 	
 	auto compute_K_single = 
-	[&] (dbcsr::smat_d& p_bb, dbcsr::smat_d& k_bb, std::string x) {
+	[&] (dbcsr::shared_matrix<double>& p_bb, 
+		dbcsr::shared_matrix<double>& k_bb, std::string x) {
 		
 		// c_bar(X,n,l) = c_fit(X,n,s) * P(s,l)
 		auto k_1 = dbcsr::tensor<2>::create_template(*m_K_01)

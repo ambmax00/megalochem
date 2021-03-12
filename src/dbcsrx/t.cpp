@@ -6,7 +6,7 @@
 # 1 "dbcsr_tensor.hpp"
 # 10 "dbcsr_tensor.hpp"
 # 1 "../utils/ppdirs.hpp" 1
-# 439 "../utils/ppdirs.hpp"
+# 483 "../utils/ppdirs.hpp"
 namespace util {
 
 template <typename T> struct is_optional : public std::false_type {};
@@ -28,15 +28,15 @@ struct builder_type<
   typedef T type;
 };
 
-template <typename T, typename T2 = void> struct base_type;
+template <class T, typename T2 = void> struct base_type;
 
-template <typename T>
+template <class T>
 struct base_type<T,
                  typename std::enable_if<util::is_optional<T>::value>::type> {
   typedef typename T::value_type type;
 };
 
-template <typename T>
+template <class T>
 struct base_type<T,
                  typename std::enable_if<!util::is_optional<T>::value>::type> {
   typedef T type;
@@ -69,43 +69,54 @@ protected:
   template <int M, typename> friend class dist_t;
 
 public:
-# 42 "dbcsr_tensor.hpp"
+# 43 "dbcsr_tensor.hpp"
   struct create_pack {
     MPI_Comm p_comm;
     util::optional<vec<int>> p_map1;
     util::optional<vec<int>> p_map2;
     util::optional<arr<int, N>> p_tensor_dims;
+    util::optional<int> p_nsplit;
     util::optional<int> p_dimsplit;
   };
   class create_base {
     typedef create_base _create_base;
   private:
-    util::builder_type<MPI_Comm>::type c_comm;
-    util::builder_type<util::optional<vec<int>>>::type c_map1;
-    util::builder_type<util::optional<vec<int>>>::type c_map2;
-    util::builder_type<util::optional<arr<int, N>>>::type c_tensor_dims;
-    util::builder_type<util::optional<int>>::type c_dimsplit;
+    typename util::builder_type<MPI_Comm>::type c_comm;
+    typename util::builder_type<util::optional<vec<int>>>::type c_map1;
+    typename util::builder_type<util::optional<vec<int>>>::type c_map2;
+    typename util::builder_type<util::optional<arr<int, N>>>::type
+        c_tensor_dims;
+    typename util::builder_type<util::optional<int>>::type c_nsplit;
+    typename util::builder_type<util::optional<int>>::type c_dimsplit;
   public:
-    _create_base &
-    map1(util::optional<util::base_type<util::optional<vec<int>>>::type>
-             i_map1) {
+    _create_base &map1(
+        util::optional<typename util::base_type<util::optional<vec<int>>>::type>
+            i_map1) {
       c_map1 = std::move(i_map1);
       return *this;
     }
-    _create_base &
-    map2(util::optional<util::base_type<util::optional<vec<int>>>::type>
-             i_map2) {
+    _create_base &map2(
+        util::optional<typename util::base_type<util::optional<vec<int>>>::type>
+            i_map2) {
       c_map2 = std::move(i_map2);
       return *this;
     }
-    _create_base &tensor_dims(
-        util::optional<util::base_type<util::optional<arr<int, N>>>::type>
-            i_tensor_dims) {
+    _create_base &
+    tensor_dims(util::optional<
+                typename util::base_type<util::optional<arr<int, N>>>::type>
+                    i_tensor_dims) {
       c_tensor_dims = std::move(i_tensor_dims);
       return *this;
     }
-    _create_base &dimsplit(
-        util::optional<util::base_type<util::optional<int>>::type> i_dimsplit) {
+    _create_base &
+    nsplit(util::optional<typename util::base_type<util::optional<int>>::type>
+               i_nsplit) {
+      c_nsplit = std::move(i_nsplit);
+      return *this;
+    }
+    _create_base &
+    dimsplit(util::optional<typename util::base_type<util::optional<int>>::type>
+                 i_dimsplit) {
       c_dimsplit = std::move(i_dimsplit);
       return *this;
     }
@@ -133,6 +144,13 @@ public:
         }
       }
       if constexpr (!util::is_optional<util::optional<int>>::value) {
+        if (!c_nsplit) {
+          throw std::runtime_error("Parameter "
+                                   "nsplit"
+                                   " not present!");
+        }
+      }
+      if constexpr (!util::is_optional<util::optional<int>>::value) {
         if (!c_dimsplit) {
           throw std::runtime_error("Parameter "
                                    "dimsplit"
@@ -144,13 +162,14 @@ public:
           util::evaluate<util::optional<vec<int>>>(c_map1),
           util::evaluate<util::optional<vec<int>>>(c_map2),
           util::evaluate<util::optional<arr<int, N>>>(c_tensor_dims),
+          util::evaluate<util::optional<int>>(c_nsplit),
           util::evaluate<util::optional<int>>(c_dimsplit)};
       return std::make_shared<pgrid>(std::move(p));
     }
   };
   template <typename... Types> static create_base create(Types &&... p) {
     return create_base(std::forward<Types>(p)...);
-  };
+  }
 
   pgrid(create_pack &&p) {
 
@@ -224,16 +243,18 @@ public:
   class create_base {
     typedef create_base _create_base;
   private:
-    util::builder_type<pgrid<N> &>::type c_set_pgrid;
-    util::builder_type<arrvec<int, N> &>::type c_nd_dists;
+    typename util::builder_type<pgrid<N> &>::type c_set_pgrid;
+    typename util::builder_type<arrvec<int, N> &>::type c_nd_dists;
   public:
     _create_base &
-    set_pgrid(util::optional<util::base_type<pgrid<N> &>::type> i_set_pgrid) {
+    set_pgrid(util::optional<typename util::base_type<pgrid<N> &>::type>
+                  i_set_pgrid) {
       c_set_pgrid = std::move(i_set_pgrid);
       return *this;
     }
-    _create_base &nd_dists(
-        util::optional<util::base_type<arrvec<int, N> &>::type> i_nd_dists) {
+    _create_base &
+    nd_dists(util::optional<typename util::base_type<arrvec<int, N> &>::type>
+                 i_nd_dists) {
       c_nd_dists = std::move(i_nd_dists);
       return *this;
     }
@@ -260,7 +281,7 @@ public:
   };
   template <typename... Types> static create_base create(Types &&... p) {
     return create_base(std::forward<Types>(p)...);
-  };
+  }
 
   dist_t(create_pack &&p) {
 
@@ -334,7 +355,7 @@ public:
 
   typedef T value_type;
   const static int dim = N;
-# 226 "dbcsr_tensor.hpp"
+# 227 "dbcsr_tensor.hpp"
   struct create_pack {
     std::string p_name;
     util::optional<dist_t<N> &> p_set_dist;
@@ -346,40 +367,45 @@ public:
   class create_base {
     typedef create_base _create_base;
   private:
-    util::builder_type<std::string>::type c_name;
-    util::builder_type<util::optional<dist_t<N> &>>::type c_set_dist;
-    util::builder_type<util::optional<pgrid<N> &>>::type c_set_pgrid;
-    util::builder_type<vec<int>>::type c_map1;
-    util::builder_type<vec<int>>::type c_map2;
-    util::builder_type<arrvec<int, N>>::type c_blk_sizes;
+    typename util::builder_type<std::string>::type c_name;
+    typename util::builder_type<util::optional<dist_t<N> &>>::type c_set_dist;
+    typename util::builder_type<util::optional<pgrid<N> &>>::type c_set_pgrid;
+    typename util::builder_type<vec<int>>::type c_map1;
+    typename util::builder_type<vec<int>>::type c_map2;
+    typename util::builder_type<arrvec<int, N>>::type c_blk_sizes;
   public:
     _create_base &
-    name(util::optional<util::base_type<std::string>::type> i_name) {
+    name(util::optional<typename util::base_type<std::string>::type> i_name) {
       c_name = std::move(i_name);
       return *this;
     }
     _create_base &
-    set_dist(util::optional<util::base_type<util::optional<dist_t<N> &>>::type>
+    set_dist(util::optional<
+             typename util::base_type<util::optional<dist_t<N> &>>::type>
                  i_set_dist) {
       c_set_dist = std::move(i_set_dist);
       return *this;
     }
     _create_base &
-    set_pgrid(util::optional<util::base_type<util::optional<pgrid<N> &>>::type>
+    set_pgrid(util::optional<
+              typename util::base_type<util::optional<pgrid<N> &>>::type>
                   i_set_pgrid) {
       c_set_pgrid = std::move(i_set_pgrid);
       return *this;
     }
-    _create_base &map1(util::optional<util::base_type<vec<int>>::type> i_map1) {
+    _create_base &
+    map1(util::optional<typename util::base_type<vec<int>>::type> i_map1) {
       c_map1 = std::move(i_map1);
       return *this;
     }
-    _create_base &map2(util::optional<util::base_type<vec<int>>::type> i_map2) {
+    _create_base &
+    map2(util::optional<typename util::base_type<vec<int>>::type> i_map2) {
       c_map2 = std::move(i_map2);
       return *this;
     }
-    _create_base &blk_sizes(
-        util::optional<util::base_type<arrvec<int, N>>::type> i_blk_sizes) {
+    _create_base &
+    blk_sizes(util::optional<typename util::base_type<arrvec<int, N>>::type>
+                  i_blk_sizes) {
       c_blk_sizes = std::move(i_blk_sizes);
       return *this;
     }
@@ -438,13 +464,12 @@ public:
   };
   template <typename... Types> static create_base create(Types &&... p) {
     return create_base(std::forward<Types>(p)...);
-  };
+  }
 
-  template <int M = N, typename std::enable_if<${idim} $ == M, int>::type = 0>
   tensor(create_pack &&p) {
 
     void *dist_ptr = nullptr;
-    std::shared_ptr<dist_t<M>> distn;
+    std::shared_ptr<dist_t<N>> distn;
 
     if (p.p_set_dist) {
 
@@ -453,15 +478,15 @@ public:
 
     } else {
 
-      arrvec<int, M> distvecs;
+      arrvec<int, N> distvecs;
       auto pgrid_dims = p.p_set_pgrid->dims();
 
-      for (int i = 0; i != M; ++i) {
+      for (int i = 0; i != N; ++i) {
         distvecs[i] = default_dist(p.p_blk_sizes[i].size(), pgrid_dims[i],
                                    p.p_blk_sizes[i]);
       }
 
-      distn = dist_t<M>::create()
+      distn = typename dist_t<N>::create(5)
                   .set_pgrid(*p.p_set_pgrid)
                   .nd_dists(distvecs)
                   .build();
@@ -484,53 +509,89 @@ public:
   }
 # 277 "dbcsr_tensor.hpp"
   struct create_template_pack {
+    tensor<N, T> &p_templet;
     std::string p_name;
     util::optional<dist_t<N> &> p_ndist;
     util::optional<vec<int>> p_map1;
     util::optional<vec<int>> p_map2;
-    tensor<N, T> &p_templet;
   };
 
   class create_template_base {
     typedef create_template_base _create_base;
   private:
-    util::builder_type<std::string>::type c_name;
-    util::builder_type<util::optional<dist_t<N> &>>::type c_ndist;
-    util::builder_type<util::optional<vec<int>>>::type c_map1;
-    util::builder_type<util::optional<vec<int>>>::type c_map2;
-    util::builder_type<tensor<N, T> &>::type c_templet;
+    typename util::builder_type<tensor<N, T> &>::type c_templet;
+    typename util::builder_type<std::string>::type c_name;
+    typename util::builder_type<util::optional<dist_t<N> &>>::type c_ndist;
+    typename util::builder_type<util::optional<vec<int>>>::type c_map1;
+    typename util::builder_type<util::optional<vec<int>>>::type c_map2;
   public:
     _create_base &
-    templet(util::optional<util::base_type<tensor<N, T> &>::type> i_templet) {
-      c_templet = std::move(i_templet);
+    name(util::optional<typename util::base_type<std::string>::type> i_name) {
+      c_name = std::move(i_name);
       return *this;
     }
-    create_template_base(std::string i_name,
-                         util::optional<dist_t<N> &> i_ndist,
-                         util::optional<vec<int>> i_map1,
-                         util::optional<vec<int>> i_map2)
-        : c_name(i_name), c_ndist(i_ndist), c_map1(i_map1), c_map2(i_map2) {}
+    _create_base &
+    ndist(util::optional<
+          typename util::base_type<util::optional<dist_t<N> &>>::type>
+              i_ndist) {
+      c_ndist = std::move(i_ndist);
+      return *this;
+    }
+    _create_base &map1(
+        util::optional<typename util::base_type<util::optional<vec<int>>>::type>
+            i_map1) {
+      c_map1 = std::move(i_map1);
+      return *this;
+    }
+    _create_base &map2(
+        util::optional<typename util::base_type<util::optional<vec<int>>>::type>
+            i_map2) {
+      c_map2 = std::move(i_map2);
+      return *this;
+    }
+    create_template_base(tensor<N, T> &i_templet) : c_templet(i_templet) {}
     std::shared_ptr<tensor> build() {
-      if constexpr (!util::is_optional<tensor<N, T> &>::value) {
-        if (!c_templet) {
+      if constexpr (!util::is_optional<std::string>::value) {
+        if (!c_name) {
           throw std::runtime_error("Parameter "
-                                   "templet"
+                                   "name"
+                                   " not present!");
+        }
+      }
+      if constexpr (!util::is_optional<util::optional<dist_t<N> &>>::value) {
+        if (!c_ndist) {
+          throw std::runtime_error("Parameter "
+                                   "ndist"
+                                   " not present!");
+        }
+      }
+      if constexpr (!util::is_optional<util::optional<vec<int>>>::value) {
+        if (!c_map1) {
+          throw std::runtime_error("Parameter "
+                                   "map1"
+                                   " not present!");
+        }
+      }
+      if constexpr (!util::is_optional<util::optional<vec<int>>>::value) {
+        if (!c_map2) {
+          throw std::runtime_error("Parameter "
+                                   "map2"
                                    " not present!");
         }
       }
       create_template_pack p = {
+          util::evaluate<tensor<N, T> &>(c_templet),
           util::evaluate<std::string>(c_name),
           util::evaluate<util::optional<dist_t<N> &>>(c_ndist),
           util::evaluate<util::optional<vec<int>>>(c_map1),
-          util::evaluate<util::optional<vec<int>>>(c_map2),
-          util::evaluate<tensor<N, T> &>(c_templet)};
+          util::evaluate<util::optional<vec<int>>>(c_map2)};
       return std::make_shared<tensor>(std::move(p));
     }
   };
   template <typename... Types>
   static create_template_base create_template(Types &&... p) {
     return create_template_base(std::forward<Types>(p)...);
-  };
+  }
 
   tensor(create_template_pack &&p) {
 
@@ -545,35 +606,33 @@ public:
                               (p.p_map2) ? p.p_map2->size() : 0, &m_data_type);
   }
 # 305 "dbcsr_tensor.hpp"
-  struct create_template_pack {
-    std::string p_name;
-    util::optional<dist_t<N> &> p_ndist;
-    util::optional<vec<int>> p_map1;
-    util::optional<vec<int>> p_map2;
+  struct create_matrix_pack {
+    matrix<T> &p_matrix_in;
     util::optional<std::string> p_name;
     util::optional<vec<int>> p_order;
   };
 
-  class create_template_base {
-    typedef create_template_base _create_base;
+  class create_matrix_base {
+    typedef create_matrix_base _create_base;
   private:
-    util::builder_type<matrix<T> &>::type c_matrix_in;
-    util::builder_type<util::optional<std::string>>::type c_name;
-    util::builder_type<util::optional<vec<int>>>::type c_order;
+    typename util::builder_type<matrix<T> &>::type c_matrix_in;
+    typename util::builder_type<util::optional<std::string>>::type c_name;
+    typename util::builder_type<util::optional<vec<int>>>::type c_order;
   public:
     _create_base &
-    name(util::optional<util::base_type<util::optional<std::string>>::type>
+    name(util::optional<
+         typename util::base_type<util::optional<std::string>>::type>
              i_name) {
       c_name = std::move(i_name);
       return *this;
     }
-    _create_base &
-    order(util::optional<util::base_type<util::optional<vec<int>>>::type>
-              i_order) {
+    _create_base &order(
+        util::optional<typename util::base_type<util::optional<vec<int>>>::type>
+            i_order) {
       c_order = std::move(i_order);
       return *this;
     }
-    create_template_base(matrix<T> &i_matrix_in) : c_matrix_in(i_matrix_in) {}
+    create_matrix_base(matrix<T> &i_matrix_in) : c_matrix_in(i_matrix_in) {}
     std::shared_ptr<tensor> build() {
       if constexpr (!util::is_optional<util::optional<std::string>>::value) {
         if (!c_name) {
@@ -589,7 +648,7 @@ public:
                                    " not present!");
         }
       }
-      create_template_pack p = {
+      create_matrix_pack p = {
           util::evaluate<matrix<T> &>(c_matrix_in),
           util::evaluate<util::optional<std::string>>(c_name),
           util::evaluate<util::optional<vec<int>>>(c_order)};
@@ -597,9 +656,9 @@ public:
     }
   };
   template <typename... Types>
-  static create_template_base create_template(Types &&... p) {
-    return create_template_base(std::forward<Types>(p)...);
-  };
+  static create_matrix_base create_matrix(Types &&... p) {
+    return create_matrix_base(std::forward<Types>(p)...);
+  }
 
   tensor(create_matrix_pack &&p) {
 
@@ -609,3 +668,1055 @@ public:
                             (p.p_order) ? p.p_order->data() : nullptr,
                             (p.p_name) ? p.p_name->c_str() : nullptr);
   }
+# 350 "dbcsr_tensor.hpp"
+  arr<int, N> nblks_total() {
+    arr<int, N> out;
+    c_dbcsr_t_get_info(m_tensor_ptr, N, out.data(), nullptr, nullptr, nullptr,
+                       nullptr, nullptr, 0, 0, 0, 0, 0, 0, 0, 0, nullptr,
+                       nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
+                       nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
+                       nullptr, nullptr, nullptr, nullptr, nullptr, nullptr);
+    return out;
+  }
+  arr<int, N> nfull_total() {
+    arr<int, N> out;
+    c_dbcsr_t_get_info(m_tensor_ptr, N, nullptr, out.data(), nullptr, nullptr,
+                       nullptr, nullptr, 0, 0, 0, 0, 0, 0, 0, 0, nullptr,
+                       nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
+                       nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
+                       nullptr, nullptr, nullptr, nullptr, nullptr, nullptr);
+    return out;
+  }
+  arr<int, N> nblks_local() {
+    arr<int, N> out;
+    c_dbcsr_t_get_info(m_tensor_ptr, N, nullptr, nullptr, out.data(), nullptr,
+                       nullptr, nullptr, 0, 0, 0, 0, 0, 0, 0, 0, nullptr,
+                       nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
+                       nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
+                       nullptr, nullptr, nullptr, nullptr, nullptr, nullptr);
+    return out;
+  }
+  arr<int, N> nfull_local() {
+    arr<int, N> out;
+    c_dbcsr_t_get_info(m_tensor_ptr, N, nullptr, nullptr, nullptr, out.data(),
+                       nullptr, nullptr, 0, 0, 0, 0, 0, 0, 0, 0, nullptr,
+                       nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
+                       nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
+                       nullptr, nullptr, nullptr, nullptr, nullptr, nullptr);
+    return out;
+  }
+  arr<int, N> pdims() {
+    arr<int, N> out;
+    c_dbcsr_t_get_info(m_tensor_ptr, N, nullptr, nullptr, nullptr, nullptr,
+                       out.data(), nullptr, 0, 0, 0, 0, 0, 0, 0, 0, nullptr,
+                       nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
+                       nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
+                       nullptr, nullptr, nullptr, nullptr, nullptr, nullptr);
+    return out;
+  }
+  arr<int, N> my_ploc() {
+    arr<int, N> out;
+    c_dbcsr_t_get_info(m_tensor_ptr, N, nullptr, nullptr, nullptr, nullptr,
+                       nullptr, out.data(), 0, 0, 0, 0, 0, 0, 0, 0, nullptr,
+                       nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
+                       nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
+                       nullptr, nullptr, nullptr, nullptr, nullptr, nullptr);
+    return out;
+  }
+# 456 "dbcsr_tensor.hpp"
+  template <int M = N>
+  typename std::enable_if<M == 2, arrvec<int, N>>::type blks_local() {
+    arrvec<int, N> out;
+    vec<int> sizes(N);
+    constexpr char nameleft[] = "blks_local";
+    constexpr char nameright[] = "blks_local";
+    if constexpr (nameleft == nameright) {
+      sizes[0] = c_dbcsr_t_nblks_local(m_tensor_ptr, 0);
+      sizes[1] = c_dbcsr_t_nblks_local(m_tensor_ptr, 1);
+    } else {
+      sizes[0] = c_dbcsr_t_nblks_total(m_tensor_ptr, 0);
+      sizes[1] = c_dbcsr_t_nblks_total(m_tensor_ptr, 1);
+    }
+    if constexpr (nameleft == nameright) {
+      c_dbcsr_t_get_info(m_tensor_ptr, N, nullptr, nullptr, nullptr, nullptr,
+                         nullptr, nullptr, sizes[0], sizes[1], 0, 0, 0, 0, 0, 0,
+                         out[0].data(), out[1].data(), nullptr, nullptr,
+                         nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
+                         nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
+                         nullptr, nullptr, nullptr);
+    } else {
+      c_dbcsr_t_get_info(m_tensor_ptr, N, nullptr, nullptr, nullptr, nullptr,
+                         nullptr, nullptr, 0, 0, 0, 0, sizes[0], sizes[1], 0, 0,
+                         out[0].data(), out[1].data(), nullptr, nullptr,
+                         nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
+                         nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
+                         nullptr, nullptr, nullptr);
+    }
+    return out;
+  }
+  template <int M = N>
+  typename std::enable_if<M == 2, arrvec<int, N>>::type proc_dist() {
+    arrvec<int, N> out;
+    vec<int> sizes(N);
+    constexpr char nameleft[] = "proc_dist";
+    constexpr char nameright[] = "blks_local";
+    if constexpr (nameleft == nameright) {
+      sizes[0] = c_dbcsr_t_nblks_local(m_tensor_ptr, 0);
+      sizes[1] = c_dbcsr_t_nblks_local(m_tensor_ptr, 1);
+    } else {
+      sizes[0] = c_dbcsr_t_nblks_total(m_tensor_ptr, 0);
+      sizes[1] = c_dbcsr_t_nblks_total(m_tensor_ptr, 1);
+    }
+    if constexpr (nameleft == nameright) {
+      c_dbcsr_t_get_info(m_tensor_ptr, N, nullptr, nullptr, nullptr, nullptr,
+                         nullptr, nullptr, sizes[0], sizes[1], 0, 0, 0, 0, 0, 0,
+                         nullptr, nullptr, nullptr, nullptr, out[0].data(),
+                         out[1].data(), nullptr, nullptr, nullptr, nullptr,
+                         nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
+                         nullptr, nullptr, nullptr);
+    } else {
+      c_dbcsr_t_get_info(m_tensor_ptr, N, nullptr, nullptr, nullptr, nullptr,
+                         nullptr, nullptr, 0, 0, 0, 0, sizes[0], sizes[1], 0, 0,
+                         nullptr, nullptr, nullptr, nullptr, out[0].data(),
+                         out[1].data(), nullptr, nullptr, nullptr, nullptr,
+                         nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
+                         nullptr, nullptr, nullptr);
+    }
+    return out;
+  }
+  template <int M = N>
+  typename std::enable_if<M == 2, arrvec<int, N>>::type blk_sizes() {
+    arrvec<int, N> out;
+    vec<int> sizes(N);
+    constexpr char nameleft[] = "blk_sizes";
+    constexpr char nameright[] = "blks_local";
+    if constexpr (nameleft == nameright) {
+      sizes[0] = c_dbcsr_t_nblks_local(m_tensor_ptr, 0);
+      sizes[1] = c_dbcsr_t_nblks_local(m_tensor_ptr, 1);
+    } else {
+      sizes[0] = c_dbcsr_t_nblks_total(m_tensor_ptr, 0);
+      sizes[1] = c_dbcsr_t_nblks_total(m_tensor_ptr, 1);
+    }
+    if constexpr (nameleft == nameright) {
+      c_dbcsr_t_get_info(m_tensor_ptr, N, nullptr, nullptr, nullptr, nullptr,
+                         nullptr, nullptr, sizes[0], sizes[1], 0, 0, 0, 0, 0, 0,
+                         nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
+                         nullptr, nullptr, out[0].data(), out[1].data(),
+                         nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
+                         nullptr, nullptr, nullptr);
+    } else {
+      c_dbcsr_t_get_info(m_tensor_ptr, N, nullptr, nullptr, nullptr, nullptr,
+                         nullptr, nullptr, 0, 0, 0, 0, sizes[0], sizes[1], 0, 0,
+                         nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
+                         nullptr, nullptr, out[0].data(), out[1].data(),
+                         nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
+                         nullptr, nullptr, nullptr);
+    }
+    return out;
+  }
+  template <int M = N>
+  typename std::enable_if<M == 2, arrvec<int, N>>::type blk_offsets() {
+    arrvec<int, N> out;
+    vec<int> sizes(N);
+    constexpr char nameleft[] = "blk_offsets";
+    constexpr char nameright[] = "blks_local";
+    if constexpr (nameleft == nameright) {
+      sizes[0] = c_dbcsr_t_nblks_local(m_tensor_ptr, 0);
+      sizes[1] = c_dbcsr_t_nblks_local(m_tensor_ptr, 1);
+    } else {
+      sizes[0] = c_dbcsr_t_nblks_total(m_tensor_ptr, 0);
+      sizes[1] = c_dbcsr_t_nblks_total(m_tensor_ptr, 1);
+    }
+    if constexpr (nameleft == nameright) {
+      c_dbcsr_t_get_info(m_tensor_ptr, N, nullptr, nullptr, nullptr, nullptr,
+                         nullptr, nullptr, sizes[0], sizes[1], 0, 0, 0, 0, 0, 0,
+                         nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
+                         nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
+                         out[0].data(), out[1].data(), nullptr, nullptr,
+                         nullptr, nullptr, nullptr);
+    } else {
+      c_dbcsr_t_get_info(m_tensor_ptr, N, nullptr, nullptr, nullptr, nullptr,
+                         nullptr, nullptr, 0, 0, 0, 0, sizes[0], sizes[1], 0, 0,
+                         nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
+                         nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
+                         out[0].data(), out[1].data(), nullptr, nullptr,
+                         nullptr, nullptr, nullptr);
+    }
+    return out;
+  }
+  template <int M = N>
+  typename std::enable_if<M == 3, arrvec<int, N>>::type blks_local() {
+    arrvec<int, N> out;
+    vec<int> sizes(N);
+    constexpr char nameleft[] = "blks_local";
+    constexpr char nameright[] = "blks_local";
+    if constexpr (nameleft == nameright) {
+      sizes[0] = c_dbcsr_t_nblks_local(m_tensor_ptr, 0);
+      sizes[1] = c_dbcsr_t_nblks_local(m_tensor_ptr, 1);
+      sizes[2] = c_dbcsr_t_nblks_local(m_tensor_ptr, 2);
+    } else {
+      sizes[0] = c_dbcsr_t_nblks_total(m_tensor_ptr, 0);
+      sizes[1] = c_dbcsr_t_nblks_total(m_tensor_ptr, 1);
+      sizes[2] = c_dbcsr_t_nblks_total(m_tensor_ptr, 2);
+    }
+    if constexpr (nameleft == nameright) {
+      c_dbcsr_t_get_info(m_tensor_ptr, N, nullptr, nullptr, nullptr, nullptr,
+                         nullptr, nullptr, sizes[0], sizes[1], sizes[2], 0, 0,
+                         0, 0, 0, out[0].data(), out[1].data(), out[2].data(),
+                         nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
+                         nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
+                         nullptr, nullptr, nullptr, nullptr);
+    } else {
+      c_dbcsr_t_get_info(m_tensor_ptr, N, nullptr, nullptr, nullptr, nullptr,
+                         nullptr, nullptr, 0, 0, 0, 0, sizes[0], sizes[1],
+                         sizes[2], 0, out[0].data(), out[1].data(),
+                         out[2].data(), nullptr, nullptr, nullptr, nullptr,
+                         nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
+                         nullptr, nullptr, nullptr, nullptr, nullptr, nullptr);
+    }
+    return out;
+  }
+  template <int M = N>
+  typename std::enable_if<M == 3, arrvec<int, N>>::type proc_dist() {
+    arrvec<int, N> out;
+    vec<int> sizes(N);
+    constexpr char nameleft[] = "proc_dist";
+    constexpr char nameright[] = "blks_local";
+    if constexpr (nameleft == nameright) {
+      sizes[0] = c_dbcsr_t_nblks_local(m_tensor_ptr, 0);
+      sizes[1] = c_dbcsr_t_nblks_local(m_tensor_ptr, 1);
+      sizes[2] = c_dbcsr_t_nblks_local(m_tensor_ptr, 2);
+    } else {
+      sizes[0] = c_dbcsr_t_nblks_total(m_tensor_ptr, 0);
+      sizes[1] = c_dbcsr_t_nblks_total(m_tensor_ptr, 1);
+      sizes[2] = c_dbcsr_t_nblks_total(m_tensor_ptr, 2);
+    }
+    if constexpr (nameleft == nameright) {
+      c_dbcsr_t_get_info(m_tensor_ptr, N, nullptr, nullptr, nullptr, nullptr,
+                         nullptr, nullptr, sizes[0], sizes[1], sizes[2], 0, 0,
+                         0, 0, 0, nullptr, nullptr, nullptr, nullptr,
+                         out[0].data(), out[1].data(), out[2].data(), nullptr,
+                         nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
+                         nullptr, nullptr, nullptr, nullptr, nullptr);
+    } else {
+      c_dbcsr_t_get_info(m_tensor_ptr, N, nullptr, nullptr, nullptr, nullptr,
+                         nullptr, nullptr, 0, 0, 0, 0, sizes[0], sizes[1],
+                         sizes[2], 0, nullptr, nullptr, nullptr, nullptr,
+                         out[0].data(), out[1].data(), out[2].data(), nullptr,
+                         nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
+                         nullptr, nullptr, nullptr, nullptr, nullptr);
+    }
+    return out;
+  }
+  template <int M = N>
+  typename std::enable_if<M == 3, arrvec<int, N>>::type blk_sizes() {
+    arrvec<int, N> out;
+    vec<int> sizes(N);
+    constexpr char nameleft[] = "blk_sizes";
+    constexpr char nameright[] = "blks_local";
+    if constexpr (nameleft == nameright) {
+      sizes[0] = c_dbcsr_t_nblks_local(m_tensor_ptr, 0);
+      sizes[1] = c_dbcsr_t_nblks_local(m_tensor_ptr, 1);
+      sizes[2] = c_dbcsr_t_nblks_local(m_tensor_ptr, 2);
+    } else {
+      sizes[0] = c_dbcsr_t_nblks_total(m_tensor_ptr, 0);
+      sizes[1] = c_dbcsr_t_nblks_total(m_tensor_ptr, 1);
+      sizes[2] = c_dbcsr_t_nblks_total(m_tensor_ptr, 2);
+    }
+    if constexpr (nameleft == nameright) {
+      c_dbcsr_t_get_info(m_tensor_ptr, N, nullptr, nullptr, nullptr, nullptr,
+                         nullptr, nullptr, sizes[0], sizes[1], sizes[2], 0, 0,
+                         0, 0, 0, nullptr, nullptr, nullptr, nullptr, nullptr,
+                         nullptr, nullptr, nullptr, out[0].data(),
+                         out[1].data(), out[2].data(), nullptr, nullptr,
+                         nullptr, nullptr, nullptr, nullptr, nullptr, nullptr);
+    } else {
+      c_dbcsr_t_get_info(m_tensor_ptr, N, nullptr, nullptr, nullptr, nullptr,
+                         nullptr, nullptr, 0, 0, 0, 0, sizes[0], sizes[1],
+                         sizes[2], 0, nullptr, nullptr, nullptr, nullptr,
+                         nullptr, nullptr, nullptr, nullptr, out[0].data(),
+                         out[1].data(), out[2].data(), nullptr, nullptr,
+                         nullptr, nullptr, nullptr, nullptr, nullptr, nullptr);
+    }
+    return out;
+  }
+  template <int M = N>
+  typename std::enable_if<M == 3, arrvec<int, N>>::type blk_offsets() {
+    arrvec<int, N> out;
+    vec<int> sizes(N);
+    constexpr char nameleft[] = "blk_offsets";
+    constexpr char nameright[] = "blks_local";
+    if constexpr (nameleft == nameright) {
+      sizes[0] = c_dbcsr_t_nblks_local(m_tensor_ptr, 0);
+      sizes[1] = c_dbcsr_t_nblks_local(m_tensor_ptr, 1);
+      sizes[2] = c_dbcsr_t_nblks_local(m_tensor_ptr, 2);
+    } else {
+      sizes[0] = c_dbcsr_t_nblks_total(m_tensor_ptr, 0);
+      sizes[1] = c_dbcsr_t_nblks_total(m_tensor_ptr, 1);
+      sizes[2] = c_dbcsr_t_nblks_total(m_tensor_ptr, 2);
+    }
+    if constexpr (nameleft == nameright) {
+      c_dbcsr_t_get_info(m_tensor_ptr, N, nullptr, nullptr, nullptr, nullptr,
+                         nullptr, nullptr, sizes[0], sizes[1], sizes[2], 0, 0,
+                         0, 0, 0, nullptr, nullptr, nullptr, nullptr, nullptr,
+                         nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
+                         nullptr, out[0].data(), out[1].data(), out[2].data(),
+                         nullptr, nullptr, nullptr, nullptr);
+    } else {
+      c_dbcsr_t_get_info(m_tensor_ptr, N, nullptr, nullptr, nullptr, nullptr,
+                         nullptr, nullptr, 0, 0, 0, 0, sizes[0], sizes[1],
+                         sizes[2], 0, nullptr, nullptr, nullptr, nullptr,
+                         nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
+                         nullptr, nullptr, out[0].data(), out[1].data(),
+                         out[2].data(), nullptr, nullptr, nullptr, nullptr);
+    }
+    return out;
+  }
+  template <int M = N>
+  typename std::enable_if<M == 4, arrvec<int, N>>::type blks_local() {
+    arrvec<int, N> out;
+    vec<int> sizes(N);
+    constexpr char nameleft[] = "blks_local";
+    constexpr char nameright[] = "blks_local";
+    if constexpr (nameleft == nameright) {
+      sizes[0] = c_dbcsr_t_nblks_local(m_tensor_ptr, 0);
+      sizes[1] = c_dbcsr_t_nblks_local(m_tensor_ptr, 1);
+      sizes[2] = c_dbcsr_t_nblks_local(m_tensor_ptr, 2);
+      sizes[3] = c_dbcsr_t_nblks_local(m_tensor_ptr, 3);
+    } else {
+      sizes[0] = c_dbcsr_t_nblks_total(m_tensor_ptr, 0);
+      sizes[1] = c_dbcsr_t_nblks_total(m_tensor_ptr, 1);
+      sizes[2] = c_dbcsr_t_nblks_total(m_tensor_ptr, 2);
+      sizes[3] = c_dbcsr_t_nblks_total(m_tensor_ptr, 3);
+    }
+    if constexpr (nameleft == nameright) {
+      c_dbcsr_t_get_info(
+          m_tensor_ptr, N, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
+          sizes[0], sizes[1], sizes[2], sizes[3], 0, 0, 0, 0, out[0].data(),
+          out[1].data(), out[2].data(), out[3].data(), nullptr, nullptr,
+          nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
+          nullptr, nullptr, nullptr, nullptr, nullptr, nullptr);
+    } else {
+      c_dbcsr_t_get_info(
+          m_tensor_ptr, N, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
+          0, 0, 0, 0, sizes[0], sizes[1], sizes[2], sizes[3], out[0].data(),
+          out[1].data(), out[2].data(), out[3].data(), nullptr, nullptr,
+          nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
+          nullptr, nullptr, nullptr, nullptr, nullptr, nullptr);
+    }
+    return out;
+  }
+  template <int M = N>
+  typename std::enable_if<M == 4, arrvec<int, N>>::type proc_dist() {
+    arrvec<int, N> out;
+    vec<int> sizes(N);
+    constexpr char nameleft[] = "proc_dist";
+    constexpr char nameright[] = "blks_local";
+    if constexpr (nameleft == nameright) {
+      sizes[0] = c_dbcsr_t_nblks_local(m_tensor_ptr, 0);
+      sizes[1] = c_dbcsr_t_nblks_local(m_tensor_ptr, 1);
+      sizes[2] = c_dbcsr_t_nblks_local(m_tensor_ptr, 2);
+      sizes[3] = c_dbcsr_t_nblks_local(m_tensor_ptr, 3);
+    } else {
+      sizes[0] = c_dbcsr_t_nblks_total(m_tensor_ptr, 0);
+      sizes[1] = c_dbcsr_t_nblks_total(m_tensor_ptr, 1);
+      sizes[2] = c_dbcsr_t_nblks_total(m_tensor_ptr, 2);
+      sizes[3] = c_dbcsr_t_nblks_total(m_tensor_ptr, 3);
+    }
+    if constexpr (nameleft == nameright) {
+      c_dbcsr_t_get_info(
+          m_tensor_ptr, N, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
+          sizes[0], sizes[1], sizes[2], sizes[3], 0, 0, 0, 0, nullptr, nullptr,
+          nullptr, nullptr, out[0].data(), out[1].data(), out[2].data(),
+          out[3].data(), nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
+          nullptr, nullptr, nullptr, nullptr, nullptr);
+    } else {
+      c_dbcsr_t_get_info(
+          m_tensor_ptr, N, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
+          0, 0, 0, 0, sizes[0], sizes[1], sizes[2], sizes[3], nullptr, nullptr,
+          nullptr, nullptr, out[0].data(), out[1].data(), out[2].data(),
+          out[3].data(), nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
+          nullptr, nullptr, nullptr, nullptr, nullptr);
+    }
+    return out;
+  }
+  template <int M = N>
+  typename std::enable_if<M == 4, arrvec<int, N>>::type blk_sizes() {
+    arrvec<int, N> out;
+    vec<int> sizes(N);
+    constexpr char nameleft[] = "blk_sizes";
+    constexpr char nameright[] = "blks_local";
+    if constexpr (nameleft == nameright) {
+      sizes[0] = c_dbcsr_t_nblks_local(m_tensor_ptr, 0);
+      sizes[1] = c_dbcsr_t_nblks_local(m_tensor_ptr, 1);
+      sizes[2] = c_dbcsr_t_nblks_local(m_tensor_ptr, 2);
+      sizes[3] = c_dbcsr_t_nblks_local(m_tensor_ptr, 3);
+    } else {
+      sizes[0] = c_dbcsr_t_nblks_total(m_tensor_ptr, 0);
+      sizes[1] = c_dbcsr_t_nblks_total(m_tensor_ptr, 1);
+      sizes[2] = c_dbcsr_t_nblks_total(m_tensor_ptr, 2);
+      sizes[3] = c_dbcsr_t_nblks_total(m_tensor_ptr, 3);
+    }
+    if constexpr (nameleft == nameright) {
+      c_dbcsr_t_get_info(
+          m_tensor_ptr, N, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
+          sizes[0], sizes[1], sizes[2], sizes[3], 0, 0, 0, 0, nullptr, nullptr,
+          nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, out[0].data(),
+          out[1].data(), out[2].data(), out[3].data(), nullptr, nullptr,
+          nullptr, nullptr, nullptr, nullptr, nullptr);
+    } else {
+      c_dbcsr_t_get_info(m_tensor_ptr, N, nullptr, nullptr, nullptr, nullptr,
+                         nullptr, nullptr, 0, 0, 0, 0, sizes[0], sizes[1],
+                         sizes[2], sizes[3], nullptr, nullptr, nullptr, nullptr,
+                         nullptr, nullptr, nullptr, nullptr, out[0].data(),
+                         out[1].data(), out[2].data(), out[3].data(), nullptr,
+                         nullptr, nullptr, nullptr, nullptr, nullptr, nullptr);
+    }
+    return out;
+  }
+  template <int M = N>
+  typename std::enable_if<M == 4, arrvec<int, N>>::type blk_offsets() {
+    arrvec<int, N> out;
+    vec<int> sizes(N);
+    constexpr char nameleft[] = "blk_offsets";
+    constexpr char nameright[] = "blks_local";
+    if constexpr (nameleft == nameright) {
+      sizes[0] = c_dbcsr_t_nblks_local(m_tensor_ptr, 0);
+      sizes[1] = c_dbcsr_t_nblks_local(m_tensor_ptr, 1);
+      sizes[2] = c_dbcsr_t_nblks_local(m_tensor_ptr, 2);
+      sizes[3] = c_dbcsr_t_nblks_local(m_tensor_ptr, 3);
+    } else {
+      sizes[0] = c_dbcsr_t_nblks_total(m_tensor_ptr, 0);
+      sizes[1] = c_dbcsr_t_nblks_total(m_tensor_ptr, 1);
+      sizes[2] = c_dbcsr_t_nblks_total(m_tensor_ptr, 2);
+      sizes[3] = c_dbcsr_t_nblks_total(m_tensor_ptr, 3);
+    }
+    if constexpr (nameleft == nameright) {
+      c_dbcsr_t_get_info(
+          m_tensor_ptr, N, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
+          sizes[0], sizes[1], sizes[2], sizes[3], 0, 0, 0, 0, nullptr, nullptr,
+          nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
+          nullptr, nullptr, nullptr, out[0].data(), out[1].data(),
+          out[2].data(), out[3].data(), nullptr, nullptr, nullptr);
+    } else {
+      c_dbcsr_t_get_info(
+          m_tensor_ptr, N, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
+          0, 0, 0, 0, sizes[0], sizes[1], sizes[2], sizes[3], nullptr, nullptr,
+          nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
+          nullptr, nullptr, nullptr, out[0].data(), out[1].data(),
+          out[2].data(), out[3].data(), nullptr, nullptr, nullptr);
+    }
+    return out;
+  }
+# 525 "dbcsr_tensor.hpp"
+  int ndim_nd() {
+    int c_out;
+    c_dbcsr_t_get_mapping_info(m_tensor_ptr, N, 0, 0, &c_out, nullptr, nullptr,
+                               nullptr, nullptr, nullptr, nullptr, nullptr,
+                               nullptr, nullptr, nullptr, nullptr, nullptr);
+    return c_out;
+  }
+  int ndim1_2d() {
+    int c_out;
+    c_dbcsr_t_get_mapping_info(m_tensor_ptr, N, 0, 0, nullptr, &c_out, nullptr,
+                               nullptr, nullptr, nullptr, nullptr, nullptr,
+                               nullptr, nullptr, nullptr, nullptr, nullptr);
+    return c_out;
+  }
+  int ndim2_2d() {
+    int c_out;
+    c_dbcsr_t_get_mapping_info(m_tensor_ptr, N, 0, 0, nullptr, nullptr, &c_out,
+                               nullptr, nullptr, nullptr, nullptr, nullptr,
+                               nullptr, nullptr, nullptr, nullptr, nullptr);
+    return c_out;
+  }
+# 593 "dbcsr_tensor.hpp"
+  vec<long long int> dims_2d_i8() {
+    int nd_size = N;
+    int nd_row_size = c_dbcsr_t_ndims_matrix_row(m_tensor_ptr);
+    int nd_col_size = c_dbcsr_t_ndims_matrix_column(m_tensor_ptr);
+    int vsize;
+    constexpr char char_dims_2d_i8[] = "dims_2d_i8";
+    constexpr char char_dims_2d[] = "dims_2d";
+    constexpr char char_dims_nd[] = "dims_nd";
+    constexpr char char_dims1_2d[] = "dims1_2d";
+    constexpr char char_dims2_2d[] = "dims2_2d";
+    constexpr char char_map1_2d[] = "map1_2d";
+    constexpr char char_map2_2d[] = "map2_2d";
+    constexpr char char_map_nd[] = "map_nd";
+    if constexpr (char_dims_2d_i8 == char_dims_2d_i8 ||
+                  char_dims_2d_i8 == char_dims_2d) {
+      vsize = 2;
+    } else if (char_dims_2d_i8 == char_dims_nd ||
+               char_dims_2d_i8 == char_map_nd) {
+      vsize = nd_size;
+    } else if (char_dims_2d_i8 == char_dims1_2d ||
+               char_dims_2d_i8 == char_map1_2d) {
+      vsize = nd_row_size;
+    } else {
+      vsize = nd_col_size;
+    }
+    vec<long long int> out(vsize);
+    c_dbcsr_t_get_mapping_info(m_tensor_ptr, N, nd_row_size, nd_col_size,
+                               nullptr, nullptr, nullptr, out.data(), nullptr,
+                               nullptr, nullptr, nullptr, nullptr, nullptr,
+                               nullptr, nullptr, nullptr);
+    return out;
+  }
+  vec<int> dims_2d() {
+    int nd_size = N;
+    int nd_row_size = c_dbcsr_t_ndims_matrix_row(m_tensor_ptr);
+    int nd_col_size = c_dbcsr_t_ndims_matrix_column(m_tensor_ptr);
+    int vsize;
+    constexpr char char_dims_2d_i8[] = "dims_2d_i8";
+    constexpr char char_dims_2d[] = "dims_2d";
+    constexpr char char_dims_nd[] = "dims_nd";
+    constexpr char char_dims1_2d[] = "dims1_2d";
+    constexpr char char_dims2_2d[] = "dims2_2d";
+    constexpr char char_map1_2d[] = "map1_2d";
+    constexpr char char_map2_2d[] = "map2_2d";
+    constexpr char char_map_nd[] = "map_nd";
+    if constexpr (char_dims_2d == char_dims_2d_i8 ||
+                  char_dims_2d == char_dims_2d) {
+      vsize = 2;
+    } else if (char_dims_2d == char_dims_nd || char_dims_2d == char_map_nd) {
+      vsize = nd_size;
+    } else if (char_dims_2d == char_dims1_2d || char_dims_2d == char_map1_2d) {
+      vsize = nd_row_size;
+    } else {
+      vsize = nd_col_size;
+    }
+    vec<int> out(vsize);
+    c_dbcsr_t_get_mapping_info(m_tensor_ptr, N, nd_row_size, nd_col_size,
+                               nullptr, nullptr, nullptr, nullptr, out.data(),
+                               nullptr, nullptr, nullptr, nullptr, nullptr,
+                               nullptr, nullptr, nullptr);
+    return out;
+  }
+  vec<int> dims_nd() {
+    int nd_size = N;
+    int nd_row_size = c_dbcsr_t_ndims_matrix_row(m_tensor_ptr);
+    int nd_col_size = c_dbcsr_t_ndims_matrix_column(m_tensor_ptr);
+    int vsize;
+    constexpr char char_dims_2d_i8[] = "dims_2d_i8";
+    constexpr char char_dims_2d[] = "dims_2d";
+    constexpr char char_dims_nd[] = "dims_nd";
+    constexpr char char_dims1_2d[] = "dims1_2d";
+    constexpr char char_dims2_2d[] = "dims2_2d";
+    constexpr char char_map1_2d[] = "map1_2d";
+    constexpr char char_map2_2d[] = "map2_2d";
+    constexpr char char_map_nd[] = "map_nd";
+    if constexpr (char_dims_nd == char_dims_2d_i8 ||
+                  char_dims_nd == char_dims_2d) {
+      vsize = 2;
+    } else if (char_dims_nd == char_dims_nd || char_dims_nd == char_map_nd) {
+      vsize = nd_size;
+    } else if (char_dims_nd == char_dims1_2d || char_dims_nd == char_map1_2d) {
+      vsize = nd_row_size;
+    } else {
+      vsize = nd_col_size;
+    }
+    vec<int> out(vsize);
+    c_dbcsr_t_get_mapping_info(m_tensor_ptr, N, nd_row_size, nd_col_size,
+                               nullptr, nullptr, nullptr, nullptr, nullptr,
+                               out.data(), nullptr, nullptr, nullptr, nullptr,
+                               nullptr, nullptr, nullptr);
+    return out;
+  }
+  vec<int> dims1_2d() {
+    int nd_size = N;
+    int nd_row_size = c_dbcsr_t_ndims_matrix_row(m_tensor_ptr);
+    int nd_col_size = c_dbcsr_t_ndims_matrix_column(m_tensor_ptr);
+    int vsize;
+    constexpr char char_dims_2d_i8[] = "dims_2d_i8";
+    constexpr char char_dims_2d[] = "dims_2d";
+    constexpr char char_dims_nd[] = "dims_nd";
+    constexpr char char_dims1_2d[] = "dims1_2d";
+    constexpr char char_dims2_2d[] = "dims2_2d";
+    constexpr char char_map1_2d[] = "map1_2d";
+    constexpr char char_map2_2d[] = "map2_2d";
+    constexpr char char_map_nd[] = "map_nd";
+    if constexpr (char_dims1_2d == char_dims_2d_i8 ||
+                  char_dims1_2d == char_dims_2d) {
+      vsize = 2;
+    } else if (char_dims1_2d == char_dims_nd || char_dims1_2d == char_map_nd) {
+      vsize = nd_size;
+    } else if (char_dims1_2d == char_dims1_2d ||
+               char_dims1_2d == char_map1_2d) {
+      vsize = nd_row_size;
+    } else {
+      vsize = nd_col_size;
+    }
+    vec<int> out(vsize);
+    c_dbcsr_t_get_mapping_info(m_tensor_ptr, N, nd_row_size, nd_col_size,
+                               nullptr, nullptr, nullptr, nullptr, nullptr,
+                               nullptr, out.data(), nullptr, nullptr, nullptr,
+                               nullptr, nullptr, nullptr);
+    return out;
+  }
+  vec<int> dims2_2d() {
+    int nd_size = N;
+    int nd_row_size = c_dbcsr_t_ndims_matrix_row(m_tensor_ptr);
+    int nd_col_size = c_dbcsr_t_ndims_matrix_column(m_tensor_ptr);
+    int vsize;
+    constexpr char char_dims_2d_i8[] = "dims_2d_i8";
+    constexpr char char_dims_2d[] = "dims_2d";
+    constexpr char char_dims_nd[] = "dims_nd";
+    constexpr char char_dims1_2d[] = "dims1_2d";
+    constexpr char char_dims2_2d[] = "dims2_2d";
+    constexpr char char_map1_2d[] = "map1_2d";
+    constexpr char char_map2_2d[] = "map2_2d";
+    constexpr char char_map_nd[] = "map_nd";
+    if constexpr (char_dims2_2d == char_dims_2d_i8 ||
+                  char_dims2_2d == char_dims_2d) {
+      vsize = 2;
+    } else if (char_dims2_2d == char_dims_nd || char_dims2_2d == char_map_nd) {
+      vsize = nd_size;
+    } else if (char_dims2_2d == char_dims1_2d ||
+               char_dims2_2d == char_map1_2d) {
+      vsize = nd_row_size;
+    } else {
+      vsize = nd_col_size;
+    }
+    vec<int> out(vsize);
+    c_dbcsr_t_get_mapping_info(m_tensor_ptr, N, nd_row_size, nd_col_size,
+                               nullptr, nullptr, nullptr, nullptr, nullptr,
+                               nullptr, nullptr, out.data(), nullptr, nullptr,
+                               nullptr, nullptr, nullptr);
+    return out;
+  }
+  vec<int> map1_2d() {
+    int nd_size = N;
+    int nd_row_size = c_dbcsr_t_ndims_matrix_row(m_tensor_ptr);
+    int nd_col_size = c_dbcsr_t_ndims_matrix_column(m_tensor_ptr);
+    int vsize;
+    constexpr char char_dims_2d_i8[] = "dims_2d_i8";
+    constexpr char char_dims_2d[] = "dims_2d";
+    constexpr char char_dims_nd[] = "dims_nd";
+    constexpr char char_dims1_2d[] = "dims1_2d";
+    constexpr char char_dims2_2d[] = "dims2_2d";
+    constexpr char char_map1_2d[] = "map1_2d";
+    constexpr char char_map2_2d[] = "map2_2d";
+    constexpr char char_map_nd[] = "map_nd";
+    if constexpr (char_map1_2d == char_dims_2d_i8 ||
+                  char_map1_2d == char_dims_2d) {
+      vsize = 2;
+    } else if (char_map1_2d == char_dims_nd || char_map1_2d == char_map_nd) {
+      vsize = nd_size;
+    } else if (char_map1_2d == char_dims1_2d || char_map1_2d == char_map1_2d) {
+      vsize = nd_row_size;
+    } else {
+      vsize = nd_col_size;
+    }
+    vec<int> out(vsize);
+    c_dbcsr_t_get_mapping_info(m_tensor_ptr, N, nd_row_size, nd_col_size,
+                               nullptr, nullptr, nullptr, nullptr, nullptr,
+                               nullptr, nullptr, nullptr, out.data(), nullptr,
+                               nullptr, nullptr, nullptr);
+    return out;
+  }
+  vec<int> map2_2d() {
+    int nd_size = N;
+    int nd_row_size = c_dbcsr_t_ndims_matrix_row(m_tensor_ptr);
+    int nd_col_size = c_dbcsr_t_ndims_matrix_column(m_tensor_ptr);
+    int vsize;
+    constexpr char char_dims_2d_i8[] = "dims_2d_i8";
+    constexpr char char_dims_2d[] = "dims_2d";
+    constexpr char char_dims_nd[] = "dims_nd";
+    constexpr char char_dims1_2d[] = "dims1_2d";
+    constexpr char char_dims2_2d[] = "dims2_2d";
+    constexpr char char_map1_2d[] = "map1_2d";
+    constexpr char char_map2_2d[] = "map2_2d";
+    constexpr char char_map_nd[] = "map_nd";
+    if constexpr (char_map2_2d == char_dims_2d_i8 ||
+                  char_map2_2d == char_dims_2d) {
+      vsize = 2;
+    } else if (char_map2_2d == char_dims_nd || char_map2_2d == char_map_nd) {
+      vsize = nd_size;
+    } else if (char_map2_2d == char_dims1_2d || char_map2_2d == char_map1_2d) {
+      vsize = nd_row_size;
+    } else {
+      vsize = nd_col_size;
+    }
+    vec<int> out(vsize);
+    c_dbcsr_t_get_mapping_info(m_tensor_ptr, N, nd_row_size, nd_col_size,
+                               nullptr, nullptr, nullptr, nullptr, nullptr,
+                               nullptr, nullptr, nullptr, nullptr, out.data(),
+                               nullptr, nullptr, nullptr);
+    return out;
+  }
+  vec<int> map_nd() {
+    int nd_size = N;
+    int nd_row_size = c_dbcsr_t_ndims_matrix_row(m_tensor_ptr);
+    int nd_col_size = c_dbcsr_t_ndims_matrix_column(m_tensor_ptr);
+    int vsize;
+    constexpr char char_dims_2d_i8[] = "dims_2d_i8";
+    constexpr char char_dims_2d[] = "dims_2d";
+    constexpr char char_dims_nd[] = "dims_nd";
+    constexpr char char_dims1_2d[] = "dims1_2d";
+    constexpr char char_dims2_2d[] = "dims2_2d";
+    constexpr char char_map1_2d[] = "map1_2d";
+    constexpr char char_map2_2d[] = "map2_2d";
+    constexpr char char_map_nd[] = "map_nd";
+    if constexpr (char_map_nd == char_dims_2d_i8 ||
+                  char_map_nd == char_dims_2d) {
+      vsize = 2;
+    } else if (char_map_nd == char_dims_nd || char_map_nd == char_map_nd) {
+      vsize = nd_size;
+    } else if (char_map_nd == char_dims1_2d || char_map_nd == char_map1_2d) {
+      vsize = nd_row_size;
+    } else {
+      vsize = nd_col_size;
+    }
+    vec<int> out(vsize);
+    c_dbcsr_t_get_mapping_info(m_tensor_ptr, N, nd_row_size, nd_col_size,
+                               nullptr, nullptr, nullptr, nullptr, nullptr,
+                               nullptr, nullptr, nullptr, nullptr, nullptr,
+                               out.data(), nullptr, nullptr);
+    return out;
+  }
+# 641 "dbcsr_tensor.hpp"
+  tensor() : m_tensor_ptr(nullptr) {}
+
+  ~tensor() { destroy(); }
+
+  void destroy() {
+
+    if (m_tensor_ptr != nullptr) {
+      c_dbcsr_t_destroy(&m_tensor_ptr);
+    }
+
+    m_tensor_ptr = nullptr;
+  }
+# 683 "dbcsr_tensor.hpp"
+  template <int M = N>
+  typename std::enable_if<M == 2>::type reserve(arrvec<int, N> &nzblks) {
+    if (nzblks[0].size() == 0)
+      return;
+    if (!(nzblks[0].size() == nzblks[0].size() &&
+          nzblks[0].size() == nzblks[1].size())) {
+      throw std::runtime_error("tensor.reserve : wrong dimensions.");
+    }
+    c_dbcsr_t_reserve_blocks_index(m_tensor_ptr, nzblks[0].size(),
+                                   nzblks[0].data(), nzblks[1].data(), nullptr,
+                                   nullptr);
+  }
+  template <int M = N>
+  typename std::enable_if<M == 3>::type reserve(arrvec<int, N> &nzblks) {
+    if (nzblks[0].size() == 0)
+      return;
+    if (!(nzblks[0].size() == nzblks[0].size() &&
+          nzblks[0].size() == nzblks[1].size() &&
+          nzblks[0].size() == nzblks[2].size())) {
+      throw std::runtime_error("tensor.reserve : wrong dimensions.");
+    }
+    c_dbcsr_t_reserve_blocks_index(m_tensor_ptr, nzblks[0].size(),
+                                   nzblks[0].data(), nzblks[1].data(),
+                                   nzblks[2].data(), nullptr);
+  }
+  template <int M = N>
+  typename std::enable_if<M == 4>::type reserve(arrvec<int, N> &nzblks) {
+    if (nzblks[0].size() == 0)
+      return;
+    if (!(nzblks[0].size() == nzblks[0].size() &&
+          nzblks[0].size() == nzblks[1].size() &&
+          nzblks[0].size() == nzblks[2].size() &&
+          nzblks[0].size() == nzblks[3].size())) {
+      throw std::runtime_error("tensor.reserve : wrong dimensions.");
+    }
+    c_dbcsr_t_reserve_blocks_index(m_tensor_ptr, nzblks[0].size(),
+                                   nzblks[0].data(), nzblks[1].data(),
+                                   nzblks[2].data(), nzblks[3].data());
+  }
+
+  void reserve_all() {
+
+    auto blks = this->blks_local();
+    arrvec<int, N> res;
+
+    std::function<void(int, int *)> loop;
+
+    int *arr = new int[N];
+
+    loop = [&res, &blks, &loop](int depth, int *vals) {
+      for (auto eleN : blks[depth]) {
+        vals[depth] = eleN;
+        if (depth == N - 1) {
+          for (int i = 0; i != N; ++i) {
+            res[i].push_back(vals[i]);
+          }
+        } else {
+          loop(depth + 1, vals);
+        }
+      }
+    };
+
+    loop(0, arr);
+    this->reserve(res);
+
+    delete[] arr;
+  }
+
+  void reserve_template(tensor &t_template) {
+    c_dbcsr_t_reserve_blocks_template(t_template.m_tensor_ptr,
+                                      this->m_tensor_ptr);
+  }
+
+  void put_block(const index<N> &idx, block<N, T> &blk,
+                 std::optional<bool> sum = std::nullopt,
+                 std::optional<double> scale = std::nullopt) {
+
+    c_dbcsr_t_put_block(m_tensor_ptr, idx.data(), blk.size().data(), blk.data(),
+                        (sum) ? &*sum : nullptr, (scale) ? &*scale : nullptr);
+  }
+
+  void put_block(const index<N> &idx, T *data, const index<N> &size) {
+    c_dbcsr_t_put_block(m_tensor_ptr, idx.data(), size.data(), data, nullptr,
+                        nullptr);
+  }
+
+  block<N, T> get_block(const index<N> &idx, const index<N> &blk_size,
+                        bool &found) {
+
+    block<N, T> blk_out(blk_size);
+
+    c_dbcsr_t_get_block(m_tensor_ptr, idx.data(), blk_size.data(),
+                        blk_out.data(), &found);
+
+    return blk_out;
+  }
+
+  void get_block(T *data_ptr, const index<N> &idx, const index<N> &blk_size,
+                 bool &found) {
+
+    c_dbcsr_t_get_block(m_tensor_ptr, idx.data(), blk_size.data(), data_ptr,
+                        &found);
+  }
+
+  T *get_block_p(const index<N> &idx, bool &found) {
+
+    T *out = nullptr;
+
+    c_dbcsr_t_get_block_p(m_tensor_ptr, idx.data(), &out, &found);
+
+    return out;
+  }
+
+  int proc(const index<N> &idx) {
+    int p = -1;
+    c_dbcsr_t_get_stored_coordinates(m_tensor_ptr, idx.data(), &p);
+    return p;
+  }
+
+  T *data(long long int &data_size) {
+
+    T *data_ptr;
+    T data_type = T();
+
+    c_dbcsr_t_get_data_p(m_tensor_ptr, &data_ptr, &data_size, data_type,
+                         nullptr, nullptr);
+
+    return data_ptr;
+  }
+
+  void clear() { c_dbcsr_t_clear(m_tensor_ptr); }
+
+  MPI_Comm comm() { return m_comm; }
+
+  std::string name() const {
+    char *cstring;
+    c_dbcsr_t_get_info(m_tensor_ptr, N, nullptr, nullptr, nullptr, nullptr,
+                       nullptr, nullptr, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                       0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, nullptr, &cstring,
+                       nullptr);
+    std::string out(cstring);
+    c_free_string(&cstring);
+    return out;
+  }
+
+  int num_blocks() const { return c_dbcsr_t_get_num_blocks(m_tensor_ptr); }
+
+  long long int num_blocks_total() const {
+    return c_dbcsr_t_get_num_blocks_total(m_tensor_ptr);
+  }
+
+  int num_nze() { return c_dbcsr_t_get_nze(m_tensor_ptr); }
+
+  long long int num_nze_total() const {
+    return c_dbcsr_t_get_nze_total(m_tensor_ptr);
+  }
+
+  void filter(T eps, std::optional<filter> method = std::nullopt,
+              std::optional<bool> use_absolute = std::nullopt) {
+
+    int fmethod = (method) ? static_cast<int>(*method) : 0;
+
+    c_dbcsr_t_filter(m_tensor_ptr, eps, (method) ? &fmethod : nullptr,
+                     (use_absolute) ? &*use_absolute : nullptr);
+  }
+
+  double occupation() {
+
+    auto nfull = this->nfull_total();
+    long long int tote = std::accumulate(nfull.begin(), nfull.end(), 1,
+                                         std::multiplies<long long int>());
+    long long int nze = this->num_nze_total();
+
+    return (double)nze / (double)tote;
+  }
+
+  double long_sum() {
+
+    long long int num_nze;
+    T *data = this->data(num_nze);
+
+    double local_sum = std::accumulate(data, data + num_nze, 0.0);
+    double total_sum = 0.0;
+
+    MPI_Allreduce(&local_sum, &total_sum, 1, MPI_DOUBLE, MPI_SUM, m_comm);
+
+    return total_sum;
+  }
+
+  void scale(T factor) { c_dbcsr_t_scale(m_tensor_ptr, factor); }
+
+  void set(T factor) { c_dbcsr_t_set(m_tensor_ptr, factor); }
+
+  void finalize() { c_dbcsr_t_finalize(m_tensor_ptr); }
+
+  void batched_contract_init() {
+    c_dbcsr_t_batched_contract_init(m_tensor_ptr);
+  }
+
+  void batched_contract_finalize() {
+    c_dbcsr_t_batched_contract_finalize(m_tensor_ptr, nullptr);
+  }
+
+  vec<int> idx_speed() {
+
+    auto map1 = this->map1_2d();
+    auto map2 = this->map2_2d();
+    map2.insert(map2.end(), map1.begin(), map1.end());
+
+    return map2;
+  }
+
+  std::shared_ptr<tensor<N, T>> get_ptr() { return this->shared_from_this(); }
+};
+
+template <int N, typename T = double>
+using shared_tensor = std::shared_ptr<tensor<N, T>>;
+
+template <int N, typename T> class iterator_t {
+private:
+  void *m_iter_ptr;
+  void *m_tensor_ptr;
+
+  index<N> m_idx;
+  int m_blk_n;
+  int m_blk_p;
+  std::array<int, N> m_size;
+  std::array<int, N> m_offset;
+
+public:
+  iterator_t(tensor<N, T> &t_tensor)
+      : m_iter_ptr(nullptr), m_tensor_ptr(t_tensor.m_tensor_ptr), m_blk_n(0),
+        m_blk_p(0) {}
+
+  ~iterator_t() {}
+
+  void start() { c_dbcsr_t_iterator_start(&m_iter_ptr, m_tensor_ptr); }
+
+  void stop() {
+    c_dbcsr_t_iterator_stop(&m_iter_ptr);
+    m_iter_ptr = nullptr;
+  }
+
+  void next() {
+
+    c_dbcsr_t_iterator_next_block(m_iter_ptr, m_idx.data(), &m_blk_n, &m_blk_p,
+                                  m_size.data(), m_offset.data());
+  }
+
+  void next_block() {
+
+    c_dbcsr_t_iterator_next_block(m_iter_ptr, m_idx.data(), &m_blk_n, nullptr,
+                                  nullptr, nullptr);
+  }
+
+  bool blocks_left() { return c_dbcsr_t_iterator_blocks_left(m_iter_ptr); }
+
+  const index<N> &idx() { return m_idx; }
+
+  const index<N> &size() { return m_size; }
+
+  const index<N> &offset() { return m_offset; }
+
+  int blk_n() { return m_blk_n; }
+
+  int blk_p() { return m_blk_p; }
+};
+
+template <int N, typename T> void print(tensor<N, T> &t_in) {
+
+  int myrank, mpi_size;
+
+  MPI_Comm_rank(t_in.comm(), &myrank);
+  MPI_Comm_size(t_in.comm(), &mpi_size);
+
+  iterator_t<N, T> iter(t_in);
+  iter.start();
+
+  if (myrank == 0)
+    std::cout << "Tensor: " << t_in.name() << std::endl;
+
+  for (int p = 0; p != mpi_size; ++p) {
+    if (myrank == p) {
+      int nblk = 0;
+      while (iter.blocks_left()) {
+
+        nblk++;
+
+        iter.next();
+        bool found = false;
+        auto idx = iter.idx();
+        auto size = iter.size();
+
+        std::cout << myrank << ": [";
+
+        for (int s = 0; s != N; ++s) {
+          std::cout << idx[s];
+          if (s != N - 1) {
+            std::cout << ",";
+          }
+        }
+
+        std::cout << "] (";
+
+        for (int s = 0; s != N; ++s) {
+          std::cout << size[s];
+          if (s != N - 1) {
+            std::cout << ",";
+          }
+        }
+        std::cout << ") {";
+
+        auto blk = t_in.get_block(idx, size, found);
+
+        for (int i = 0; i != blk.ntot(); ++i) {
+          std::cout << blk[i] << " ";
+        }
+        std::cout << "}" << std::endl;
+      }
+
+      if (nblk == 0) {
+        std::cout << myrank << ": {empty}" << std::endl;
+      }
+    }
+    MPI_Barrier(t_in.comm());
+  }
+
+  iter.stop();
+}
+
+} // namespace dbcsr
