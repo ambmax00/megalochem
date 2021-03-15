@@ -9,6 +9,8 @@
 #define PPDIRS_OP (
 #define PPDIRS_CP )
 #define PPDIRS_SC ;
+#define PPDIRS_OB {
+#define PPDIRS_CB }
 
 #define PASTE(x, ...) x ## __VA_ARGS__
 #define EVALUATING_PASTE(x, ...) PASTE(x, __VA_ARGS__)
@@ -383,6 +385,9 @@ print('\n')
 #define XSTR(a) STR(a)
 #define STR(a) #a
 
+#define STRING_EQUAL(str1,str2) \
+	util::string_equal(XSTR(str1),XSTR(str2))
+
 #define _LISTSIZE_DETAIL(UNUSED, ...) NARGS(__VA_ARGS__)
 #define LISTSIZE(list) _LISTSIZE_DETAIL(,UNPAREN list)
 
@@ -478,9 +483,14 @@ print('\n')
 
 #ifndef TEST_MACRO
 #include "optional.hpp"
+#include <string_view>
 #endif
 
 namespace util {
+	
+constexpr bool string_equal(const char* str1, const char* str2) {
+	return std::string_view(str1) == str2;
+}
 
 template <typename T>
 struct is_optional : public std::false_type {};
