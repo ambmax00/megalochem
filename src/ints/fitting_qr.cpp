@@ -17,7 +17,7 @@ namespace ints {
 	
 static constexpr bool use_qr = true;
 static constexpr int chunk_size = 2;
-static constexpr double radius_eps = 1e-16;
+static constexpr double radius_eps = 1e-12;
 static constexpr double radius_step = 0.2;
 static constexpr int radius_max_step = 10000;	
 
@@ -44,9 +44,10 @@ std::vector<block_info> get_block_info(desc::cluster_basis& cbas) {
 }
 
 dbcsr::sbtensor<3,double> dfitting::compute_qr_new(
-	dbcsr::shared_matrix<double> s_bb, dbcsr::shared_matrix<double> s_xx_inv, 
+	dbcsr::shared_matrix<double> s_bb, 
+	dbcsr::shared_matrix<double> s_xx_inv, 
 	dbcsr::shared_matrix<double> m_xx, dbcsr::shared_pgrid<3> spgrid3_xbb,
-	shared_screener scr_s, std::array<int,3> bdims, dbcsr::btype mytype, 
+	shared_screener scr_s, std::array<int,3> bdims, dbcsr::btype mytype,
 	bool atomic)
 {
 	
@@ -205,6 +206,13 @@ dbcsr::sbtensor<3,double> dfitting::compute_qr_new(
 		prev_centre = current_centre;
 	}
 	
+	for (int ifrag = 0; ifrag != frag_blocks.size(); ++ifrag) {
+		LOG.os<1>("Fragment ", ifrag, " (size: ", frag_blk_sizes[ifrag], ")\n");
+		for (auto ff : frag_blocks[ifrag]) {
+			LOG.os<1>(ff, " ");
+		} LOG.os<1>('\n');
+	}
+	
 	int nbatches = c_xbb_batched->nbatches(2);
 	std::vector<std::vector<int>> frag_bounds(nbatches);
 	for (int inu = 0; inu != nbatches; ++inu) {
@@ -262,6 +270,8 @@ dbcsr::sbtensor<3,double> dfitting::compute_qr_new(
 				pow(p1[2] - p2[2],2.0));
 	};		
 	
+	auto blknorms = dbcsr::block_norms(*s_bb);
+	
 	// ================== LOOP OVER NU BATCHES ==============
 	
 	c_xbb_batched->compress_init({2}, vec<int>{0}, vec<int>{1,2});
@@ -270,8 +280,6 @@ dbcsr::sbtensor<3,double> dfitting::compute_qr_new(
 	
 	std::vector<int> blkprev;
 	int ncounter = 0;
-	
-	auto blknorm = dbcsr::block_norms(*s_bb);
 	
 	for (int ibatch_nu = 0; ibatch_nu != c_xbb_batched->nbatches(2); ++ibatch_nu) {
 		
@@ -314,7 +322,10 @@ dbcsr::sbtensor<3,double> dfitting::compute_qr_new(
 			for (auto c : global_tasks[itask]) {
 				LOG.os<>(c.first, " ", c.second, '\n');
 			}
-		}*/
+		}
+		
+		std::cout << "NTASKS: " << global_tasks.size() << std::endl;
+		ntasks += global_tasks.size();*/
 		
 		/* =============================================================
 		 *            TASK FUNCTION FOR SCHEDULER 
@@ -337,7 +348,7 @@ dbcsr::sbtensor<3,double> dfitting::compute_qr_new(
 			
 			work_time.start();
 			
-			arrvec<int,3> blkidx;
+			arrvec<int,3> blkidx, blkidx_full;
 						
 			for (auto chunk : global_tasks[itask]) {
 				
@@ -351,17 +362,19 @@ dbcsr::sbtensor<3,double> dfitting::compute_qr_new(
 						double rj = blkinfo_b[imu].radius;
 						auto posi = blkinfo_b[inu].pos;
 						auto posj = blkinfo_b[imu].pos;
-												
-						if (blktype_b[imu] == blktype_b[inu] &&
-							blknorm(imu,inu) < dbcsr::global::filter_eps) 
+						
+						bool is_same_type = (blktype_b[imu] == blktype_b[inu]);
+						
+						if (is_same_type && blknorms(imu,inu) < dbcsr::global::filter_eps) {
 							continue;
+						}
 						
 						for (int ix = 0; ix != x.size(); ++ix) {
 							
 							blkidx[0].push_back(ix);
 							blkidx[1].push_back(imu);
 							blkidx[2].push_back(inu);
-														
+																												
 						}
 					}
 				}
@@ -383,7 +396,7 @@ dbcsr::sbtensor<3,double> dfitting::compute_qr_new(
 			};
 			
 			// 3. Contract
-						
+			
 			if (ovlp_xbb_local->num_blocks() == 0) {
 				std::cout << "RANK: " << m_world.rank() << "COMPLETE SCREEN" << std::endl;
 				ovlp_time.finish();
@@ -732,9 +745,7 @@ dbcsr::sbtensor<3,double> dfitting::compute_qr_new(
 		tasks.run();
 	
 		comp_time.start();
-		
-		LOG(-1).os<>("Could have skipped: ", ncounter, '\n');
-				
+						
 		dbcsr::copy_local_to_global(*c_xbb_local, *c_xbb_global);
 		
 		c_xbb_local->clear();
@@ -742,7 +753,7 @@ dbcsr::sbtensor<3,double> dfitting::compute_qr_new(
 		c_xbb_batched->compress({ibatch_nu}, c_xbb_global);
 		c_xbb_global->clear();
 		
-		comp_time.finish();		
+		comp_time.finish();	
 		
 	} // end loop over batches
 	

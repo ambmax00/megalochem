@@ -13,6 +13,7 @@
 #include <iostream>
 #include <thread>
 #include <chrono>
+#include <cassert>
 
 //#define _DLOG
 
@@ -939,6 +940,93 @@ public:
 	
 };
 
+class mutex {
+private:
+
+	MPI_Comm _comm;
+	MPI_Win _lock_win;
+	int _comm_size, _comm_rank;
+	
+	std::atomic<bool> *_lock_data;
+	std::atomic<bool> *_lock_ptr;
+	
+	const bool _IS_LOCKED = true;
+	const bool _IS_UNLOCKED = false;
+	
+public:
+
+	mutex(MPI_Comm comm) : _comm(comm) {
+		
+		assert(ATOMIC_BOOL_LOCK_FREE == 2);
+		
+		MPI_Comm_size(_comm, &_comm_size);
+		MPI_Comm_rank(_comm, &_comm_rank);
+		
+		int atomic_size = sizeof(std::atomic<bool>);
+		int nele = (_comm_rank == 0) ? 1 : 0;
+		
+		MPI_Win_allocate_shared(nele * atomic_size, atomic_size, MPI_INFO_NULL, 
+			_comm, &_lock_data, &_lock_win);
+	
+		if (_comm_rank == 0) {
+			auto init_lock = new (_lock_data) std::atomic<bool>(_IS_UNLOCKED);
+		}
+		
+		int size;
+		MPI_Aint disp;
+		
+		MPI_Win_shared_query(_lock_win, 0, &disp, &size, &_lock_ptr);
+				
+		MPI_Barrier(_comm);
+		
+	}
+	
+	bool try_lock() {
+		
+		bool expected = _IS_UNLOCKED;
+		bool desired = _IS_LOCKED;
+						
+		bool success = _lock_ptr->compare_exchange_strong( 
+			expected, desired, std::memory_order_relaxed,
+			std::memory_order_relaxed);
+			
+		return success;
+		
+	}
+	
+	void lock() {
+		
+		bool expected = _IS_UNLOCKED;
+		bool desired = _IS_LOCKED;
+		
+		while (_lock_ptr->compare_exchange_strong( 
+			expected, desired, std::memory_order_relaxed, 
+			std::memory_order_relaxed)) 
+		{
+			expected = false;
+		}
+		
+	}
+	
+	void unlock() {
+					
+		bool expected = _IS_LOCKED;
+		bool desired = _IS_UNLOCKED;
+		
+		_lock_ptr->compare_exchange_strong(expected, desired,
+			std::memory_order_relaxed, std::memory_order_relaxed);
+				
+	}
+		
+	~mutex() {
+		MPI_Win_free(&_lock_win);
+	}
+	
+	mutex(const mutex& in) = delete;
+	mutex& operator=(const mutex& in) = delete;
+	
+};
+
 class basic_scheduler {
 private:
 
@@ -956,9 +1044,7 @@ private:
 	int64_t _global_counter;
 	
 	// local mutex
-	MPI_Win _local_mtx_win;
-	std::mutex* _mtx_data;
-	std::mutex* _local_mtx;
+	std::shared_ptr<util::mutex> _local_mtx;
 	
 	// local atomics;
 	MPI_Win _local_atomic_win;
@@ -1020,6 +1106,11 @@ private:
 				
 		_DPRINT("Fetching tasks");
 		if (_local_mtx->try_lock()) {
+			
+			if (!local_queue_empty()) {
+				_local_mtx->unlock();
+				return;
+			}
 			
 			_DPRINT("Filling queue")
 			
@@ -1091,25 +1182,9 @@ public:
 		MPI_Comm_size(_local_comm, &_local_size);
 		MPI_Comm_rank(_local_comm, &_local_rank);
 		
+		_local_mtx.reset(new mutex(_local_comm));
+		
 		// allocate shared windows
-		// ... for mutex
-		
-		int mtx_size = sizeof(std::mutex);
-		int nele = (_local_rank == 0) ? 1 : 0;
-		
-		MPI_Aint size0;
-		int disp0;
-		
-		MPI_Win_allocate_shared(nele * mtx_size, mtx_size, MPI_INFO_NULL, 
-			_local_comm, &_mtx_data, &_local_mtx_win);
-		
-		// initialize
-		if (_local_rank == 0) {
-			auto init_mtx = new (_mtx_data) std::mutex();
-		}
-			
-		MPI_Win_shared_query(_local_mtx_win, 0, &size0, &disp0,&_local_mtx);
-		
 		// ... for atomics
 		
 		int atom_size = sizeof(std::atomic<int64_t>);
@@ -1124,7 +1199,10 @@ public:
 			auto init2 = new (_atomic_data + 1) std::atomic<int64_t>(0);
 		}
 		
-		MPI_Win_shared_query(_local_atomic_win, 0, &size0, &disp0, &_local_counter);
+		int size0;
+		MPI_Aint disp0;
+		
+		MPI_Win_shared_query(_local_atomic_win, 0, &disp0, &size0, &_local_counter);
 		_local_ubound = _local_counter + 1;
 		
 		_DPRINT("INIT: " + std::to_string(*_local_counter) + "/" 
@@ -1139,6 +1217,8 @@ public:
 		_DPRINT("STARTING RUN WITH NTASKS = " + std::to_string(_ntasks))
 		
 		_ntasks_completed = 0;
+		
+		std::vector<int> ntvec(_ntasks,0);
 		
 		if (_global_rank != 0) {
 		
@@ -1160,6 +1240,7 @@ public:
 					_DPRINT("EXECUTING TASK " + std::to_string(task))
 					_executer(task);
 					++_ntasks_completed;
+					ntvec[task] += 1;
 				}
 				
 			}
@@ -1191,16 +1272,26 @@ public:
 		
 		_DPRINT("EXITED LOOP");	
 		
-		/* check for consistency
-		MPI_Allreduce(MPI_IN_PLACE, &_ntasks_completed, 1, MPI_INT64_T,
+		MPI_Barrier(_global_comm);
+		
+		int64_t ntasks_completed_global = 0;
+				
+		// check for consistency
+				
+		MPI_Allreduce(&_ntasks_completed, &ntasks_completed_global, 1, MPI_INT64_T,
 			MPI_SUM, _global_comm);
-						
-		if (_global_rank == 0 && _ntasks_completed != _ntasks) {
-			throw std::runtime_error("Scheduler: Not all tasks were executed!!");
-		}*/
 		
 		MPI_Barrier(_global_comm);
 		
+		_DPRINT("Done here")
+						
+		if (_global_rank == 0 && ntasks_completed_global != _ntasks) {
+			// not throwing here because it somehow leads to a deadlock, dunno why
+			std::cout << "Scheduler: Not all tasks were executed!!" << std::endl;
+			MPI_Abort(_global_comm, MPI_ERR_OTHER);
+		}
+				
+		MPI_Barrier(_global_comm);
 		
 		_DPRINT("DONE WITH RUN")
 
@@ -1209,7 +1300,6 @@ public:
 	
 	~basic_scheduler() {
 		MPI_Comm_free(&_global_comm);
-		MPI_Win_free(&_local_mtx_win);
 		MPI_Win_free(&_local_atomic_win);
 		MPI_Comm_free(&_local_comm);
 	}

@@ -33,7 +33,8 @@ enum class ctr {
 	c_3c1e	= 3,
 	c_3c2e	= 4,
 	c_4c2e	= 5,
-	_END = 6
+	c_4c1e 	= 6,
+	_END = 7
 };
 
 constexpr int combine(op e1, ctr e2) {
@@ -529,11 +530,16 @@ public:
 				m_intfunc = cint3c1e_sph;
 				break;
 				
+			case combine(op::overlap, ctr::c_4c1e):
+				m_intfunc = cint4c1e_sph;
+				break;
+				
 			case combine(op::coulomb, ctr::c_2c2e):
 				m_intfunc = cint2c2e_sph;
 				break;
 				
 			case combine(op::coulomb, ctr::c_3c2e):
+				m_env[PTR_RANGE_OMEGA] = 0.0d;
 				m_intfunc = cint3c2e_sph;
 				break;
 				
@@ -878,6 +884,24 @@ dbcsr::shared_matrix<double> aofactory::ao_3cschwarz() {
 	pimpl->set_dim("xx");
 	pimpl->set_center(ctr::c_2c2e);
 	pimpl->set_operator(op::coulomb);
+	pimpl->setup_calc(true);
+	return pimpl->compute_screen("schwarz", "xx");
+}
+
+dbcsr::shared_matrix<double> aofactory::ao_schwarz_ovlp() {
+	pimpl->set_name("Z_mn");
+	pimpl->set_dim("bb");
+	pimpl->set_center(ctr::c_4c1e);
+	pimpl->set_operator(op::overlap);
+	pimpl->setup_calc(true);
+	return pimpl->compute_screen("schwarz", "bbbb");
+}
+	
+dbcsr::shared_matrix<double> aofactory::ao_3cschwarz_ovlp() {
+	pimpl->set_name("Z_x");
+	pimpl->set_dim("xx");
+	pimpl->set_center(ctr::c_2c1e);
+	pimpl->set_operator(op::overlap);
 	pimpl->setup_calc(true);
 	return pimpl->compute_screen("schwarz", "xx");
 }

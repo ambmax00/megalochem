@@ -67,6 +67,10 @@ public:
 	
 	dbcsr::shared_matrix<double> ao_schwarz();
 	dbcsr::shared_matrix<double> ao_3cschwarz();
+	
+	dbcsr::shared_matrix<double> ao_schwarz_ovlp();
+	dbcsr::shared_matrix<double> ao_3cschwarz_ovlp();
+	
 #if 0
 	std::array<dbcsr::shared_matrix<double>,3> 
 		ao_emultipole(std::array<int,3> O = {0,0,0});

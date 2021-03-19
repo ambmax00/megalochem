@@ -465,9 +465,8 @@ void aoloader::compute() {
 		auto s_bb = m_reg.get<smatd>(key::ovlp_bb);
 		auto m_xx = m_reg.get<smatd>(key::coul_xx);
 		auto s_xx_inv = m_reg.get<smatd>(key::ovlp_xx_inv);
-		auto scr = m_reg.get<ints::shared_screener>(key::scr_xbb);
 		
-		auto c_xbb_qr = dfit.compute_qr_new(s_bb, s_xx_inv, m_xx, spgrid3, scr, 
+		auto c_xbb_qr = dfit.compute_qr_new(s_bb, s_xx_inv, m_xx, spgrid3, nullptr, 
 			bdims, m_btype_intermeds, true);
 		m_reg.insert(key::qr_xbb, c_xbb_qr);
 		
