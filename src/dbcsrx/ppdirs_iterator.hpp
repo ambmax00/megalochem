@@ -1,6 +1,0 @@
-#ifndef UTILS_PPDIRS_ITERATOR_HPP
-#define UTILS_PPDIRS_ITERATOR_HPP
-
-
-
-#endif

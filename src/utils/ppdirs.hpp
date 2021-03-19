@@ -1,6 +1,11 @@
 #ifndef UTILS_PPDIRS_H
 #define UTILS_PPDIRS_H
 
+#ifndef TEST_MACRO
+#include "utils/optional.hpp"
+#include <string_view>
+#endif
+
 #define CAT(a,...) PRIMITIVE_CAT(a,__VA_ARGS__)
 #define PRIMITIVE_CAT(a,...) a##__VA_ARGS__
 
@@ -19,74 +24,12 @@
 #define UNPAREN(...) __VA_ARGS__
 #define WRAP(FUNC, ...) 
 
-/* PYTHON SCRIPT FOR GENERATING MACROS:
-NMAX = 32
-
-listfront = ["_" + str(i) + ", " for i in range(0,NMAX+1)]
-listback = [str(i) + "," for i in range(NMAX,0,-1)]
-
-##### NARGS #####
-
-print("#define NARGS_SEQ(", end='')
-for ele in listfront:
-    print(ele, end='')
-print("N, ...) N", end='\n')
-print("#define NARGS(...) NARGS_SEQ(0, ##__VA_ARGS__,", end='')
-for ele in listback:
-    print(ele, end='')
-print("0)",end='\n')
-print('\n')
-
-##### ITERATE #####
-
-print("#define ITERATE_LIST(FUNC, DELIM, SUFFIX, list) ITERATE(FUNC, DELIM, SUFFIX, UNPAREN list)", end='\n')
-print("#define ITERATE(FUNC, DELIM, SUFFIX, ...) CAT(_ITERATE_, NARGS(__VA_ARGS__))(FUNC, DELIM, SUFFIX, __VA_ARGS__)", end='\n')
-print("#define _ITERATE_0(FUNC, DELIM, SUFFIX, x) ", end='\n')
-print("#define _ITERATE_1(FUNC, DELIM, SUFFIX, x) FUNC(x) UNPAREN SUFFIX", end='\n')
-for i in range(2,NMAX+1):
-    print("#define _ITERATE_" + str(i) + "(FUNC, DELIM, SUFFIX, x, ...) FUNC(x) UNPAREN DELIM _ITERATE_" +  str(i-1) + "(FUNC, DELIM, SUFFIX, __VA_ARGS__)")
-print('\n')
-
-##### ITERATE_N #####
-
-print("#define ITERATE_N_LIST(FUNC, DELIM, SUFFIX, list) ITERATE_N(FUNC, DELIM, SUFFIX, UNPAREN list)", end='\n')
-print("#define ITERATE_N(FUNC, DELIM, SUFFIX, ...) CAT(_ITERATE_N_, NARGS(__VA_ARGS__))(FUNC, DELIM, SUFFIX, __VA_ARGS__)", end='\n')
-print("#define _ITERATE_N_0(FUNC, DELIM, SUFFIX, x) ", end='\n')
-print("#define _ITERATE_N_1(FUNC, DELIM, SUFFIX, x) FUNC(x,1) UNPAREN SUFFIX", end='\n')
-for i in range(2,NMAX+1):
-    print("#define _ITERATE_N_" + str(i) + "(FUNC, DELIM, SUFFIX, x, ...) FUNC(x, " + str(i) +") UNPAREN DELIM _ITERATE_N_" +  str(i-1) + "(FUNC, DELIM, SUFFIX, __VA_ARGS__)")
-print('\n')
-
-##### DEC #####
-
-print("#define DEC(x) CAT(_DEC_,x)",end='\n')
-for i in range(1,NMAX+1):
-    print("#define _DEC_" + str(i) + " " + str(i-1),end='\n')
-print('\n')
-
-##### INC #####
-
-print("#define INC(x) CAT(_INC_,x)",end='\n')
-for i in range(0,NMAX+1):
-    print("#define _INC_" + str(i) + " " + str(i+1),end='\n')
-print('\n')
-
-##### GET #####
-
-for i in range(1,NMAX+1):
-    print("#define GET_" + str(i) + "(", end='')
-    list = ["a_" + str(j) + "," for  j in range(1,i+1)]
-    for ele in list:
-        print(ele, end='')
-    print("...) a_" + str(i), end='\n')
-print('\n')
-
-*/
-
+/***********************************************************************
+ *                   PYTHON GENERATED FUNCTIONS
+ **********************************************************************/
 
 #define NARGS_SEQ(_0, _1, _2, _3, _4, _5, _6, _7, _8, _9, _10, _11, _12, _13, _14, _15, _16, _17, _18, _19, _20, _21, _22, _23, _24, _25, _26, _27, _28, _29, _30, _31, _32, N, ...) N
 #define NARGS(...) NARGS_SEQ(0, ##__VA_ARGS__,32,31,30,29,28,27,26,25,24,23,22,21,20,19,18,17,16,15,14,13,12,11,10,9,8,7,6,5,4,3,2,1,0)
-
 
 #define ITERATE_LIST(FUNC, DELIM, SUFFIX, list) ITERATE(FUNC, DELIM, SUFFIX, UNPAREN list)
 #define ITERATE(FUNC, DELIM, SUFFIX, ...) CAT(_ITERATE_, NARGS(__VA_ARGS__))(FUNC, DELIM, SUFFIX, __VA_ARGS__)
@@ -368,6 +311,10 @@ print('\n')
 #define _RECURSIVE_31(FUNC, X) FUNC( _RECURSIVE_30(FUNC, X))
 #define _RECURSIVE_32(FUNC, X) FUNC( _RECURSIVE_31(FUNC, X))
 
+/***********************************************************************
+ *                       OTHER FUNCTIONS
+ **********************************************************************/
+
 #define ADD(X,Y) RECURSIVE(INC, Y, X)
 #define SUB(X,Y) RECURSIVE(DEC, Y, X)
 
@@ -480,15 +427,13 @@ print('\n')
 		return CAT(structname, _base) (std::forward<Types>(p)...);\
 	}
 	
-
-#ifndef TEST_MACRO
-#include "optional.hpp"
-#include <string_view>
-#endif
+/***********************************************************************
+ *                          CPP FUNCTIONS
+ **********************************************************************/
 
 namespace util {
 	
-constexpr bool string_equal(const char* str1, const char* str2) {
+inline constexpr bool string_equal(const char* str1, const char* str2) {
 	return std::string_view(str1) == str2;
 }
 

@@ -6,14 +6,13 @@ set(SOURCES
 	z_mem.cpp
 )
 
-set(FYPP_SOURCES
-        z_builder.hpp.fypp
+set(CPP_SOURCES
+        z_builder.hpp
 )
 
-add_fypp_sources(HEADERS GEN_DIR chem_mp_fypp ${FYPP_SOURCES})
+add_cpp_sources(chem_mp_cpp ${CPP_SOURCES})
 
 add_library(chem_mp ${SOURCES})
-add_dependencies(chem_mp chem_mp_fypp)
 
 target_link_libraries(
 	chem_mp

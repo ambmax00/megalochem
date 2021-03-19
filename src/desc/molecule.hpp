@@ -1,23 +1,22 @@
 #ifndef DESC_MOLECULE
 #define DESC_MOLECULE
 
-#:include "megalochem.fypp"
-
+#ifndef TEST_MACRO
 #include "desc/atom.hpp"
 #include "desc/basis.hpp"
 #include "io/data_handler.hpp"
-
 #include <vector>
 #include <mpi.h>
 #include <memory>
+#endif
+
+#include "utils/ppdirs.hpp"
 
 namespace desc {
 
 // defaults
 static const int MOLECULE_MO_SPLIT = 5;
 static const std::string MOLECULE_AO_SPLIT_METHOD = "atomic";
-
-class create_mol_base;
 
 class molecule {	
 protected:
@@ -150,19 +149,19 @@ protected:
 	
 public:
 
-#:set list = [&
-	['comm', 'MPI_Comm', _REQ, _VAL],&
-	['name', 'std::string', _REQ, _VAL],&
-	['atoms', 'std::vector<Atom>', _REQ, _VAL],&
-	['charge', 'int', _REQ, _VAL],&
-	['mult', 'int', _REQ, _VAL],&
-	['mo_split', 'int', _OPT, _VAL],&
-	['fractional', 'bool', _OPT, _VAL],&
-	['spin_average', 'bool', _OPT, _VAL],&
-	['cluster_basis', 'shared_cluster_basis', _REQ, _VAL]]
-
-${_MAKE_PARAM_STRUCT('create', list)}$
-${_MAKE_BUILDER_CLASS('molecule', 'create', list, True)}$
+#define MOLECULE_CREATE_LIST (\
+	((MPI_Comm), comm),\
+	((std::string),name),\
+	((std::vector<Atom>),atoms),\
+	((int), charge),\
+	((int),mult),\
+	((util::optional<int>),mo_split),\
+	((util::optional<bool>),fractional),\
+	((util::optional<bool>),spin_average),\
+	((shared_cluster_basis),cluster_basis))
+	
+	MAKE_PARAM_STRUCT(create, MOLECULE_CREATE_LIST, ())
+	MAKE_BUILDER_CLASS(molecule, create, MOLECULE_CREATE_LIST, ())
 
 	molecule(create_pack&& p);
 	
@@ -243,8 +242,6 @@ ${_MAKE_BUILDER_CLASS('molecule', 'create', list, True)}$
 	std::shared_ptr<desc::molecule> fragment(int noa, int nob, int nvo,
 		int nvb, std::vector<int> atom_list);
 	
-	friend class create_mol_base;
-
 };
 
 using shared_molecule = std::shared_ptr<molecule>;

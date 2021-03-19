@@ -17,7 +17,7 @@ void MVP_AORIADC1::init() {
 		case fock::jmethod::dfao: 
 		{
 			m_jbuilder = fock::DF_J::create()
-				.world(m_world)
+				.set_world(m_world)
 				.molecule(m_mol)
 				.print(nprint)
 				.eri3c2e_batched(m_eri3c2e_batched)
@@ -35,7 +35,7 @@ void MVP_AORIADC1::init() {
 		case fock::kmethod::dfao:
 		{
 			m_kbuilder = fock::DFAO_K::create()
-				.world(m_world)
+				.set_world(m_world)
 				.molecule(m_mol)
 				.print(nprint)
 				.eri3c2e_batched(m_eri3c2e_batched)
@@ -46,7 +46,7 @@ void MVP_AORIADC1::init() {
 		case fock::kmethod::dfmem:
 		{
 			m_kbuilder = fock::DFMEM_K::create()
-				.world(m_world)
+				.set_world(m_world)
 				.molecule(m_mol)
 				.print(nprint)
 				.eri3c2e_batched(m_eri3c2e_batched)
@@ -56,7 +56,7 @@ void MVP_AORIADC1::init() {
 		}
 		case fock::kmethod::dflmo:
 			m_kbuilder = fock::DFLMO_K::create()
-				.world(m_world)
+				.set_world(m_world)
 				.molecule(m_mol)
 				.print(nprint)
 				.eri3c2e_batched(m_eri3c2e_batched)

@@ -5,14 +5,13 @@ set(SOURCES
 	jkdf_robust.cpp
 )
 
-set(FYPP_SOURCES
-	jkbuilder.hpp.fypp
+set(CPP_SOURCES
+	jkbuilder.hpp
 )
 
-add_fypp_sources(HEADERS GEN_DIR chem_fock_fypp ${FYPP_SOURCES})
+add_cpp_sources(chem_fock_pp ${CPP_SOURCES})
 
 add_library(chem_fock ${SOURCES})
-add_dependencies(chem_fock chem_fock_fypp)
 
 target_link_libraries(
 	chem_fock

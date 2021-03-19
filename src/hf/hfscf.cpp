@@ -138,7 +138,7 @@ hfmod::hfmod(dbcsr::world w, desc::shared_molecule mol, desc::options opt)
 	
 	m_aoloader = ints::aoloader::create()
 		.set_world(m_world)
-		.molecule(m_mol)
+		.set_molecule(m_mol)
 		.print(LOG.global_plev())
 		.nbatches_b(nbatches_b)
 		.nbatches_x(nbatches_x)

@@ -1,3 +1,10 @@
+set(CPP_SOURCES
+	dbcsr_common.hpp
+	dbcsr_matrix.hpp
+)
+
+add_cpp_sources(dbcsrx_cpp ${CPP_SOURCES})
+
 add_library(chem_dbcsrx INTERFACE)
 
 target_link_libraries(

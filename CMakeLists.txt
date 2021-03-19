@@ -9,6 +9,7 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} ${CMAKE_SOURCE_DIR}/cmake/modules)
 
 include(fypp_sources)
+include(cpp_sources)
 
 find_package(Eigen3 REQUIRED NO_MODULE)
 
@@ -42,6 +43,7 @@ include_directories(
 )
 
 add_subdirectory(src)
+add_dependencies(chem cpp_target)
 
 target_link_libraries(
 	chem

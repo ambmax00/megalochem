@@ -59,7 +59,7 @@ void MVP_AORISOSADC2::init() {
 		case fock::jmethod::dfao:
 		{
 			m_jbuilder = fock::DF_J::create()
-				.world(m_world)
+				.set_world(m_world)
 				.molecule(m_mol)
 				.print(nprint)
 				.eri3c2e_batched(m_eri3c2e_batched)
@@ -78,7 +78,7 @@ void MVP_AORISOSADC2::init() {
 		case fock::kmethod::dfao:
 		{
 			m_kbuilder = fock::DFAO_K::create()
-				.world(m_world)
+				.set_world(m_world)
 				.molecule(m_mol)
 				.print(nprint)
 				.eri3c2e_batched(m_eri3c2e_batched)
@@ -89,7 +89,7 @@ void MVP_AORISOSADC2::init() {
 		case fock::kmethod::dfmem:
 		{
 			m_kbuilder = fock::DFMEM_K::create()
-				.world(m_world)
+				.set_world(m_world)
 				.molecule(m_mol)
 				.print(nprint)
 				.eri3c2e_batched(m_eri3c2e_batched)
@@ -110,8 +110,8 @@ void MVP_AORISOSADC2::init() {
 		case mp::zmethod::llmp_full:
 		{
 			m_zbuilder = mp::LLMP_FULL_Z::create()
-				.world(m_world)
-				.molecule(m_mol)
+				.set_world(m_world)
+				.set_molecule(m_mol)
 				.print(LOG.global_plev())
 				.eri3c2e_batched(m_eri3c2e_batched)
 				.intermeds(m_btype)
@@ -121,8 +121,8 @@ void MVP_AORISOSADC2::init() {
 		case mp::zmethod::llmp_mem:
 		{
 			m_zbuilder = mp::LLMP_MEM_Z::create()
-				.world(m_world)
-				.molecule(m_mol)
+				.set_world(m_world)
+				.set_molecule(m_mol)
 				.print(LOG.global_plev())
 				.eri3c2e_batched(m_eri3c2e_batched)
 				.build();
@@ -329,7 +329,7 @@ void MVP_AORISOSADC2::compute_intermeds() {
 				auto I_fit_xbb = dfit.compute(m_eri3c2e_batched, f_xx_ilap, m_btype);
 				LOG.os<1>("Occupancy of Ifit: ", I_fit_xbb->occupation() * 100, '\n');
 				k_inter = fock::DFAO_K::create()
-					.world(m_world)
+					.set_world(m_world)
 					.molecule(m_mol)
 					.print(nprint)
 					.eri3c2e_batched(m_eri3c2e_batched)
@@ -340,7 +340,7 @@ void MVP_AORISOSADC2::compute_intermeds() {
 			case fock::kmethod::dfmem:
 			{
 				k_inter = fock::DFMEM_K::create()
-					.world(m_world)
+					.set_world(m_world)
 					.molecule(m_mol)
 					.print(nprint)
 					.eri3c2e_batched(m_eri3c2e_batched)

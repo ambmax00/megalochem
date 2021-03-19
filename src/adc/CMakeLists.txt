@@ -8,14 +8,13 @@ set(SOURCES
 	adc_mvp_aoriadc2.cpp
 )
 
-set(FYPP_SOURCES
-        adc_mvp.hpp.fypp
+set(CPP_SOURCES
+        adc_mvp.hpp
 )
 
-add_fypp_sources(HEADERS GEN_DIR chem_adc_fypp ${FYPP_SOURCES})
+add_cpp_sources(chem_adc_cpp ${CPP_SOURCES})
 
 add_library(chem_adc ${SOURCES})
-add_dependencies(chem_adc chem_adc_fypp)
 
 target_link_libraries(
 	chem_adc
