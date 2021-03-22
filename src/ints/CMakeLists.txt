@@ -30,6 +30,7 @@ target_include_directories(
 target_link_libraries(
 	chem_ints
 	${LIBCINT_LIBRARIES}
+	quadmath
        	chem_desc
         chem_dbcsrx
         OpenMP::OpenMP_CXX

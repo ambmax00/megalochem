@@ -8,7 +8,6 @@ set(CMAKE_CXX_STANDARD 17)
 
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} ${CMAKE_SOURCE_DIR}/cmake/modules)
 
-include(fypp_sources)
 include(cpp_sources)
 
 find_package(Eigen3 REQUIRED NO_MODULE)
@@ -25,6 +24,8 @@ find_package(Python REQUIRED COMPONENTS Interpreter)
 find_package(PkgConfig)
 pkg_check_modules(deps REQUIRED IMPORTED_TARGET GLOBAL libxsmmf)
 find_package(SCALAPACK REQUIRED)
+
+find_package(QUADMATH)
 
 find_library(LIBCINT_LIBRARIES 
 	NAMES libcint.a 

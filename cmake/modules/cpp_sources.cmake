@@ -26,8 +26,6 @@ function (ADD_CPP_SOURCES OUTVAR)
                 get_filename_component(root "${file}" NAME_WE)
                 get_filename_component(extension "${file}" EXT)
 
-                message("INCLUDE: ${CPP_INCLUDE_DIR}")
-
                 set(new_extension ".hpp")
 		set(of "${CPP_GENERATED_SUBDIR}/${root}${extension}")
                 add_custom_command(
