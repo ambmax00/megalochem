@@ -20,7 +20,7 @@ find_package(OpenMP REQUIRED)
 find_package(MPI REQUIRED)
 find_package(DBCSR 2.1.0 CONFIG REQUIRED)
 find_package(Python REQUIRED COMPONENTS Interpreter)
-#find_package(HDF5 REQUIRED)
+find_package(HDF5 REQUIRED)
 find_package(PkgConfig)
 pkg_check_modules(deps REQUIRED IMPORTED_TARGET GLOBAL libxsmmf)
 find_package(SCALAPACK REQUIRED)
@@ -56,6 +56,7 @@ target_link_libraries(
 	chem_hf
 	chem_mp
 	chem_adc
+	${HDF5_LIBRARIES}
 )
 
 target_link_libraries(
@@ -68,5 +69,6 @@ target_link_libraries(
 	chem_hf
 	chem_mp
 	chem_adc
+	${HDF5_LIBRARIES}
 )
 

@@ -245,7 +245,7 @@ public:
 };
 
 using shared_molecule = std::shared_ptr<molecule>;
-/*
+
 inline void write_molecule(std::string name, desc::molecule& mol, filio::data_handler& dh) {
 
 	dh.open(filio::access_mode::rdwr);
@@ -276,7 +276,7 @@ inline void write_molecule(std::string name, desc::molecule& mol, filio::data_ha
 	
 	dh.close();
 	
-}*/
+}
 
 } // end namespace
 
