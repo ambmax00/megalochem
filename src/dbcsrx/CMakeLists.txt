@@ -1,6 +1,10 @@
 set(CPP_SOURCES
 	dbcsr_common.hpp
 	dbcsr_matrix.hpp
+	dbcsr_tensor.hpp
+	dbcsr_matrix_ops.hpp
+	dbcsr_tensor_ops.hpp
+	dbcsr_btensor.hpp
 )
 
 add_cpp_sources(dbcsrx_cpp ${CPP_SOURCES})
