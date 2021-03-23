@@ -385,7 +385,7 @@ void pivinc_cd::compute() {
 		
 }
 	
-dbcsr::smat_d pivinc_cd::L(std::vector<int> rowblksizes, std::vector<int> colblksizes) {
+dbcsr::shared_matrix<double> pivinc_cd::L(std::vector<int> rowblksizes, std::vector<int> colblksizes) {
 	
 	auto w = m_mat_in->get_world();
 	
@@ -1168,7 +1168,7 @@ void pivinc_cd::compute(std::optional<int> force_rank) {
 		
 }
 
-dbcsr::smat_d pivinc_cd::L(std::vector<int> rowblksizes, std::vector<int> colblksizes) {
+dbcsr::shared_matrix<double> pivinc_cd::L(std::vector<int> rowblksizes, std::vector<int> colblksizes) {
 	
 	static int i = 0;
 	i++;

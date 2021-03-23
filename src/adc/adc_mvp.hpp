@@ -1,8 +1,7 @@
 #ifndef ADC_MVP_H
 #define ADC_MVP_H
 
-#:include "megalochem.fypp"
-
+#ifndef TEST_MACRO
 #include <dbcsr_matrix_ops.hpp>
 #include <dbcsr_tensor_ops.hpp>
 #include "desc/options.hpp"
@@ -10,6 +9,9 @@
 #include "mp/z_builder.hpp"
 #include "adc/adc_defaults.hpp"
 #include "math/laplace/laplace_helper.hpp"
+#endif
+
+#include "utils/ppdirs.hpp"
 
 namespace adc {
 	
@@ -81,30 +83,30 @@ private:
 
 public:
 
-#:set list = [&
-	['world', 'dbcsr::world', _REQ, _VAL],&
-	['molecule', 'desc::shared_molecule', _REQ, _VAL],&
-	['print', 'int', _OPT, _VAL],&
-	['c_bo', 'dbcsr::shared_matrix<double>', _REQ, _VAL],&
-	['c_bv', 'dbcsr::shared_matrix<double>', _REQ, _VAL],&
-	['metric_inv', 'dbcsr::shared_matrix<double>', _REQ, _VAL],&
-	['eps_occ', 'std::vector<double>', _REQ, _VAL],&
-	['eps_vir', 'std::vector<double>', _REQ, _VAL],&
-	['eri3c2e_batched', 'dbcsr::sbtensor<3,double>', _REQ, _VAL],&
-	['fitting_batched', 'dbcsr::sbtensor<3,double>', _REQ, _VAL],&
-	['kmethod', 'fock::kmethod', _REQ, _VAL],&
-	['jmethod', 'fock::jmethod', _REQ, _VAL]]
-	
-${_MAKE_PARAM_STRUCT('create', list)}$
-${_MAKE_BUILDER_CLASS('MVP_AORIADC1', 'create', list, True)}$
+#define AORIADC1_LIST (\
+	((dbcsr::world), set_world),\
+	((desc::shared_molecule), set_molecule),\
+	((util::optional<int>), print),\
+	((dbcsr::shared_matrix<double>), c_bo),\
+	((dbcsr::shared_matrix<double>), c_bv),\
+	((dbcsr::shared_matrix<double>), metric_inv),\
+	((std::vector<double>), eps_occ),\
+	((std::vector<double>), eps_vir),\
+	((dbcsr::sbtensor<3,double>),eri3c2e_batched),\
+	((dbcsr::sbtensor<3,double>),fitting_batched),\
+	((fock::kmethod), kmethod),\
+	((fock::jmethod), jmethod))
 
+	MAKE_PARAM_STRUCT(create, AORIADC1_LIST, ())
+	MAKE_BUILDER_CLASS(MVP_AORIADC1, create, AORIADC1_LIST, ())
+	
 	MVP_AORIADC1(create_pack&& p) :
 		m_c_bo(p.p_c_bo), m_c_bv(p.p_c_bv), m_v_xx(p.p_metric_inv),
 		m_eps_occ(p.p_eps_occ), m_eps_vir(p.p_eps_vir), 
 		m_eri3c2e_batched(p.p_eri3c2e_batched),
 		m_fitting_batched(p.p_fitting_batched),
 		m_kmethod(p.p_kmethod), m_jmethod(p.p_jmethod),
-		MVP(p.p_world, p.p_molecule, (p.p_print) ? *p.p_print : 0,
+		MVP(p.p_set_world, p.p_set_molecule, (p.p_print) ? *p.p_print : 0,
 			"MVP_AORIADC1") {}
 		
 	void init() override;
@@ -225,28 +227,28 @@ private:
 	
 public:
 
-#:set list = [&
-	['world', 'dbcsr::world', _REQ, _VAL],&
-	['molecule', 'desc::shared_molecule', _REQ, _VAL],&
-	['print', 'int', _OPT, _VAL],&
-	['c_bo', 'dbcsr::shared_matrix<double>', _REQ, _VAL],&
-	['c_bv', 'dbcsr::shared_matrix<double>', _REQ, _VAL],&
-	['s_bb', 'dbcsr::shared_matrix<double>', _REQ, _VAL],&
-	['metric_inv', 'dbcsr::shared_matrix<double>', _REQ, _VAL],&
-	['eps_occ', 'std::vector<double>', _REQ, _VAL],&
-	['eps_vir', 'std::vector<double>', _REQ, _VAL],&
-	['eri3c2e_batched', 'dbcsr::sbtensor<3,double>', _REQ, _VAL],&
-	['fitting_batched', 'dbcsr::sbtensor<3,double>', _REQ, _VAL],&
-	['kmethod', 'fock::kmethod', _REQ, _VAL],&
-	['jmethod', 'fock::jmethod', _REQ, _VAL],&
-	['zmethod', 'mp::zmethod', _REQ, _VAL],&
-	['btype', 'dbcsr::btype', _REQ, _VAL],&
-	['nlap', 'int', _OPT, _VAL],&
-	['c_os', 'double', _OPT, _VAL],&
-	['c_os_coupling', 'double', _OPT, _VAL]]
-	
-${_MAKE_PARAM_STRUCT('create', list)}$
-${_MAKE_BUILDER_CLASS('MVP_AORISOSADC2', 'create', list, True)}$
+#define AORIADC2_LIST (\
+	((dbcsr::world), set_world),\
+	((desc::shared_molecule), set_molecule),\
+	((util::optional<int>), print),\
+	((dbcsr::shared_matrix<double>), c_bo),\
+	((dbcsr::shared_matrix<double>), c_bv),\
+	((dbcsr::shared_matrix<double>), s_bb),\
+	((dbcsr::shared_matrix<double>), metric_inv),\
+	((std::vector<double>), eps_occ),\
+	((std::vector<double>), eps_vir),\
+	((dbcsr::sbtensor<3,double>),eri3c2e_batched),\
+	((dbcsr::sbtensor<3,double>),fitting_batched),\
+	((fock::kmethod), kmethod),\
+	((mp::zmethod), zmethod),\
+	((fock::jmethod), jmethod),\
+	((dbcsr::btype), btype),\
+	((util::optional<int>), nlap),\
+	((util::optional<double>),c_os),\
+	((util::optional<double>),c_os_coupling))
+
+	MAKE_PARAM_STRUCT(create, AORIADC2_LIST, ())
+	MAKE_BUILDER_CLASS(MVP_AORISOSADC2, create, AORIADC2_LIST, ())
 
 	MVP_AORISOSADC2(create_pack&& p) :
 		m_c_bo(p.p_c_bo), m_c_bv(p.p_c_bv), m_v_xx(p.p_metric_inv),
@@ -259,7 +261,7 @@ ${_MAKE_BUILDER_CLASS('MVP_AORISOSADC2', 'create', list, True)}$
 		m_c_os((p.p_c_os) ? *p.p_c_os : ADC_ADC2_C_OS),
 		m_c_os_coupling((p.p_c_os_coupling) ? 
 			*p.p_c_os_coupling : ADC_ADC2_C_OS_COUPLING),
-		MVP(p.p_world, p.p_molecule, (p.p_print) ? *p.p_print : 0, 
+		MVP(p.p_set_world, p.p_set_molecule, (p.p_print) ? *p.p_print : 0, 
 			"MVP_AORISOSADC2") {}
 		
 	void init() override;

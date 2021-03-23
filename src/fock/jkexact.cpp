@@ -113,7 +113,8 @@ void EXACT_J::compute_J() {
 
 void EXACT_K::compute_K() {
 	
-	auto compute_K_single = [&](dbcsr::smat_d& p, dbcsr::smat_d& k, std::string x) {
+	auto compute_K_single = [&](dbcsr::shared_matrix<double>& p, 
+		dbcsr::shared_matrix<double>& k, std::string x) {
 		
 		dbcsr::copy_matrix_to_3Dtensor_new<double>(*p,*m_p_bbd,true);
 		m_p_bbd->filter(dbcsr::global::filter_eps);		

@@ -11,14 +11,13 @@ set(SOURCES
 	molecule.cpp
 )
 
-set(FYPP_SOURCES
-	molecule.hpp.fypp
+set(CPP_SOURCES
+	molecule.hpp
 )
 
-add_fypp_sources(HEADERS GEN_DIR chem_desc_fypp ${FYPP_SOURCES})
+add_cpp_sources(chem_desc_cpp ${CPP_SOURCES})
 
 add_library(chem_desc ${SOURCES})
-add_dependencies(chem_desc chem_desc_fypp)
 
 target_link_libraries(
 	chem_desc

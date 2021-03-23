@@ -1,8 +1,7 @@
 #ifndef FOCK_JK_BUILDER_H
 #define FOCK_JK_BUILDER_H
 
-#:include "megalochem.fypp"
-
+#ifndef TEST_MACRO
 #include "ints/aoloader.hpp"
 #include "utils/registry.hpp"
 #include "desc/molecule.hpp"
@@ -10,6 +9,9 @@
 #include "utils/mpi_time.hpp"
 #include <dbcsr_btensor.hpp>
 #include <dbcsr_matrix.hpp>
+#endif
+
+#include "utils/ppdirs.hpp"
 
 namespace fock {
 
@@ -137,9 +139,13 @@ public:
 	
 };
 
-#:def _BASE_INIT(jk, jkname) 
-${jk}$(p.p_world, p.p_molecule, (p.p_print) ? *p.p_print : 0, "${jkname}$")
-#:enddef
+#define BASE_INIT(jk, jkname) \
+	jk(p.p_set_world, p.p_molecule, (p.p_print) ? *p.p_print : 0, #jkname)
+
+#define BASE_LIST (\
+	((dbcsr::world), set_world),\
+	((desc::shared_molecule), molecule),\
+	((util::optional<int>), print))
 
 class EXACT_J : public J {
 private:
@@ -152,18 +158,15 @@ private:
 	
 public:
 
-#:set list = [&
-	['world', 'dbcsr::world', _REQ, _VAL],&
-	['molecule', 'desc::shared_molecule', _REQ, _VAL],&
-	['print', 'int', _OPT, _VAL],&
-	['eri4c2e_batched', 'dbcsr::sbtensor<4,double>', _REQ, _VAL]]
-	
-${_MAKE_PARAM_STRUCT('create', list)}$
-${_MAKE_BUILDER_CLASS('EXACT_J', 'create', list, True)}$
-	
+#define EXACT_J_LIST (\
+	((dbcsr::sbtensor<4,double>), eri4c2e_batched))
+
+	MAKE_PARAM_STRUCT(create, CONCAT(BASE_LIST, EXACT_J_LIST), ())
+	MAKE_BUILDER_CLASS(EXACT_J, create, CONCAT(BASE_LIST, EXACT_J_LIST), ())
+
 	EXACT_J(create_pack&& p) : 
 		m_eri4c2e_batched(p.p_eri4c2e_batched),
-		${_BASE_INIT('J', 'EXACT_J')}$
+		BASE_INIT(J, EXACT_J)
 	{}
 	void compute_J() override;
 	void init() override;
@@ -181,18 +184,15 @@ private:
 		
 public:
 
-#:set list = [&
-	['world', 'dbcsr::world', _REQ, _VAL],&
-	['molecule', 'desc::shared_molecule', _REQ, _VAL],&
-	['print', 'int', _OPT, _VAL],&
-	['eri4c2e_batched', 'dbcsr::sbtensor<4,double>', _REQ, _VAL]]
-	
-${_MAKE_PARAM_STRUCT('create', list)}$
-${_MAKE_BUILDER_CLASS('EXACT_K', 'create', list, True)}$
+#define EXACT_K_LIST (\
+	((dbcsr::sbtensor<4,double>), eri4c2e_batched))
+
+	MAKE_PARAM_STRUCT(create, CONCAT(BASE_LIST, EXACT_J_LIST), ())
+	MAKE_BUILDER_CLASS(EXACT_K, create, CONCAT(BASE_LIST, EXACT_J_LIST), ())
 
 	EXACT_K(create_pack&& p) :
 		m_eri4c2e_batched(p.p_eri4c2e_batched),
-		${_BASE_INIT('K', 'EXACT_K')}$
+		BASE_INIT(K, EXACT_K)
 	{}
 	void compute_K() override;
 	void init() override;
@@ -216,20 +216,17 @@ private:
 	
 public:
 
-#:set list = [&
-	['world', 'dbcsr::world', _REQ, _VAL],&
-	['molecule', 'desc::shared_molecule', _REQ, _VAL],&
-	['print', 'int', _OPT, _VAL],&
-	['eri3c2e_batched', 'dbcsr::sbtensor<3,double>', _REQ, _VAL],&
-	['metric_inv', 'dbcsr::shared_matrix<double>', _REQ, _VAL]]
+#define DF_J_LIST (\
+	((dbcsr::sbtensor<3,double>), eri3c2e_batched),\
+	((dbcsr::shared_matrix<double>), metric_inv))
 	
-${_MAKE_PARAM_STRUCT('create', list)}$
-${_MAKE_BUILDER_CLASS('DF_J', 'create', list, True)}$
-
+	MAKE_PARAM_STRUCT(create, CONCAT(BASE_LIST, DF_J_LIST), ())
+	MAKE_BUILDER_CLASS(DF_J, create, CONCAT(BASE_LIST, DF_J_LIST), ())
+	
 	DF_J(create_pack&& p) : 
 		m_eri3c2e_batched(p.p_eri3c2e_batched),
 		m_v_inv(p.p_metric_inv),
-		${_BASE_INIT('J', 'DF_J')}$
+		BASE_INIT(J, DF_J)
 	{}
 	void compute_J() override;
 	void init() override;
@@ -257,23 +254,20 @@ private:
 	dbcsr::shared_pgrid<2> m_spgrid2;
 		
 public:
-
-#:set list = [&
-	['world', 'dbcsr::world', _REQ, _VAL],&
-	['molecule', 'desc::shared_molecule', _REQ, _VAL],&
-	['print', 'int', _OPT, _VAL],&
-	['eri3c2e_batched', 'dbcsr::sbtensor<3,double>', _REQ, _VAL],&
-	['metric_invsqrt', 'dbcsr::shared_matrix<double>', _REQ, _VAL],&
-	['occ_nbatches', 'int', _OPT, _VAL]]
 	
-${_MAKE_PARAM_STRUCT('create', list)}$
-${_MAKE_BUILDER_CLASS('DFMO_K', 'create', list, True)}$
+#define DFMO_K_LIST (\
+	((dbcsr::sbtensor<3,double>), eri3c2e_batched),\
+	((dbcsr::shared_matrix<double>), metric_invsqrt),\
+	((util::optional<int>), occ_nbatches))
+	
+	MAKE_PARAM_STRUCT(create, CONCAT(BASE_LIST, DFMO_K_LIST), ())
+	MAKE_BUILDER_CLASS(DFMO_K, create, CONCAT(BASE_LIST, DFMO_K_LIST), ())
 
 	DFMO_K(create_pack&& p) : 
 		m_eri3c2e_batched(p.p_eri3c2e_batched),
 		m_v_invsqrt(p.p_metric_invsqrt),
 		m_occ_nbatches((p.p_occ_nbatches) ? *p.p_occ_nbatches : 5),
-		${_BASE_INIT('K', 'DFMO_K')}$
+		BASE_INIT(K, DFMO_K)
 	{}
 	void compute_K() override;
 	void init() override;
@@ -300,20 +294,17 @@ private:
 		
 public:
 
-#:set list = [&
-	['world', 'dbcsr::world', _REQ, _VAL],&
-	['molecule', 'desc::shared_molecule', _REQ, _VAL],&
-	['print', 'int', _OPT, _VAL],&
-	['eri3c2e_batched', 'dbcsr::sbtensor<3,double>', _REQ, _VAL],&
-	['fitting_batched', 'dbcsr::sbtensor<3,double>', _REQ, _VAL]]
-	
-${_MAKE_PARAM_STRUCT('create', list)}$
-${_MAKE_BUILDER_CLASS('DFAO_K', 'create', list, True)}$
+#define DFAO_K_LIST (\
+	((dbcsr::sbtensor<3,double>), eri3c2e_batched),\
+	((dbcsr::sbtensor<3,double>), fitting_batched))
+
+	MAKE_PARAM_STRUCT(create, CONCAT(BASE_LIST, DFAO_K_LIST), ())
+	MAKE_BUILDER_CLASS(DFAO_K, create, CONCAT(BASE_LIST, DFAO_K_LIST), ())
 
 	DFAO_K(create_pack&& p) : 
 		m_eri3c2e_batched(p.p_eri3c2e_batched),
 		m_fitting_batched(p.p_fitting_batched),
-		${_BASE_INIT('K', 'DFAO_K')}$
+		BASE_INIT(K, DFAO_K)
 	{}
 	
 	void compute_K() override;
@@ -345,22 +336,19 @@ private:
 		
 public:
 
-#:set list = [&
-	['world', 'dbcsr::world', _REQ, _VAL],&
-	['molecule', 'desc::shared_molecule', _REQ, _VAL],&
-	['print', 'int', _OPT, _VAL],&
-	['eri3c2e_batched', 'dbcsr::sbtensor<3,double>', _REQ, _VAL],&
-	['fitting_batched', 'dbcsr::sbtensor<3,double>', _REQ, _VAL],&
-	['metric', 'dbcsr::shared_matrix<double>', _REQ, _VAL]]
-	
-${_MAKE_PARAM_STRUCT('create', list)}$
-${_MAKE_BUILDER_CLASS('DFROBUST_K', 'create', list, True)}$
+#define DFROBUST_K_LIST (\
+	((dbcsr::sbtensor<3,double>), eri3c2e_batched),\
+	((dbcsr::sbtensor<3,double>), fitting_batched),\
+	((dbcsr::shared_matrix<double>), metric))
+
+	MAKE_PARAM_STRUCT(create, CONCAT(BASE_LIST, DFROBUST_K_LIST), ())
+	MAKE_BUILDER_CLASS(DFROBUST_K, create, CONCAT(BASE_LIST, DFROBUST_K_LIST), ())
 
 	DFROBUST_K(create_pack&& p) : 
 		m_eri3c2e_batched(p.p_eri3c2e_batched),
 		m_fitting_batched(p.p_fitting_batched),
 		m_v_xx(p.p_metric),
-		${_BASE_INIT('K', 'DFROBUST_K')}$
+		BASE_INIT(K, DFROBUST_K)
 	{}
 	
 	void compute_K() override;
@@ -394,20 +382,17 @@ private:
 		
 public:
 
-#:set list = [&
-	['world', 'dbcsr::world', _REQ, _VAL],&
-	['molecule', 'desc::shared_molecule', _REQ, _VAL],&
-	['print', 'int', _OPT, _VAL],&
-	['eri3c2e_batched', 'dbcsr::sbtensor<3,double>', _REQ, _VAL],&
-	['metric_inv', 'dbcsr::shared_matrix<double>', _REQ, _VAL]]
+#define DFMEM_K_LIST (\
+	((dbcsr::sbtensor<3,double>), eri3c2e_batched),\
+	((dbcsr::shared_matrix<double>), metric_inv))
 	
-${_MAKE_PARAM_STRUCT('create', list)}$
-${_MAKE_BUILDER_CLASS('DFMEM_K', 'create', list, True)}$
+	MAKE_PARAM_STRUCT(create, CONCAT(BASE_LIST, DFMEM_K_LIST), ())
+	MAKE_BUILDER_CLASS(DFMEM_K, create, CONCAT(BASE_LIST, DFMEM_K_LIST), ())
 
 	DFMEM_K(create_pack&& p) : 
 		m_eri3c2e_batched(p.p_eri3c2e_batched),
 		m_v_xx(p.p_metric_inv),
-		${_BASE_INIT('K', 'DFMEM_K')}$
+		BASE_INIT(K, DFMEM_K)
 	{}
 	
 	void compute_K() override;
@@ -433,22 +418,19 @@ private:
 	
 public:
 
-#:set list = [&
-	['world', 'dbcsr::world', _REQ, _VAL],&
-	['molecule', 'desc::shared_molecule', _REQ, _VAL],&
-	['print', 'int', _OPT, _VAL],&
-	['eri3c2e_batched', 'dbcsr::sbtensor<3,double>', _REQ, _VAL],&
-	['metric_inv', 'dbcsr::shared_matrix<double>', _REQ, _VAL],&
-	['occ_nbatches', 'int', _OPT, _VAL]]
+#define DFLMO_K_LIST (\
+	((dbcsr::sbtensor<3,double>), eri3c2e_batched),\
+	((dbcsr::shared_matrix<double>),metric_inv),\
+	((util::optional<int>), occ_nbatches))
 	
-${_MAKE_PARAM_STRUCT('create', list)}$
-${_MAKE_BUILDER_CLASS('DFLMO_K', 'create', list, True)}$
+	MAKE_PARAM_STRUCT(create, CONCAT(BASE_LIST, DFLMO_K_LIST), ())
+	MAKE_BUILDER_CLASS(DFLMO_K, create, CONCAT(BASE_LIST, DFLMO_K_LIST), ())
 
 	DFLMO_K(create_pack&& p) : 
 		m_eri3c2e_batched(p.p_eri3c2e_batched),
 		m_v_xx(p.p_metric_inv),
 		m_occ_nbatches((p.p_occ_nbatches) ? *p.p_occ_nbatches : 5),
-		${_BASE_INIT('K', 'DFLMO_K')}$
+		BASE_INIT(K, DFLMO_K)
 	{}
 	
 	void compute_K() override;
@@ -587,26 +569,31 @@ inline void load_kints(kmethod kmet, ints::metric metr, ints::aoloader& ao) {
 		
 	}
 }
-
-#:set list = [&
-	['set_world', 'dbcsr::world', _REQ, _VAL],&
-	['molecule', 'desc::shared_molecule', _REQ, _VAL],&
-	['method', 'jmethod', _REQ, _VAL],&
-	['aoloader', 'ints::aoloader', _REQ, _REF],&
-	['print', 'int', _OPT, _VAL],&
-	['metric', 'ints::metric', _REQ, _VAL]]
+	
+#define CREATE_J_LIST (\
+	((dbcsr::world), set_world),\
+	((desc::shared_molecule), molecule),\
+	((jmethod), method),\
+	((ints::aoloader), aoloader),\
+	((util::optional<int>), print),\
+	((ints::metric), metric))
 	
 class create_j_base {
+private:
 
-${_MAKE_BUILDER_MEMBERS('create_j', list)}$
+	typedef create_j_base _create_base;
+	
+	MAKE_BUILDER_MEMBERS(create, CREATE_J_LIST)
 
 public:
+
+	MAKE_BUILDER_SETS(create, CREATE_J_LIST)
 
 	create_j_base() {}
 	
 	std::shared_ptr<J> build() {
 
-		${_CHECK_REQUIRED('create_j', '', list)}$
+		CHECK_REQUIRED(CREATE_J_LIST)
 
 		std::shared_ptr<J> jbuilder;
 		auto aoreg = c_aoloader->get_registry();
@@ -618,7 +605,7 @@ public:
 			auto eris = aoreg.get<dbcsr::sbtensor<4,double>>(ints::key::coul_bbbb);
 			
 			jbuilder = EXACT_J::create()
-				.world(*c_set_world)
+				.set_world(*c_set_world)
 				.molecule(*c_molecule)
 				.print(nprint)
 				.eri4c2e_batched(eris)
@@ -652,7 +639,7 @@ public:
 			}
 			
 			jbuilder = DF_J::create()
-				.world(*c_set_world)
+				.set_world(*c_set_world)
 				.molecule(*c_molecule)
 				.print(nprint)
 				.eri3c2e_batched(eris)
@@ -669,26 +656,30 @@ public:
 
 inline create_j_base create_j() { return create_j_base(); }
 
-#:set list = [&
-	['set_world', 'dbcsr::world', _REQ, _VAL],&
-	['molecule', 'desc::shared_molecule', _REQ, _VAL],&
-	['method', 'kmethod', _REQ, _VAL],&
-	['aoloader', 'ints::aoloader', _REQ, _REF],&
-	['print', 'int', _OPT, _VAL],&
-	['metric', 'ints::metric', _REQ, _VAL],&
-	['occ_nbatches', 'int', _OPT, _VAL]]
+#define CREATE_K_LIST (\
+	((dbcsr::world), set_world),\
+	((desc::shared_molecule), molecule),\
+	((kmethod), method),\
+	((ints::aoloader), aoloader),\
+	((util::optional<int>), print),\
+	((ints::metric), metric),\
+	((util::optional<int>), occ_nbatches))
 
 class create_k_base {
-
-	${_MAKE_BUILDER_MEMBERS('create_k', list)}$
+private:
+	
+	typedef create_k_base _create_base;
+	MAKE_BUILDER_MEMBERS(create, CREATE_K_LIST)
 	
 public:
+
+	MAKE_BUILDER_SETS(create, CREATE_K_LIST)
 
 	create_k_base() {}
 	
 	std::shared_ptr<K> build() {
 	
-		${_CHECK_REQUIRED('create_k_base', '', list)}$
+		CHECK_REQUIRED(CREATE_K_LIST)
 
 		std::shared_ptr<K> kbuilder;
 		auto aoreg = c_aoloader->get_registry();
@@ -702,7 +693,7 @@ public:
 			auto eris = aoreg.get<dbcsr::sbtensor<4,double>>(ints::key::coul_bbbb);
 			
 			kbuilder = EXACT_K::create()
-				.world(*c_set_world)
+				.set_world(*c_set_world)
 				.molecule(*c_molecule)
 				.print(nprint)
 				.eri4c2e_batched(eris)
@@ -733,7 +724,7 @@ public:
 			}
 			
 			kbuilder = DFAO_K::create()
-				.world(*c_set_world)
+				.set_world(*c_set_world)
 				.molecule(*c_molecule)
 				.print(nprint)
 				.eri3c2e_batched(eris)
@@ -746,7 +737,7 @@ public:
 			auto invsqrt = aoreg.get<dbcsr::shared_matrix<double>>(ints::key::coul_xx_invsqrt);
 			
 			kbuilder = DFMO_K::create()
-				.world(*c_set_world)
+				.set_world(*c_set_world)
 				.molecule(*c_molecule)
 				.print(nprint)
 				.eri3c2e_batched(eris)
@@ -780,7 +771,7 @@ public:
 			
 			if (*c_method == kmethod::dfmem) {
 				kbuilder = DFMEM_K::create()
-					.world(*c_set_world)
+					.set_world(*c_set_world)
 					.molecule(*c_molecule)
 					.print(nprint)
 					.eri3c2e_batched(eris)
@@ -789,7 +780,7 @@ public:
 					
 			} else {
 				kbuilder = DFLMO_K::create()
-					.world(*c_set_world)
+					.set_world(*c_set_world)
 					.molecule(*c_molecule)
 					.print(nprint)
 					.eri3c2e_batched(eris)
@@ -806,7 +797,7 @@ public:
 			auto v_xx = aoreg.get<dbcsr::shared_matrix<double>>(ints::key::coul_xx);
 			
 			kbuilder = DFROBUST_K::create()
-				.world(*c_set_world)
+				.set_world(*c_set_world)
 				.molecule(*c_molecule)
 				.print(nprint)
 				.eri3c2e_batched(eris)

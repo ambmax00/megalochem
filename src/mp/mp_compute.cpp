@@ -142,7 +142,7 @@ void mpmod::compute() {
 	std::shared_ptr<ints::aoloader> ao
 		= ints::aoloader::create()
 		.set_world(m_world)
-		.molecule(mol)
+		.set_molecule(mol)
 		.print(LOG.global_plev())
 		.nbatches_b(nbatches_b_opt)
 		.nbatches_x(nbatches_x_opt)
@@ -166,7 +166,7 @@ void mpmod::compute() {
 	
 	auto zbuilder = create_z()
 		.set_world(m_world)
-		.molecule(mol)
+		.set_molecule(mol)
 		.print(LOG.global_plev())
 		.aoloader(*ao)
 		.method(zmeth)
@@ -371,7 +371,7 @@ void mpmod::compute() {
 		
 		LOG.os<1>("Local reduction.\n");
 		
-		dbcsr::iter_d iter(*ztilde_XX);
+		dbcsr::iterator iter(*ztilde_XX);
 		
 		double sum = 0.0;
 		

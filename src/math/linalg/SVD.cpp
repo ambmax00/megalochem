@@ -207,7 +207,8 @@ dbcsr::shared_matrix<double> SVD::inverse() {
 	
 }
 
-dbcsr::smat_d SVD::U(std::vector<int> rowblksizes, std::vector<int> colblksizes) {
+dbcsr::shared_matrix<double> SVD::U(std::vector<int> rowblksizes, 
+	std::vector<int> colblksizes) {
 	
 	auto w = m_mat_in->get_world();
 	
@@ -224,7 +225,8 @@ dbcsr::smat_d SVD::U(std::vector<int> rowblksizes, std::vector<int> colblksizes)
 	
 }
 
-dbcsr::smat_d SVD::Vt(std::vector<int> rowblksizes, std::vector<int> colblksizes) {
+dbcsr::shared_matrix<double> SVD::Vt(std::vector<int> rowblksizes, 
+	std::vector<int> colblksizes) {
 	
 	auto w = m_mat_in->get_world();
 	

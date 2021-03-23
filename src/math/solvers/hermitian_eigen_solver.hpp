@@ -7,8 +7,8 @@
 
 namespace math {
 
-using smatrix = dbcsr::smat_d;
-using matrix = dbcsr::mat_d;
+using smatrix = dbcsr::shared_matrix<double>;
+using matrix = dbcsr::matrix<double>;
 
 class hermitian_eigen_solver {
 private:

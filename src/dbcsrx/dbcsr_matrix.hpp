@@ -1,10 +1,12 @@
 #ifndef DBCSR_MATRIX_HPP
 #define DBCSR_MATRIX_HPP
 
-#:include "megalochem.fypp"
+#ifndef TEST_MACRO
 #include <dbcsr_common.hpp>
-
 #include <iomanip>
+#endif
+
+#include "utils/ppdirs.hpp"
 
 namespace dbcsr {
 
@@ -37,14 +39,15 @@ public:
 		d.m_dist_ptr = nullptr;
 	}
 
-#:set list = [ &
-	['set_world', 'world', _REQ, _REF],&
-	['row_dist', 'vec<int>', _REQ, _REF],&
-	['col_dist', 'vec<int>', _REQ, _REF]]
-
-${_MAKE_PARAM_STRUCT('create', list)}$
-${_MAKE_BUILDER_CLASS('dist', 'create', list, True)}$
+#define DIST_LIST (\
+	((world), set_world), \
+	((vec<int>), row_dist), \
+	((vec<int>), col_dist))
 	
+	MAKE_PARAM_STRUCT(create, DIST_LIST, ())
+	
+	MAKE_BUILDER_CLASS(dist, create, DIST_LIST, ())
+
 	dist(create_pack&& p) : m_dist_ptr(nullptr), 
 							m_world(p.p_set_world) {
 		c_dbcsr_distribution_new(&m_dist_ptr, p.p_set_world.group(), 
@@ -105,22 +108,23 @@ public:
 /* ===========================================
  *         SPECIAL MATRIX CONSTRUCTORS
  * ===========================================*/
-	
-#:set create_list = [ &
-        ['name', 'std::string', _REQ, _VAL], &
-        ['set_world', 'world', _OPT, _VAL],&
-        ['set_dist', 'dist', _OPT, _REF],&
-        ['matrix_type', 'type', _REQ, _VAL],&
-        ['row_blk_sizes', 'vec<int>', _REQ, _REF],&
-        ['col_blk_sizes', 'vec<int>', _REQ, _REF],&
-        ['nze', 'int', _OPT, _VAL],&
-        ['reuse', 'bool', _OPT, _VAL],&
-        ['reuse_arrays', 'bool', _OPT, _VAL],&
-        ['mutable_work', 'bool', _OPT, _VAL],&
-        ['replication_type', 'repl', _OPT, _VAL]]
 
-${_MAKE_PARAM_STRUCT('create', create_list)}$
-${_MAKE_BUILDER_CLASS('matrix', 'create', create_list, True)}$
+#define MATRIX_CREATE_LIST (\
+	((std::string), name),\
+	((util::optional<world>), set_world),\
+	((util::optional<dist&>), set_dist), \
+	((type), matrix_type), \
+	((vec<int>&), row_blk_sizes), \
+	((vec<int>&), col_blk_sizes), \
+	((util::optional<int>), nze), \
+	((util::optional<bool>), reuse), \
+	((util::optional<bool>), reuse_arrays), \
+	((util::optional<bool>), mutable_work), \
+	((util::optional<repl>), replication_type)) 
+	
+	MAKE_PARAM_STRUCT(create, MATRIX_CREATE_LIST, ())
+	
+	MAKE_BUILDER_CLASS(matrix, create, MATRIX_CREATE_LIST, ())
 
 	matrix(create_pack&& p) : m_matrix_ptr(nullptr) {
 		
@@ -168,26 +172,29 @@ ${_MAKE_BUILDER_CLASS('matrix', 'create', create_list, True)}$
         if (!p.p_set_dist) dist_ptr->release();
         
     }
-    
-#:set init_list = [&
-	['templet', 'matrix<T>', _REQ, _REF]]
 
-#:set list = [ &
-	['name', 'std::string', _REQ, _VAL],&
-	['set_dist', 'dist', _OPT, _REF],&
-	['matrix_type', 'type', _OPT, _VAL],&
-	['row_blk_sizes', 'vec<int>', _OPT, _REF],&
-	['col_blk_sizes', 'vec<int>', _OPT, _REF],&
-	['nze', 'int', _OPT, _VAL],&
-	['reuse', 'const bool', _OPT, _VAL],&
-	['reuse_arrays', 'const bool', _OPT, _VAL],&
-	['mutable_work', 'const bool', _OPT, _VAL],&
-	['replication_type', 'repl', _OPT, _VAL]]
+#define MATRIX_TEMPLATE_ILIST (\
+	((matrix<T>&), templet)\
+)
+
+#define MATRIX_TEMPLATE_PLIST (\
+	((std::string), name),\
+	((util::optional<dist&>), set_dist),\
+	((util::optional<type>), matrix_type),\
+	((util::optional<vec<int>&>), row_blk_sizes),\
+	((util::optional<vec<int>&>), col_blk_sizes),\
+	((util::optional<int>), nze),\
+	((util::optional<bool>), reuse),\
+	((util::optional<bool>), reuse_arrays),\
+	((util::optional<bool>), mutable_work),\
+	((util::optional<repl>), replication_type))
 	
-${_MAKE_PARAM_STRUCT('create_template', list, init_list)}$
-${_MAKE_BUILDER_CLASS('matrix', 'create_template', list, True, init_list)}$
+	MAKE_PARAM_STRUCT(create_template, MATRIX_TEMPLATE_PLIST,
+		MATRIX_TEMPLATE_ILIST)
 	
-	
+	MAKE_BUILDER_CLASS(matrix, create_template, MATRIX_TEMPLATE_PLIST,
+		MATRIX_TEMPLATE_ILIST)
+    
 	matrix(create_template_pack&& p) {
 		
 		m_matrix_ptr = nullptr;
@@ -212,19 +219,23 @@ ${_MAKE_BUILDER_CLASS('matrix', 'create_template', list, True, init_list)}$
 			(p.p_replication_type) ? &repl_type : nullptr);
                                    
     }
-    
-#:set init_list = [&
-	['matrix_in', 'matrix<T>', _REQ, _REF]]
-    
-#:set list = [ &
-    ['shallow_copy', 'bool', _OPT, _VAL],&
-    ['transpose_data', 'bool', _OPT, _VAL],& 
-    ['transpose_dist', 'bool', _OPT, _VAL],& 
-    ['use_dist', 'bool', _OPT, _VAL]]
-    
-${_MAKE_PARAM_STRUCT('transpose', list, init_list)}$
-${_MAKE_BUILDER_CLASS('matrix', 'transpose', list, True, init_list)}$
-    
+
+#define MATRIX_TRANSPOSE_ILIST (\
+	((matrix<T>&), matrix_in))
+	
+#define MATRIX_TRANSPOSE_PLIST (\
+	((util::optional<bool>), shallow_copy),\
+	((util::optional<bool>), transpose_data),\
+	((util::optional<bool>), transpose_dist),\
+	((util::optional<bool>), use_dist))
+
+
+	MAKE_PARAM_STRUCT(transpose, MATRIX_TRANSPOSE_PLIST,
+		MATRIX_TRANSPOSE_ILIST)
+	
+	MAKE_BUILDER_CLASS(matrix, transpose, MATRIX_TRANSPOSE_PLIST,
+		MATRIX_TRANSPOSE_ILIST)
+
     matrix(transpose_pack&& p) {
     
 		m_matrix_ptr = nullptr;
@@ -238,18 +249,20 @@ ${_MAKE_BUILDER_CLASS('matrix', 'transpose', list, True, init_list)}$
                                 
     }
     
-#:set init_list = [&
-	['matrix_in', 'matrix<T>', _REQ, _REF]]
+#define MATRIX_COPY_ILIST (\
+	((matrix<T>&), matrix_in))
 	
-#:set list = [ &
-    ['name', 'std::string', _OPT, _VAL],&
-    ['keep_sparsity', 'bool', _OPT, _VAL],&
-    ['shallow_data', 'bool', _OPT, _VAL],&
-    ['keep_imaginary', 'bool', _OPT, _VAL],&
-    ['matrix_type', 'type', _OPT, _VAL]]
+#define MATRIX_COPY_PLIST (\
+	((util::optional<std::string>), name),\
+	((util::optional<bool>), keep_sparsity),\
+	((util::optional<bool>), shallow_data),\
+	((util::optional<bool>), keep_imaginary),\
+	((util::optional<type>), matrix_type))
     
-${_MAKE_PARAM_STRUCT('copy', list, init_list)}$
-${_MAKE_BUILDER_CLASS('matrix', 'copy', list, True, init_list)}$
+	MAKE_PARAM_STRUCT(copy, MATRIX_COPY_PLIST, MATRIX_COPY_ILIST)
+	
+	MAKE_BUILDER_CLASS(matrix, copy, MATRIX_COPY_PLIST,
+		MATRIX_COPY_ILIST)
 	
 	matrix(copy_pack&& p) {
 		
@@ -267,14 +280,15 @@ ${_MAKE_BUILDER_CLASS('matrix', 'copy', list, True, init_list)}$
 			(p.p_matrix_type) ? &mat_type : nullptr);
 			
 	}
+	
+#define MATRIX_READ_PLIST (\
+	((std::string), filepath),\
+	((dist&), set_dist),\
+	((world), set_world))
 
-#:set read_list = [&
-    ['filepath', 'std::string', _REQ, _VAL],&
-    ['distribution', 'dist', _REQ, _REF],&
-    ['set_world', 'world', _REQ, _VAL]]
-
-${_MAKE_PARAM_STRUCT('read', read_list)}$
-${_MAKE_BUILDER_CLASS('matrix', 'read', read_list, True)}$
+	MAKE_PARAM_STRUCT(read, MATRIX_READ_PLIST, ())
+	
+	MAKE_BUILDER_CLASS(matrix, read, MATRIX_READ_PLIST, ())
 
 	matrix(read_pack&& p) {
 				
@@ -285,7 +299,7 @@ ${_MAKE_BUILDER_CLASS('matrix', 'read', read_list, True)}$
 			m_world.comm(), &m_matrix_ptr);
 			
     }
-
+    
     typedef T value_type;
     
     template <typename D>
@@ -535,37 +549,90 @@ ${_MAKE_BUILDER_CLASS('matrix', 'read', read_list, True)}$
        return c_dbcsr_nblkcols_local(m_matrix_ptr);
     }
 
-#:set vars = ['local_rows', 'local_cols', 'proc_row_dist', 'proc_col_dist', &
-                'row_blk_size', 'col_blk_size', 'row_blk_offset', 'col_blk_offset']
-#:for i in range(0,len(vars))
-#:set var = vars[i]
-#:set name = var
-#:if var in ['row_blk_size', 'col_blk_size', 'row_blk_offset', 'col_blk_offset']
-#:set name = var + 's'
-#:endif
-    std::vector<int> ${name}$() const {
-#:set rowcol = 'rows'
-#:set loctot = 'total'
-#:if 'local' in var
-    #:set loctot = 'local'
-#:endif
-#:if i % 2 != 0
-    #:set rowcol = 'cols'
-#:endif
-		int size = this->nblk${rowcol}$_${loctot}$();
+    std::vector<int> local_rows() const {
+		int size = this->nblkrows_local();
         std::vector<int> out(size,0);
-        //std::cout << out.size() << std::endl;
         
-        c_dbcsr_get_${var}$(m_matrix_ptr, out.data(), size);
+        c_dbcsr_get_local_rows(m_matrix_ptr, out.data(), size);
                              
         return out;
         
     }
-#:endfor
+    std::vector<int> local_cols() const {
+		int size = this->nblkcols_local();
+        std::vector<int> out(size,0);
+        
+        c_dbcsr_get_local_cols(m_matrix_ptr, out.data(), size);
+                             
+        return out;
+        
+    }
+    
+    std::vector<int> proc_row_dist() const {
+		int size = this->nblkrows_total();
+        std::vector<int> out(size,0);
+        
+        c_dbcsr_get_proc_row_dist(m_matrix_ptr, out.data(), size);
+                             
+        return out;
+        
+    }
+    
+    std::vector<int> proc_col_dist() const {
+		int size = this->nblkcols_total();
+        std::vector<int> out(size,0);
+        
+        c_dbcsr_get_proc_col_dist(m_matrix_ptr, out.data(), size);
+                             
+        return out;
+        
+    }
+    
+    std::vector<int> row_blk_sizes() const {
+		int size = this->nblkrows_total();
+        std::vector<int> out(size,0);
+        
+        c_dbcsr_get_row_blk_size(m_matrix_ptr, out.data(), size);
+                             
+        return out;
+        
+    }
+    
+    std::vector<int> col_blk_sizes() const {
+		int size = this->nblkcols_total();
+        std::vector<int> out(size,0);
+        
+        c_dbcsr_get_col_blk_size(m_matrix_ptr, out.data(), size);
+                             
+        return out;
+        
+    }
+    
+    std::vector<int> row_blk_offsets() const {
+		int size = this->nblkrows_total();
+        std::vector<int> out(size,0);
+        //std::cout << out.size() << std::endl;
+        
+        c_dbcsr_get_row_blk_offset(m_matrix_ptr, out.data(), size);
+                             
+        return out;
+        
+    }
+    
+    std::vector<int> col_blk_offsets() const {
+		int size = this->nblkcols_total();
+        std::vector<int> out(size,0);
+        
+        c_dbcsr_get_col_blk_offset(m_matrix_ptr, out.data(), size);
+                             
+        return out;
+        
+    }
      
     std::string name() const {
         char* cname;
-        c_dbcsr_get_info(m_matrix_ptr, ${repeat('nullptr',19)}$, &cname, nullptr, nullptr, nullptr);
+        c_dbcsr_get_info(m_matrix_ptr, REPEAT_FIRST(ECHO_P, nullptr, 1, 19, (PPDIRS_COMMA), ()), 
+			&cname, nullptr, nullptr, nullptr);
         
         std::string out(cname);
         c_free_string(&cname);
@@ -574,7 +641,8 @@ ${_MAKE_BUILDER_CLASS('matrix', 'read', read_list, True)}$
     
     type matrix_type() const {
         char out;
-        c_dbcsr_get_info(m_matrix_ptr, ${repeat('nullptr',20)}$, &out, nullptr, nullptr);
+        c_dbcsr_get_info(m_matrix_ptr, REPEAT_FIRST(ECHO_P, nullptr, 1, 20, (PPDIRS_COMMA), ()), 
+			&out, nullptr, nullptr);
         return static_cast<type>(out);
     }
     
@@ -651,13 +719,6 @@ using shared_matrix = std::shared_ptr<matrix<T>>;
 
 template <typename T>
 class iterator {
-/*#:set list = [&
-    ['shared', 'bool', 'optional', 'val'],&
-    ['dynamic', 'bool', 'optional', 'val'],&
-    ['dynamic_byrows', 'bool', 'optional', 'val'],&
-    ['contiguous_ptrs', 'bool', 'optional', 'val'],&
-    ['read_only', 'bool', 'optional', 'val']]
-*/
 
 private:
     void* m_iter_ptr;
@@ -719,11 +780,14 @@ public:
 		}
 		return sqrt(out);
 	}
-    
-#:set list = ['row', 'col', 'iblk', 'blk_p', 'row_size', 'col_size', 'row_offset', 'col_offset']
-#:for var in list
-    int ${var}$() { return m_${var}$; }
-#:endfor
+
+#define ITER_LIST (\
+	row, col, iblk, blk_p, row_size, col_size, row_offset, col_offset)
+	
+#define ECHO_FUNC(var) \
+	int var() { return CAT(m_, var); }
+	
+	ITERATE_LIST(ECHO_FUNC, (), (), ITER_LIST)
 
     T* data() { return m_blk_ptr; }	
     
@@ -779,18 +843,6 @@ void print(matrix<T>& mat) {
 	iter.stop();
 		
 }
-
-
-// typedefs
-#:for i in range(0,4)
-#:set type = typelist[i]
-#:set suffix = typesuffix[i]
-typedef block<2,${type}$> block_${suffix}$;
-typedef matrix<${type}$> mat_${suffix}$;
-typedef smatrix<${type}$> smat_${suffix}$;
-typedef iterator<${type}$> iter_${suffix}$;
-#:endfor
-
 
 } // end namespace
 

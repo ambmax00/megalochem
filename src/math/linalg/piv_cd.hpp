@@ -42,7 +42,7 @@ public:
 	
 	int rank() { return m_rank; }
 	
-	dbcsr::smat_d L(std::vector<int> rowblksizes, std::vector<int> colblksizes);
+	dbcsr::shared_matrix<double> L(std::vector<int> rowblksizes, std::vector<int> colblksizes);
 	
 };
 	

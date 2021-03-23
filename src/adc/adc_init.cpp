@@ -48,7 +48,7 @@ adcmod::adcmod(dbcsr::world w, hf::shared_hf_wfn hfref, desc::options& opt) :
 	
 	m_aoloader = ints::aoloader::create()
 		.set_world(m_world)
-		.molecule(m_hfwfn->mol())
+		.set_molecule(m_hfwfn->mol())
 		.print(LOG.global_plev())
 		.nbatches_b(nbatches_b_opt)
 		.nbatches_x(nbatches_x_opt)
@@ -176,8 +176,8 @@ std::shared_ptr<MVP> adcmod::create_adc1() {
 	}
 	
 	auto ptr = MVP_AORIADC1::create()
-		.world(m_world)
-		.molecule( m_hfwfn->mol())
+		.set_world(m_world)
+		.set_molecule( m_hfwfn->mol())
 		.print(LOG.global_plev())
 		.c_bo(m_hfwfn->c_bo_A())
 		.c_bv(m_hfwfn->c_bv_A())
@@ -284,8 +284,8 @@ std::shared_ptr<MVP> adcmod::create_adc2(std::optional<canon_lmo> clmo) {
 	}
 
 	auto ptr = MVP_AORISOSADC2::create()
-		.world(m_world)
-		.molecule(mol)
+		.set_world(m_world)
+		.set_molecule(mol)
 		.print(LOG.global_plev())
 		.c_bo(c_bo)
 		.c_bv(c_bv)

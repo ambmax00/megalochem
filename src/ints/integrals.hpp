@@ -63,11 +63,12 @@ typedef int (*CINTIntegralFunction)(double *out, const int *shls,
 		
 namespace ints {
 		
-void calc_ints(dbcsr::mat_d& m_out, std::vector<std::vector<int>*> shell_offsets, 
+void calc_ints(dbcsr::matrix<double>& m_out, std::vector<std::vector<int>*> shell_offsets, 
 		std::vector<std::vector<int>*> shell_sizes, CINTIntegralFunction& int_func,
 		int *atm, int natm, int* bas, int nbas, double* env, int max_l);
 		
-void calc_ints(dbcsr::mat_d& m_x, dbcsr::mat_d& m_y, dbcsr::mat_d& m_z, 
+void calc_ints(dbcsr::matrix<double>& m_x, dbcsr::matrix<double>& m_y,
+		dbcsr::matrix<double>& m_z, 
 		std::vector<std::vector<int>*> shell_offsets, 
 		std::vector<std::vector<int>*> shell_sizes, CINTIntegralFunction& int_func,
 		int *atm, int natm, int* bas, int nbas, double* env, int max_l);
@@ -80,11 +81,11 @@ void calc_ints(dbcsr::tensor<4,double>& m_out, std::vector<std::vector<int>*> sh
 		std::vector<std::vector<int>*> shell_sizes, CINTIntegralFunction& int_func,
 		int *atm, int natm, int* bas, int nbas, double* env, int max_l);
 
-void calc_ints_schwarz_mn(dbcsr::mat_d& m_out, std::vector<std::vector<int>*> shell_offsets, 
+void calc_ints_schwarz_mn(dbcsr::matrix<double>& m_out, std::vector<std::vector<int>*> shell_offsets, 
 		std::vector<std::vector<int>*> shell_sizes, CINTIntegralFunction& int_func,
 		int *atm, int natm, int* bas, int nbas, double* env, int max_l);
 		
-void calc_ints_schwarz_x(dbcsr::mat_d& m_out, std::vector<std::vector<int>*> shell_offsets, 
+void calc_ints_schwarz_x(dbcsr::matrix<double>& m_out, std::vector<std::vector<int>*> shell_offsets, 
 		std::vector<std::vector<int>*> shell_sizes, CINTIntegralFunction& int_func,
 		int *atm, int natm, int* bas, int nbas, double* env, int max_l);
 

@@ -1,8 +1,11 @@
 #ifndef DBCSR_TENSOR_OPS_HPP
 #define DBCSR_TENSOR_OPS_HPP
 
-#:include "megalochem.fypp"
+#ifndef TEST_MACRO
 #include <dbcsr_tensor.hpp>
+#endif
+
+#include "utils/ppdirs.hpp"
 
 namespace dbcsr {
 	
@@ -20,21 +23,25 @@ D* unfold_bounds(vec<vec<D>>& v) {
 
 template <int N, typename T>
 class tensor_copy_base {
+	
+	typedef tensor_copy_base _create_base;
 
-    #:set list = [ &
-        ['order','vec<int>', _OPT, _VAL],&
-        ['sum','bool', _OPT, _VAL],&
-        ['bounds','vec<vec<int>>', _OPT, _REF],&
-        ['move_data','bool', _OPT, _VAL]]
+#define TENSOR_COPY_LIST (\
+	((util::optional<vec<int>>), order),\
+	((util::optional<bool>), sum),\
+	((util::optional<vec<vec<int>>>), bounds),\
+	((util::optional<bool>), move_data))
+	
+	MAKE_BUILDER_MEMBERS(tensor_copy, TENSOR_COPY_LIST)
         
 private:
-
-${_MAKE_BUILDER_MEMBERS('tensor_copy', list)}$
 
     tensor<N,T>& c_t_in;
     tensor<N,T>& c_t_out;
     
 public:
+
+	MAKE_BUILDER_SETS(tensor_copy, TENSOR_COPY_LIST)
 
     tensor_copy_base(tensor<N,T>& t1, tensor<N,T>& t2) : c_t_in(t1), c_t_out(t2) {}
     
@@ -65,25 +72,27 @@ copy(tensortype& t1, tensortype& t2) {
 
 template <int N1, int N2, int N3, typename T>
 class contract_base {
+	
+	typedef contract_base _create_base;
 
-#:set list = [ &
-	['con1', 'vec<int>', _REQ, _VAL],&
-	['ncon1', 'vec<int>', _REQ, _VAL],&
-	['con2', 'vec<int>', _REQ, _VAL],&
-	['ncon2', 'vec<int>', _REQ, _VAL],&
-	['map1', 'vec<int>', _REQ, _VAL],&
-	['map2', 'vec<int>', _REQ, _VAL],&
-	['bounds1','vec<vec<int>>', _OPT, _REF],&
-	['bounds2','vec<vec<int>>', _OPT, _REF],&
-	['bounds3','vec<vec<int>>', _OPT, _REF],&
-	['filter','double', _OPT, _VAL],&
-	['flop','long long int', _OPT, _REF],&
-	['move','bool', _OPT, _VAL],&
-	['retain_sparsity','bool', _OPT, _VAL],&
-	['print','bool', _OPT, _VAL],&
-	['log','bool', _OPT, _VAL]]
-
-${_MAKE_BUILDER_MEMBERS('contract', list)}$
+#define TENSOR_CONTRACT_LIST (\
+	((vec<int>), con1),\
+	((vec<int>), con2),\
+	((vec<int>), ncon1),\
+	((vec<int>), ncon2),\
+	((vec<int>), map1),\
+	((vec<int>), map2),\
+	((util::optional<vec<vec<int>>&>), bounds1),\
+	((util::optional<vec<vec<int>>&>), bounds2),\
+	((util::optional<vec<vec<int>>&>), bounds3),\
+	((util::optional<double>), filter),\
+	((util::optional<long long int&>), flop),\
+	((util::optional<bool>), move),\
+	((util::optional<bool>), retain_sparsity),\
+	((util::optional<bool>), print),\
+	((util::optional<bool>), log))
+	
+	MAKE_BUILDER_MEMBERS(contract_base, TENSOR_CONTRACT_LIST)
 
 private:
 
@@ -93,6 +102,8 @@ private:
     T c_alpha, c_beta;
     
 public:
+
+	MAKE_BUILDER_SETS(contract, TENSOR_CONTRACT_LIST)
     
     contract_base(T alpha, dbcsr::tensor<N1,T>& t1, dbcsr::tensor<N2,T>& t2, 
 		T beta, dbcsr::tensor<N3,T>& t3) 
@@ -100,8 +111,8 @@ public:
     
     void perform() {
     
-		${_CHECK_REQUIRED('tensor_contract', '', list)}$ 
-        
+		CHECK_REQUIRED(TENSOR_CONTRACT_LIST)
+            
         int* f_b1 = (c_bounds1) ? unfold_bounds<int>(*c_bounds1) : nullptr;
         int* f_b2 = (c_bounds2) ? unfold_bounds<int>(*c_bounds2) : nullptr;
         int* f_b3 = (c_bounds3) ? unfold_bounds<int>(*c_bounds3) : nullptr;

@@ -1,8 +1,7 @@
 #ifndef AOLOADER_H
 #define AOLOADER_H
 
-#:include "megalochem.fypp"
-
+#ifndef TEST_MACRO
 #include <dbcsr_common.hpp>
 #include "ints/aofactory.hpp"
 #include "ints/screening.hpp"
@@ -10,6 +9,9 @@
 #include "utils/registry.hpp"
 #include "desc/options.hpp"
 #include "desc/molecule.hpp"
+#endif
+
+#include "utils/ppdirs.hpp"
 
 namespace ints {
 
@@ -69,20 +71,20 @@ private:
 
 public:
 
-#:set list = [&
-	['set_world', 'dbcsr::world', _REQ, _VAL],&
-	['molecule', 'desc::shared_molecule', _REQ, _VAL],&
-	['print', 'int', _OPT, _VAL],&
-	['nbatches_b', 'int', _OPT, _VAL],&
-	['nbatches_x', 'int', _OPT, _VAL],&
-	['btype_eris', 'dbcsr::btype', _OPT, _VAL],&
-	['btype_intermeds', 'dbcsr::btype', _OPT, _VAL]]
+#define AOLOADER_CREATE_LIST (\
+	((dbcsr::world), set_world),\
+	((desc::shared_molecule), set_molecule),\
+	((util::optional<int>), print),\
+	((util::optional<int>), nbatches_b),\
+	((util::optional<int>), nbatches_x),\
+	((util::optional<dbcsr::btype>), btype_eris),\
+	((util::optional<dbcsr::btype>), btype_intermeds))
 
-${_MAKE_PARAM_STRUCT('create', list)}$
-${_MAKE_BUILDER_CLASS('aoloader', 'create', list, True)}$
+	MAKE_PARAM_STRUCT(create, AOLOADER_CREATE_LIST, ())
+	MAKE_BUILDER_CLASS(aoloader, create, AOLOADER_CREATE_LIST, ())
 
 	aoloader(create_pack&& p) :
-		m_world(p.p_set_world), m_mol(p.p_molecule),
+		m_world(p.p_set_world), m_mol(p.p_set_molecule),
 		LOG(p.p_set_world.comm(), (p.p_print) ? *p.p_print : 0),
 		TIME(p.p_set_world.comm(), "AO-loader"),
 		m_btype_eris((p.p_btype_eris) ? *p.p_btype_eris : dbcsr::btype::core),

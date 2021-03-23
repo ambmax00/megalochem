@@ -1,27 +1,32 @@
 #ifndef DBCSR_OPS_HPP
 #define DBCSR_OPS_HPP
 
-#:include "megalochem.fypp"
+#ifndef TEST_MACRO
 #include <dbcsr_matrix.hpp>
+#endif
+
+#include "utils/ppdirs.hpp"
 
 namespace dbcsr {
 
 template <typename T>
 class multiply_base {
+	
+	typedef multiply_base _create_base;
 
-#:set list = [ &
-    ['first_row', 'int', _OPT, _VAL],&
-    ['last_row', 'int', _OPT, _VAL],&
-    ['first_col', 'int', _OPT, _VAL],&
-    ['last_col', 'int', _OPT, _VAL],&
-    ['first_k', 'int', _OPT, _VAL],&
-    ['last_k', 'int', _OPT, _VAL],&
-    ['retain_sparsity', 'bool', _OPT, _VAL],&
-    ['filter_eps', 'double', _OPT, _VAL],&
-    ['flop', 'long long int', _OPT, _REF]] 
+#define MULT_BASE_LIST (\
+	((util::optional<int>), first_row),\
+	((util::optional<int>), first_col),\
+	((util::optional<int>), last_row),\
+	((util::optional<int>), last_col),\
+	((util::optional<int>), first_k),\
+	((util::optional<int>), last_k),\
+	((util::optional<bool>), retain_sparsity),\
+	((util::optional<double>), filter_eps),\
+	((util::optional<long long int&>), flop))
     
-${_MAKE_BUILDER_MEMBERS('multiply', list)}$
-    
+    MAKE_BUILDER_MEMBERS(multiply, MULT_BASE_LIST)
+        
 private:
 
     char m_transa, m_transb;
@@ -31,6 +36,8 @@ private:
     matrix<T>& m_C;
     
 public:
+
+	MAKE_BUILDER_SETS(multiply, MULT_BASE_LIST)
 
     multiply_base(char transa, char transb, T alpha, matrix<T>& A, matrix<T>& B, 
 		T beta, matrix<T>& C) :

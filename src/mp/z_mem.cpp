@@ -315,6 +315,7 @@ void LLMP_MEM_Z::compute() {
 	
 }
 
+/*
 void LLMP_ASYM_Z::init() {
 	
 	LOG.os<1>("Setting up tensors in LLMP_ASYM.\n");
@@ -607,6 +608,6 @@ void LLMP_ASYM_Z::compute() {
 	
 	TIME.finish();
 	
-}
+}*/
 	
 } // end namespace

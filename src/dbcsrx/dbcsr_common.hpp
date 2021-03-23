@@ -1,7 +1,9 @@
 #ifndef DBCSR_COMMON_HPP
 #define DBCSR_COMMON_HPP
 
-#:include "megalochem.fypp"
+#define MAXDIM 4
+
+#ifndef TEST_MACRO
 
 #include <dbcsr.h>
 #include <vector>
@@ -14,9 +16,10 @@
 #include <random>
 #include <algorithm>
 #include <iostream>
-#include <fortran_utils.hpp>
 
-#include "utils/optional.hpp"
+#endif
+
+#include "utils/ppdirs.hpp"
 
 // ----------------------------------------
 //               typedefs                 
@@ -49,7 +52,7 @@ typedef index<4> idx4;
 
 template <int N>
 struct is_valid_dim {
-    const static bool value = (N >= 2 && N <= ${MAXDIM}$);
+    const static bool value = (N >= 2 && N <= MAXDIM);
 };
 
 template <typename T> 
@@ -443,7 +446,7 @@ public:
 		return *this;
 	}
 	
-	void print() {
+	void print() const {
 		
 		std::cout << "(";
 		for (int i = 0; i != N; ++i) {
@@ -458,10 +461,11 @@ public:
 		
 	}
 	 
-	int ntot() { return m_nfull; }
-	const index<N> size() { return m_size; }
+	int ntot() const { return m_nfull; }
 	
-	T* data() {
+	const index<N> size() const { return m_size; }
+	
+	T* data() const {
 		return m_data;
 	}
 	
@@ -470,46 +474,70 @@ public:
 		return m_data[id]; 
 	}
 
-#:def make_idx(n)
-    #:if n == 0
-        i_0
-    #:else
-        + i_${n}$
-        #:for i in range(0,n)
-            * m_size[${i}$]
-        #:endfor
-    #:endif
-#:enddef
+#define MSIZE(x,n) \
+	m_size[ DEC(n) ]
 
-#:for idim in range(2,MAXDIM+1)
-    template <typename D = T, int M = N>
-    typename std::enable_if<M == ${idim}$, D&>::type
-    operator()(
-    #:for n in range(0,idim)
-        int i_${n}$
-        #:if n < idim-1
-        ,
-        #:endif
-    #:endfor
-    ) {
-    return m_data[
-    #:for n in range(0,idim)
-        ${make_idx(n)}$
-    #:endfor
-        ];
-    }
-#:endfor
+#define ARRAYINDEX(var,n) \
+	CAT(i_, n) REPEAT_THIRD(ECHO_NONE, UNUSED, 0, n, (), (*)) \
+	REPEAT_THIRD(MSIZE, UNUSED, 1, n, (*), ())  
 
-#:for idim in range(2,MAXDIM+1)
-	template <typename D = T, int M = N> 
-	typename std::enable_if<M == ${idim}$, void>::type
-	reshape(D* data, std::array<int,2> sizes, vec<int>& map1, vec<int>& map2) {
-	
-		fortran_reshape_${idim}$d(data, sizes.data(), m_data,
-			m_size.data(), map1.data(), map1.size(), map2.data(), map2.size());
-
+#define OPERATOR(var,n) \
+	template <typename D = T, int M = N> \
+    	typename std::enable_if<M == n, D&>::type \
+    	operator()(REPEAT_SECOND(CAT, int i_, 0, n, (PPDIRS_COMMA), ())) {\
+		return m_data[ \
+		REPEAT_SECOND(ARRAYINDEX, UNUSED, 0, n, (+), ()) \
+		];\
 	}
-#:endfor
+			  
+    REPEAT_FIRST(OPERATOR, UNUSED, 2, 3, (), ())
+    
+#define RESHAPE(var,n) \
+	template <typename D = T, int M = N> \
+	typename std::enable_if<M == n, void>::type \
+	reshape(D* data, std::array<int,2> sizes, vec<int> map1, vec<int> map2) { \
+		CAT(fortran_reshape_, n)(data, sizes.data(), m_data, \
+			m_size.data(), map1.data(), map1.size(), map2.data(), map2.size()); \
+	}
+
+	//REPEAT_FIRST(RESHAPE, UNUSED, 2, 3, (), ())
+
+#define ASSIGN(var,n) \
+	int& CAT(i_, n) = idx[n]; \
+	int& CAT(r_, n) = idx[rev_order[n]]; \
+	int& CAT(rsize_,n) = m_size[rev_order[n]]; \
+	
+#define FOR_CLAUSE(var,n) \
+	for (CAT(r_,n) = 0; CAT(r_,n) != CAT(rsize_,n); ++CAT(r_,n)) PPDIRS_OB  
+
+#define ECHO_PARA(var,n) \
+	CAT(i_,n)
+
+#define RESHAPE_2D(var,n) \
+	template <typename D = T, int M = N> \
+	typename std::enable_if<M == n, void>::type \
+	reshape_2d(T* data, vec<int> map1, vec<int> map2) \
+	{ \
+		vec<int> order = map1; \
+		order.insert(order.end(), map2.begin(), map2.end()); \
+		\
+		vec<int> order_ref(N);\
+		std::iota(order_ref.begin(), order_ref.end(), 0);\
+		\
+		if (order == order_ref) {\
+			std::copy(data, data + m_nfull, m_data);\
+		} else {\
+			int off = 0; \
+			std::vector<int> idx(N,0); \
+			vec<int> rev_order(order.rbegin(), order.rend()); \
+			REPEAT_SECOND(ASSIGN, UNUSED, 0, n, (), ()) \
+			REPEAT_SECOND(FOR_CLAUSE, i_, 0, n, (), ()) \
+			this->operator()(REPEAT_SECOND(ECHO_PARA, UNUSED, 0, n, (,), ())) = data[off++]; \
+			REPEAT_SECOND(ECHO_P, PPDIRS_CB, 0, n, (), ()) \
+		} \
+	}
+		
+	REPEAT_FIRST(RESHAPE_2D, UNUSED, 2, SUB(MAXDIM,1), (), ())
 	
 	void fill_rand(T a, T b) {
 		
@@ -524,7 +552,7 @@ public:
 		
 	} 
 	
-	T norm() {
+	T norm() const {
 		
 		T out = 0;
 		for (int i = 0; i != m_nfull; ++i) {
@@ -535,7 +563,7 @@ public:
 		
 	}
 	
-	T max_abs() {
+	T max_abs() const {
 		
 		T* max_it = std::max_element(m_data, m_data + m_nfull, 
 			[](const T a, const T b) {
@@ -544,7 +572,14 @@ public:
 		return *max_it;
 		
 	}
-		
+	
+	T* begin() const {
+		return m_data;
+	}
+	
+	T* end() const {
+		return m_data + m_nfull;
+	}
 	
 	~block() {
 		

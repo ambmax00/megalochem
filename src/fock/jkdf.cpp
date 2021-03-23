@@ -216,7 +216,8 @@ void DFMO_K::compute_K() {
 	auto X = m_mol->dims().x();
 	
 	auto compute_K_single = 
-	[&] (dbcsr::smat_d& c_bm, dbcsr::smat_d& k_bb, std::string x) {
+	[&] (dbcsr::shared_matrix<double>& c_bm, 
+		dbcsr::shared_matrix<double>& k_bb, std::string x) {
 		
 		auto& reo0 = TIME.sub("Reordering ints (1) " + x);
 		auto& fetch1 = TIME.sub("Fetch ints " + x);
@@ -486,7 +487,8 @@ void DFAO_K::compute_K() {
 	TIME.start();
 	
 	auto compute_K_single = 
-	[&] (dbcsr::smat_d& p_bb, dbcsr::smat_d& k_bb, std::string x) {
+	[&] (dbcsr::shared_matrix<double>& p_bb, dbcsr::shared_matrix<double>& k_bb, 
+		std::string x) {
 		
 		LOG.os<1>("Computing exchange part (", x, ")\n");
 		
@@ -703,7 +705,8 @@ void DFMEM_K::compute_K() {
 	m_v_xx_01->filter(dbcsr::global::filter_eps);
 		
 	auto compute_K_single = 
-	[&] (dbcsr::smat_d& p_bb, dbcsr::smat_d& k_bb, std::string x) {
+	[&] (dbcsr::shared_matrix<double>& p_bb, dbcsr::shared_matrix<double>& k_bb, 
+		std::string x) {
 		
 		LOG.os<1>("Computing exchange part (", x, ")\n");
 		
@@ -894,7 +897,8 @@ void DFLMO_K::compute_K() {
 	m_v_xx_01->filter(dbcsr::global::filter_eps);
 		
 	auto compute_K_single_sym = 
-	[&] (dbcsr::smat_d& p_bb, dbcsr::smat_d& k_bb, std::string X) {
+	[&] (dbcsr::shared_matrix<double>& p_bb, 
+		dbcsr::shared_matrix<double>& k_bb, std::string X) {
 		
 		LOG.os<1>("Computing exchange part (", X, ")\n");
 		
@@ -1128,7 +1132,8 @@ void DFLMO_K::compute_K() {
 	}; // end lambda function sym
 	
 	auto compute_K_single = 
-	[&] (dbcsr::smat_d& p_bb, dbcsr::smat_d& k_bb, std::string X) {
+	[&] (dbcsr::shared_matrix<double>& p_bb, 
+		dbcsr::shared_matrix<double>& k_bb, std::string X) {
 		
 		auto& time_svd = TIME.sub("Singular value decomposition");
 		auto& time_reo1 = TIME.sub("First reordering");

@@ -1,8 +1,7 @@
 #ifndef MP_Z_BUILDER_H
 #define MP_Z_BUILDER_H
 
-#:include "megalochem.fypp"
-
+#ifndef TEST_MACRO
 #include <dbcsr_matrix_ops.hpp>
 #include <dbcsr_tensor_ops.hpp>
 #include <dbcsr_conversions.hpp>
@@ -11,6 +10,9 @@
 #include "utils/mpi_time.hpp"
 #include "desc/molecule.hpp"
 #include "ints/aoloader.hpp"
+#endif
+
+#include "utils/ppdirs.hpp"
 
 namespace mp {
 
@@ -63,22 +65,22 @@ public:
 		LOG(m_world.comm(), nprint),
 		TIME (m_world.comm(), mname) {}
 
-	Z& set_occ_density(dbcsr::smat_d& pocc) {
+	Z& set_occ_density(dbcsr::shared_matrix<double>& pocc) {
 		m_pocc = pocc;
 		return *this;
 	}
 	
-	Z& set_vir_density(dbcsr::smat_d& pvir) {
+	Z& set_vir_density(dbcsr::shared_matrix<double>& pvir) {
 		m_pvir = pvir;
 		return *this;
 	}
 	
-	Z& set_occ_coeff(dbcsr::smat_d& locc) {
+	Z& set_occ_coeff(dbcsr::shared_matrix<double>& locc) {
 		m_locc = locc;
 		return *this;
 	}
 	
-	Z& set_vir_coeff(dbcsr::smat_d& lvir) {
+	Z& set_vir_coeff(dbcsr::shared_matrix<double>& lvir) {
 		m_lvir = lvir;
 		return *this;
 	}
@@ -103,9 +105,13 @@ public:
 	
 };
 
-#:def _INIT(name)
-	Z(p.p_world, p.p_molecule, (p.p_print) ? *p.p_print : 0, "${name}$")
-#:enddef
+#define Z_INIT_LIST (\
+	((dbcsr::world), set_world),\
+	((desc::shared_molecule), set_molecule),\
+	((util::optional<int>), print))
+
+#define Z_INIT_CON(name) \
+	Z(p.p_set_world, p.p_set_molecule, (p.p_print) ? *p.p_print : 0, #name)
 
 class LLMP_FULL_Z : public Z {
 private:	
@@ -119,20 +125,17 @@ private:
 		
 public:
 
-#:set list = [&
-	['world', 'dbcsr::world', _REQ, _VAL],&
-	['molecule', 'desc::shared_molecule', _REQ, _VAL],&
-	['print', 'int', _OPT, _VAL],&
-	['eri3c2e_batched', 'dbcsr::sbtensor<3,double>', _REQ, _VAL],&
-	['intermeds', 'dbcsr::btype', _REQ, _VAL]]
+#define LLMP_FULL_Z_LIST (\
+	((dbcsr::sbtensor<3,double>),eri3c2e_batched),\
+	((dbcsr::btype), intermeds))
 	
-${_MAKE_PARAM_STRUCT('create', list)}$
-${_MAKE_BUILDER_CLASS('LLMP_FULL_Z', 'create', list, True)}$
+	MAKE_PARAM_STRUCT(create, CONCAT(Z_INIT_LIST, LLMP_FULL_Z_LIST), ())
+	MAKE_BUILDER_CLASS(LLMP_FULL_Z, create, CONCAT(Z_INIT_LIST, LLMP_FULL_Z_LIST), ())
 
 	LLMP_FULL_Z(create_pack&& p) : 
 		m_eri3c2e_batched(p.p_eri3c2e_batched),
 		m_intermeds(p.p_intermeds),
-		${_INIT('LLMP_FULL')}$ 
+		Z_INIT_CON(LLMP_FULL_Z)
 	{}
 
 	void init() override;
@@ -192,18 +195,15 @@ private:
 		
 public:
 
-#:set list = [&
-	['world', 'dbcsr::world', _REQ, _VAL],&
-	['molecule', 'desc::shared_molecule', _REQ, _VAL],&
-	['print', 'int', _OPT, _VAL],&
-	['eri3c2e_batched', 'dbcsr::sbtensor<3,double>', _REQ, _VAL]]
-	
-${_MAKE_PARAM_STRUCT('create', list)}$
-${_MAKE_BUILDER_CLASS('LLMP_MEM_Z', 'create', list, True)}$
+#define LLMP_MEM_Z_LIST (\
+	((dbcsr::sbtensor<3,double>),eri3c2e_batched))
+
+	MAKE_PARAM_STRUCT(create, CONCAT(Z_INIT_LIST, LLMP_MEM_Z_LIST), ())
+	MAKE_BUILDER_CLASS(LLMP_MEM_Z, create, CONCAT(Z_INIT_LIST, LLMP_MEM_Z_LIST), ())
 
 	LLMP_MEM_Z(create_pack&& p) : 
 		m_eri3c2e_batched(p.p_eri3c2e_batched),
-		${_INIT('LLMP_MEM')}$ 
+		Z_INIT_CON(LLMP_MEM_Z)
 	{}
 
 	void init() override;
@@ -214,6 +214,7 @@ ${_MAKE_BUILDER_CLASS('LLMP_MEM_Z', 'create', list, True)}$
 	
 };
 
+/*
 class LLMP_ASYM_Z : public Z {
 private:	
 	
@@ -246,7 +247,7 @@ ${_MAKE_BUILDER_CLASS('LLMP_ASYM_Z', 'create', list, True)}$
 	
 	~LLMP_ASYM_Z() override {}
 	
-};
+};*/
 
 inline void load_zints(zmethod zmet, ints::metric metr, ints::aoloader& ao) {
 	
@@ -280,26 +281,28 @@ inline void load_zints(zmethod zmet, ints::metric metr, ints::aoloader& ao) {
 	}
 }
 
-#:set list = [&
-	['set_world', 'dbcsr::world', _REQ, _VAL],&
-	['molecule', 'desc::shared_molecule', _REQ, _VAL],&
-	['method', 'zmethod', _REQ, _VAL],&
-	['aoloader', 'ints::aoloader', _REQ, _REF],&
-	['print', 'int', _OPT, _VAL],&
-	['btype_intermeds', 'dbcsr::btype', _OPT, _VAL],& 
-	['metric', 'ints::metric', _REQ, _VAL]]
+#define ZBUILDER_LIST (\
+	((zmethod), method),\
+	((ints::aoloader&), aoloader),\
+	((util::optional<dbcsr::btype>), btype_intermeds),\
+	((ints::metric), metric))
 
 class create_z_base {
+private:
 
-	${_MAKE_BUILDER_MEMBERS('create_z', list)}$
+	typedef create_z_base _create_base;
+	
+	MAKE_BUILDER_MEMBERS(create,CONCAT(Z_INIT_LIST, ZBUILDER_LIST))
 	
 public:
+
+	MAKE_BUILDER_SETS(create, CONCAT(Z_INIT_LIST, ZBUILDER_LIST))
 
 	create_z_base() {}
 	
 	std::shared_ptr<Z> build() {
 	
-		${_CHECK_REQUIRED('create_z_base', '', list)}$
+		CHECK_REQUIRED(CONCAT(Z_INIT_LIST, ZBUILDER_LIST))
 
 		auto aoreg = c_aoloader->get_registry();
 		
@@ -333,8 +336,8 @@ public:
 		if (*c_method == zmethod::llmp_full) {
 		
 			zbuilder = LLMP_FULL_Z::create()
-				.world(c_set_world)
-				.molecule(c_molecule)
+				.set_world(c_set_world)
+				.set_molecule(c_set_molecule)
 				.print((c_print) ? *c_print : 0)
 				.eri3c2e_batched(eri3c2e_batched)
 				.intermeds((c_btype_intermeds) ? 
@@ -344,8 +347,8 @@ public:
 		} else if (*c_method == zmethod::llmp_mem) {
 			
 			zbuilder = LLMP_MEM_Z::create()
-				.world(c_set_world)
-				.molecule(c_molecule)
+				.set_world(c_set_world)
+				.set_molecule(c_set_molecule)
 				.print((c_print) ? *c_print : 0)
 				.eri3c2e_batched(eri3c2e_batched)
 				.build();
