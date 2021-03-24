@@ -8,7 +8,19 @@ endif()
 
 add_custom_target(cpp_target)
 
+find_program(CLANG_FORMAT_EXE clang-format)
+if (CLANG_FORMAT_EXE) 
+	message(STATUS "Found clang-format. Generating headers.")
+else()
+	message(STATUS "Could not find clang-format. Headers are not generated.")
+
+endif()
+
 function (ADD_CPP_SOURCES OUTVAR)
+
+	if (NOT CLANG_FORMAT_EXE) 
+		return()
+	endif()
 
         set(outfiles)
 
@@ -30,7 +42,7 @@ function (ADD_CPP_SOURCES OUTVAR)
 		set(of "${CPP_GENERATED_SUBDIR}/${root}${extension}")
                 add_custom_command(
                         OUTPUT ${of}
-                        COMMAND "${CMAKE_CXX_COMPILER}" -I ${CPP_INCLUDE_DIR} -E -DTEST_MACRO ${file} | clang-format > ${of}
+			COMMAND "${CMAKE_CXX_COMPILER}" -I ${CPP_INCLUDE_DIR} -E -DTEST_MACRO ${file} | ${CLANG_FORMAT_EXE} > ${of}
                         DEPENDS "${file}" "${CPP_DEFINITIONS}"
                 )
                 list(APPEND outfiles "${of}")
