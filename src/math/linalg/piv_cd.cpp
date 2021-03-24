@@ -777,7 +777,7 @@ void pivinc_cd::compute(std::optional<int> force_rank) {
 	
 	LOG.os<1>("-- Setting up dbcsr environment and matrices.\n"); 
 	
-	double filter_eps = dbcsr::global::filter_eps/100;
+	double filter_100 = dbcsr::global::filter_eps/100;
 	
 	auto wrd = m_mat_in->get_world();
 	
@@ -807,7 +807,7 @@ void pivinc_cd::compute(std::optional<int> force_rank) {
 	U->complete_redistribute(*mat_sym);
 	mat_sym->release();
 	
-	U->filter(filter_eps);
+	U->filter(filter_100);
 	
 	LOG.os<1>("-- Occupation of U: ", U->occupation(), '\n');
 	
@@ -815,7 +815,7 @@ void pivinc_cd::compute(std::optional<int> force_rank) {
 	
 	int nblks = U->nblkrows_total();
 	
-	double thresh = filter_eps;
+	double thresh = filter_100;
 	LOG.os<1>("-- Threshold: ", thresh, '\n');
 			
 	std::vector<int> rowperm(N), backperm(N);
@@ -825,7 +825,7 @@ void pivinc_cd::compute(std::optional<int> force_rank) {
 	std::function<void(int)> cholesky_step;
 	cholesky_step = [&](int I) {
 		
-		U->filter(filter_eps);
+		U->filter(filter_100);
 		
 		// STEP 1: If Dimension of U is one, then set L and return 
 		
@@ -908,7 +908,7 @@ void pivinc_cd::compute(std::optional<int> force_rank) {
 				
 		// b) form Utilde
 		dbcsr::multiply('N', 'T', -1.0/U_II, *ui, *ui, 1.0, *U)
-			.filter_eps(filter_eps)
+			.filter_eps(filter_100)
 			.first_row(I+1)
 			.first_col(I+1)
 			.perform();
@@ -945,7 +945,7 @@ void pivinc_cd::compute(std::optional<int> force_rank) {
 		
 		auto colvecperm = dbcsr::eigen_to_matrix(eigencolperm, wrd, "colperm", 
 			splitrange, single, dbcsr::type::no_symmetry);
-		colvecperm->filter(dbcsr::global::filter_eps);
+		colvecperm->filter(filter_100);
 		
 		cvec0->clear();
 		cvec0->copy_in(*colvecperm);

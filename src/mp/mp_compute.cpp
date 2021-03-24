@@ -154,7 +154,7 @@ void mpmod::compute() {
 		m_opt.get<std::string>("build_Z", MP_BUILD_Z));
 		
 	auto zmetr = ints::str_to_metric(
-		m_opt.get<std::string>("metric", MP_METRIC));
+		m_opt.get<std::string>("df_metric", MP_METRIC));
 	
 	#ifdef _ORTHOGONALIZE
 	ao->request(ints::key::ovlp_bb, true);
@@ -370,72 +370,25 @@ void mpmod::compute() {
 		redtime.start();
 		
 		LOG.os<1>("Local reduction.\n");
-		
-		dbcsr::iterator iter(*ztilde_XX);
-		
-		double sum = 0.0;
-		
-		int nblks = x.size();
-		
+								
 		auto ztilde_XX_t = dbcsr::matrix<>::transpose(*ztilde_XX)
 			.build();
 			
-		//dbcsr::print(*Ztilde_XX);
-		//dbcsr::print(*Ztilde_XX_t);
-		
-		const auto loc_rows = ztilde_XX->local_rows();
-		const auto loc_cols = ztilde_XX->local_cols();
-		
-		const int isize = loc_rows.size();
-		const int jsize = loc_cols.size();
-
-#pragma omp parallel for collapse(2) reduction(+:sum)
-		for (int i = 0; i < isize; ++i) {
-			for (int j = 0; j < jsize; ++j) {
-		//for (auto iblk : loc_rows) {
-		//	for (auto jblk : loc_cols) {
-				int iblk = loc_rows[i];
-				int jblk = loc_cols[j];
-				
-				//std::cout << iblk << " " << jblk << std::endl;
-				
-				bool found1 = false;
-				bool found2 = false;
-				
-				auto blk = ztilde_XX->get_block_p(iblk,jblk,found1);
-				auto blk_t = ztilde_XX_t->get_block_p(iblk,jblk,found2);
-				
-				//for (int i = 0; i != blk.ntot(); ++i) {
-				//	std::cout << blk.data()[i] << " " << blk_t.data()[i] << std::endl;
-				//}
-				
-				if (!found1 || !found2) continue;
-				
-				//std::cout << "COMPUTE." << std::endl;
-				
-				sum += std::inner_product(blk.data(), blk.data() + blk.ntot(),
-					blk_t.data(), 0.0);
-					
-			}
-		}
-
+		double sum = ztilde_XX->dot(*ztilde_XX_t);
+			
 		redtime.finish();
-
-		double total = 0.0;
-		LOG.os<1>("Global reduction.\n");
-
-		MPI_Allreduce(&sum, &total, 1, MPI_DOUBLE, MPI_SUM, m_world.comm());
 		
-		LOG.os<>("Partial sum: ", total, '\n');
+		LOG.os<>("Partial sum: ", sum, '\n');
 		
-		mp2_energy += total;
+		mp2_energy += sum;
 		
 	}
 	
-	mp2_energy *= c_os;
+	//mp2_energy *= c_os;
 	
 	LOG.setprecision(12);
 	LOG.os<>("Final MP2 energy: ", mp2_energy, '\n');
+	LOG.os<>("Final MP2 energy (scaled): ", mp2_energy * c_os, '\n');
 	LOG.reset();
 
 	TIME.finish();
