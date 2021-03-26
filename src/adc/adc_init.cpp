@@ -67,22 +67,28 @@ void adcmod::init_ao_tensors() {
 	LOG.os<>("Setting up AO integral tensors.\n");
 		
 	// LOAD ALL ADC1 INTEGRALS
-	auto adc1_opt = m_opt.subtext("adc1");
-		
-	auto jstr_adc1 = adc1_opt.get<std::string>("jmethod", ADC_ADC1_JMETHOD);
-	auto kstr_adc1 = adc1_opt.get<std::string>("kmethod", ADC_ADC1_KMETHOD);
-	auto mstr_adc1 = adc1_opt.get<std::string>("df_metric", ADC_ADC1_DF_METRIC);
 	
-	std::cout << "K: " << mstr_adc1 << std::endl;
-	
-	auto jmet_adc1 = fock::str_to_jmethod(jstr_adc1);
-	auto kmet_adc1 = fock::str_to_kmethod(kstr_adc1);
-	auto metr_adc1 = ints::str_to_metric(mstr_adc1);
-	
-	fock::load_jints(jmet_adc1, metr_adc1, *m_aoloader);
-	fock::load_kints(kmet_adc1, metr_adc1, *m_aoloader);
-	
+	bool do_adc1 = m_opt.get<bool>("do_adc1",true);
 	bool do_adc2 = m_opt.get<bool>("do_adc2",ADC_DO_ADC2);
+	
+	if (do_adc1) {
+	
+		auto adc1_opt = m_opt.subtext("adc1");
+			
+		auto jstr_adc1 = adc1_opt.get<std::string>("jmethod", ADC_ADC1_JMETHOD);
+		auto kstr_adc1 = adc1_opt.get<std::string>("kmethod", ADC_ADC1_KMETHOD);
+		auto mstr_adc1 = adc1_opt.get<std::string>("df_metric", ADC_ADC1_DF_METRIC);
+		
+		std::cout << "K: " << mstr_adc1 << std::endl;
+		
+		auto jmet_adc1 = fock::str_to_jmethod(jstr_adc1);
+		auto kmet_adc1 = fock::str_to_kmethod(kstr_adc1);
+		auto metr_adc1 = ints::str_to_metric(mstr_adc1);
+		
+		fock::load_jints(jmet_adc1, metr_adc1, *m_aoloader);
+		fock::load_kints(kmet_adc1, metr_adc1, *m_aoloader);
+		
+	}
 	
 	if (do_adc2) {
 		

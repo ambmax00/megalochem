@@ -91,12 +91,18 @@ void adcmod::compute() {
 		
 	// generate the guesses
 	
+	std::vector<dbcsr::shared_matrix<double>> dav_eigvecs;
+	std::vector<double> dav_eigvals;
+	
 	auto o = m_hfwfn->mol()->dims().oa();
 	auto v = m_hfwfn->mol()->dims().va();
 	auto b = m_hfwfn->mol()->dims().b();
 	
+	int nroots = m_opt.get<int>("nroots", ADC_NROOTS);
 	int nguesses = m_opt.get<int>("nguesses", ADC_NGUESSES);
-	std::vector<dbcsr::shared_matrix<double>> dav_guess(nguesses);
+	
+	dav_eigvecs.resize(nguesses);
+	dav_eigvals.resize(nroots);
 	
 	for (int i = 0; i != nguesses; ++i) {
 		
@@ -110,204 +116,214 @@ void adcmod::compute() {
 		auto guessmat = dbcsr::eigen_to_matrix(mat, m_world, name,
 			o, v, dbcsr::type::no_symmetry);
 		
-		dav_guess[i] = guessmat;
+		dav_eigvecs[i] = guessmat;
 		
 		//dbcsr::print(*guessmat);
 		
 	}
 	
+	LOG.os<1>("Initial guess excitation energies:\n");
+	for (int ii = 0; ii != nroots; ++ii) {
+		dav_eigvals[ii] = eigen_ia.data()[index[ii]];
+		LOG.os<1>(dav_eigvals[ii], " ");
+	}
+	LOG.os<1>('\n');
+	
 	// set up ADC(1) and davidson 
 	
 	bool do_balancing = m_opt.get<bool>("balanced", ADC_BALANCING);
 	bool do_block = m_opt.get<bool>("block", ADC_BLOCK);
+	bool do_adc1 = m_opt.get<bool>("do_adc1", true);
+	int nstart = do_block ? 0 : nroots-1;
+	
 	double conv_adc1 = m_opt.get<double>("adc1/dav_conv", ADC_ADC1_DAV_CONV);
 	int maxiter_adc1 = m_opt.get<double>("adc1/maxiter", ADC_ADC1_MAXITER);
 	
-	auto adc1_mvp = create_adc1();
-	math::davidson<MVP> dav(m_world.comm(), LOG.global_plev());
+	if (do_adc1) {
 	
-	dav.set_factory(adc1_mvp);
-	dav.set_diag(m_d_ov);
-	dav.pseudo(false);
-	dav.balancing(do_balancing);
-	dav.block(do_block);
-	dav.conv(conv_adc1);
-	dav.maxiter(maxiter_adc1);	
-	
-	int nroots = m_opt.get<int>("nroots", ADC_NROOTS);
-	
-	auto& t_davidson = TIME.sub("Davidson diagonalization");
-	
-	/*
-	auto r = filio::read_matrix("lauric.dat", "name", m_world, o, v,
-		dbcsr::type::no_symmetry);
+		auto adc1_mvp = create_adc1();
+		math::davidson<MVP> dav(m_world.comm(), LOG.global_plev());
 		
-	auto nto = get_canon_pao(r, m_hfwfn->c_bo_A(),
-		m_hfwfn->c_bv_A(), *m_hfwfn->eps_occ_A(), *m_hfwfn->eps_vir_A(),
-		0.995);*/
+		dav.set_factory(adc1_mvp);
+		dav.set_diag(m_d_ov);
+		dav.pseudo(false);
+		dav.balancing(do_balancing);
+		dav.block(do_block);
+		dav.conv(conv_adc1);
+		dav.maxiter(maxiter_adc1);	
 		
-	/*
-
-	auto cbo = m_hfwfn->c_bo_A();
-	auto cbv = m_hfwfn->c_bv_A(); 	
-	
-	auto rcopy = dbcsr::copy(*r).build();
-	rcopy->scale(1.0/sqrt(rcopy->dot(*rcopy)));
-	
-	math::SVD svdcomp(rcopy, 'V', 'V', 10);
-	svdcomp.compute();
-	
-	auto fullrank = svdcomp.rank();
-	auto fullvals = svdcomp.s();
-	
-	LOG.os<>("RANK FULL: ", fullrank, '\n');
-	LOG.os<>("SING VAL FULL\n");
-	for (auto sval : fullvals) {
-		LOG.os<>(sval, " ");
-	}
-	LOG.os<>('\n');
-	
-	auto [atomblks, sigblks] = get_significant_blocks(r, 0.95, nullptr, 0.0);
-	
-	LOG.os<>("Significant atoms:\n");
-	for (auto blk : atomblks) {
-		LOG.os<>(blk, " ");
-	}
-	LOG.os<>('\n');
-	
-	LOG.os<>("Significant blocks:\n");
-	for (auto blk : sigblks) {
-		LOG.os<>(blk, " ");
-	}
-	LOG.os<>('\n');
-	
-	locorb::mo_localizer moloc(m_world, m_hfwfn->mol());
-	
-	auto reg = m_ao.get_registry();
-	auto s_bb = reg.get<dbcsr::shared_matrix<double>>(ints::key::ovlp_bb);
-	
-	auto [co_pr, u_ro, epso_r] = moloc.compute_truncated_pao(
-		cbo, s_bb, *epso, sigblks);
-	auto [cv_ps, u_sv, epsv_s] = moloc.compute_truncated_pao(
-		cbv, s_bb, *epsv, sigblks);
-	
-	auto pv = dbcsr::create_template<double>(*s_bb)
-		.name("pv")
-		.build();
+		auto& t_davidson = TIME.sub("Davidson diagonalization");
 		
-	auto pvloc = dbcsr::create_template<double>(*s_bb)
-		.name("pv")
-		.build();
-		
-	dbcsr::multiply('N', 'T', *cbv, *cbv, *pv).perform();
-	dbcsr::multiply('N', 'T', *cv_ps, *cv_ps, *pvloc).perform();
-	
-	pv->filter(1e-3);
-	pvloc->filter(1e-3);
-	
-	LOG.os<>("OCCUP: ", pv->occupation(), " ", pvloc->occupation(), '\n');
-	
-	MPI_Barrier(m_world.comm());
-	exit(0);
-	
-	int nbas = m_hfwfn->mol()->c_basis()->nbf();
-	int nbas_t = co_pr->nfullrows_total();
-	int nocc_t = co_pr->nfullcols_total();
-	int nvir_t = cv_ps->nfullcols_total();
-	
-	LOG.os<>("AO: ", nbas, " -> ", nbas_t, '\n');
-	LOG.os<>("MO (O): ", nocc, " -> ", nocc_t, '\n');
-	LOG.os<>("MO (V): ", nvir, " -> ", nvir_t, '\n');
-	LOG.os<>("NXbas(prev): ", m_hfwfn->mol()->c_dfbasis()->nbf(), '\n');
-
-	int natoms = m_hfwfn->mol()->atoms().size();
-	std::vector<int> fullatoms(natoms);
-	std::iota(fullatoms.begin(), fullatoms.end(), 0);
-	
-	LOG.os<>("Forming fragment...\n");
-	auto mol_frag = m_hfwfn->mol()->fragment(nocc_t, nocc_t, nvir_t, 
-		nvir_t, fullatoms);
-		
-	LOG.os<>("Fragment info:\n");
-	LOG.os<>("Nelec alpha: ", mol_frag->nele_alpha(), '\n');
-	LOG.os<>("Nelec beta: ", mol_frag->nele_beta(), '\n');
-	LOG.os<>("Occ: ", mol_frag->nocc_alpha(), '\n');
-	LOG.os<>("Vir: ", mol_frag->nvir_alpha(), '\n');
-	LOG.os<>("Nbas: ", mol_frag->c_basis()->nbf(), '\n');
-	LOG.os<>("NXbas: ", mol_frag->c_dfbasis()->nbf(), '\n');
-		
-	//dbcsr::print(*ctrunc);
-	
-	auto x = mol_frag->dims().x();
-	LOG.os<>("THIS IS X: \n");
-	for (auto f : x) {
-		std::cout << f << std::endl;
-	}
-	
-	
-	ints::aoloader fragloader(m_world, mol_frag, m_opt);
-	
-	fock::load_jints(fock::jmethod::dfao, ints::metric::coulomb, fragloader);
-	fock::load_kints(fock::kmethod::dfao, ints::metric::coulomb, fragloader);
-	
-	fragloader.compute();
-	
-	auto freg = fragloader.get_registry();
-	auto eribatched = freg.get<dbcsr::sbtensor<3,double>>(ints::key::coul_xbb);
-	auto v_xx = freg.get<dbcsr::shared_matrix<double>>(ints::key::coul_xx_inv);
-	auto fitbatched = freg.get<dbcsr::sbtensor<3,double>>(ints::key::dfit_coul_xbb);
-	
-	auto ptr = create_MVP_AOADC1(m_world, mol_frag, LOG.global_plev())
-		.c_bo(co_pr)
-		.c_bv(cv_ps)
-		.eps_occ(epso_r)
-		.eps_vir(epsv_s)
-		.eri3c2e_batched(eribatched)
-		.fitting_batched(fitbatched)
-		.v_xx(v_xx)
-		.jmethod(fock::jmethod::dfao)
-		.kmethod(fock::kmethod::dfao)
-		.build();
-		
-	ptr->init();
-		
-	auto u_rs = u_transform(r, 'N', u_ro, 'T', u_sv);
-	
-	dbcsr::print(*u_rs);
-	
-	double n = sqrt(u_rs->dot(*u_rs));
-	u_rs->scale(1.0/n);
-	
-	auto sig = ptr->compute(u_rs, 0.0);
-	
-	double energy = u_rs->dot(*sig);
-	
-	LOG.os<>("ENERGY: ", energy, '\n');
-		
-	MPI_Barrier(m_world.comm());
-	exit(0);*/
-	
-	LOG.os<>("==== Starting ADC(1) Computation ====\n\n"); 
-	
-	t_davidson.start();
-	dav.compute(dav_guess, nroots);
-	t_davidson.finish();
-	
-	adc1_mvp->print_info();
+		/*
+		auto r = filio::read_matrix("lauric.dat", "name", m_world, o, v,
+			dbcsr::type::no_symmetry);
 			
-	//auto rvecs = std::vector<dbcsr::shared_matrix<double>>{r}; //dav.ritz_vectors();
-	//auto ex = std::vector<double>{0.21392}; //dav.eigvals();
+		auto nto = get_canon_pao(r, m_hfwfn->c_bo_A(),
+			m_hfwfn->c_bv_A(), *m_hfwfn->eps_occ_A(), *m_hfwfn->eps_vir_A(),
+			0.995);*/
+			
+		/*
+
+		auto cbo = m_hfwfn->c_bo_A();
+		auto cbv = m_hfwfn->c_bv_A(); 	
+		
+		auto rcopy = dbcsr::copy(*r).build();
+		rcopy->scale(1.0/sqrt(rcopy->dot(*rcopy)));
+		
+		math::SVD svdcomp(rcopy, 'V', 'V', 10);
+		svdcomp.compute();
+		
+		auto fullrank = svdcomp.rank();
+		auto fullvals = svdcomp.s();
+		
+		LOG.os<>("RANK FULL: ", fullrank, '\n');
+		LOG.os<>("SING VAL FULL\n");
+		for (auto sval : fullvals) {
+			LOG.os<>(sval, " ");
+		}
+		LOG.os<>('\n');
+		
+		auto [atomblks, sigblks] = get_significant_blocks(r, 0.95, nullptr, 0.0);
+		
+		LOG.os<>("Significant atoms:\n");
+		for (auto blk : atomblks) {
+			LOG.os<>(blk, " ");
+		}
+		LOG.os<>('\n');
+		
+		LOG.os<>("Significant blocks:\n");
+		for (auto blk : sigblks) {
+			LOG.os<>(blk, " ");
+		}
+		LOG.os<>('\n');
+		
+		locorb::mo_localizer moloc(m_world, m_hfwfn->mol());
+		
+		auto reg = m_ao.get_registry();
+		auto s_bb = reg.get<dbcsr::shared_matrix<double>>(ints::key::ovlp_bb);
+		
+		auto [co_pr, u_ro, epso_r] = moloc.compute_truncated_pao(
+			cbo, s_bb, *epso, sigblks);
+		auto [cv_ps, u_sv, epsv_s] = moloc.compute_truncated_pao(
+			cbv, s_bb, *epsv, sigblks);
+		
+		auto pv = dbcsr::create_template<double>(*s_bb)
+			.name("pv")
+			.build();
+			
+		auto pvloc = dbcsr::create_template<double>(*s_bb)
+			.name("pv")
+			.build();
+			
+		dbcsr::multiply('N', 'T', *cbv, *cbv, *pv).perform();
+		dbcsr::multiply('N', 'T', *cv_ps, *cv_ps, *pvloc).perform();
+		
+		pv->filter(1e-3);
+		pvloc->filter(1e-3);
+		
+		LOG.os<>("OCCUP: ", pv->occupation(), " ", pvloc->occupation(), '\n');
+		
+		MPI_Barrier(m_world.comm());
+		exit(0);
+		
+		int nbas = m_hfwfn->mol()->c_basis()->nbf();
+		int nbas_t = co_pr->nfullrows_total();
+		int nocc_t = co_pr->nfullcols_total();
+		int nvir_t = cv_ps->nfullcols_total();
+		
+		LOG.os<>("AO: ", nbas, " -> ", nbas_t, '\n');
+		LOG.os<>("MO (O): ", nocc, " -> ", nocc_t, '\n');
+		LOG.os<>("MO (V): ", nvir, " -> ", nvir_t, '\n');
+		LOG.os<>("NXbas(prev): ", m_hfwfn->mol()->c_dfbasis()->nbf(), '\n');
+
+		int natoms = m_hfwfn->mol()->atoms().size();
+		std::vector<int> fullatoms(natoms);
+		std::iota(fullatoms.begin(), fullatoms.end(), 0);
+		
+		LOG.os<>("Forming fragment...\n");
+		auto mol_frag = m_hfwfn->mol()->fragment(nocc_t, nocc_t, nvir_t, 
+			nvir_t, fullatoms);
+			
+		LOG.os<>("Fragment info:\n");
+		LOG.os<>("Nelec alpha: ", mol_frag->nele_alpha(), '\n');
+		LOG.os<>("Nelec beta: ", mol_frag->nele_beta(), '\n');
+		LOG.os<>("Occ: ", mol_frag->nocc_alpha(), '\n');
+		LOG.os<>("Vir: ", mol_frag->nvir_alpha(), '\n');
+		LOG.os<>("Nbas: ", mol_frag->c_basis()->nbf(), '\n');
+		LOG.os<>("NXbas: ", mol_frag->c_dfbasis()->nbf(), '\n');
+			
+		//dbcsr::print(*ctrunc);
+		
+		auto x = mol_frag->dims().x();
+		LOG.os<>("THIS IS X: \n");
+		for (auto f : x) {
+			std::cout << f << std::endl;
+		}
+		
+		
+		ints::aoloader fragloader(m_world, mol_frag, m_opt);
+		
+		fock::load_jints(fock::jmethod::dfao, ints::metric::coulomb, fragloader);
+		fock::load_kints(fock::kmethod::dfao, ints::metric::coulomb, fragloader);
+		
+		fragloader.compute();
+		
+		auto freg = fragloader.get_registry();
+		auto eribatched = freg.get<dbcsr::sbtensor<3,double>>(ints::key::coul_xbb);
+		auto v_xx = freg.get<dbcsr::shared_matrix<double>>(ints::key::coul_xx_inv);
+		auto fitbatched = freg.get<dbcsr::sbtensor<3,double>>(ints::key::dfit_coul_xbb);
+		
+		auto ptr = create_MVP_AOADC1(m_world, mol_frag, LOG.global_plev())
+			.c_bo(co_pr)
+			.c_bv(cv_ps)
+			.eps_occ(epso_r)
+			.eps_vir(epsv_s)
+			.eri3c2e_batched(eribatched)
+			.fitting_batched(fitbatched)
+			.v_xx(v_xx)
+			.jmethod(fock::jmethod::dfao)
+			.kmethod(fock::kmethod::dfao)
+			.build();
+			
+		ptr->init();
+			
+		auto u_rs = u_transform(r, 'N', u_ro, 'T', u_sv);
+		
+		dbcsr::print(*u_rs);
+		
+		double n = sqrt(u_rs->dot(*u_rs));
+		u_rs->scale(1.0/n);
+		
+		auto sig = ptr->compute(u_rs, 0.0);
+		
+		double energy = u_rs->dot(*sig);
+		
+		LOG.os<>("ENERGY: ", energy, '\n');
+			
+		MPI_Barrier(m_world.comm());
+		exit(0);*/
+		
+		LOG.os<>("==== Starting ADC(1) Computation ====\n\n"); 
+		
+		t_davidson.start();
+		dav.compute(dav_eigvecs, nroots);
+		t_davidson.finish();
+		
+		adc1_mvp->print_info();
+				
+		//auto rvecs = std::vector<dbcsr::shared_matrix<double>>{r}; //dav.ritz_vectors();
+		//auto ex = std::vector<double>{0.21392}; //dav.eigvals();
+		
+		dav_eigvecs = dav.ritz_vectors();
+		dav_eigvals = dav.eigvals();
+		
+		LOG.os<>("==== Finished ADC(1) Computation ====\n\n"); 
 	
-	auto rvecs = dav.ritz_vectors();
-	auto ex = dav.eigvals();
-	
-	LOG.os<>("==== Finished ADC(1) Computation ====\n\n"); 
-	
-	int nstart = do_block ? 0 : nroots-1;
-	
-	LOG.os<>("ADC(1) Excitation energies:\n");
-	for (int iroot = nstart; iroot != nroots; ++iroot) {
-		LOG.os<>("Excitation nr. ", iroot+1, " : ", ex[iroot], '\n');
+		LOG.os<>("ADC(1) Excitation energies:\n");
+		for (int iroot = nstart; iroot != nroots; ++iroot) {
+			LOG.os<>("Excitation nr. ", iroot+1, " : ", dav_eigvals[iroot], '\n');
+		}
+		
 	}
 	
 	/*
@@ -335,10 +351,10 @@ void adcmod::compute() {
 	
 	//int theta = m_opt.get<int>("adc2/theta", -1.0);
 	
-	auto paos = get_canon_pao(rvecs[0], m_hfwfn->c_bo_A(), m_hfwfn->c_bv_A(), 
+	/*auto paos = get_canon_pao(dav_eigvecs[0], m_hfwfn->c_bo_A(), m_hfwfn->c_bv_A(), 
 		*m_hfwfn->eps_occ_A(), *m_hfwfn->eps_vir_A(), 0.995);
 		
-	auto dpao_ov = u_transform(m_d_ov, 'T', paos.u_or, 'N', paos.u_vs);
+	auto dpao_ov = u_transform(m_d_ov, 'T', paos.u_or, 'N', paos.u_vs);*/
 	
 	LOG.os<>("==== Starting ADC(2) Computation ====\n\n"); 
 	
@@ -380,7 +396,7 @@ void adcmod::compute() {
 		}
 		
 		mdav.set_factory(adc2_mvp);
-		mdav.compute(rvecs, iroot+1, ex[iroot]);
+		mdav.compute(dav_eigvecs, iroot+1, dav_eigvals[iroot]);
 		
 		double en = mdav.eigval()[iroot];
 		ex_adc2[iroot] = en;

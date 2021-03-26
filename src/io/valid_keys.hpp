@@ -89,6 +89,7 @@ static const json valid_keys =
 		{"block", true},
 		{"balanced", true},
 		{"nguesses", 1},
+		{"do_adc1", true},
 		{"do_adc2", true},
 		// first go through adc1 (required)
 		{"adc1", {
