@@ -225,14 +225,23 @@ desc::shared_molecule parse_molecule(json& jdata, MPI_Comm comm, int nprint) {
 	}
 	
 	int ao_split = assign<int>(jmol, "ao_split", 10);
+	
 	std::string basname = jmol["basis"];
 	std::optional<std::string> augbasname = std::nullopt;
 	
-	
 	bool augmented = assign<bool>(jmol, "augmentation", false);
+	
 	desc::shared_cluster_basis cbas = 
 		std::make_shared<desc::cluster_basis>(
 			basname, atoms, ao_split_method, ao_split, augmented);
+			
+	desc::shared_cluster_basis cbas2 = nullptr;
+	
+	if (jmol.find("basis2") != jmol.end()) {
+		std::string bas2name = jmol["basis2"];
+		cbas2 = std::make_shared<desc::cluster_basis>(
+			bas2name, atoms, ao_split_method, ao_split, false);
+	}
 	
 	int charge = jmol["charge"];
 	int mult = jmol["mult"];
@@ -266,8 +275,10 @@ desc::shared_molecule parse_molecule(json& jdata, MPI_Comm comm, int nprint) {
 		.mo_split(mo_split)
 		.build();
 		
-	mol->print_info(1);
-	LOG.os<>('\n');
+	if (cbas2) mol->set_cluster_basis2(cbas2);
+		
+	//mol->print_info(1);
+	//LOG.os<>('\n');
 	
 	return mol;
 	

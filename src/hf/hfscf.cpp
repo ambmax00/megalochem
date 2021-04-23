@@ -2,6 +2,7 @@
 #include "hf/hfdefaults.hpp"
 #include "math/linalg/orthogonalizer.hpp"
 #include "math/solvers/diis.hpp"
+#include "math/linalg/piv_cd.hpp"
 
 namespace hf {
 	
@@ -187,7 +188,7 @@ void hfmod::one_electron() {
 	ints::aofactory int_engine(m_mol, m_world);
 	
 	// overlap			 
-	m_s_bb = int_engine.ao_overlap();	 
+	m_s_bb = int_engine.ao_overlap();	
 	
 	//kinetic
 	m_t_bb = int_engine.ao_kinetic();
@@ -386,11 +387,11 @@ void hfmod::compute() {
 	// first, get one-electron integrals...
 	one_electron();
 	
-	// then, get two-electron integrals
-	two_electron();
-	
 	// form the guess
 	compute_guess();
+	
+	// then, get two-electron integrals
+	two_electron();
 	
 	compute_nucrep();
 	

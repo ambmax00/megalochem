@@ -5,6 +5,7 @@
 #include "ints/screening.hpp"
 #include "utils/mpi_time.hpp"
 #include "utils/pool.hpp"
+#include "math/linalg/piv_cd.hpp"
 
 extern "C" {
 #include <cint.h>
@@ -253,7 +254,8 @@ protected:
 	std::vector<int> m_bas;
 	std::vector<double> m_env;
 	
-	int m_natoms, m_nbas, m_ndfbas;
+	int m_natoms, m_nbas;
+	std::optional<int> m_ndfbas, m_nbas2;
 	
 	CINTIntegralFunction m_intfunc;
 	
@@ -264,8 +266,8 @@ protected:
 	
 	std::vector<int> m_b_offsets;
 	std::vector<int> m_b_nshells;
-	std::vector<int> m_x_offsets;
-	std::vector<int> m_x_nshells;
+	std::optional<std::vector<int>> m_x_offsets, m_x_nshells;
+	std::optional<std::vector<int>> m_b2_offsets, m_b2_nshells;
 	
 	std::vector<std::vector<int>*> m_shell_offsets;
 	std::vector<std::vector<int>*> m_nshells;
@@ -321,7 +323,6 @@ public:
 		m_mol(mol),
 		m_natoms(0),
 		m_nbas(0),
-		m_ndfbas(0),
 		m_max_l(0),
 		TIME(w.comm(), "integrals")
 	{ init(); }
@@ -353,6 +354,7 @@ public:
 		
 		auto cbas = m_mol->c_basis();
 		auto xbas = m_mol->c_dfbasis();
+		auto cbas2 = m_mol->c_basis2();
 		
 		// add unit shell
 		std::vector<int> bas_unit(BAS_SLOTS);
@@ -372,6 +374,7 @@ public:
 		
 		m_nbas = cbas->nshells();
 		if (xbas) m_ndfbas = xbas->nshells();
+		if (cbas2) m_nbas2 = cbas2->nshells();
 		 
 		auto add_basis = [this,&atoms,&off](desc::cluster_basis& cbas) 
 		{
@@ -414,6 +417,7 @@ public:
 		
 		add_basis(*cbas);
 		if (xbas) add_basis(*xbas);
+		if (cbas2) add_basis(*cbas2);
 		
 		//std::cout << "MAX_L: " << m_max_l << std::endl;
 		
@@ -429,46 +433,35 @@ public:
 		
 		// offsets
 		
-		auto s = m_mol->dims().s();
-		auto s_off = s;
-		
 		off = 1;
 		
-		for (int i = 0; i != s.size(); ++i) {
-			s_off[i] = off;
-			off += s[i];
-		}
-		
-		//std::cout << "OFFSETS" << std::endl;
-		
-		m_b_nshells = s;
-		m_b_offsets = s_off;
-		
-		//print(s);
-		//print(s_off);
-		
-		if (xbas) {
-			auto xs = m_mol->dims().xs();
-			auto xs_off = xs;
-			for (int i = 0; i != xs.size(); ++i) {
-				xs_off[i] = off;
-				off += xs[i];
+		auto add_offsets = [&](int& off,
+			std::vector<int> mol_s,
+			std::vector<int>& shell_sizes,
+			std::vector<int>& shell_offsets) 
+		{
+			
+			shell_sizes = mol_s;
+			shell_offsets = mol_s;
+			
+			for (int i = 0; i != mol_s.size(); ++i) {
+				shell_offsets[i] = off;
+				off += shell_sizes[i];
 			}
-			
-			//print(xs);
-			//print(xs_off);
-			
-			m_x_nshells = xs;
-			m_x_offsets = xs_off;
+		
+		};
+			 
+		add_offsets(off, m_mol->dims().s(), m_b_nshells, m_b_offsets);
+		if (xbas) {
+			m_x_nshells = std::vector<int>();
+			m_x_offsets = std::vector<int>();
+			add_offsets(off, m_mol->dims().xs(), *m_x_nshells, *m_x_offsets);
 		}
-		
-		//std::cout << "B/X" << std::endl;
-		//auto xsizes = m_mol->dims().x();
-		//auto bsizes = m_mol->dims().b();
-		
-		//print(xsizes);
-		//print(bsizes);
-			
+		if (cbas2) {
+			m_b2_nshells = std::vector<int>();
+			m_b2_offsets = std::vector<int>();
+			add_offsets(off, m_mol->dims().s2(), *m_b2_nshells, *m_b2_offsets);
+		}
 				
 	}
 	
@@ -486,17 +479,21 @@ public:
 			m_nshells = {&m_b_nshells, &m_b_nshells};
 			m_shell_offsets = {&m_b_offsets, &m_b_offsets};
 			m_tensor_sizes = {m_mol->dims().b(), m_mol->dims().b()};
+		} else if (dim == "bb2") {
+			m_nshells = {&m_b_nshells, &(*m_b2_nshells)};
+			m_shell_offsets = {&m_b_offsets, &(*m_b2_offsets)};
+			m_tensor_sizes = {m_mol->dims().b(), m_mol->dims().b2()};
 		} else if (dim == "xx") {
-			m_nshells = {&m_x_nshells, &m_x_nshells};
-			m_shell_offsets = {&m_x_offsets, &m_x_offsets};
+			m_nshells = {&(*m_x_nshells), &(*m_x_nshells)};
+			m_shell_offsets = {&(*m_x_offsets), &(*m_x_offsets)};
 			m_tensor_sizes = {m_mol->dims().x(), m_mol->dims().x()};
 		} else if (dim == "bbbb") {
 			m_nshells = {&m_b_nshells, &m_b_nshells, &m_b_nshells, &m_b_nshells};
 			m_shell_offsets = {&m_b_offsets, &m_b_offsets, &m_b_offsets, &m_b_offsets};
 			m_tensor_sizes = {m_mol->dims().b(), m_mol->dims().b(), m_mol->dims().b(), m_mol->dims().b()};
 		} else if (dim == "xbb") {
-			m_nshells = {&m_x_nshells, &m_b_nshells, &m_b_nshells};
-			m_shell_offsets = {&m_x_offsets, &m_b_offsets, &m_b_offsets};
+			m_nshells = {&(*m_x_nshells), &m_b_nshells, &m_b_nshells};
+			m_shell_offsets = {&(*m_x_offsets), &m_b_offsets, &m_b_offsets};
 			m_tensor_sizes = {m_mol->dims().x(), m_mol->dims().b(), m_mol->dims().b()};
 		} else {
 			throw std::runtime_error("Invalid dimension");
@@ -580,15 +577,23 @@ public:
 	
 	dbcsr::shared_matrix<double> compute() {
 		
+		bool sym = (m_tensor_sizes[0] == m_tensor_sizes[1]) ? true : false;
+		
+		dbcsr::type mtype = (sym) ? dbcsr::type::symmetric : dbcsr::type::no_symmetry;
+		
 		auto m_ints = dbcsr::matrix<double>::create()
 			.name(m_intname)
 			.set_world(m_world)
 			.row_blk_sizes(m_tensor_sizes[0])
 			.col_blk_sizes(m_tensor_sizes[1])
-			.matrix_type(dbcsr::type::symmetric)
+			.matrix_type(mtype)
 			.build();
 			
-		m_ints->reserve_sym();
+		if (sym) {
+			m_ints->reserve_sym();
+		} else {
+			m_ints->reserve_all();
+		}
 		
 		calc_ints(*m_ints, m_shell_offsets, m_nshells, m_intfunc,
 			m_atm.data(), m_natoms, m_bas.data(), m_nbas,
@@ -752,6 +757,16 @@ dbcsr::shared_matrix<double> aofactory::ao_overlap() {
 	return pimpl->compute();
 }
 
+dbcsr::shared_matrix<double> aofactory::ao_overlap2() {
+	pimpl->set_name("s_bb2");
+	pimpl->set_dim("bb2");
+	pimpl->set_center(ctr::c_2c1e);
+	pimpl->set_operator(op::overlap);
+	pimpl->setup_calc();
+	return pimpl->compute();
+}
+	
+
 dbcsr::shared_matrix<double> aofactory::ao_kinetic() {
 	
 	pimpl->set_name("t_bb");
@@ -914,5 +929,103 @@ std::function<void(dbcsr::stensor<3>&,vec<vec<int>>&)>
 }
 
 desc::shared_molecule aofactory::mol() { return pimpl->mol(); }
+
+desc::shared_cluster_basis remove_lindep(
+	dbcsr::world wrd,
+	desc::shared_cluster_basis cbas, 
+	std::vector<desc::Atom> atoms) 
+{
+	
+	util::mpi_log LOG(wrd.comm(), 0);
+	
+	LOG.os<>("Computing lindep...\n");
+	
+	// make a fake molecule
+	
+	auto mol = desc::molecule::create()
+		.comm(wrd.comm())
+		.name("lindep")
+		.atoms(atoms)
+		.cluster_basis(cbas)
+		.charge(0)
+		.mult(1)
+		.mo_split(5)
+		.build();
+		
+	ints::aofactory aofac(mol, wrd);
+	
+	auto ovlp = aofac.ao_overlap();
+	
+	math::pivinc_cd pivcd(ovlp, 0);
+	 
+	pivcd.compute(std::nullopt, 1e-4);
+	
+	LOG.os<>("RANK: ", pivcd.rank(), '\n');
+	
+	int prank = pivcd.rank();
+	auto perm = pivcd.perm();
+		
+	// get all Shells in a single vector
+	
+	std::vector<desc::Shell> vshell;
+	std::vector<int> shell_s2b;
+	std::vector<int> shell_b2s;
+	
+	// make a mapping bas func -> bas shell
+	
+	int off = 0;
+	int ishell = 0;
+	
+	for (auto& cluster : *cbas) {
+		for (auto& shell : cluster) {
+			
+			vshell.push_back(shell);
+			shell_s2b.push_back(off);
+			off += shell.size();
+			
+			for (int ii = 0; ii != shell.size(); ++ii) {
+				shell_b2s.push_back(ishell);
+			}
+			
+			++ishell;
+		}
+	}
+	
+	for (auto i : shell_s2b) {
+		std::cout << i << " ";
+	} std::cout << std::endl;
+	
+	for (auto i : shell_b2s) {
+		std::cout << i << " ";
+	} std::cout << std::endl;
+	
+	// check which shells we are keeping
+	
+	std::vector<bool> keep_shell(vshell.size(), false);
+	
+	for (int ifunc = 0; ifunc != prank; ++ifunc) {
+		int jshell = shell_b2s[perm[ifunc]];
+		keep_shell[jshell] = true;
+	}
+	
+	std::vector<desc::Shell> newvshell;
+	
+	for (int ishell = 0; ishell != vshell.size(); ++ishell) {
+		if (keep_shell[ishell]) {
+			 newvshell.push_back(vshell[ishell]);
+		} else {
+			LOG.os<>("Removing: \n", vshell[ishell], '\n');
+		}
+	}
+	
+	LOG.os<>("REMOVED ", vshell.size() - newvshell.size(), " SHELLS.\n");
+	
+	auto newcbas = std::make_shared<desc::cluster_basis>(
+		newvshell, cbas->split_method(), cbas->nsplit());
+		
+	return newcbas;
+	
+}
+	
 
 } // end namespace ints

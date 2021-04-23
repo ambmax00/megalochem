@@ -119,6 +119,34 @@ int main(int argc, char** argv) {
 	auto mol = filio::parse_molecule(data,comm,0);
 	auto opt = filio::parse_options(data,comm,0);
 	
+	auto cbas = mol->c_basis();
+	auto atm = mol->atoms();
+	
+	auto newcbas = ints::remove_lindep(wrd, cbas, atm);
+	
+	auto newmol = desc::molecule::create()
+		.comm(wrd.comm())
+		.name(mol->name())
+		.atoms(atm)
+		.cluster_basis(newcbas)
+		.charge(mol->charge())
+		.mult(mol->mult())
+		.mo_split(mol->mo_split())
+		.build();
+		
+	auto cbas2 = mol->c_basis2();
+	if (cbas2) newmol->set_cluster_basis2(cbas2);
+		
+	mol->print_info(1);
+	LOG.os<>('\n');
+		
+	newmol->print_info(1);
+	LOG.os<>('\n'); 
+	
+	mol = newmol;
+	
+	//exit(0);
+	
 	desc::write_molecule("molecule", *mol, *dh);
 	
 	if (wrd.rank() == 0) {

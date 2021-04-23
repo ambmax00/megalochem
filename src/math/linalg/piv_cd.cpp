@@ -769,7 +769,8 @@ std::tuple<double,int> get_max_diag(dbcsr::matrix<double>& mat, int istart = 0) 
 }
 
 #ifdef _USE_SPARSE_COMPUTE
-void pivinc_cd::compute(std::optional<int> force_rank) {
+void pivinc_cd::compute(std::optional<int> force_rank,
+	std::optional<double> eps) {
 	
 	// convert input mat to scalapack format
 	
@@ -815,12 +816,14 @@ void pivinc_cd::compute(std::optional<int> force_rank) {
 	
 	int nblks = U->nblkrows_total();
 	
-	double thresh = filter_100;
+	double thresh = (eps) ? *eps : filter_100;
 	LOG.os<1>("-- Threshold: ", thresh, '\n');
 			
 	std::vector<int> rowperm(N), backperm(N);
 	std::iota(rowperm.begin(), rowperm.end(), 0);
 	std::iota(backperm.begin(), backperm.end(), 0);
+	
+	std::vector<int> max_pos;
 	
 	std::function<void(int)> cholesky_step;
 	cholesky_step = [&](int I) {
@@ -859,7 +862,6 @@ void pivinc_cd::compute(std::optional<int> force_rank) {
 				
 		LOG.os<1>("---- Maximum element: ", diag_max, " on pos ", i_max, '\n');
 				
-		
 		// b) permute rows/cols
 		// U := P * U * P^t
 		
@@ -959,6 +961,8 @@ void pivinc_cd::compute(std::optional<int> force_rank) {
 	};
 	
 	cholesky_step(0);
+	
+	m_perm = rowperm;
 	
 	LOG.os<1>("-- Returned from recursion.\n");
 	

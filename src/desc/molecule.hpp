@@ -27,8 +27,10 @@ protected:
 	int m_mult;
 	int m_charge;
 	std::vector<Atom> m_atoms;
+	
 	shared_cluster_basis m_cluster_basis;
 	shared_cluster_basis m_cluster_dfbasis;
+	shared_cluster_basis m_cluster_basis2;
 	
 	int m_nocc_alpha;
 	int m_nocc_beta;
@@ -60,6 +62,8 @@ protected:
 		std::vector<int> m_shell_sizes;
 		std::vector<int> m_dfbas_sizes;
 		std::vector<int> m_dfshell_sizes;
+		std::vector<int> m_bas2_sizes;
+		std::vector<int> m_shell2_sizes;
 	
 	public:
 	
@@ -91,6 +95,10 @@ protected:
 				set_x(*mol.m_cluster_dfbasis);
 			}
 			
+			if (mol.m_cluster_basis2) {
+				set_b2(*mol.m_cluster_basis2);
+			}
+			
 		}
 		
 		std::vector<int> oa() { return m_occ_alpha_sizes; }
@@ -102,7 +110,9 @@ protected:
 		std::vector<int> b() { return m_bas_sizes; }
 		std::vector<int> x() { return m_dfbas_sizes; }
 		std::vector<int> s() { return m_shell_sizes; }
+		std::vector<int> b2() { return m_bas2_sizes; }
 		std::vector<int> xs() { return m_dfshell_sizes; }
+		std::vector<int> s2() { return m_shell2_sizes; }
 		
 		void set_b(cluster_basis& c) {
 			
@@ -121,6 +131,17 @@ protected:
 			m_dfshell_sizes.clear();
 			for (int i = 0; i != cdf.size(); ++i) {
 				m_dfshell_sizes.push_back(cdf[i].size());
+			}
+			
+		}
+		
+		void set_b2(cluster_basis& c2) {
+			
+			m_bas2_sizes = c2.cluster_sizes();
+			
+			m_shell2_sizes.clear();
+			for (int i = 0; i != c2.size(); ++i) {
+				m_shell2_sizes.push_back(c2[i].size());
 			}
 			
 		}			
@@ -176,12 +197,21 @@ public:
 		m_blocks.set_x(*df);
 	}
 	
+	void set_cluster_basis2(shared_cluster_basis& cbas2) {
+		m_cluster_basis2 = cbas2;
+		m_blocks.set_b2(*cbas2);
+	}
+	
 	shared_cluster_basis c_basis() {
 		return m_cluster_basis;
 	}
 	
 	shared_cluster_basis c_dfbasis() {
 		return m_cluster_dfbasis;
+	}
+	
+	shared_cluster_basis c_basis2() {
+		return m_cluster_basis2;
 	}
 	
 	std::vector<Atom> atoms() {

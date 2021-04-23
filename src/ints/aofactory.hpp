@@ -56,6 +56,7 @@ public:
 	~aofactory();
 	
 	dbcsr::shared_matrix<double> ao_overlap();
+	dbcsr::shared_matrix<double> ao_overlap2();
 	dbcsr::shared_matrix<double> ao_kinetic();
 	dbcsr::shared_matrix<double> ao_nuclear();
 	
@@ -100,6 +101,11 @@ public:
 	
 		
 }; // end class aofactory
+
+desc::shared_cluster_basis remove_lindep(
+	dbcsr::world w,
+	desc::shared_cluster_basis cbas, 
+	std::vector<desc::Atom> atoms);
 
 } // end namespace ints
 			

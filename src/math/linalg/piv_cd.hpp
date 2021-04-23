@@ -26,7 +26,8 @@ private:
 	util::mpi_log LOG;
 	
 	int m_rank = -1;
-	double m_thresh;
+	
+	std::vector<int> m_perm;
 	
 	void reorder_and_reduce(scalapack::distmat<double>& L);
 
@@ -36,11 +37,16 @@ public:
 		m_mat_in(mat_in), LOG(m_mat_in->get_world().comm(), print) {}
 	~pivinc_cd() {}
 	
-	void compute(std::optional<int> force_rank = std::nullopt);
+	void compute(std::optional<int> force_rank = std::nullopt,
+		std::optional<double> eps = std::nullopt);
 	
 	void compute_sparse();
 	
 	int rank() { return m_rank; }
+	
+	std::vector<int> perm() {
+		return m_perm;
+	}
 	
 	dbcsr::shared_matrix<double> L(std::vector<int> rowblksizes, std::vector<int> colblksizes);
 	

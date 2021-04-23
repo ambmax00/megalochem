@@ -31,6 +31,9 @@ extern "C" {
 	
 	double pdlange_(char* nrom, int* m, int* n, double* a, int* ia, int* ja, int* desca, double* work);
 	
+	void pddot_(int* n, double* dot, double* x, int* ix, int* jx, int* descx, 
+		int* incx, double* y, int* iy, int* jy, int* descy, int* incy);
+	
 	void pdgeadd_(char* trans, int* m, int* n, double* alpha, double* a, int* ia, int* ja,
 		int* desca, double* beta, double* c, int* ic, int* jc, int* desc);
 	
@@ -97,6 +100,22 @@ inline void c_blacs_gridexit(int ctxt)
 inline void c_blacs_exit(int comt) 
 {
 	blacs_exit_(&comt);
+};
+
+inline double c_pddot(int n, double* x, int ix, int jx, int* descx, 
+	int incx, double* y, int iy, int jy, int* descy, int incy) 
+{
+	int f_ix = ix + 1;
+	int f_jx = jx + 1;
+	int f_iy = iy + 1;
+	int f_jy = jy + 1;
+	
+	double dot = 0;
+	
+	pddot_(&n, &dot, x, &f_ix, &f_jx, descx, &incx, y, &f_iy, &f_jy, descy, &incy);
+	
+	return dot;
+	
 };
 
 inline int c_indxl2g(int indxloc, int nb, int iproc, int isrcproc, int nprocs)

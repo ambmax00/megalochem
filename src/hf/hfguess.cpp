@@ -2,6 +2,7 @@
 #include "hf/hfdefaults.hpp"
 #include "math/solvers/hermitian_eigen_solver.hpp"
 #include "math/linalg/piv_cd.hpp"
+#include "math/linalg/LLT.hpp"
 #include <dbcsr_conversions.hpp>
 #include <limits>
 
@@ -63,7 +64,60 @@ void scale_huckel(dbcsr::tensor<2>& t, std::vector<double>& v) {
 	}
 	
 }	
-*/				
+*/
+
+void gram_schmidt(dbcsr::shared_matrix<double>& mat) {
+	
+	int nrows = mat->nfullrows_total();
+	int ncols = mat->nfullcols_total();
+	
+	int nsplit = 10;
+	
+	auto V = dbcsr::matrix_to_scalapack(mat, "mat_s", nsplit, nsplit, 0, 0);
+	
+	scalapack::distmat<double> U(nrows, ncols, nsplit, nsplit, 0, 0); 
+	
+	for (int icol = 0; icol != ncols; ++icol) {
+		
+		// u_n = v_n 
+		
+		c_pdgeadd('N', nrows, 1, 1.0, V.data(), 0, icol, V.desc().data(), 
+			1.0, U.data(), 0, icol, U.desc().data());
+	
+		for (int jcol = 0; jcol != icol; ++jcol) {
+			
+			// dot(u_jcol, v_icol)			
+			double dot_uv = c_pddot(nrows, U.data(), 0, jcol, U.desc().data(), 
+				1, V.data(), 0, icol, V.desc().data(), 1);
+			
+			// dot(u_jcol, u_jcol)
+			double dot_uu = c_pddot(nrows, U.data(), 0, jcol, U.desc().data(), 
+				1, U.data(), 0, jcol, U.desc().data(), 1);
+				
+			std::cout << dot_uv << " " << dot_uu << std::endl;
+	
+			// u_icol += - proj(u_jcol, v_icol)	
+			c_pdgeadd('N', nrows, 1, -dot_uv/dot_uu, U.data(), 0, jcol, 
+				U.desc().data(), 1.0, U.data(), 0, icol, U.desc().data());
+				
+		}
+		
+	}
+	
+	auto w = mat->get_world();
+	auto rblk = mat->row_blk_sizes();
+	auto cblk = mat->col_blk_sizes();
+	
+	auto mat_ortho = dbcsr::scalapack_to_matrix(U, mat->name() + "_ortho", w,
+		rblk, cblk);
+		
+	//dbcsr::print(*mat);
+	
+	//dbcsr::print(*mat_ortho);
+	
+	mat = mat_ortho;
+	
+}
 
 void hfmod::compute_guess() {
 	
@@ -477,6 +531,130 @@ void hfmod::compute_guess() {
 		LOG.os<>("Finished with SAD.\n");
 		
 		//end SAD :(
+	
+	} else if (m_guess == "project") {
+		
+		LOG.os<>("Launching Hartree Fock calculation with secondary basis\n");
+		
+		auto cbas2 = m_mol->c_basis2();
+		if (!cbas2) {
+			throw std::runtime_error("No secondary basis given!");
+		}
+		
+		auto mol_sub = desc::molecule::create()
+			.comm(m_world.comm())
+			.name("SUB")
+			.atoms(m_mol->atoms())
+			.cluster_basis(cbas2)
+			.charge(m_mol->charge())
+			.mult(m_mol->mult())
+			.mo_split(m_mol->mo_split())
+			.build();
+		
+		desc::options opt2(m_opt);
+			
+		int print = LOG.global_plev(); // - 1;
+		
+		opt2.set<int>("print", print);
+		
+		opt2.set<std::string>("guess", "SAD");
+		opt2.set<double>("scf_thresh", 10 * m_opt.get<double>("scf_thresh", HF_SCF_THRESH));
+		if (m_opt.present("dfbasis2")) {
+			opt2.set<std::string>("dfbasis", m_opt.get<std::string>("dfbasis2"));
+		}
+		
+		hfmod subhf(m_world, mol_sub, opt2);
+		subhf.compute();
+		
+		LOG.os<>("Finished Hartree Fock computation with secondary basis set.\n");
+		LOG.os<>("Now computing projected MO coefficient matrices");
+		
+		auto subwfn = subhf.wfn();
+		
+		auto b = m_mol->dims().b();
+		auto b2 = m_mol->dims().b2();
+		auto m = m_c_bm_A->col_blk_sizes();
+		auto oa = m_mol->dims().oa();
+		auto ob = m_mol->dims().ob();
+		
+		auto c_b2o_A = subwfn->c_bo_A();
+		auto c_b2o_B = subwfn->c_bo_B();
+		
+		math::LLT lltsolver(m_s_bb, 0);
+		lltsolver.compute();
+		auto s_inv_bb = lltsolver.inverse(b);
+		
+		ints::aofactory aofac(m_mol, m_world);
+		auto s_bb2 = aofac.ao_overlap2();
+		
+		//dbcsr::print(*s_bb2);
+		
+		auto x_bb2 = dbcsr::matrix<double>::create()
+			.set_world(m_world)
+			.name("x_bb2")
+			.row_blk_sizes(b)
+			.col_blk_sizes(b2)
+			.matrix_type(dbcsr::type::no_symmetry)
+			.build();
+			
+		dbcsr::multiply('N', 'N', 1.0, *s_inv_bb, *s_bb2, 0.0, *x_bb2)
+			.perform();
+			
+		auto c_bo_A = dbcsr::matrix<double>::create()
+			.set_world(m_world)
+			.name("c_bo_A")
+			.row_blk_sizes(b)
+			.col_blk_sizes(oa)
+			.matrix_type(dbcsr::type::no_symmetry)
+			.build();	
+			
+		dbcsr::multiply('N', 'N', 1.0, *x_bb2, *c_b2o_A, 0.0, *c_bo_A)
+			.perform();
+			
+		//gram_schmidt(c_bo_A);
+							
+		// copy over
+		
+		auto copy = [&](auto& c_bo, auto& c_bm) {
+			auto c_bo_eigen = dbcsr::matrix_to_eigen(*c_bo);
+			int nrows = c_bm->nfullrows_total();
+			int ncols = c_bm->nfullcols_total();
+			Eigen::MatrixXd c_bm_eigen = Eigen::MatrixXd::Zero(nrows,ncols);
+			c_bm_eigen.block(0,0,c_bo_eigen.rows(),c_bo_eigen.cols()) = c_bo_eigen;
+			c_bm = dbcsr::eigen_to_matrix(c_bm_eigen, m_world, c_bm->name(), 
+				b, m, dbcsr::type::no_symmetry);
+		};
+		
+		copy(c_bo_A, m_c_bm_A);
+		
+		//dbcsr::print(*c_bo_A);
+		
+		//dbcsr::print(*m_c_bm_A);
+			
+		dbcsr::multiply('N', 'T', 1.0, *c_bo_A, *c_bo_A, 0.0, *m_p_bb_A)
+			.perform();
+			
+		if (m_c_bm_B) {
+			
+			auto c_bo_B = dbcsr::matrix<double>::create()
+				.set_world(m_world)
+				.name("c_bo_B")
+				.row_blk_sizes(b)
+				.col_blk_sizes(ob)
+				.matrix_type(dbcsr::type::no_symmetry)
+				.build();	
+				
+			dbcsr::multiply('N', 'N', 1.0, *x_bb2, *c_b2o_B, 0.0, *c_bo_B)
+				.perform();
+				
+			//gram_schmidt(c_bo_B);
+				
+			dbcsr::multiply('N', 'T', 1.0, *c_bo_B, *c_bo_B, 0.0, *m_p_bb_B)
+				.perform();
+				
+			copy(c_bo_B, m_c_bm_B);
+			
+		}
 		
 	} else {
 		

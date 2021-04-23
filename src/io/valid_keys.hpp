@@ -23,6 +23,7 @@ static const json valid_keys =
 		{"reorder", true}, // whether to reorder atoms
 		{"unit", "string"}, // angstrom
 		{"basis", "string"}, // basisset name
+		{"basis2", "string"},
 		{"augmentation", "string"}, // use augmented functions from aug-{basname}
 		//{"gen_basis", "basis"}, // custom basis set input
 		{"geometry", {0.0,0.0,0.0}}, // mol xyz
@@ -58,6 +59,7 @@ static const json valid_keys =
 		{"SAD_diis", true},
 		{"SAD_spin_average", true},
 		{"dfbasis", "string"},
+		{"dfbasis2", "string"},
 		{"df_augmentation", true},
 		{"locc", false},
 		{"lvir", false},

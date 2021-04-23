@@ -88,6 +88,10 @@ public:
 	
 	void compute();	
 	
+	dbcsr::shared_matrix<double> s_bb() {
+		return m_s_bb;
+	}
+	
 	hf::shared_hf_wfn wfn() { 
 		
 		// separate occupied and virtual coefficient matrix
