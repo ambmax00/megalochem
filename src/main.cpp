@@ -122,7 +122,7 @@ int main(int argc, char** argv) {
 	auto cbas = mol->c_basis();
 	auto atm = mol->atoms();
 	
-	auto newcbas = ints::remove_lindep(wrd, cbas, atm);
+	/*auto newcbas = ints::remove_lindep(wrd, cbas, atm);
 	
 	auto newmol = desc::molecule::create()
 		.comm(wrd.comm())
@@ -135,15 +135,15 @@ int main(int argc, char** argv) {
 		.build();
 		
 	auto cbas2 = mol->c_basis2();
-	if (cbas2) newmol->set_cluster_basis2(cbas2);
+	if (cbas2) newmol->set_cluster_basis2(cbas2);*/
 		
 	mol->print_info(1);
 	LOG.os<>('\n');
 		
-	newmol->print_info(1);
+	//newmol->print_info(1);
 	LOG.os<>('\n'); 
 	
-	mol = newmol;
+	//mol = newmol;
 	
 	//exit(0);
 	

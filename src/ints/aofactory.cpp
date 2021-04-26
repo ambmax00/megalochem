@@ -110,8 +110,8 @@ private:
 			
 		}
 		
-		auto x = m_mol->dims().x();
-		auto b = m_mol->dims().b();
+		auto x = m_cdfbas->cluster_sizes();
+		auto b = m_cbas->cluster_sizes();
 		
 		double mem = 0.0;
 		double mem_tot = 0.0;
@@ -243,19 +243,22 @@ public:
 		
 	}
 	
-	desc::shared_molecule mol() { return m_mol; }
-
 protected:
 
 	dbcsr::world m_world;
-	desc::shared_molecule m_mol;
 	
-	std::vector<int> m_atm;
-	std::vector<int> m_bas;
-	std::vector<double> m_env;
+	std::vector<desc::Atom> m_atoms;
 	
-	int m_natoms, m_nbas;
-	std::optional<int> m_ndfbas, m_nbas2;
+	desc::shared_cluster_basis m_cbas, m_cdfbas, m_cbas2;
+	
+	std::vector<int> m_b_cint_offsets, m_x_cint_offsets, m_b2_cint_offsets;
+	
+	std::vector<int> m_cint_atm;
+	std::vector<int> m_cint_bas;
+	std::vector<double> m_cint_env;
+	
+	int m_cint_natoms;
+	int m_cint_nbas;
 	
 	CINTIntegralFunction m_intfunc;
 	
@@ -264,13 +267,8 @@ protected:
 	op m_op = op::invalid;
 	int m_max_l;
 	
-	std::vector<int> m_b_offsets;
-	std::vector<int> m_b_nshells;
-	std::optional<std::vector<int>> m_x_offsets, m_x_nshells;
-	std::optional<std::vector<int>> m_b2_offsets, m_b2_nshells;
-	
-	std::vector<std::vector<int>*> m_shell_offsets;
-	std::vector<std::vector<int>*> m_nshells;
+	std::vector<std::vector<int>> m_shell_offsets;
+	std::vector<std::vector<int>> m_nshells;
 	std::vector<std::vector<int>> m_tensor_sizes;
 	
 	double gaussian_int(int l, double alpha) {
@@ -320,41 +318,74 @@ public:
 	
 	impl(desc::shared_molecule mol, dbcsr::world w) :
 		m_world(w),
-		m_mol(mol),
-		m_natoms(0),
-		m_nbas(0),
+		m_atoms(mol->atoms()),
+		m_cbas(mol->c_basis()),
+		m_cdfbas(mol->c_dfbasis()),
+		m_cbas2(mol->c_basis2()),
+		m_cint_natoms(0),
+		m_cint_nbas(0),
 		m_max_l(0),
 		TIME(w.comm(), "integrals")
 	{ init(); }
 	
+	impl(dbcsr::world w, desc::shared_cluster_basis cbas,
+		desc::shared_cluster_basis cdfbas,
+		desc::shared_cluster_basis cbas2) :
+		m_world(w),
+		m_cbas(cbas),
+		m_cdfbas(cdfbas),
+		m_cbas2(cbas2),
+		m_cint_natoms(0),
+		m_cint_nbas(0),
+		m_max_l(0),
+		TIME(w.comm(), "integrals")
+	{
+		
+		for (auto& cluster : *cbas) {
+			for (auto shell : cluster) {
+				
+				// check if coordinates inside
+				auto it = std::find_if(m_atoms.begin(), m_atoms.end(), 
+					[&shell](const desc::Atom& a) {
+						return a.x == shell.O[0] && 
+							a.y == shell.O[1] && 
+							a.z == shell.O[2];
+					}
+				);
+				
+				if (it != m_atoms.end()) {
+					m_atoms.push_back(desc::Atom{shell.O[0], 
+						shell.O[1], shell.O[2], 0});
+				}
+				
+			}
+		}
+					
+		init();
+		
+	}				
+				
 	void init() {
 		
-		m_atm.resize(ATM_SLOTS * m_mol->atoms().size());
-		
 		// atoms
-		auto atoms = m_mol->atoms();
-		m_natoms = atoms.size();
+		m_cint_natoms = m_atoms.size();
 		int off = PTR_ENV_START;
 		
-		m_env.resize(off);
-		m_env[PTR_RANGE_OMEGA] = 0;
+		m_cint_atm.resize(ATM_SLOTS * m_cint_natoms);
+		
+		m_cint_env.resize(off);
+		m_cint_env[PTR_RANGE_OMEGA] = 0;
 				
-		for (int i = 0; i != m_natoms; ++i) {
-			m_atm[i * ATM_SLOTS + CHARGE_OF] = atoms[i].atomic_number;
-			m_atm[i * ATM_SLOTS + PTR_COORD] = off;
+		for (int i = 0; i != m_cint_natoms; ++i) {
+			m_cint_atm[i * ATM_SLOTS + CHARGE_OF] = m_atoms[i].atomic_number;
+			m_cint_atm[i * ATM_SLOTS + PTR_COORD] = off;
 			
-			m_env.push_back(atoms[i].x);
-			m_env.push_back(atoms[i].y);
-			m_env.push_back(atoms[i].z);
+			m_cint_env.push_back(m_atoms[i].x);
+			m_cint_env.push_back(m_atoms[i].y);
+			m_cint_env.push_back(m_atoms[i].z);
 			
 			off += 3;
 		}
-		
-		// basis
-		
-		auto cbas = m_mol->c_basis();
-		auto xbas = m_mol->c_dfbasis();
-		auto cbas2 = m_mol->c_basis2();
 		
 		// add unit shell
 		std::vector<int> bas_unit(BAS_SLOTS);
@@ -365,18 +396,14 @@ public:
 		bas_unit[PTR_EXP] = off++;
 		bas_unit[PTR_COEFF] = off++;
 		
-		m_bas.insert(m_bas.begin(), bas_unit.begin(), bas_unit.end());
+		m_cint_bas.insert(m_cint_bas.begin(), bas_unit.begin(), bas_unit.end());
 				
 		constexpr double two_sqrt_pi = 3.5449077018110320545963349666;
 		
-		m_env.push_back(0.0);
-		m_env.push_back(two_sqrt_pi);
+		m_cint_env.push_back(0.0);
+		m_cint_env.push_back(two_sqrt_pi);
 		
-		m_nbas = cbas->nshells();
-		if (xbas) m_ndfbas = xbas->nshells();
-		if (cbas2) m_nbas2 = cbas2->nshells();
-		 
-		auto add_basis = [this,&atoms,&off](desc::cluster_basis& cbas) 
+		auto add_basis = [this, &off](desc::cluster_basis& cbas) 
 		{
 			for (auto& cluster : cbas) {
 				
@@ -389,14 +416,14 @@ public:
 					m_max_l = std::max((size_t)m_max_l, shell.l);
 					
 					std::vector<int> bas_i(BAS_SLOTS);
-					bas_i[ATOM_OF] = atom_of(shell,atoms);
+					bas_i[ATOM_OF] = atom_of(shell,m_atoms);
 					bas_i[ANG_OF] = shell.l;
 					bas_i[NPRIM_OF] = shell.nprim();
 					bas_i[NCTR_OF] = 1;
 					bas_i[PTR_EXP] = off;
 										
 					for (int i = 0; i != shell.alpha.size(); ++i) {
-						m_env.push_back(shell.alpha[i]);
+						m_cint_env.push_back(shell.alpha[i]);
 						++off;
 					}
 					
@@ -405,19 +432,23 @@ public:
 					auto coeff = gto_normalize(shell.l, shell.alpha, shell.coeff);
 					
 					for (int i = 0; i != coeff.size(); ++i) {
-						m_env.push_back(coeff[i]);
+						m_cint_env.push_back(coeff[i]);
 						++off;
 					}
 					
-					m_bas.insert(m_bas.end(), bas_i.begin(), bas_i.end());
+					m_cint_bas.insert(m_cint_bas.end(), bas_i.begin(), 
+						bas_i.end());
 					
 				}
 			}
+			
+			m_cint_nbas += cbas.nbf();
+			
 		};
 		
-		add_basis(*cbas);
-		if (xbas) add_basis(*xbas);
-		if (cbas2) add_basis(*cbas2);
+		add_basis(*m_cbas);
+		if (m_cdfbas) add_basis(*m_cdfbas);
+		if (m_cbas2) add_basis(*m_cbas2);
 		
 		//std::cout << "MAX_L: " << m_max_l << std::endl;
 		
@@ -435,32 +466,26 @@ public:
 		
 		off = 1;
 		
-		auto add_offsets = [&](int& off,
-			std::vector<int> mol_s,
-			std::vector<int>& shell_sizes,
-			std::vector<int>& shell_offsets) 
+		auto add_offsets = [&](int& off, std::vector<int> nshells)
 		{
 			
-			shell_sizes = mol_s;
-			shell_offsets = mol_s;
+			std::vector<int> shell_offsets = nshells;
 			
-			for (int i = 0; i != mol_s.size(); ++i) {
+			for (int i = 0; i != nshells.size(); ++i) {
 				shell_offsets[i] = off;
-				off += shell_sizes[i];
+				off += nshells[i];
 			}
+			
+			return shell_offsets;
 		
 		};
 			 
-		add_offsets(off, m_mol->dims().s(), m_b_nshells, m_b_offsets);
-		if (xbas) {
-			m_x_nshells = std::vector<int>();
-			m_x_offsets = std::vector<int>();
-			add_offsets(off, m_mol->dims().xs(), *m_x_nshells, *m_x_offsets);
+		m_b_cint_offsets = add_offsets(off, m_cbas->nshells());
+		if (m_cdfbas) {
+			m_x_cint_offsets = add_offsets(off, m_cdfbas->nshells());
 		}
-		if (cbas2) {
-			m_b2_nshells = std::vector<int>();
-			m_b2_offsets = std::vector<int>();
-			add_offsets(off, m_mol->dims().s2(), *m_b2_nshells, *m_b2_offsets);
+		if (m_cbas2) {
+			m_b2_cint_offsets = add_offsets(off, m_cbas2->nshells());
 		}
 				
 	}
@@ -476,27 +501,33 @@ public:
 	void set_dim(std::string dim) {
 		
 		if (dim == "bb") {
-			m_nshells = {&m_b_nshells, &m_b_nshells};
-			m_shell_offsets = {&m_b_offsets, &m_b_offsets};
-			m_tensor_sizes = {m_mol->dims().b(), m_mol->dims().b()};
+			m_nshells = {m_cbas->nshells(), m_cbas->nshells()};
+			m_shell_offsets = {m_b_cint_offsets, m_b_cint_offsets};
+			m_tensor_sizes = {m_cbas->cluster_sizes(), m_cbas->cluster_sizes()};
+		
 		} else if (dim == "bb2") {
-			m_nshells = {&m_b_nshells, &(*m_b2_nshells)};
-			m_shell_offsets = {&m_b_offsets, &(*m_b2_offsets)};
-			m_tensor_sizes = {m_mol->dims().b(), m_mol->dims().b2()};
+			m_nshells = {m_cbas->nshells(), m_cbas2->nshells()};
+			m_shell_offsets = {m_b_cint_offsets, m_b2_cint_offsets};
+			m_tensor_sizes = {m_cbas->cluster_sizes(), m_cbas2->cluster_sizes()};
+		
 		} else if (dim == "xx") {
-			m_nshells = {&(*m_x_nshells), &(*m_x_nshells)};
-			m_shell_offsets = {&(*m_x_offsets), &(*m_x_offsets)};
-			m_tensor_sizes = {m_mol->dims().x(), m_mol->dims().x()};
+			m_nshells = {m_cdfbas->nshells(), m_cdfbas->nshells()};
+			m_shell_offsets = {m_x_cint_offsets, m_x_cint_offsets};
+			m_tensor_sizes = {m_cdfbas->cluster_sizes(), m_cdfbas->cluster_sizes()};
+		
 		} else if (dim == "bbbb") {
-			m_nshells = {&m_b_nshells, &m_b_nshells, &m_b_nshells, &m_b_nshells};
-			m_shell_offsets = {&m_b_offsets, &m_b_offsets, &m_b_offsets, &m_b_offsets};
-			m_tensor_sizes = {m_mol->dims().b(), m_mol->dims().b(), m_mol->dims().b(), m_mol->dims().b()};
+			m_nshells = {m_cbas->nshells(), m_cbas->nshells(), m_cbas->nshells(), m_cbas->nshells(),};
+			m_shell_offsets = {m_b_cint_offsets, m_b_cint_offsets, m_b_cint_offsets, m_b_cint_offsets};
+			m_tensor_sizes = {m_cbas->cluster_sizes(), m_cbas->cluster_sizes(), m_cbas->cluster_sizes(), m_cbas->cluster_sizes()};
+		
 		} else if (dim == "xbb") {
-			m_nshells = {&(*m_x_nshells), &m_b_nshells, &m_b_nshells};
-			m_shell_offsets = {&(*m_x_offsets), &m_b_offsets, &m_b_offsets};
-			m_tensor_sizes = {m_mol->dims().x(), m_mol->dims().b(), m_mol->dims().b()};
+			m_nshells = {m_cdfbas->nshells(), m_cbas->nshells(), m_cbas->nshells()};
+			m_shell_offsets = {m_x_cint_offsets, m_b_cint_offsets, m_b_cint_offsets};
+			m_tensor_sizes = {m_cdfbas->cluster_sizes(), m_cbas->cluster_sizes(), m_cbas->cluster_sizes(),};
+		
 		} else {
 			throw std::runtime_error("Invalid dimension");
+		
 		}
 		
 	}
@@ -507,7 +538,7 @@ public:
 	
 	void setup_calc(bool dummy = false) {
 		
-		m_env[PTR_RANGE_OMEGA] = 0.0;
+		m_cint_env[PTR_RANGE_OMEGA] = 0.0;
 		
 		switch (combine(m_op, m_ctr)) {
 			
@@ -536,7 +567,7 @@ public:
 				break;
 				
 			case combine(op::coulomb, ctr::c_3c2e):
-				m_env[PTR_RANGE_OMEGA] = 0.0d;
+				m_cint_env[PTR_RANGE_OMEGA] = 0.0d;
 				m_intfunc = cint3c2e_sph;
 				break;
 				
@@ -545,17 +576,17 @@ public:
 				break;
 				
 			case combine(op::erfc_coulomb, ctr::c_2c2e):
-				m_env[PTR_RANGE_OMEGA] = - global::omega;
+				m_cint_env[PTR_RANGE_OMEGA] = - global::omega;
 				m_intfunc = cint2c2e_sph;
 				break;
 				
 			case combine(op::erfc_coulomb, ctr::c_3c2e):
-				m_env[PTR_RANGE_OMEGA] = - global::omega;
+				m_cint_env[PTR_RANGE_OMEGA] = - global::omega;
 				m_intfunc = cint3c2e_sph;
 				break;
 				
 			case combine(op::erfc_coulomb, ctr::c_4c2e):
-				m_env[PTR_RANGE_OMEGA] = - global::omega;
+				m_cint_env[PTR_RANGE_OMEGA] = - global::omega;
 				m_intfunc = cint2e_sph;
 				break;
 				
@@ -596,8 +627,8 @@ public:
 		}
 		
 		calc_ints(*m_ints, m_shell_offsets, m_nshells, m_intfunc,
-			m_atm.data(), m_natoms, m_bas.data(), m_nbas,
-			m_env.data(), m_max_l);
+			m_cint_atm.data(), m_cint_natoms, m_cint_bas.data(), m_cint_nbas,
+			m_cint_env.data(), m_max_l);
 				
 		return m_ints;
 		
@@ -625,14 +656,14 @@ public:
 		ints_y->reserve_sym();
 		ints_z->reserve_sym();
 		
-		m_env[PTR_COMMON_ORIG + 0] = O[0]; 
-		m_env[PTR_COMMON_ORIG + 1] = O[1];
-		m_env[PTR_COMMON_ORIG + 2] = O[2];
+		m_cint_env[PTR_COMMON_ORIG + 0] = O[0]; 
+		m_cint_env[PTR_COMMON_ORIG + 1] = O[1];
+		m_cint_env[PTR_COMMON_ORIG + 2] = O[2];
 		
 		calc_ints(*ints_x, *ints_y, *ints_z, m_shell_offsets, 
 				m_nshells, m_intfunc,
-				m_atm.data(), m_natoms, m_bas.data(), m_nbas,
-				m_env.data(), m_max_l);
+				m_cint_atm.data(), m_cint_natoms, m_cint_bas.data(), m_cint_nbas,
+				m_cint_env.data(), m_max_l);
 				
 		std::array<dbcsr::shared_matrix<double>,3> out = {
 			ints_x, ints_y, ints_z
@@ -648,16 +679,16 @@ public:
 		reserve_3_partial(t_in, blkbounds, s_scr);
 		
 		calc_ints(*t_in, m_shell_offsets, m_nshells, m_intfunc,
-			m_atm.data(), m_natoms, m_bas.data(), m_nbas,
-			m_env.data(), m_max_l);
+			m_cint_atm.data(), m_cint_natoms, m_cint_bas.data(), m_cint_nbas,
+			m_cint_env.data(), m_max_l);
 	
 	}	
 	
 	void compute_3_all(dbcsr::shared_tensor<3>& t_in) {
 				
 		calc_ints(*t_in, m_shell_offsets, m_nshells, m_intfunc,
-			m_atm.data(), m_natoms, m_bas.data(), m_nbas,
-			m_env.data(), m_max_l);
+			m_cint_atm.data(), m_cint_natoms, m_cint_bas.data(), m_cint_nbas,
+			m_cint_env.data(), m_max_l);
 	
 	}	
 	
@@ -667,8 +698,8 @@ public:
 		reserve_3_partial_idx(t_in, idx, s_scr);
 		
 		calc_ints(*t_in, m_shell_offsets, m_nshells, m_intfunc,
-			m_atm.data(), m_natoms, m_bas.data(), m_nbas,
-			m_env.data(), m_max_l);
+			m_cint_atm.data(), m_cint_natoms, m_cint_bas.data(), m_cint_nbas,
+			m_cint_env.data(), m_max_l);
 		
 	}	
 	
@@ -678,15 +709,15 @@ public:
 		reserve_4_partial(t_in, blkbounds, s_scr);
 		
 		calc_ints(*t_in, m_shell_offsets, m_nshells, m_intfunc,
-			m_atm.data(), m_natoms, m_bas.data(), m_nbas,
-			m_env.data(), m_max_l);
+			m_cint_atm.data(), m_cint_natoms, m_cint_bas.data(), m_cint_nbas,
+			m_cint_env.data(), m_max_l);
 		
 	}
 	
 	dbcsr::shared_matrix<double> compute_screen(std::string method, std::string dim) {
 		
-		auto rowsizes = (dim == "bbbb") ? m_mol->dims().s() : m_mol->dims().xs();
-		auto colsizes = (dim == "bbbb") ? m_mol->dims().s() : vec<int>{1};
+		auto rowsizes = (dim == "bbbb") ? m_cbas->nshells() : m_cdfbas->nshells();
+		auto colsizes = (dim == "bbbb") ? m_cbas->nshells() : vec<int>{1};
 		
 		auto sym = (dim == "bbbb") ? dbcsr::type::symmetric : dbcsr::type::no_symmetry;
 		
@@ -723,12 +754,12 @@ public:
 		
 		if (dim == "bbbb" && method == "schwarz") {
 			calc_ints_schwarz_mn(*m_ints, m_shell_offsets, m_nshells, m_intfunc,
-			m_atm.data(), m_natoms, m_bas.data(), m_nbas,
-			m_env.data(), m_max_l);
+			m_cint_atm.data(), m_cint_natoms, m_cint_bas.data(), m_cint_nbas,
+			m_cint_env.data(), m_max_l);
 		} else if (dim == "xx" && method == "schwarz") {
 			calc_ints_schwarz_x(*m_ints, m_shell_offsets, m_nshells, m_intfunc,
-			m_atm.data(), m_natoms, m_bas.data(), m_nbas,
-			m_env.data(), m_max_l);
+			m_cint_atm.data(), m_cint_natoms, m_cint_bas.data(), m_cint_nbas,
+			m_cint_env.data(), m_max_l);
 		} else {
 			throw std::runtime_error("Unknown screening method.");
 		}
@@ -744,6 +775,11 @@ public:
 aofactory::aofactory(desc::shared_molecule mol, dbcsr::world& w) : 
 	pimpl(new impl(mol, w))  {}
 	
+aofactory::aofactory(dbcsr::world& w, desc::shared_cluster_basis cbas, 
+	desc::shared_cluster_basis cdfbas, 
+	desc::shared_cluster_basis cbas2) :
+	pimpl(new impl(w, cbas, cdfbas, cbas2)) {}
+
 aofactory::~aofactory() { delete pimpl; }
 
 
@@ -927,8 +963,6 @@ std::function<void(dbcsr::stensor<3>&,vec<vec<int>>&)>
 		return pimpl->get_generator(s_scr);
 		
 }
-
-desc::shared_molecule aofactory::mol() { return pimpl->mol(); }
 
 desc::shared_cluster_basis remove_lindep(
 	dbcsr::world wrd,

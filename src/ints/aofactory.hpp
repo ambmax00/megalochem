@@ -53,6 +53,11 @@ private:
 public:
 
 	aofactory(desc::shared_molecule mol, dbcsr::world& w);
+	
+	aofactory(dbcsr::world& w, desc::shared_cluster_basis cbas, 
+		desc::shared_cluster_basis cdfbas = nullptr, 
+		desc::shared_cluster_basis cbas2 = nullptr);
+	
 	~aofactory();
 	
 	dbcsr::shared_matrix<double> ao_overlap();

@@ -210,7 +210,15 @@ public:
 		return m_clusters.size();
 	}
 	
-	size_t nshells() {
+	std::vector<int> nshells() {
+		std::vector<int> out;
+		for (auto& cluster : m_clusters) {
+			out.push_back(cluster.size());
+		}
+		return out;
+	} 
+	
+	size_t nshells_tot() {
 		size_t n = 0;
 		for (auto& c : m_clusters) {
 			n += c.size();
