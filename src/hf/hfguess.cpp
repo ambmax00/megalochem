@@ -264,7 +264,7 @@ void hfmod::compute_guess() {
 			
 			desc::shared_cluster_basis at_dfbasis = nullptr;
 			
-			if (m_mol->c_dfbasis()) {
+			/*if (m_mol->c_dfbasis()) {
 				//std::cout << "INSIDE HERE." << std::endl;
 				std::vector<desc::Shell> at_libint_dfbasis;
 				
@@ -277,7 +277,7 @@ void hfmod::compute_guess() {
 				at_dfbasis = std::make_shared<desc::cluster_basis>(
 					at_libint_dfbasis, "atomic", 1);;
 				
-			}
+			}*/
 			
 			std::string name = "ATOM_rank" + std::to_string(m_world.rank()) + "_" + std::to_string(Z);
 			

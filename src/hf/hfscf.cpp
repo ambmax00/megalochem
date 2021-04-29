@@ -107,8 +107,12 @@ hfmod::hfmod(dbcsr::world w, desc::shared_molecule mol, desc::options opt)
 		LOG.os<>("Setting df basis: ", basname, "\n\n");
 		auto dfbasis = std::make_shared<desc::cluster_basis>(
 			basname, atoms, smethod, nsplit, augmented);
+			
+		auto newdfbasis = ints::remove_lindep(m_world, dfbasis, m_mol->atoms());
 	
-		m_mol->set_cluster_dfbasis(dfbasis);
+		//exit(0);
+	
+		m_mol->set_cluster_dfbasis(newdfbasis);
 		
 		auto x = m_mol->dims().x();
 		if (LOG.global_plev() >= 1) {

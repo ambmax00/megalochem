@@ -20,12 +20,11 @@ std::pair<smatd,smatd> aoloader::invert(smatd in) {
 	auto inv_sqrt = dbcsr::matrix<double>::transpose(*linv).build();
 	auto inv = chol.inverse(m);
 	
-	/*	
-	math::hermitian_eigen_solver herm(in, 'V', true);
+	/*math::hermitian_eigen_solver herm(in, 'V', true);
 	herm.compute();
 	
 	auto inv = herm.inverse();
-	auto invsqrt = herm.inverse_sqrt();*/
+	auto inv_sqrt = herm.inverse_sqrt();*/
 
 	return std::make_pair<smatd,smatd>(
 		std::move(inv),std::move(inv_sqrt));

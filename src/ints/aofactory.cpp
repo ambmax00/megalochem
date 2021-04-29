@@ -344,22 +344,30 @@ public:
 		for (auto& cluster : *cbas) {
 			for (auto shell : cluster) {
 				
+				//std::cout << "CLUSTER" << std::endl;
+				
 				// check if coordinates inside
 				auto it = std::find_if(m_atoms.begin(), m_atoms.end(), 
 					[&shell](const desc::Atom& a) {
-						return a.x == shell.O[0] && 
-							a.y == shell.O[1] && 
-							a.z == shell.O[2];
+						return (fabs(a.x - shell.O[0]) < 1e-12) &&
+							(fabs(a.y - shell.O[1]) < 1e-12) &&
+							(fabs(a.z - shell.O[2]) < 1e-12);
 					}
 				);
 				
-				if (it != m_atoms.end()) {
+				if (it == m_atoms.end()) {
 					m_atoms.push_back(desc::Atom{shell.O[0], 
 						shell.O[1], shell.O[2], 0});
 				}
 				
 			}
 		}
+		
+		/*std::cout << "ATOMS: " << std::endl;
+		for (auto a : m_atoms) {
+			std::cout << a.atomic_number << " " << a.x << " " << a.y << 
+				" " << a.z << std::endl;
+		}*/
 					
 		init();
 		
@@ -970,31 +978,31 @@ desc::shared_cluster_basis remove_lindep(
 	std::vector<desc::Atom> atoms) 
 {
 	
+	return cbas;
+	
 	util::mpi_log LOG(wrd.comm(), 0);
 	
 	LOG.os<>("Computing lindep...\n");
 	
-	// make a fake molecule
+	//LOG.os<>("1\n");
 	
-	auto mol = desc::molecule::create()
-		.comm(wrd.comm())
-		.name("lindep")
-		.atoms(atoms)
-		.cluster_basis(cbas)
-		.charge(0)
-		.mult(1)
-		.mo_split(5)
-		.build();
-		
-	ints::aofactory aofac(mol, wrd);
+	ints::aofactory aofac(wrd, cbas);
+	
+	//ints::aofactory aofac(mol, wrd);
+	
+	//LOG.os<>("2\n");
 	
 	auto ovlp = aofac.ao_overlap();
 	
-	math::pivinc_cd pivcd(ovlp, 0);
+	//LOG.os<>("3\n");
+	
+	math::pivinc_cd pivcd(ovlp, 2);
 	 
 	pivcd.compute(std::nullopt, 1e-4);
 	
-	LOG.os<>("RANK: ", pivcd.rank(), '\n');
+	//LOG.os<>("4\n");
+	
+	//LOG.os<>("RANK: ", pivcd.rank(), '\n');
 	
 	int prank = pivcd.rank();
 	auto perm = pivcd.perm();
@@ -1048,14 +1056,16 @@ desc::shared_cluster_basis remove_lindep(
 		if (keep_shell[ishell]) {
 			 newvshell.push_back(vshell[ishell]);
 		} else {
-			LOG.os<>("Removing: \n", vshell[ishell], '\n');
+			//LOG.os<>("Removing: \n", vshell[ishell], '\n');
 		}
 	}
 	
-	LOG.os<>("REMOVED ", vshell.size() - newvshell.size(), " SHELLS.\n");
+	LOG.os<>("REMOVED ", vshell.size() - newvshell.size(), " of ", vshell.size(), " SHELLS.\n");
 	
 	auto newcbas = std::make_shared<desc::cluster_basis>(
 		newvshell, cbas->split_method(), cbas->nsplit());
+		
+	//exit(0);	
 		
 	return newcbas;
 	

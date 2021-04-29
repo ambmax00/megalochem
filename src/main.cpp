@@ -122,9 +122,10 @@ int main(int argc, char** argv) {
 	auto cbas = mol->c_basis();
 	auto atm = mol->atoms();
 	
-	/*auto newcbas = ints::remove_lindep(wrd, cbas, atm);
+	//LOG.os<>("REMOVING LINDEP\n");
+	//auto newcbas = ints::remove_lindep(wrd, cbas, atm);
 	
-	auto newmol = desc::molecule::create()
+	/*auto newmol = desc::molecule::create()
 		.comm(wrd.comm())
 		.name(mol->name())
 		.atoms(atm)
