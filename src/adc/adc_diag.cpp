@@ -16,7 +16,7 @@ dbcsr::shared_matrix<double> adcmod::compute_diag_0() {
 	
 	auto d_ov_0 = dbcsr::matrix<>::create()
 		.name("diag_ov_0")
-		.set_world(m_world)
+		.set_cart(m_cart)
 		.row_blk_sizes(o)
 		.col_blk_sizes(v)
 		.matrix_type(dbcsr::type::no_symmetry)
@@ -59,8 +59,8 @@ dbcsr::shared_matrix<double> adcmod::compute_diag_0() {
 
 dbcsr::shared_matrix<double> adcmod::compute_diag_1() {
 	
-	ints::aofactory aofac(m_hfwfn->mol(), m_world);
-	ints::screener* scr = new ints::schwarz_screener(m_world, m_hfwfn->mol());
+	ints::aofactory aofac(m_hfwfn->mol(), m_cart);
+	ints::screener* scr = new ints::schwarz_screener(m_cart, m_hfwfn->mol());
 	ints::shared_screener s_scr(scr);
 	
 	s_scr->compute();
@@ -84,8 +84,8 @@ dbcsr::shared_matrix<double> adcmod::compute_diag_1() {
 	arrvec<int,4> oovb = {o,o,v,b};
 	arrvec<int,4> oovv = {o,o,v,v};
 	
-	dbcsr::shared_pgrid<2> spgrid2 = dbcsr::pgrid<2>::create(m_world.comm()).build();
-	dbcsr::shared_pgrid<4> spgrid4 = dbcsr::pgrid<4>::create(m_world.comm()).build();
+	dbcsr::shared_pgrid<2> spgrid2 = dbcsr::pgrid<2>::create(m_cart.comm()).build();
+	dbcsr::shared_pgrid<4> spgrid4 = dbcsr::pgrid<4>::create(m_cart.comm()).build();
 	
 	int nbatches = m_opt.get<int>("nbatches_b", ADC_NBATCHES_B);
 	std::array<int,4> bdims = {nbatches,nbatches,nbatches,nbatches};
@@ -194,7 +194,7 @@ dbcsr::shared_matrix<double> adcmod::compute_diag_1() {
 		.build();
 		
 	auto d_iaia = dbcsr::matrix<>::create()
-		.set_world(m_world)
+		.set_cart(m_cart)
 		.name("d_ia_1")
 		.row_blk_sizes(o)
 		.col_blk_sizes(v)
@@ -202,7 +202,7 @@ dbcsr::shared_matrix<double> adcmod::compute_diag_1() {
 		.build();
 		
 	auto d_iiaa = dbcsr::matrix<>::create()
-		.set_world(m_world)
+		.set_cart(m_cart)
 		.name("d_ia_2")
 		.row_blk_sizes(o)
 		.col_blk_sizes(v)
@@ -245,7 +245,7 @@ dbcsr::shared_matrix<double> adcmod::compute_diag_1() {
 			idx[2] = io;
 			idx[3] = iv;
 			
-			if (T_ovov->proc(idx) == m_world.rank()) {
+			if (T_ovov->proc(idx) == m_cart.rank()) {
 				blkidx_ovov[0].push_back(io);
 				blkidx_ovov[1].push_back(iv);
 				blkidx_ovov[2].push_back(io);
@@ -255,7 +255,7 @@ dbcsr::shared_matrix<double> adcmod::compute_diag_1() {
 			idx[1] = io;
 			idx[2] = iv;
 			
-			if (T_oovv->proc(idx) == m_world.rank()) {
+			if (T_oovv->proc(idx) == m_cart.rank()) {
 				blkidx_oovv[0].push_back(io);
 				blkidx_oovv[1].push_back(io);
 				blkidx_oovv[2].push_back(iv);
@@ -345,7 +345,7 @@ dbcsr::shared_matrix<double> adcmod::compute_diag_1() {
 							idx[2] = io;
 							idx[3] = ilam;
 							
-							if (T_obob->proc(idx) == m_world.rank()) {
+							if (T_obob->proc(idx) == m_cart.rank()) {
 								blkidx_obob[0].push_back(io);
 								blkidx_obob[2].push_back(io);
 								blkidx_obob[1].push_back(inu);
@@ -357,7 +357,7 @@ dbcsr::shared_matrix<double> adcmod::compute_diag_1() {
 							idx[2] = inu;
 							idx[3] = ilam;
 							
-							if (T_oobb->proc(idx) == m_world.rank()) {
+							if (T_oobb->proc(idx) == m_cart.rank()) {
 								blkidx_oobb[0].push_back(io);
 								blkidx_oobb[1].push_back(io);
 								blkidx_oobb[2].push_back(inu);

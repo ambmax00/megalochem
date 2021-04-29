@@ -11,7 +11,7 @@ int threshold = 1e-6;
 	
 void orthogonalizer::compute() {
 	
-	util::mpi_log LOG(m_mat_in->get_world().comm(), (m_print) ? 0 : -1);
+	util::mpi_log LOG(m_mat_in->get_cart().comm(), (m_print) ? 0 : -1);
 	
 	hermitian_eigen_solver solver(m_mat_in, 'V', m_print);
 	

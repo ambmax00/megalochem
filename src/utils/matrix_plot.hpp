@@ -29,8 +29,8 @@ inline void plot(dbcsr::shared_matrix<double> mat_in, double thresh,
 		val = (fabs(val) < thresh) ? zeroval : std::log10(fabs(val));
 	}
 	
-	auto myworld = mat_in->get_world();
-	if (myworld.rank() == 0) {
+	auto mycart = mat_in->get_cart();
+	if (mycart.rank() == 0) {
 	
 		std::ofstream file(filename + ".dat");
 		for (int j = 0; j != ncols; ++j) {
@@ -44,7 +44,7 @@ inline void plot(dbcsr::shared_matrix<double> mat_in, double thresh,
 		
 	}
 	
-	MPI_Barrier(myworld.comm());
+	MPI_Barrier(mycart.comm());
 	
 }
 	

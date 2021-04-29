@@ -35,7 +35,7 @@ public:
 		int nprint) :
 	m_nlap(nlap), m_c_bo(c_bo), m_c_bv(c_bv), m_s_sqrt(s_sqrt), m_s_invsqrt(s_invsqrt),
 		m_eps_occ(eps_occ), m_eps_vir(eps_vir),
-		LOG(c_bo->get_world().comm(), nprint)
+		LOG(c_bo->get_cart().comm(), nprint)
 	{}
 	
 	laplace_helper(const laplace_helper& in) = default;
@@ -68,9 +68,9 @@ public:
 		
 		auto b = c_bm->row_blk_sizes();
 		
-		auto w = c_bm->get_world();
+		auto w = c_bm->get_cart();
 		auto p_bb = dbcsr::matrix<>::create()
-			.set_world(w)
+			.set_cart(w)
 			.name("density matrix of " + c_bm->name())
 			.row_blk_sizes(b)
 			.col_blk_sizes(b)
@@ -152,7 +152,7 @@ public:
 		LOG.os<1>("eps_min/eps_homo/eps_lumo/eps_max ", emin, " ", ehomo, " ", elumo, " ", emax, '\n');
 		LOG.os<1>("ymin/ymax ", ymin, " ", ymax, '\n');
 		
-		math::laplace lp(m_c_bo->get_world().comm(), LOG.global_plev());
+		math::laplace lp(m_c_bo->get_cart().comm(), LOG.global_plev());
 		
 		lp.compute(m_nlap, ymin, ymax);
 			

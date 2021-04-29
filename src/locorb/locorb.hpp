@@ -15,7 +15,7 @@ using smat_d = dbcsr::shared_matrix<double>;
 class mo_localizer {
 private:	
 
-	dbcsr::world m_world;
+	dbcsr::cart m_cart;
 	desc::shared_molecule m_mol;
 	
 	std::shared_ptr<ints::aofactory> m_aofac;
@@ -24,8 +24,8 @@ private:
 	
 public:
 
-	mo_localizer(dbcsr::world w, desc::shared_molecule mol) :
-		m_world(w),
+	mo_localizer(dbcsr::cart w, desc::shared_molecule mol) :
+		m_cart(w),
 		m_mol(mol),
 		LOG(w.comm(), 0),
 		m_aofac(std::make_shared<ints::aofactory>(mol,w))
@@ -50,12 +50,12 @@ public:
 		auto temp = dbcsr::matrix<>::create_template(*c_bm)
 			.name("temp").build();
 		
-		auto w = c_bm->get_world();
+		auto w = c_bm->get_cart();
 		auto m = c_bm->col_blk_sizes();
 		
 		auto u_mm = dbcsr::matrix<>::create()
 			.name("u_mm")
-			.set_world(w)
+			.set_cart(w)
 			.row_blk_sizes(m)
 			.col_blk_sizes(m)
 			.matrix_type(dbcsr::type::no_symmetry)

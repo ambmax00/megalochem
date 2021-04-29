@@ -255,7 +255,7 @@ inline void print_statistics(const bool print_timers = false) {
 	c_dbcsr_print_statistics(&print_timers, nullptr);
 }
 
-class world {
+class cart {
 private:
 
     std::shared_ptr<MPI_Comm> m_comm_ptr;
@@ -269,7 +269,7 @@ private:
     
 public:
 
-    world(MPI_Comm comm) {
+    cart(MPI_Comm comm) {
 		
 		m_comm_ptr = std::make_shared<MPI_Comm>(comm);
 		m_group_ptr = std::make_shared<MPI_Comm>(); 
@@ -292,7 +292,7 @@ public:
         
     }
     
-    world(MPI_Comm comm, MPI_Comm group) {
+    cart(MPI_Comm comm, MPI_Comm group) {
 		
 		m_comm_ptr = std::make_shared<MPI_Comm>(comm);
 		m_group_ptr = std::make_shared<MPI_Comm>(group); 
@@ -313,9 +313,9 @@ public:
          
 	}
     
-    world() {}
+    cart() {}
     
-    world(const world& w) :
+    cart(const cart& w) :
 		m_comm_ptr(w.m_comm_ptr), m_group_ptr(w.m_group_ptr),
 		m_rank(w.m_rank), m_size(w.m_size),
 		m_dims(w.m_dims), m_coord(w.m_coord) {}
@@ -325,7 +325,7 @@ public:
         //if (*m_comm_ptr != MPI_COMM_NULL) MPI_Comm_free(&*m_comm_ptr);
     }
     
-    ~world() {}
+    ~cart() {}
     
     MPI_Comm comm() { return *m_comm_ptr; }
     MPI_Comm group() { return *m_group_ptr; }

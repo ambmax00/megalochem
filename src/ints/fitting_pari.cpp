@@ -12,7 +12,7 @@ namespace ints {
 dbcsr::sbtensor<3,double> dfitting::compute_pari(dbcsr::shared_matrix<double> s_xx, 
 	shared_screener scr_s, std::array<int,3> bdims, dbcsr::btype mytype) {
 	
-	auto aofac = std::make_shared<aofactory>(m_mol, m_world);
+	auto aofac = std::make_shared<aofactory>(m_mol, m_cart);
 	aofac->ao_3c2e_setup(metric::coulomb);
 	
 	auto& time_setup = TIME.sub("Setting up preliminary data");
@@ -66,15 +66,15 @@ dbcsr::sbtensor<3,double> dfitting::compute_pari(dbcsr::shared_matrix<double> s_
 	
 	std::array<int,3> xbbsizes = {1,nbf,nbf};
 	
-	auto spgrid2 = dbcsr::pgrid<2>::create(m_world.comm()).build();
+	auto spgrid2 = dbcsr::pgrid<2>::create(m_cart.comm()).build();
 	
-	auto spgrid3_xbb =dbcsr::pgrid<3>::create(m_world.comm()).build();
+	auto spgrid3_xbb =dbcsr::pgrid<3>::create(m_cart.comm()).build();
 	
 	auto spgrid2_self = dbcsr::pgrid<2>::create(MPI_COMM_SELF).build();
 	
 	auto spgrid3_self = dbcsr::pgrid<3>::create(MPI_COMM_SELF).build();
 		
-	LOG.os<>("Grid size: ", m_world.nprow(), " ", m_world.npcol(), '\n');
+	LOG.os<>("Grid size: ", m_cart.nprow(), " ", m_cart.npcol(), '\n');
 	
 	// === END
 
@@ -170,7 +170,7 @@ dbcsr::sbtensor<3,double> dfitting::compute_pari(dbcsr::shared_matrix<double> s_
 		LOG.os<1>("BATCH: ", inu, " with atoms [", atom_lb, ",", atom_ub, "]\n");
 		
 		int64_t ntasks = (atom_ub - atom_lb + 1) * natoms;
-		int rank = m_world.rank();
+		int rank = m_cart.rank();
 		
 		std::function<void(int64_t)> workfunc = 
 			[rank,natoms,&blkmap_b,&blkmap_x,&aofac,&inv_local,&eri_local,
@@ -397,7 +397,7 @@ dbcsr::sbtensor<3,double> dfitting::compute_pari(dbcsr::shared_matrix<double> s_
 				
 		}; // end worker function
 	
-		util::scheduler worker(m_world.comm(), ntasks, workfunc);
+		util::scheduler worker(m_cart.comm(), ntasks, workfunc);
 		worker.run();
 				
 		dbcsr::copy_local_to_global(*c_xbb_local, *c_xbb_global);

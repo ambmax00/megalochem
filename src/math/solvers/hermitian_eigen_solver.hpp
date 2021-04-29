@@ -16,7 +16,7 @@ private:
 	dbcsr::shared_matrix<double> m_mat_in;
 	dbcsr::shared_matrix<double> m_eigvec;
 	std::vector<double> m_eigval;
-	dbcsr::world m_world;
+	dbcsr::cart m_cart;
 	util::mpi_log LOG;
 
 	char m_jobz;
@@ -40,8 +40,8 @@ public:
 
 	hermitian_eigen_solver(dbcsr::shared_matrix<double>& mat_in, 
 		char jobz, bool print = false) :
-		m_mat_in(mat_in), m_world(mat_in->get_world()),
-		LOG(m_world.comm(), (print) ? 0 : -1),
+		m_mat_in(mat_in), m_cart(mat_in->get_cart()),
+		LOG(m_cart.comm(), (print) ? 0 : -1),
 		m_jobz(jobz) {}
 
 	void compute();

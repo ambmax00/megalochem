@@ -120,16 +120,16 @@ private:
 			mem += x[res[0][i]] * b[res[1][i]] * b[res[2][i]] * 8;
 		}
 		
-		for (int ip = 0; ip != m_world.size(); ++ip) {
-			if (ip == m_world.rank()) {
+		for (int ip = 0; ip != m_cart.size(); ++ip) {
+			if (ip == m_cart.rank()) {
 				std::cout << "RANK: " << mem/1e+9 << " GB will be reserved. Total number of blocks: "
 				<< totblk << std::endl;
 			}
-			MPI_Barrier(m_world.comm());
+			MPI_Barrier(m_cart.comm());
 		}
 		
-		MPI_Allreduce(&mem, &mem_tot, 1, MPI_DOUBLE, MPI_SUM, m_world.comm());
-		if (m_world.rank() == 0) std::cout << "TOTAL MEM: " << mem_tot << std::endl;
+		MPI_Allreduce(&mem, &mem_tot, 1, MPI_DOUBLE, MPI_SUM, m_cart.comm());
+		if (m_cart.rank() == 0) std::cout << "TOTAL MEM: " << mem_tot << std::endl;
    
 		t_in->reserve(res);
 		
@@ -245,7 +245,7 @@ public:
 	
 protected:
 
-	dbcsr::world m_world;
+	dbcsr::cart m_cart;
 	
 	std::vector<desc::Atom> m_atoms;
 	
@@ -316,8 +316,8 @@ protected:
 
 public:
 	
-	impl(desc::shared_molecule mol, dbcsr::world w) :
-		m_world(w),
+	impl(desc::shared_molecule mol, dbcsr::cart w) :
+		m_cart(w),
 		m_atoms(mol->atoms()),
 		m_cbas(mol->c_basis()),
 		m_cdfbas(mol->c_dfbasis()),
@@ -328,10 +328,10 @@ public:
 		TIME(w.comm(), "integrals")
 	{ init(); }
 	
-	impl(dbcsr::world w, desc::shared_cluster_basis cbas,
+	impl(dbcsr::cart w, desc::shared_cluster_basis cbas,
 		desc::shared_cluster_basis cdfbas,
 		desc::shared_cluster_basis cbas2) :
-		m_world(w),
+		m_cart(w),
 		m_cbas(cbas),
 		m_cdfbas(cdfbas),
 		m_cbas2(cbas2),
@@ -622,7 +622,7 @@ public:
 		
 		auto m_ints = dbcsr::matrix<double>::create()
 			.name(m_intname)
-			.set_world(m_world)
+			.set_cart(m_cart)
 			.row_blk_sizes(m_tensor_sizes[0])
 			.col_blk_sizes(m_tensor_sizes[1])
 			.matrix_type(mtype)
@@ -646,7 +646,7 @@ public:
 		
 		auto ints_x = dbcsr::matrix<>::create()
 			.name(m_intname + "_x")
-			.set_world(m_world)
+			.set_cart(m_cart)
 			.row_blk_sizes(m_tensor_sizes[0])
 			.col_blk_sizes(m_tensor_sizes[1])
 			.matrix_type(dbcsr::type::symmetric)
@@ -731,7 +731,7 @@ public:
 		
 		auto m_ints = dbcsr::matrix<double>::create()
 			.name(m_intname)
-			.set_world(m_world)
+			.set_cart(m_cart)
 			.row_blk_sizes(rowsizes).col_blk_sizes(colsizes)
 			.matrix_type(sym)
 			.build();
@@ -745,7 +745,7 @@ public:
 			
 			for (int i = 0; i != nblks; ++i) {
 				for (int j = 0; j != nblks; ++j) {
-					if (m_ints->proc(i,j) == m_world.rank() && i <= j) {
+					if (m_ints->proc(i,j) == m_cart.rank() && i <= j) {
 						resrows.push_back(i);
 						rescols.push_back(j);
 					}
@@ -780,10 +780,10 @@ public:
 
 };
 
-aofactory::aofactory(desc::shared_molecule mol, dbcsr::world& w) : 
+aofactory::aofactory(desc::shared_molecule mol, dbcsr::cart& w) : 
 	pimpl(new impl(mol, w))  {}
 	
-aofactory::aofactory(dbcsr::world& w, desc::shared_cluster_basis cbas, 
+aofactory::aofactory(dbcsr::cart& w, desc::shared_cluster_basis cbas, 
 	desc::shared_cluster_basis cdfbas, 
 	desc::shared_cluster_basis cbas2) :
 	pimpl(new impl(w, cbas, cdfbas, cbas2)) {}
@@ -973,7 +973,7 @@ std::function<void(dbcsr::stensor<3>&,vec<vec<int>>&)>
 }
 
 desc::shared_cluster_basis remove_lindep(
-	dbcsr::world wrd,
+	dbcsr::cart wrd,
 	desc::shared_cluster_basis cbas, 
 	std::vector<desc::Atom> atoms) 
 {

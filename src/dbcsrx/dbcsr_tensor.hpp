@@ -309,7 +309,7 @@ public:
     
     tensor(create_matrix_pack&& p) {
    
-        m_comm = p.p_matrix_in.get_world().comm();
+        m_comm = p.p_matrix_in.get_cart().comm();
 		
 		c_dbcsr_t_create_matrix(
 			p.p_matrix.m_matrix_ptr, &m_tensor_ptr, 

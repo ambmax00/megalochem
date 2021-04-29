@@ -20,8 +20,8 @@ void hermitian_eigen_solver::compute() {
 	
 	int n = m_mat_in->nfullrows_total();
 	int nb = scalapack::global::block_size;
-	int nprow = m_world.dims()[0];
-	int npcol = m_world.dims()[1];
+	int nprow = m_cart.dims()[0];
+	int npcol = m_cart.dims()[1];
 	
 	LOG.os<>("Running SCALAPACK pdsyev calculation\n");
 	
@@ -42,12 +42,12 @@ void hermitian_eigen_solver::compute() {
 	int ori_proc = m_mat_in->proc(0,0);
 	int ori_coord[2];
 	
-	if (m_mat_in->get_world().rank() == ori_proc) {
+	if (m_mat_in->get_cart().rank() == ori_proc) {
 		ori_coord[0] = scalapack::global_grid.myprow();
 		ori_coord[1] = scalapack::global_grid.mypcol();
 	}
 	
-	MPI_Bcast(&ori_coord[0],2,MPI_INT,ori_proc,m_mat_in->get_world().comm());
+	MPI_Bcast(&ori_coord[0],2,MPI_INT,ori_proc,m_mat_in->get_cart().comm());
 		
 	scalapack::distmat<double> sca_mat_in = dbcsr::matrix_to_scalapack(m_mat_in, 
 		m_mat_in->name() + "_scalapack", nb, nb, ori_coord[0], ori_coord[1]);
@@ -87,7 +87,7 @@ void hermitian_eigen_solver::compute() {
 		//sca_eigvec_opt->print();
 		
 		m_eigvec = dbcsr::scalapack_to_matrix(*sca_eigvec_opt, 
-			"eigenvectors", m_world, rowblksizes, colblksizes); 
+			"eigenvectors", m_cart, rowblksizes, colblksizes); 
 				
 		sca_eigvec_opt->release();
 		

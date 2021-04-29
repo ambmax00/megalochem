@@ -24,13 +24,108 @@
 #include <Eigen/Eigenvalues>
 #include <Eigen/Core>
 
+/*
+namespace megalochem {
+	
+dbcsr::cart init(MPI_Comm comm) {
+	
+	// init dbcsr
+	dbcsr::init();
+	
+	dbcsr::cart wrd(comm);
+	
+	// init scalapack
+	int sysctxt = -1;
+	c_blacs_get(0, 0, &sysctxt);
+	
+	int gridctxt = sysctxt;
+	c_blacs_gridinit(&gridctxt, 'R', wrd.nprow(), wrd.npcol());
+	
+	scalapack::global_grid.set(gridctxt);
+	
+	return wrd;
+
+}
+
+class world {
+private:
+
+	
+
+public:
+
+	world(MPI_Comm comm)
+	
+	
+};
+
+void print_devinfo(MPI_Comm comm) {
+
+	util::mpi_log LOG(comm, 0);
+	
+	MPI_Barrier(comm);
+	
+	std::string s = R"(|  \/  ||  ___|  __ \ / _ \ | |   |  _  /  __ \| | | ||  ___|  \/  |)""\n"
+					R"(| .  . || |__ | |  \// /_\ \| |   | | | | /  \/| |_| || |__ | .  . |)""\n"
+					R"(| |\/| ||  __|| | __ |  _  || |   | | | | |    |  _  ||  __|| |\/| |)""\n"
+					R"(| |  | || |___| |_\ \| | | || |___\ \_/ / \__/\| | | || |___| |  | |)""\n"
+					R"(\_|  |_/\____/ \____/\_| |_/\_____/\___/ \____/\_| |_/\____/\_|  |_/)";
+	
+	LOG.banner(s,90,'*');
+	LOG.os<>('\n');
+	
+#ifndef NDEBUG
+	LOG.os<>("Build type: DEBUG\n\n");
+#else 
+	LOG.os<>("Build type: RELEASE\n\n");
+#endif
+
+	LOG.os<>("Authors: \n \t M. A. Ambroise\n\n");
+	LOG.os<>("Commit: ", GitMetadata::CommitSHA1(), '\n');
+	
+	std::string dirty = (GitMetadata::AnyUncommittedChanges()) ? "true" : "false";
+	
+	LOG.os<>("Uncommitted changes: ", dirty, '\n');
+	
+	MPI_Barrier(comm);
+
+}
+	
+}
+
+int main(int argc, char** argv) {
+	
+	MPI_Init(&argc,&argv);
+	MPI_Comm comm = MPI_COMM_WORLD;
+	
+	// init SCALPACK, DBCSR, etc...
+	auto megaworld = megalochem::init(comm);
+	
+	megalochem::print_devinfo(comm);
+	
+	/*
+	// init file output? checks if hdf5 present, returns fistream, fostream, logstream
+	mg::fhandle fh = megalochem::init_io(comm, hdf5name, logname);
+	
+	// stack/job controller
+	// saves file data, checks for errors.
+	
+	
+	stack = megalochem::parse_file(megaworld, file);
+	
+	stack.run(fh);
+	
+	megalochem::finalize();
+	
+}*/
+	
 int main(int argc, char** argv) {
 
 	MPI_Init(&argc, &argv);
 	MPI_Comm comm = MPI_COMM_WORLD;
 	
 	dbcsr::init();
-	dbcsr::world wrd(comm);
+	dbcsr::cart wrd(comm);
 	
 	util::mpi_time time(comm, "Megalochem");
 	util::mpi_log LOG(comm ,0);

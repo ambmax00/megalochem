@@ -38,16 +38,16 @@ void aoloader::compute() {
 	TIME.start();
 	
 	std::shared_ptr<ints::aofactory> m_aofac 
-		= std::make_shared<ints::aofactory>(m_mol, m_world);
+		= std::make_shared<ints::aofactory>(m_mol, m_cart);
 	
-	ints::dfitting dfit(m_world, m_mol, LOG.global_plev());
+	ints::dfitting dfit(m_cart, m_mol, LOG.global_plev());
 	
 	// setup all pgrids
 	dbcsr::shared_pgrid<2> spgrid2;
 	dbcsr::shared_pgrid<3> spgrid3;
 	dbcsr::shared_pgrid<4> spgrid4;
 	
-	spgrid2 = dbcsr::pgrid<2>::create(m_world.comm()).build();
+	spgrid2 = dbcsr::pgrid<2>::create(m_cart.comm()).build();
 	m_reg.insert(key::pgrid2, spgrid2);
 	m_to_keep[static_cast<int>(key::pgrid2)] = true;
 	
@@ -56,14 +56,14 @@ void aoloader::compute() {
 	if (m_mol->c_dfbasis()) {
 		int naux = m_mol->c_dfbasis()->nbf();
 		std::array<int,3> pdims3 = {naux,nbf,nbf};
-		spgrid3 = dbcsr::pgrid<3>::create(m_world.comm())
+		spgrid3 = dbcsr::pgrid<3>::create(m_cart.comm())
 			.tensor_dims(pdims3).build();
 		m_reg.insert(key::pgrid3,spgrid3);
 		m_to_keep[static_cast<int>(key::pgrid3)] = true;
 	}
 	
 	std::array<int,4> pdims4 = {nbf,nbf,nbf,nbf};
-	spgrid4 = dbcsr::pgrid<4>::create(m_world.comm())
+	spgrid4 = dbcsr::pgrid<4>::create(m_cart.comm())
 		.tensor_dims(pdims4).build();
 	m_reg.insert(key::pgrid4,spgrid4);
 	m_to_keep[static_cast<int>(key::pgrid4)] = true;
@@ -287,7 +287,7 @@ void aoloader::compute() {
 		std::shared_ptr<ints::screener> scr;
 		//if (comp(key::coul_xbb)) 
 		//if (comp(key::erfc_xbb)) scr.reset(new ints::schwarz_screener(m_aofac,"erfc_coulomb"));
-		scr.reset(new ints::schwarz_screener(m_world, m_mol));		
+		scr.reset(new ints::schwarz_screener(m_cart, m_mol));		
 		scr->compute();
 				
 		m_reg.insert(key::scr_xbb,scr);

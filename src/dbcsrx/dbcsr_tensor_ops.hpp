@@ -473,7 +473,7 @@ void copy_3Dtensor_to_2Dtensor(tensor<3,T>& t3, tensor<2,T>& t2, bool sum = fals
 template <typename T>
 void copy_matrix_to_3Dtensor_new(matrix<T>& m, tensor<3,T>& t, bool sym = false) {
 	
-	auto w = m.get_world();
+	auto w = m.get_cart();
 	
 	int mpirank = w.rank();
 	int mpisize = w.size();
@@ -659,7 +659,7 @@ void copy_matrix_to_3Dtensor_new(matrix<T>& m, tensor<3,T>& t, bool sym = false)
 template <typename T>
 void copy_3Dtensor_to_matrix_new(tensor<3,T>& t, matrix<T>& m) {
 	
-	auto w = m.get_world();
+	auto w = m.get_cart();
 	
 	int mpirank = w.rank();
 	int mpisize = w.size();

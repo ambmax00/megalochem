@@ -13,7 +13,7 @@ std::pair<smat_d,smat_d>
 	
 	auto p_bb = dbcsr::matrix<>::create()
 		.name("p_bb")
-		.set_world(m_world)
+		.set_cart(m_cart)
 		.row_blk_sizes(b)
 		.col_blk_sizes(b)
 		.matrix_type(dbcsr::type::symmetric)

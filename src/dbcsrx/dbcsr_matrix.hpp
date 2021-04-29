@@ -14,7 +14,7 @@ class dist {
 protected:
 
     void* m_dist_ptr;
-    world m_world;
+    cart m_cart;
     
 public:
 
@@ -34,13 +34,13 @@ public:
 	
 	dist(const dist& d) = delete;
 	
-	dist(dist&& d) : m_dist_ptr(d.m_dist_ptr), m_world(d.m_world) 
+	dist(dist&& d) : m_dist_ptr(d.m_dist_ptr), m_cart(d.m_cart) 
 	{
 		d.m_dist_ptr = nullptr;
 	}
 
 #define DIST_LIST (\
-	((world), set_world), \
+	((cart), set_cart), \
 	((vec<int>), row_dist), \
 	((vec<int>), col_dist))
 	
@@ -49,8 +49,8 @@ public:
 	MAKE_BUILDER_CLASS(dist, create, DIST_LIST, ())
 
 	dist(create_pack&& p) : m_dist_ptr(nullptr), 
-							m_world(p.p_set_world) {
-		c_dbcsr_distribution_new(&m_dist_ptr, p.p_set_world.group(), 
+							m_cart(p.p_set_cart) {
+		c_dbcsr_distribution_new(&m_dist_ptr, p.p_set_cart.group(), 
             p.p_row_dist.data(), p.p_row_dist.size(),
             p.p_col_dist.data(), p.p_col_dist.size());
 	}
@@ -72,11 +72,11 @@ class matrix : std::enable_shared_from_this<matrix<T>> {
 protected:
     
     void* m_matrix_ptr;
-    world m_world;
+    cart m_cart;
     
     const int m_data_type = dbcsr_type<T>::value;
     
-    matrix(void* ptr, world& w) : m_matrix_ptr(ptr), m_world(w) {}
+    matrix(void* ptr, cart& w) : m_matrix_ptr(ptr), m_cart(w) {}
     
 public:
 
@@ -88,7 +88,7 @@ public:
 	{
 		this->release();
 		this->m_matrix_ptr = m.m_matrix_ptr;
-		this->m_world = m.m_world;
+		this->m_cart = m.m_cart;
 		m.m_matrix_ptr = nullptr;
 	}
 
@@ -98,7 +98,7 @@ public:
 		
 		this->release();
 		this->m_matrix_ptr = m.m_matrix_ptr;
-		this->m_world = m.m_world;
+		this->m_cart = m.m_cart;
 		
 		m.m_matrix_ptr = nullptr;
 		return *this;
@@ -111,7 +111,7 @@ public:
 
 #define MATRIX_CREATE_LIST (\
 	((std::string), name),\
-	((util::optional<world>), set_world),\
+	((util::optional<cart>), set_cart),\
 	((util::optional<dist&>), set_dist), \
 	((type), matrix_type), \
 	((vec<int>&), row_blk_sizes), \
@@ -128,15 +128,15 @@ public:
 
 	matrix(create_pack&& p) : m_matrix_ptr(nullptr) {
 		
-		m_world = (p.p_set_world) ? (*p.p_set_world) : 
-			(*p.p_set_dist).m_world;
+		m_cart = (p.p_set_cart) ? (*p.p_set_cart) : 
+			(*p.p_set_dist).m_cart;
 		
         dist* dist_ptr = nullptr;
         
         if (!p.p_set_dist) {
 			
             vec<int> rowdist, coldist; 
-            auto dims = p.p_set_world->dims();
+            auto dims = p.p_set_cart->dims();
             
             auto rdist = default_dist(p.p_row_blk_sizes.size(),
                             dims[0], p.p_row_blk_sizes);
@@ -145,7 +145,7 @@ public:
                             
             dist_ptr = new dist(std::move(
 				*dist::create()
-				.set_world(*p.p_set_world)
+				.set_cart(*p.p_set_cart)
 				.row_dist(rdist)
 				.col_dist(cdist)
 				.build()));
@@ -198,7 +198,7 @@ public:
 	matrix(create_template_pack&& p) {
 		
 		m_matrix_ptr = nullptr;
-		m_world = p.p_templet.m_world;
+		m_cart = p.p_templet.m_cart;
 		
 		char mat_type = (p.p_matrix_type) ? 
 			static_cast<char>(*p.p_matrix_type) : '0';
@@ -239,7 +239,7 @@ public:
     matrix(transpose_pack&& p) {
     
 		m_matrix_ptr = nullptr;
-        m_world = p.p_matrix_in.m_world;
+        m_cart = p.p_matrix_in.m_cart;
         
         c_dbcsr_transposed(&m_matrix_ptr, p.p_matrix_in.m_matrix_ptr, 
                             (p.p_shallow_copy) ? &*p.p_shallow_copy : nullptr,
@@ -267,7 +267,7 @@ public:
 	matrix(copy_pack&& p) {
 		
 		m_matrix_ptr = nullptr;
-		m_world = p.p_matrix_in.m_world;
+		m_cart = p.p_matrix_in.m_cart;
 		
 		char mat_type = (p.p_matrix_type) ? 
 			static_cast<char>(*p.p_matrix_type) : '0';
@@ -284,7 +284,7 @@ public:
 #define MATRIX_READ_PLIST (\
 	((std::string), filepath),\
 	((dist&), set_dist),\
-	((world), set_world))
+	((cart), set_cart))
 
 	MAKE_PARAM_STRUCT(read, MATRIX_READ_PLIST, ())
 	
@@ -293,10 +293,10 @@ public:
 	matrix(read_pack&& p) {
 				
 		m_matrix_ptr = nullptr;
-		m_world = p.p_set_world;
+		m_cart = p.p_set_cart;
 		
         c_dbcsr_binary_read(p.p_filepath.c_str(), p.p_distribution.m_dist_ptr, 
-			m_world.comm(), &m_matrix_ptr);
+			m_cart.comm(), &m_matrix_ptr);
 			
     }
     
@@ -410,7 +410,7 @@ public:
     std::shared_ptr<matrix<T>> get_block_diag(matrix<T>& in) { 
 		auto out = std::make_shared<matrix<T>>();
         c_dbcsr_get_block_diag(in.m_matrix_ptr, &out->m_matrix_ptr);
-        out->m_world = in.m_world;
+        out->m_cart = in.m_cart;
         return out;
     }
     
@@ -430,7 +430,7 @@ public:
     std::shared_ptr<matrix<T>> desymmetrize() {
 		auto out = std::make_shared<matrix<T>>();
         c_dbcsr_desymmetrize(m_matrix_ptr, &out->m_matrix_ptr);
-        out->m_world = this->m_world;
+        out->m_cart = this->m_cart;
         return out;
     }
     
@@ -461,7 +461,7 @@ public:
 		
 		for (int j = 0; j != ncolblk; ++j) {
 			for (int i = 0; i <= j; ++i) {
-				if (this->proc(i,j) == this->m_world.rank()) {
+				if (this->proc(i,j) == this->m_cart.rank()) {
 					resrows.push_back(i);
 					rescols.push_back(j);
 				}
@@ -529,8 +529,8 @@ public:
     
     ~matrix() { release(); }
     
-    world get_world() const {
-		return m_world;
+    cart get_cart() const {
+		return m_cart;
 	}
     
     int nblkrows_total() const {
@@ -796,7 +796,7 @@ public:
 template <typename T>
 void print(matrix<T>& mat) {
 		
-	world w = mat.get_world();
+	cart w = mat.get_cart();
 	
 	iterator<T> iter(mat);
 	

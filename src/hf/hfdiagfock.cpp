@@ -47,7 +47,7 @@ void hfmod::diag_fock() {
 		auto c_bm_x = solver.eigvecs();
 		
 		LOG.os<3>("Eigenvalues: \n");
-		if (LOG.global_plev() >= 3 && m_world.rank() == 0) {
+		if (LOG.global_plev() >= 3 && m_cart.rank() == 0) {
 			for (auto e : eigval) {
 				LOG.os<>(e, " ");
 			} LOG.os<>('\n');

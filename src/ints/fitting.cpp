@@ -14,7 +14,7 @@ auto get_sum = [](auto& in, auto comm) {
 dbcsr::sbtensor<3,double> dfitting::compute(dbcsr::sbtensor<3,double> eri_batched, 
 	dbcsr::shared_matrix<double> inv, dbcsr::btype mytype) {
 		
-	auto spgrid2 = dbcsr::pgrid<2>::create(m_world.comm()).build();
+	auto spgrid2 = dbcsr::pgrid<2>::create(m_cart.comm()).build();
 	auto x = m_mol->dims().x();
 	
 	arrvec<int,2> xx = {x,x};

@@ -67,7 +67,7 @@ std::tuple<smat_d, smat_d, std::vector<double>>
 	
 	auto s_pp = dbcsr::matrix<>::create()
 		.name("s_pp")
-		.set_world(m_world)
+		.set_cart(m_cart)
 		.row_blk_sizes(p)
 		.col_blk_sizes(p)
 		.matrix_type(dbcsr::type::no_symmetry)
@@ -75,7 +75,7 @@ std::tuple<smat_d, smat_d, std::vector<double>>
 	
 	auto s_pb = dbcsr::matrix<>::create()
 		.name("s_pb")
-		.set_world(m_world)
+		.set_cart(m_cart)
 		.row_blk_sizes(p)
 		.col_blk_sizes(b)
 		.matrix_type(dbcsr::type::no_symmetry)
@@ -154,7 +154,7 @@ std::tuple<smat_d, smat_d, std::vector<double>>
 	
 	auto q_pm = dbcsr::matrix<>::create()
 		.name("q_pm")
-		.set_world(m_world)
+		.set_cart(m_cart)
 		.row_blk_sizes(p)
 		.col_blk_sizes(m)
 		.matrix_type(dbcsr::type::no_symmetry)
@@ -162,7 +162,7 @@ std::tuple<smat_d, smat_d, std::vector<double>>
 		
 	auto temp_pb = dbcsr::matrix<>::create()
 		.name("temp_pb")
-		.set_world(m_world)
+		.set_cart(m_cart)
 		.row_blk_sizes(p)
 		.col_blk_sizes(b)
 		.matrix_type(dbcsr::type::no_symmetry)
@@ -207,7 +207,7 @@ std::tuple<smat_d, smat_d, std::vector<double>>
 	
 	auto f_mm = dbcsr::matrix<>::create()
 		.name("Fock")
-		.set_world(m_world)
+		.set_cart(m_cart)
 		.row_blk_sizes(m)
 		.col_blk_sizes(m)
 		.matrix_type(dbcsr::type::no_symmetry)
@@ -215,7 +215,7 @@ std::tuple<smat_d, smat_d, std::vector<double>>
 		
 	auto f_ht_rm = dbcsr::matrix<>::create()
 		.name("Fock_HT")
-		.set_world(m_world)
+		.set_cart(m_cart)
 		.row_blk_sizes(r)
 		.col_blk_sizes(m)
 		.matrix_type(dbcsr::type::no_symmetry)
@@ -223,7 +223,7 @@ std::tuple<smat_d, smat_d, std::vector<double>>
 		
 	auto f_rr = dbcsr::matrix<>::create()
 		.name("Fock_HT")
-		.set_world(m_world)
+		.set_cart(m_cart)
 		.row_blk_sizes(r)
 		.col_blk_sizes(r)
 		.matrix_type(dbcsr::type::no_symmetry)
@@ -244,7 +244,7 @@ std::tuple<smat_d, smat_d, std::vector<double>>
 	// new molecular energies
 	auto eps_s = hermsolver.eigvals();
 	
-	if (m_world.rank() == 0) {
+	if (m_cart.rank() == 0) {
 		std::cout << "Old molecular energies: " << std::endl;
 		for (auto e : eps_m) {
 			std::cout << e << " ";
@@ -262,7 +262,7 @@ std::tuple<smat_d, smat_d, std::vector<double>>
 	// T_sm = T_rs^t Σ_r Vt_rm
 	
 	auto T_ms = dbcsr::matrix<>::create()
-		.set_world(m_world)
+		.set_cart(m_cart)
 		.row_blk_sizes(m)
 		.col_blk_sizes(r)
 		.name("Transformation matrix canon. MOs -> canon. truncated MOs")
@@ -276,7 +276,7 @@ std::tuple<smat_d, smat_d, std::vector<double>>
 	
 	auto c_bs = dbcsr::matrix<>::create()
 		.name(c_bm->name() + "_truncated")
-		.set_world(m_world)
+		.set_cart(m_cart)
 		.row_blk_sizes(b)
 		.col_blk_sizes(r)
 		.matrix_type(dbcsr::type::no_symmetry)
@@ -306,7 +306,7 @@ std::tuple<smat_d, smat_d, std::vector<double>>
 		
 	/*auto p_bb = dbcsr::create<double>()
 		.name("p")
-		.set_world(m_world)
+		.set_cart(m_cart)
 		.row_blk_sizes(b)
 		.col_blk_sizes(b)
 		.matrix_type(dbcsr::type::no_symmetry)
@@ -314,7 +314,7 @@ std::tuple<smat_d, smat_d, std::vector<double>>
 		
 	auto p_pp = dbcsr::create<double>()
 		.name("p")
-		.set_world(m_world)
+		.set_cart(m_cart)
 		.row_blk_sizes(p)
 		.col_blk_sizes(p)
 		.matrix_type(dbcsr::type::no_symmetry)
@@ -341,12 +341,12 @@ std::tuple<smat_d, smat_d, std::vector<double>>
 double mo_localizer::pop_mulliken(dbcsr::matrix<double>& c_bo, 
 	dbcsr::matrix<double>& s_bb, dbcsr::matrix<double>& s_sqrt_bb) 
 {
-	auto w = c_bo.get_world();
+	auto w = c_bo.get_cart();
 	auto b = c_bo.row_blk_sizes();
 	
 	auto p_bb = dbcsr::create<double>()
 		.name("p_bb")
-		.set_world(w)
+		.set_cart(w)
 		.row_blk_sizes(b)
 		.col_blk_sizes(b)
 		.matrix_type(dbcsr::type::no_symmetry)
@@ -354,7 +354,7 @@ double mo_localizer::pop_mulliken(dbcsr::matrix<double>& c_bo,
 		
 	auto pop_bb = dbcsr::create<double>()
 		.name("pop_bb")
-		.set_world(w)
+		.set_cart(w)
 		.row_blk_sizes(b)
 		.col_blk_sizes(b)
 		.matrix_type(dbcsr::type::no_symmetry)

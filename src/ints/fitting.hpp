@@ -16,15 +16,15 @@ namespace ints {
 class dfitting {
 private:
 
-	dbcsr::world m_world;
+	dbcsr::cart m_cart;
 	desc::shared_molecule m_mol;
 	util::mpi_log LOG;
 	util::mpi_time TIME;
 
 public:
 
-	dfitting(dbcsr::world w, desc::shared_molecule smol, int print = 0) :
-		m_world(w),
+	dfitting(dbcsr::cart w, desc::shared_molecule smol, int print = 0) :
+		m_cart(w),
 		m_mol(smol),
 		LOG(w.comm(), print),
 		TIME(w.comm(), "Fitting Coefficients")

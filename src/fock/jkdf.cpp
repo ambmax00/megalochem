@@ -26,12 +26,12 @@ void DF_J::init() {
 	std::array<int,2> tsizes2 = {xnbf,1};
 	std::array<int,3> tsizes3 = {nbf,nbf,1};
 	
-	m_spgrid2 = dbcsr::pgrid<2>::create(m_world.comm()).build();
+	m_spgrid2 = dbcsr::pgrid<2>::create(m_cart.comm()).build();
 	
-	m_spgrid_xd = dbcsr::pgrid<2>::create(m_world.comm())
+	m_spgrid_xd = dbcsr::pgrid<2>::create(m_cart.comm())
 		.tensor_dims(tsizes2).build();
 		
-	m_spgrid_bbd = dbcsr::pgrid<3>::create(m_world.comm())
+	m_spgrid_bbd = dbcsr::pgrid<3>::create(m_cart.comm())
 		.tensor_dims(tsizes3).build();
 	
 	m_gp_xd = dbcsr::tensor<2>::create().name("gp_xd").set_pgrid(*m_spgrid_xd)
@@ -197,7 +197,7 @@ void DFMO_K::init() {
 	arrvec<int,2> bb = {b,b};
 	arrvec<int,2> xx = {x,x};
 	
-	m_spgrid2 = dbcsr::pgrid<2>::create(m_world.comm()).build();
+	m_spgrid2 = dbcsr::pgrid<2>::create(m_cart.comm()).build();
 	
 	m_K_01 = dbcsr::tensor<2>::create().set_pgrid(*m_spgrid2).name("K_01")
 		.map1({0}).map2({1}).blk_sizes(bb).build();
@@ -276,10 +276,10 @@ void DFMO_K::compute_K() {
 		std::array<int,3> tsizes3 = {xnbf,nocc,nbf};
 		
 		dbcsr::shared_pgrid<2> grid2 =
-			dbcsr::pgrid<2>::create(m_world.comm()).tensor_dims(tsizes2).build();
+			dbcsr::pgrid<2>::create(m_cart.comm()).tensor_dims(tsizes2).build();
 			
 		dbcsr::shared_pgrid<3> grid3 =
-			dbcsr::pgrid<3>::create(m_world.comm()).tensor_dims(tsizes3).build();
+			dbcsr::pgrid<3>::create(m_cart.comm()).tensor_dims(tsizes3).build();
 		
 		m_c_bm = dbcsr::tensor<2>::create().set_pgrid(*grid2)
 			.name("c_bm_" + x + "_0_1").map1({0}).map2({1})
@@ -461,7 +461,7 @@ void DFAO_K::init() {
 	
 	arrvec<int,2> bb = {b,b};
 	
-	m_spgrid2 = dbcsr::pgrid<2>::create(m_world.comm()).build();
+	m_spgrid2 = dbcsr::pgrid<2>::create(m_cart.comm()).build();
 	
 	m_cbar_xbb_01_2 = dbcsr::tensor<3>::create()
 		.name("Cbar_xbb_01_2")
@@ -642,7 +642,7 @@ void DFMEM_K::init() {
 	arrvec<int,2> xx = {x,x};
 	
 	m_spgrid3_xbb = m_eri3c2e_batched->spgrid();
-	m_spgrid2 = dbcsr::pgrid<2>::create(m_world.comm()).build();
+	m_spgrid2 = dbcsr::pgrid<2>::create(m_cart.comm()).build();
 	
 	m_cbar_xbb_01_2 = dbcsr::tensor<3>::create()
 		.name("Cbar_xbb_01_2")
@@ -871,7 +871,7 @@ void DFLMO_K::init() {
 	arrvec<int,2> bb = {b,b};
 	arrvec<int,2> xx = {x,x};
 	
-	m_spgrid2 = dbcsr::pgrid<2>::create(m_world.comm()).build();
+	m_spgrid2 = dbcsr::pgrid<2>::create(m_cart.comm()).build();
 	
 	m_K_01 = dbcsr::tensor<2>::create()
 		.set_pgrid(*m_spgrid2)
@@ -950,11 +950,11 @@ void DFLMO_K::compute_K() {
 		arrvec<int,3> xbm = {x,b,o};
 		arrvec<int,2> bm = {b,o};
 		
-		auto spgrid2_bm = dbcsr::pgrid<2>::create(m_world.comm())
+		auto spgrid2_bm = dbcsr::pgrid<2>::create(m_cart.comm())
 			.tensor_dims(dims2)
 			.build();
 		
-		auto spgrid3_xbm = dbcsr::pgrid<3>::create(m_world.comm())
+		auto spgrid3_xbm = dbcsr::pgrid<3>::create(m_cart.comm())
 			.tensor_dims(dims3)
 			.build();
 			
@@ -1194,15 +1194,15 @@ void DFLMO_K::compute_K() {
 		arrvec<int,2> bm = {b,o};
 		arrvec<int,2> mb = {o,b};
 		
-		auto spgrid2_bm = dbcsr::pgrid<2>::create(m_world.comm())
+		auto spgrid2_bm = dbcsr::pgrid<2>::create(m_cart.comm())
 			//.tensor_dims(dims2)
 			.build();
 		
-		auto spgrid2_mb = dbcsr::pgrid<2>::create(m_world.comm())
+		auto spgrid2_mb = dbcsr::pgrid<2>::create(m_cart.comm())
 			//.tensor_dims(dims2t)
 			.build();
 		
-		auto spgrid3_xbm = dbcsr::pgrid<3>::create(m_world.comm())
+		auto spgrid3_xbm = dbcsr::pgrid<3>::create(m_cart.comm())
 			.tensor_dims(dims3)
 			.build();
 			

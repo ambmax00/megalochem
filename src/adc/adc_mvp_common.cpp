@@ -5,7 +5,7 @@ namespace adc {
 /* transforms u */
 smat u_transform(smat& u, char to, smat& c_bo, char tv, smat& c_bv) {
 	
-	auto w = u->get_world();
+	auto w = u->get_cart();
 	
 	// create new matrices
 	auto rblks_in = u->row_blk_sizes();
@@ -15,7 +15,7 @@ smat u_transform(smat& u, char to, smat& c_bo, char tv, smat& c_bv) {
 	auto cblks_out = (tv == 'T') ? c_bv->row_blk_sizes() : c_bv->col_blk_sizes();
 	
 	smat u_t1 = dbcsr::matrix<>::create()
-		.set_world(w)
+		.set_cart(w)
 		.name("u_t1")
 		.row_blk_sizes(rblks_out)
 		.col_blk_sizes(cblks_in)
@@ -23,7 +23,7 @@ smat u_transform(smat& u, char to, smat& c_bo, char tv, smat& c_bv) {
 		.build();
 		
 	smat u_t2 = dbcsr::matrix<>::create()
-		.set_world(w)
+		.set_cart(w)
 		.name("u_transformed")
 		.row_blk_sizes(rblks_out)
 		.col_blk_sizes(cblks_out)
@@ -37,8 +37,8 @@ smat u_transform(smat& u, char to, smat& c_bo, char tv, smat& c_bv) {
 	
 }
 	
-MVP::MVP(dbcsr::world w, desc::shared_molecule smol, int nprint, std::string name) :
-	m_world(w), m_mol(smol), 
+MVP::MVP(dbcsr::cart w, desc::shared_molecule smol, int nprint, std::string name) :
+	m_cart(w), m_mol(smol), 
 	LOG(w.comm(), nprint),
 	TIME(w.comm(), name)
 {}

@@ -13,14 +13,14 @@ void LLMP_FULL_Z::init() {
 	arrvec<int,3> xbb = {x,b,b};
 	
 	m_zmat = dbcsr::matrix<>::create()
-		.set_world(m_world)
+		.set_cart(m_cart)
 		.name("zmat")
 		.row_blk_sizes(x)
 		.col_blk_sizes(x)
 		.matrix_type(dbcsr::type::no_symmetry)
 		.build();
 	
-	m_spgrid2 = dbcsr::pgrid<2>::create(m_world.comm()).build();
+	m_spgrid2 = dbcsr::pgrid<2>::create(m_cart.comm()).build();
 	
 	m_zmat_01 = dbcsr::tensor<2>::create()
 		.set_pgrid(*m_spgrid2)
@@ -106,7 +106,7 @@ void LLMP_FULL_Z::compute() {
 	
 	// ============= TAKE CARE OF TENSOR STUFF =============
 		
-	auto spgrid3_xob = dbcsr::pgrid<3>::create(m_world.comm())
+	auto spgrid3_xob = dbcsr::pgrid<3>::create(m_cart.comm())
 		.tensor_dims(xobsizes).build();
 		
 	auto spgrid3_xbb = m_eri3c2e_batched->spgrid();
@@ -249,7 +249,7 @@ void LLMP_FULL_Z::compute() {
 						for (int xblk = xblkbounds[0]; xblk != xblkbounds[1]+1; ++xblk) {
 							
 							std::array<int,3> idx = {xblk,mublk,nublk};
-							if (m_world.rank() != b2_xbb_1_02->proc(idx)) continue;
+							if (m_cart.rank() != b2_xbb_1_02->proc(idx)) continue;
 
 							res[0].push_back(xblk);
 							res[1].push_back(mublk);
@@ -399,14 +399,14 @@ void LL_Z::init() {
 	arrvec<int,3> xbb = {x,b,b};
 	
 	m_zmat = dbcsr::create<double>()
-		.set_world(m_world)
+		.set_cart(m_cart)
 		.name("zmat")
 		.row_blk_sizes(x)
 		.col_blk_sizes(x)
 		.matrix_type(dbcsr::type::no_symmetry)
 		.build();
 	
-	m_spgrid2 = dbcsr::pgrid<2>::create(m_world.comm()).build();
+	m_spgrid2 = dbcsr::pgrid<2>::create(m_cart.comm()).build();
 	
 	m_zmat_01 = dbcsr::tensor<2>::create()
 		.set_pgrid(*m_spgrid2)
@@ -480,10 +480,10 @@ void LL_Z::compute() {
 	
 	// ============= TAKE CARE OF TENSOR STUFF =============
 		
-	auto spgrid3_xob = dbcsr::pgrid<3>::create(m_world.comm())
+	auto spgrid3_xob = dbcsr::pgrid<3>::create(m_cart.comm())
 		.tensor_dims(xobsizes).build();
 		
-	auto spgrid3_xov = dbcsr::pgrid<3>::create(m_world.comm())
+	auto spgrid3_xov = dbcsr::pgrid<3>::create(m_cart.comm())
 		.tensor_dims(xovsizes).build();
 		
 	auto spgrid3_xbb = m_eri3c2e_batched->spgrid();
@@ -639,7 +639,7 @@ void LL_Z::compute() {
 						for (int xblk = xblkbounds[0]; xblk != xblkbounds[1]+1; ++xblk) {
 							
 							std::array<int,3> idx = {xblk,mublk,nublk};
-							if (m_world.rank() != b2_xbb_1_02->proc(idx)) continue;
+							if (m_cart.rank() != b2_xbb_1_02->proc(idx)) continue;
 
 							res[0].push_back(xblk);
 							res[1].push_back(mublk);

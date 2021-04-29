@@ -109,8 +109,8 @@ void pivinc_cd::compute() {
 	
 	auto& _grid = scalapack::global_grid;
 	
-	MPI_Comm comm = m_mat_in->get_world().comm();
-	int myrank = m_mat_in->get_world().rank();
+	MPI_Comm comm = m_mat_in->get_cart().comm();
+	int myrank = m_mat_in->get_cart().rank();
 	int myprow = _grid.myprow();
 	int mypcol = _grid.mypcol();
 	
@@ -387,7 +387,7 @@ void pivinc_cd::compute() {
 	
 dbcsr::shared_matrix<double> pivinc_cd::L(std::vector<int> rowblksizes, std::vector<int> colblksizes) {
 	
-	auto w = m_mat_in->get_world();
+	auto w = m_mat_in->get_cart();
 	
 	auto out = dbcsr::scalapack_to_matrix(*m_L, "Inc. Chol. Decom. of " + m_mat_in->name(), 
 		w, rowblksizes, colblksizes);
@@ -427,7 +427,7 @@ public:
 		_nb = _rblksizes[0];
 		_mb = _cblksizes[0];
 		
-		auto w = this->get_world();
+		auto w = this->get_cart();
 		
 		_rank =w.rank();
 		_nproc_row = w.dims()[0];
@@ -440,7 +440,7 @@ public:
 		
 	}
 
-	static std::shared_ptr<xmatrix> create(dbcsr::world wrd, int N, int M, int nb, int mb) 
+	static std::shared_ptr<xmatrix> create(dbcsr::cart wrd, int N, int M, int nb, int mb) 
 	{
 		
 		auto distrvec = dbcsr::split_range(N, nb);
@@ -450,7 +450,7 @@ public:
 		auto cdist = dbcsr::cyclic_dist(distcvec.size(),wrd.dims()[1]);
 
 		auto mdist = dbcsr::dist::create()
-			.set_world(wrd)
+			.set_cart(wrd)
 			.row_dist(rdist)
 			.col_dist(cdist)
 			.build();
@@ -751,7 +751,7 @@ struct alignas(alignof(int)) int_int {
 };
 		
 std::tuple<double,int> get_max_diag(dbcsr::matrix<double>& mat, int istart = 0) {
-	auto wrd = mat.get_world();
+	auto wrd = mat.get_cart();
 	 
 	auto diag = mat.get_diag();
 	auto max = std::max_element(diag.begin() + istart,diag.end());
@@ -780,7 +780,7 @@ void pivinc_cd::compute(std::optional<int> force_rank,
 	
 	double filter_100 = dbcsr::global::filter_eps/100;
 	
-	auto wrd = m_mat_in->get_world();
+	auto wrd = m_mat_in->get_cart();
 	
 	int nrows = m_mat_in->nfullrows_total();
 	int ncols = m_mat_in->nfullcols_total();
@@ -1141,7 +1141,7 @@ void pivinc_cd::compute(std::optional<int> force_rank,
 	auto rvec = dbcsr::split_range(nrows, 8);
 	
 	auto Lredist = dbcsr::matrix<double>::create()
-		.set_world(wrd)
+		.set_cart(wrd)
 		.name("Cholesky decomposition")
 		.row_blk_sizes(matrowblksizes)
 		.col_blk_sizes(rvec)
@@ -1177,10 +1177,10 @@ dbcsr::shared_matrix<double> pivinc_cd::L(std::vector<int> rowblksizes, std::vec
 	static int i = 0;
 	i++;
 	
-	auto wrd = m_L->get_world();
+	auto wrd = m_L->get_cart();
 	
 	auto Lredist = dbcsr::matrix<>::create()
-		.set_world(wrd)
+		.set_cart(wrd)
 		.name("Cholesky decomposition")
 		.row_blk_sizes(rowblksizes)
 		.col_blk_sizes(colblksizes)

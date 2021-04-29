@@ -8,7 +8,7 @@ namespace math {
 
 void SVD::compute(double eps) {
 	
-	auto wrd = m_mat_in->get_world();
+	auto wrd = m_mat_in->get_cart();
 	int m = m_mat_in->nfullrows_total();
 	int n = m_mat_in->nfullcols_total();
 	int nb = scalapack::global::block_size;
@@ -138,7 +138,7 @@ dbcsr::shared_matrix<double> SVD::inverse() {
 	
 	vec<int> sizes = (m < n) ? rowsizes : colsizes;
 	
-	auto w = m_mat_in->get_world();
+	auto w = m_mat_in->get_cart();
 	
 	dbcsr::shared_matrix<double> U =
 		dbcsr::scalapack_to_matrix(*m_U, "U", w, 
@@ -152,7 +152,7 @@ dbcsr::shared_matrix<double> SVD::inverse() {
 	//dbcsr::print(*Vt);
 			
 	auto out = dbcsr::matrix<>::create()
-		.set_world(w)
+		.set_cart(w)
 		.name("SVD inverse of " + m_mat_in->name())
 		.row_blk_sizes(colsizes)
 		.col_blk_sizes(rowsizes)
@@ -175,7 +175,7 @@ dbcsr::shared_matrix<double> SVD::inverse() {
 	//dbcsr::print(*out);
 	
 	auto ide = dbcsr::matrix<>::create()
-		.set_world(w)
+		.set_cart(w)
 		.name("IDE1")
 		.row_blk_sizes(rowsizes)
 		.col_blk_sizes(rowsizes)
@@ -210,7 +210,7 @@ dbcsr::shared_matrix<double> SVD::inverse() {
 dbcsr::shared_matrix<double> SVD::U(std::vector<int> rowblksizes, 
 	std::vector<int> colblksizes) {
 	
-	auto w = m_mat_in->get_world();
+	auto w = m_mat_in->get_cart();
 	
 	//m_U->print();
 	
@@ -228,7 +228,7 @@ dbcsr::shared_matrix<double> SVD::U(std::vector<int> rowblksizes,
 dbcsr::shared_matrix<double> SVD::Vt(std::vector<int> rowblksizes, 
 	std::vector<int> colblksizes) {
 	
-	auto w = m_mat_in->get_world();
+	auto w = m_mat_in->get_cart();
 	
 	auto out = dbcsr::scalapack_to_matrix(*m_Vt, "SVD Vt matrix of " + m_mat_in->name(), 
 		w, rowblksizes, colblksizes);

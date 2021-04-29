@@ -39,7 +39,7 @@ void read_binary_mat(const char* filename, Matrix& matrix){
 void write_matrix(dbcsr::shared_matrix<double>& m_in, std::string filename);
 
 dbcsr::shared_matrix<double> read_matrix(std::string filename, std::string matname, 
-	dbcsr::world wrld, vec<int> rowblksizes, vec<int> colblksizes, dbcsr::type mytype);
+	dbcsr::cart wrld, vec<int> rowblksizes, vec<int> colblksizes, dbcsr::type mytype);
 
 void write_vector(svector<double>& v_in, std::string filename, MPI_Comm comm);
 

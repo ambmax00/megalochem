@@ -5,7 +5,7 @@ namespace math {
 
 void LLT::compute() {
 	
-	auto wrd = m_mat_in->get_world();
+	auto wrd = m_mat_in->get_cart();
 	int n = m_mat_in->nfullrows_total();
 	int nb = scalapack::global::block_size;
 	int nprow = wrd.dims()[0];
@@ -26,7 +26,7 @@ void LLT::compute() {
 		ori_coord[1] = _grid.mypcol();
 	}
 	
-	MPI_Bcast(&ori_coord[0],2,MPI_INT,ori_proc,m_mat_in->get_world().comm());
+	MPI_Bcast(&ori_coord[0],2,MPI_INT,ori_proc,m_mat_in->get_cart().comm());
 		
 	m_L = std::make_shared<scalapack::distmat<double>>(
 		dbcsr::matrix_to_scalapack(m_mat_in, m_mat_in->name() + "_scalapack", 
@@ -48,7 +48,7 @@ void LLT::compute() {
 
 dbcsr::shared_matrix<double> LLT::L(vec<int> blksizes) {
 	
-	auto w = m_mat_in->get_world();
+	auto w = m_mat_in->get_cart();
 	auto out =
 		dbcsr::scalapack_to_matrix(*m_L, "Cholesky decomposition of "+m_mat_in->name(),
 			w,blksizes,blksizes,"lowtriang");
@@ -91,7 +91,7 @@ dbcsr::shared_matrix<double> LLT::L_inv(vec<int> blksizes) {
 	
 	compute_L_inverse();
 	
-	auto w = m_mat_in->get_world();
+	auto w = m_mat_in->get_cart();
 	auto out =
 		dbcsr::scalapack_to_matrix(*m_L_inv, "Inverted cholesky decomposition of "+m_mat_in->name(),
 			w,blksizes,blksizes,"lowtriang");

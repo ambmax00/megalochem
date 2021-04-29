@@ -25,7 +25,7 @@ private:
 
 	hf::shared_hf_wfn m_hfwfn;
 	desc::options m_opt;
-	dbcsr::world m_world;
+	dbcsr::cart m_cart;
 	
 	util::mpi_time TIME;
 	util::mpi_log LOG;
@@ -65,7 +65,7 @@ private:
 	
 public:	
 
-	adcmod(dbcsr::world w, hf::shared_hf_wfn hfref, desc::options& opt);
+	adcmod(dbcsr::cart w, hf::shared_hf_wfn hfref, desc::options& opt);
 	~adcmod() {}
 	
 	void compute();

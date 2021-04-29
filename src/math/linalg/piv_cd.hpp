@@ -34,7 +34,7 @@ private:
 public:
 
 	pivinc_cd(dbcsr::shared_matrix<double> mat_in, int print) : 
-		m_mat_in(mat_in), LOG(m_mat_in->get_world().comm(), print) {}
+		m_mat_in(mat_in), LOG(m_mat_in->get_cart().comm(), print) {}
 	~pivinc_cd() {}
 	
 	void compute(std::optional<int> force_rank = std::nullopt,

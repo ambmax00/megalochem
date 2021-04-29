@@ -19,7 +19,7 @@ void calc_ints(dbcsr::matrix<double>& m_out, std::vector<std::vector<int>>& shel
 	
 	//std::cout << "NATOMS/NBAS: " << natm << " " << nbas << std::endl;
 	
-	auto my_world = m_out.get_world();
+	auto my_cart = m_out.get_cart();
 	
 	auto& nshells0 = nshells[0];
 	auto& nshells1 = nshells[1];
@@ -128,7 +128,7 @@ void calc_ints(dbcsr::matrix<double>& m_x, dbcsr::matrix<double>& m_y, dbcsr::ma
 	//#pragma omp parallel 
 	//{	
 	
-	auto w = m_x.get_world();
+	auto w = m_x.get_cart();
 	auto rank = w.rank();
 	
 	auto row_offsets = m_x.row_blk_offsets();

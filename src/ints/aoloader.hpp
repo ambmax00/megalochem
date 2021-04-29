@@ -47,7 +47,7 @@ enum class key {
 class aoloader {
 private:
 	
-	dbcsr::world m_world;
+	dbcsr::cart m_cart;
 	desc::shared_molecule m_mol;
 	dbcsr::btype m_btype_eris;
 	dbcsr::btype m_btype_intermeds;
@@ -72,7 +72,7 @@ private:
 public:
 
 #define AOLOADER_CREATE_LIST (\
-	((dbcsr::world), set_world),\
+	((dbcsr::cart), set_cart),\
 	((desc::shared_molecule), set_molecule),\
 	((util::optional<int>), print),\
 	((util::optional<int>), nbatches_b),\
@@ -84,9 +84,9 @@ public:
 	MAKE_BUILDER_CLASS(aoloader, create, AOLOADER_CREATE_LIST, ())
 
 	aoloader(create_pack&& p) :
-		m_world(p.p_set_world), m_mol(p.p_set_molecule),
-		LOG(p.p_set_world.comm(), (p.p_print) ? *p.p_print : 0),
-		TIME(p.p_set_world.comm(), "AO-loader"),
+		m_cart(p.p_set_cart), m_mol(p.p_set_molecule),
+		LOG(p.p_set_cart.comm(), (p.p_print) ? *p.p_print : 0),
+		TIME(p.p_set_cart.comm(), "AO-loader"),
 		m_btype_eris((p.p_btype_eris) ? *p.p_btype_eris : dbcsr::btype::core),
 		m_btype_intermeds((p.p_btype_intermeds) ? *p.p_btype_intermeds 
 			: dbcsr::btype::core),

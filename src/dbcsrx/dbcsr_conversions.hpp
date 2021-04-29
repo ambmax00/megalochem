@@ -71,7 +71,7 @@ MatrixX<T,StorageOrder> matrix_to_eigen(matrix<T>& mat_in) {
 	} else {
 		
 		// eigen matrix only on one rank
-		auto w = mat_in.get_world();
+		auto w = mat_in.get_cart();
 		
 		int nblkrow = mat_in.nblkrows_total();
 		int nblkcol = mat_in.nblkcols_total();
@@ -80,7 +80,7 @@ MatrixX<T,StorageOrder> matrix_to_eigen(matrix<T>& mat_in) {
 		std::vector<int> coldist(nblkcol,pcol);
 		
 		auto locdist = dist::create()
-			.set_world(w)
+			.set_cart(w)
 			.row_dist(rowdist)
 			.col_dist(coldist)
 			.build();
@@ -147,7 +147,7 @@ MatrixX<T,StorageOrder> matrix_to_eigen(matrix<T>& mat_in) {
 template <typename Derived, typename T = double>
 shared_matrix<typename Derived::Scalar> eigen_to_matrix(
 	const Eigen::MatrixBase<Derived>& mat, 
-	world& w, std::string name, vec<int>& row_blk_sizes, 
+	cart& w, std::string name, vec<int>& row_blk_sizes, 
 	vec<int>& col_blk_sizes, type mtype) 
 {
 	
@@ -158,7 +158,7 @@ shared_matrix<typename Derived::Scalar> eigen_to_matrix(
 	
 		auto out = matrix<T>::create()
 			.name(name)
-			.set_world(w)
+			.set_cart(w)
 			.row_blk_sizes(row_blk_sizes)
 			.col_blk_sizes(col_blk_sizes)
 			.matrix_type(mtype)
@@ -197,7 +197,7 @@ shared_matrix<typename Derived::Scalar> eigen_to_matrix(
 			coldist(col_blk_sizes.size(), pcol);
 			
 		auto locdist = dist::create()
-			.set_world(w)
+			.set_cart(w)
 			.row_dist(rowdist)
 			.col_dist(coldist)
 			.build();
@@ -212,7 +212,7 @@ shared_matrix<typename Derived::Scalar> eigen_to_matrix(
 		
 		auto out = matrix<T>::create()
 			.name(name)
-			.set_world(w)
+			.set_cart(w)
 			.row_blk_sizes(row_blk_sizes)
 			.col_blk_sizes(col_blk_sizes)
 			.matrix_type(mtype)
@@ -261,7 +261,7 @@ template <typename T = double>
 scalapack::distmat<T> matrix_to_scalapack(shared_matrix<T> mat_in, std::string nameint, 
 	int nsplitrow, int nsplitcol, int ori_row, int ori_col) {
 	
-	world mworld = mat_in->get_world();	
+	cart mcart = mat_in->get_cart();	
 	
 	int nrows = mat_in->nfullrows_total();
 	int ncols = mat_in->nfullcols_total();	
@@ -270,11 +270,11 @@ scalapack::distmat<T> matrix_to_scalapack(shared_matrix<T> mat_in, std::string n
 	vec<int> rowsizes = split_range(nrows, nsplitrow);
 	vec<int> colsizes = split_range(ncols, nsplitcol);
 	
-	vec<int> rowdist = cyclic_dist(rowsizes.size(),mworld.dims()[0]);
-	vec<int> coldist = cyclic_dist(colsizes.size(),mworld.dims()[1]);
+	vec<int> rowdist = cyclic_dist(rowsizes.size(),mcart.dims()[0]);
+	vec<int> coldist = cyclic_dist(colsizes.size(),mcart.dims()[1]);
 	
 	auto scaldist = dist::create()
-		.set_world(mworld)
+		.set_cart(mcart)
 		.row_dist(rowdist)
 		.col_dist(coldist)
 		.build();
@@ -336,7 +336,7 @@ scalapack::distmat<T> matrix_to_scalapack(shared_matrix<T> mat_in, std::string n
 
 template <typename T = double>
 shared_matrix<T> scalapack_to_matrix(scalapack::distmat<T>& sca_mat_in, std::string nameint, 
-								world& world_in, vec<int>& rowblksizes, vec<int>& colblksizes, 
+								cart& cart_in, vec<int>& rowblksizes, vec<int>& colblksizes, 
 								std::string type = "") 
 {
 	// form block-cyclic distribution
@@ -358,11 +358,11 @@ shared_matrix<T> scalapack_to_matrix(scalapack::distmat<T>& sca_mat_in, std::str
 	vec<int> rowcycsizes = split_range(nfullrow, sca_mat_in.rowblk_size());
 	vec<int> colcycsizes = split_range(nfullcol, sca_mat_in.colblk_size());
 	
-	vec<int> rowdist = cyclic_dist(rowcycsizes.size(),world_in.dims()[0]);
-	vec<int> coldist = cyclic_dist(colcycsizes.size(),world_in.dims()[1]);
+	vec<int> rowdist = cyclic_dist(rowcycsizes.size(),cart_in.dims()[0]);
+	vec<int> coldist = cyclic_dist(colcycsizes.size(),cart_in.dims()[1]);
 	
 	auto cycdist = dist::create()
-		.set_world(world_in)
+		.set_cart(cart_in)
 		.row_dist(rowdist)
 		.col_dist(coldist)
 		.build();
@@ -422,7 +422,7 @@ shared_matrix<T> scalapack_to_matrix(scalapack::distmat<T>& sca_mat_in, std::str
 	// make new matrix
 	shared_matrix<T> mat_out = matrix<T>::create()
 		.name(nameint)
-		.set_world(world_in)
+		.set_cart(cart_in)
 		.row_blk_sizes(rowblksizes)
 		.col_blk_sizes(colblksizes)
 		.matrix_type((sym) ? type::symmetric : type::no_symmetry)

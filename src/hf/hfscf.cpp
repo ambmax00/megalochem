@@ -6,12 +6,12 @@
 
 namespace hf {
 	
-hfmod::hfmod(dbcsr::world w, desc::shared_molecule mol, desc::options opt) 
+hfmod::hfmod(dbcsr::cart w, desc::shared_molecule mol, desc::options opt) 
 	: m_mol(mol), 
 	  m_opt(opt), 
-	  m_world(w),
-	  LOG(m_world.comm(),m_opt.get<int>("print", HF_PRINT_LEVEL)),
-	  TIME(m_world.comm(), "Hartree Fock", LOG.global_plev()),
+	  m_cart(w),
+	  LOG(m_cart.comm(),m_opt.get<int>("print", HF_PRINT_LEVEL)),
+	  TIME(m_cart.comm(), "Hartree Fock", LOG.global_plev()),
 	  m_guess(m_opt.get<std::string>("guess", HF_GUESS)),
 	  m_max_iter(m_opt.get<int>("max_iter", HF_MAX_ITER)),
 	  m_scf_threshold(m_opt.get<double>("scf_thresh", HF_SCF_THRESH)),
@@ -48,7 +48,7 @@ hfmod::hfmod(dbcsr::world w, desc::shared_molecule mol, desc::options opt)
 	// alpha
 	
 	m_core_bb = dbcsr::matrix<>::create()
-		.set_world(m_world)
+		.set_cart(m_cart)
 		.name("core_bb")
 		.row_blk_sizes(b)
 		.col_blk_sizes(b)
@@ -62,7 +62,7 @@ hfmod::hfmod(dbcsr::world w, desc::shared_molecule mol, desc::options opt)
 		.name("f_bb_A").build();
 	
 	m_c_bm_A = dbcsr::matrix<>::create()
-		.set_world(m_world)
+		.set_cart(m_cart)
 		.name("c_bm_A")
 		.row_blk_sizes(b)
 		.col_blk_sizes(mA)
@@ -82,7 +82,7 @@ hfmod::hfmod(dbcsr::world w, desc::shared_molecule mol, desc::options opt)
 	if (!m_nobetaorb && !m_restricted) {
 		
 		m_c_bm_B = dbcsr::matrix<>::create()
-			.set_world(m_world)
+			.set_cart(m_cart)
 			.name("c_bm_B")
 			.row_blk_sizes(b)
 			.col_blk_sizes(mB)
@@ -108,7 +108,7 @@ hfmod::hfmod(dbcsr::world w, desc::shared_molecule mol, desc::options opt)
 		auto dfbasis = std::make_shared<desc::cluster_basis>(
 			basname, atoms, smethod, nsplit, augmented);
 			
-		auto newdfbasis = ints::remove_lindep(m_world, dfbasis, m_mol->atoms());
+		auto newdfbasis = ints::remove_lindep(m_cart, dfbasis, m_mol->atoms());
 	
 		//exit(0);
 	
@@ -142,7 +142,7 @@ hfmod::hfmod(dbcsr::world w, desc::shared_molecule mol, desc::options opt)
 		std::nullopt;
 	
 	m_aoloader = ints::aoloader::create()
-		.set_world(m_world)
+		.set_cart(m_cart)
 		.set_molecule(m_mol)
 		.print(LOG.global_plev())
 		.nbatches_b(nbatches_b)
@@ -189,7 +189,7 @@ void hfmod::one_electron() {
 	
 	TIME_1e.start();
 	
-	ints::aofactory int_engine(m_mol, m_world);
+	ints::aofactory int_engine(m_mol, m_cart);
 	
 	// overlap			 
 	m_s_bb = int_engine.ao_overlap();	
@@ -259,7 +259,7 @@ void hfmod::two_electron() {
 		m_opt.get<int>("occ_nbatches") : 1;
 	
 	m_jbuilder = fock::create_j()
-		.set_world(m_world)
+		.set_cart(m_cart)
 		.molecule(m_mol)
 		.print(LOG.global_plev())
 		.aoloader(*m_aoloader)
@@ -268,7 +268,7 @@ void hfmod::two_electron() {
 		.build();
 	
 	m_kbuilder = fock::create_k()
-		.set_world(m_world)
+		.set_cart(m_cart)
 		.molecule(m_mol)
 		.print(LOG.global_plev())
 		.aoloader(*m_aoloader)
@@ -407,8 +407,8 @@ void hfmod::compute() {
 	int dmin = m_opt.get<int>("diis_min_vecs", HF_DIIS_MIN_VECS);
 	int dstart = m_opt.get<int>("diis_start", HF_DIIS_START);
 	
-	math::diis_helper<2> diis_A(m_world.comm(),dstart, dmin, dmax, (LOG.global_plev() >= 2) ? true : false );
-	math::diis_helper<2> diis_B(m_world.comm(),dstart, dmin, dmax, (LOG.global_plev() >= 2) ? true : false );
+	math::diis_helper<2> diis_A(m_cart.comm(),dstart, dmin, dmax, (LOG.global_plev() >= 2) ? true : false );
+	math::diis_helper<2> diis_B(m_cart.comm(),dstart, dmin, dmax, (LOG.global_plev() >= 2) ? true : false );
 	
 	// ERROR MATRICES
 	dbcsr::shared_matrix<double> e_A;

@@ -40,7 +40,7 @@ smat u_transform(smat& u_ao, char to, smat& c_bo, char tv, smat& c_bv);
 class MVP {
 protected:
 
-	dbcsr::world m_world;
+	dbcsr::cart m_cart;
 	desc::shared_molecule m_mol;
 	
 	util::mpi_log LOG;
@@ -50,7 +50,7 @@ protected:
 
 public:
 
-	MVP(dbcsr::world w, desc::shared_molecule smol, int nprint, std::string name);
+	MVP(dbcsr::cart w, desc::shared_molecule smol, int nprint, std::string name);
 		
 	virtual smat compute(smat u_ia, double omega = 0.0) = 0;
 	
@@ -84,7 +84,7 @@ private:
 public:
 
 #define AORIADC1_LIST (\
-	((dbcsr::world), set_world),\
+	((dbcsr::cart), set_cart),\
 	((desc::shared_molecule), set_molecule),\
 	((util::optional<int>), print),\
 	((dbcsr::shared_matrix<double>), c_bo),\
@@ -106,7 +106,7 @@ public:
 		m_eri3c2e_batched(p.p_eri3c2e_batched),
 		m_fitting_batched(p.p_fitting_batched),
 		m_kmethod(p.p_kmethod), m_jmethod(p.p_jmethod),
-		MVP(p.p_set_world, p.p_set_molecule, (p.p_print) ? *p.p_print : 0,
+		MVP(p.p_set_cart, p.p_set_molecule, (p.p_print) ? *p.p_print : 0,
 			"MVP_AORIADC1") {}
 		
 	void init() override;
@@ -228,7 +228,7 @@ private:
 public:
 
 #define AORIADC2_LIST (\
-	((dbcsr::world), set_world),\
+	((dbcsr::cart), set_cart),\
 	((desc::shared_molecule), set_molecule),\
 	((util::optional<int>), print),\
 	((dbcsr::shared_matrix<double>), c_bo),\
@@ -261,7 +261,7 @@ public:
 		m_c_os((p.p_c_os) ? *p.p_c_os : ADC_ADC2_C_OS),
 		m_c_os_coupling((p.p_c_os_coupling) ? 
 			*p.p_c_os_coupling : ADC_ADC2_C_OS_COUPLING),
-		MVP(p.p_set_world, p.p_set_molecule, (p.p_print) ? *p.p_print : 0, 
+		MVP(p.p_set_cart, p.p_set_molecule, (p.p_print) ? *p.p_print : 0, 
 			"MVP_AORISOSADC2") {}
 		
 	void init() override;
@@ -338,7 +338,7 @@ private:
 	
 public:
 
-	MVP_ao_ri_adc2(dbcsr::world& w, desc::shared_molecule smol,
+	MVP_ao_ri_adc2(dbcsr::cart& w, desc::shared_molecule smol,
 		desc::options opt, util::registry& reg,
 		svector<double> epso, svector<double> epsv) :
 		MVP(w,smol,opt,reg,epso,epsv) {}

@@ -24,7 +24,7 @@ private:
 	// descriptors
 	desc::shared_molecule m_mol;
 	desc::options m_opt;
-	dbcsr::world m_world;
+	dbcsr::cart m_cart;
 	util::mpi_log LOG;
 	util::mpi_time TIME;
 	
@@ -79,7 +79,7 @@ private:
 
 public:
 
-	hfmod(dbcsr::world wrd, desc::shared_molecule mol, desc::options opt);
+	hfmod(dbcsr::cart wrd, desc::shared_molecule mol, desc::options opt);
 	
 	hfmod() = delete;
 	hfmod(hfmod& hfmod_in) = delete;
@@ -127,9 +127,9 @@ public:
 				//std::cout << eigen_cbv << std::endl;
 				
 				if (nocc != 0)
-					out_o = dbcsr::eigen_to_matrix(eigen_cbo, m_world, "c_bo_"+x, b, o, dbcsr::type::no_symmetry);
+					out_o = dbcsr::eigen_to_matrix(eigen_cbo, m_cart, "c_bo_"+x, b, o, dbcsr::type::no_symmetry);
 				if (nvir != 0) 
-					out_v = dbcsr::eigen_to_matrix(eigen_cbv, m_world, "c_bv_"+x, b, v, dbcsr::type::no_symmetry);
+					out_v = dbcsr::eigen_to_matrix(eigen_cbv, m_cart, "c_bv_"+x, b, v, dbcsr::type::no_symmetry);
 				
 		};
 		

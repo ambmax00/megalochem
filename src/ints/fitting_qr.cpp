@@ -57,7 +57,7 @@ dbcsr::sbtensor<3,double> dfitting::compute_qr_new(
 	auto& work_time = TIME.sub("Worker function");
 	auto& comp_time = TIME.sub("Compression");
 	
-	auto aofac = std::make_shared<aofactory>(m_mol, m_world);
+	auto aofac = std::make_shared<aofactory>(m_mol, m_cart);
 	
 	double qr_theta = global::qr_theta;
 	double qr_rho = global::qr_rho;
@@ -148,7 +148,7 @@ dbcsr::sbtensor<3,double> dfitting::compute_qr_new(
 		.print(0)
 		.build();
 	
-	dbcsr::world single_world(MPI_COMM_SELF);
+	dbcsr::cart single_world(MPI_COMM_SELF);
 	
 	auto s_xx_inv_eigen = dbcsr::matrix_to_eigen(*s_xx_inv);
 	auto s_xx_local_mat = dbcsr::eigen_to_matrix(s_xx_inv_eigen, single_world, 
@@ -249,7 +249,7 @@ dbcsr::sbtensor<3,double> dfitting::compute_qr_new(
 	auto blkinfo_b = get_block_info(*b_basis);
 
 #if 0
-	if (m_world.rank() == 0) {
+	if (m_cart.rank() == 0) {
 	std::cout << "X BASIS INFO: " << std::endl;
 	for (auto s : blkinfo_x) {
 		std::cout << "EXP: " << s.alpha << std::endl;
@@ -335,7 +335,7 @@ dbcsr::sbtensor<3,double> dfitting::compute_qr_new(
 		 
 		std::function<void(int64_t)> task_func = [&](int64_t itask) 
 		{
-			//std::cout << "PROC: " << m_world.rank() << " -> TASK ID: " << itask << std::endl;
+			//std::cout << "PROC: " << m_cart.rank() << " -> TASK ID: " << itask << std::endl;
 			
 			// === COMPUTE 3c1e overlap integrals
 			// 1. allocate blocks
@@ -398,7 +398,7 @@ dbcsr::sbtensor<3,double> dfitting::compute_qr_new(
 			// 3. Contract
 			
 			if (ovlp_xbb_local->num_blocks() == 0) {
-				std::cout << "RANK: " << m_world.rank() << "COMPLETE SCREEN" << std::endl;
+				std::cout << "RANK: " << m_cart.rank() << "COMPLETE SCREEN" << std::endl;
 				ovlp_time.finish();
 				work_time.finish();
 				return;
@@ -413,7 +413,7 @@ dbcsr::sbtensor<3,double> dfitting::compute_qr_new(
 			ovlp_xbb_local->clear();
 						
 			if (prs_xbb_local->num_blocks() == 0) {
-				std::cout << "RANK: " << m_world.rank() << "COMPLETE SCREEN" << std::endl;
+				std::cout << "RANK: " << m_cart.rank() << "COMPLETE SCREEN" << std::endl;
 				ovlp_time.finish();
 				work_time.finish();
 				return;
@@ -491,7 +491,7 @@ dbcsr::sbtensor<3,double> dfitting::compute_qr_new(
 			
 				if (nblkp == 0) {
 					setup_time.finish();
-					std::cout << "RANK: " << m_world.rank() << "QRRHO SCREEN" << std::endl;
+					std::cout << "RANK: " << m_cart.rank() << "QRRHO SCREEN" << std::endl;
 					continue;
 				}
 					
@@ -569,7 +569,7 @@ dbcsr::sbtensor<3,double> dfitting::compute_qr_new(
 					np += x[ip];
 				}
 			
-				std::cout << "RANK: " << m_world.rank() << " NP,NQ,NB: " << np << "/" << nq << "/" << nb << std::endl;
+				std::cout << "RANK: " << m_cart.rank() << " NP,NQ,NB: " << np << "/" << nq << "/" << nb << std::endl;
 			
 				// ==== Prepare matrices for QR decomposition ====
 				
@@ -740,7 +740,7 @@ dbcsr::sbtensor<3,double> dfitting::compute_qr_new(
 				
 		}; // end task function
 		
-		util::basic_scheduler tasks(m_world.comm(), global_tasks.size(), task_func);
+		util::basic_scheduler tasks(m_cart.comm(), global_tasks.size(), task_func);
 		
 		tasks.run();
 	
@@ -874,7 +874,7 @@ std::shared_ptr<Eigen::MatrixXi> dfitting::compute_idx(
 	cfit_xbb->decompress_finalize();
 	
 	MPI_Allreduce(idx_local.data(), idx_global.data(), x.size() * b.size(),
-		MPI_INT, MPI_LOR, m_world.comm());
+		MPI_INT, MPI_LOR, m_cart.comm());
 		
 	int nblks = 0;
 		

@@ -124,7 +124,7 @@ inline void write_hfwfn(std::string name, hf_wfn& hfwfn, filio::data_handler& dh
 }
 
 inline shared_hf_wfn read_hfwfn(std::string name, desc::shared_molecule mol, 
-	dbcsr::world w, filio::data_handler& dh) 
+	dbcsr::cart w, filio::data_handler& dh) 
 {
 	
 	dh.open(filio::access_mode::rdonly);

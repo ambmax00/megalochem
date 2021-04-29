@@ -18,7 +18,7 @@ void DFROBUST_K::init() {
 	arrvec<int,2> xx = {x,x};
 	arrvec<int,3> xbb = {x,b,b};
 		
-	m_spgrid2 = dbcsr::pgrid<2>::create(m_world.comm()).build();
+	m_spgrid2 = dbcsr::pgrid<2>::create(m_cart.comm()).build();
 	auto spgrid3 = m_eri3c2e_batched->spgrid();
 	
 	m_K_01 = dbcsr::tensor<2>::create().set_pgrid(*m_spgrid2).name("K_01")

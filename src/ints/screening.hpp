@@ -14,7 +14,7 @@ namespace ints {
 class screener {
 protected:
 
-	dbcsr::world m_world;
+	dbcsr::cart m_cart;
 	desc::shared_molecule m_mol;
 	
 	aofactory m_fac;
@@ -24,8 +24,8 @@ protected:
 	
 public:
 
-	screener(dbcsr::world w, desc::shared_molecule mol, std::string method) : 
-		m_world(w), m_mol(mol), m_fac(mol, w) {}
+	screener(dbcsr::cart w, desc::shared_molecule mol, std::string method) : 
+		m_cart(w), m_mol(mol), m_fac(mol, w) {}
 		
 	virtual void compute() = 0;
 	
@@ -49,7 +49,7 @@ protected:
 		
 public:
 
-	schwarz_screener(dbcsr::world w, desc::shared_molecule mol) : 
+	schwarz_screener(dbcsr::cart w, desc::shared_molecule mol) : 
 		screener(w, mol, "schwarz") {}
 		
 	void compute() override;
@@ -76,7 +76,7 @@ protected:
 	
 public:
 
-	atomic_screener(dbcsr::world w, desc::shared_molecule mol, std::vector<int> alist) :
+	atomic_screener(dbcsr::cart w, desc::shared_molecule mol, std::vector<int> alist) :
 		m_atom_list(alist), m_schwarz(w,mol), screener(w, mol, "atomic") {}
 		
 	void compute() override;

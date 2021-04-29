@@ -61,7 +61,7 @@ class JK_common {
 protected:
 	
 	desc::shared_molecule m_mol;
-	dbcsr::world m_world;
+	dbcsr::cart m_cart;
 		
 	util::mpi_log LOG;
 	util::mpi_time TIME;
@@ -78,7 +78,7 @@ protected:
 		
 public:
 	
-	JK_common(dbcsr::world w, desc::shared_molecule smol, int print, std::string name);
+	JK_common(dbcsr::cart w, desc::shared_molecule smol, int print, std::string name);
 	void set_density_alpha(dbcsr::shared_matrix<double>& ipA) { m_p_A = ipA; }
 	void set_density_beta(dbcsr::shared_matrix<double>& ipB) { m_p_B = ipB; }
 	void set_coeff_alpha(dbcsr::shared_matrix<double>& icA) { m_c_A = icA; }
@@ -106,7 +106,7 @@ protected:
 		
 public:
 	
-	J(dbcsr::world w, desc::shared_molecule smol, int print, std::string name) 
+	J(dbcsr::cart w, desc::shared_molecule smol, int print, std::string name) 
 		: JK_common(w,smol,print,name) {}
 	virtual ~J() {}
 	virtual void compute_J() = 0;
@@ -127,7 +127,7 @@ protected:
 		
 public:
 	
-	K(dbcsr::world w, desc::shared_molecule smol, int print, std::string name) 
+	K(dbcsr::cart w, desc::shared_molecule smol, int print, std::string name) 
 		: JK_common(w,smol,print,name) {}
 	virtual ~K() {}
 	virtual void compute_K() = 0;
@@ -140,10 +140,10 @@ public:
 };
 
 #define BASE_INIT(jk, jkname) \
-	jk(p.p_set_world, p.p_molecule, (p.p_print) ? *p.p_print : 0, #jkname)
+	jk(p.p_set_cart, p.p_molecule, (p.p_print) ? *p.p_print : 0, #jkname)
 
 #define BASE_LIST (\
-	((dbcsr::world), set_world),\
+	((dbcsr::cart), set_cart),\
 	((desc::shared_molecule), molecule),\
 	((util::optional<int>), print))
 
@@ -571,7 +571,7 @@ inline void load_kints(kmethod kmet, ints::metric metr, ints::aoloader& ao) {
 }
 	
 #define CREATE_J_LIST (\
-	((dbcsr::world), set_world),\
+	((dbcsr::cart), set_cart),\
 	((desc::shared_molecule), molecule),\
 	((jmethod), method),\
 	((ints::aoloader), aoloader),\
@@ -605,7 +605,7 @@ public:
 			auto eris = aoreg.get<dbcsr::sbtensor<4,double>>(ints::key::coul_bbbb);
 			
 			jbuilder = EXACT_J::create()
-				.set_world(*c_set_world)
+				.set_cart(*c_set_cart)
 				.molecule(*c_molecule)
 				.print(nprint)
 				.eri4c2e_batched(eris)
@@ -639,7 +639,7 @@ public:
 			}
 			
 			jbuilder = DF_J::create()
-				.set_world(*c_set_world)
+				.set_cart(*c_set_cart)
 				.molecule(*c_molecule)
 				.print(nprint)
 				.eri3c2e_batched(eris)
@@ -657,7 +657,7 @@ public:
 inline create_j_base create_j() { return create_j_base(); }
 
 #define CREATE_K_LIST (\
-	((dbcsr::world), set_world),\
+	((dbcsr::cart), set_cart),\
 	((desc::shared_molecule), molecule),\
 	((kmethod), method),\
 	((ints::aoloader), aoloader),\
@@ -693,7 +693,7 @@ public:
 			auto eris = aoreg.get<dbcsr::sbtensor<4,double>>(ints::key::coul_bbbb);
 			
 			kbuilder = EXACT_K::create()
-				.set_world(*c_set_world)
+				.set_cart(*c_set_cart)
 				.molecule(*c_molecule)
 				.print(nprint)
 				.eri4c2e_batched(eris)
@@ -724,7 +724,7 @@ public:
 			}
 			
 			kbuilder = DFAO_K::create()
-				.set_world(*c_set_world)
+				.set_cart(*c_set_cart)
 				.molecule(*c_molecule)
 				.print(nprint)
 				.eri3c2e_batched(eris)
@@ -737,7 +737,7 @@ public:
 			auto invsqrt = aoreg.get<dbcsr::shared_matrix<double>>(ints::key::coul_xx_invsqrt);
 			
 			kbuilder = DFMO_K::create()
-				.set_world(*c_set_world)
+				.set_cart(*c_set_cart)
 				.molecule(*c_molecule)
 				.print(nprint)
 				.eri3c2e_batched(eris)
@@ -771,7 +771,7 @@ public:
 			
 			if (*c_method == kmethod::dfmem) {
 				kbuilder = DFMEM_K::create()
-					.set_world(*c_set_world)
+					.set_cart(*c_set_cart)
 					.molecule(*c_molecule)
 					.print(nprint)
 					.eri3c2e_batched(eris)
@@ -780,7 +780,7 @@ public:
 					
 			} else {
 				kbuilder = DFLMO_K::create()
-					.set_world(*c_set_world)
+					.set_cart(*c_set_cart)
 					.molecule(*c_molecule)
 					.print(nprint)
 					.eri3c2e_batched(eris)
@@ -797,7 +797,7 @@ public:
 			auto v_xx = aoreg.get<dbcsr::shared_matrix<double>>(ints::key::coul_xx);
 			
 			kbuilder = DFROBUST_K::create()
-				.set_world(*c_set_world)
+				.set_cart(*c_set_cart)
 				.molecule(*c_molecule)
 				.print(nprint)
 				.eri3c2e_batched(eris)

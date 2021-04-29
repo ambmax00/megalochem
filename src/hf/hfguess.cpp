@@ -104,7 +104,7 @@ void gram_schmidt(dbcsr::shared_matrix<double>& mat) {
 		
 	}
 	
-	auto w = mat->get_world();
+	auto w = mat->get_cart();
 	auto rblk = mat->row_blk_sizes();
 	auto cblk = mat->col_blk_sizes();
 	
@@ -182,49 +182,49 @@ void hfmod::compute_guess() {
 		std::vector<desc::Atom> my_atypes;
 		
 		for (int I = 0; I != atypes.size(); ++I) {
-			//if (m_world.rank() == I % m_world.size()) my_atypes.push_back(atypes[I]);
+			//if (m_cart.rank() == I % m_cart.size()) my_atypes.push_back(atypes[I]);
 			// All om rank 1 for now
-			if (m_world.rank() == 0) my_atypes.push_back(atypes[I]);
+			if (m_cart.rank() == 0) my_atypes.push_back(atypes[I]);
 		}
 		
 		if (LOG.global_plev() >= 1) {
 			LOG.os<>("Distribution of atom types along processors:\n");
-			for (int i = 0; i != m_world.size(); ++i) {
-				if (m_world.rank() == i) {
-					std::cout << "Rank " << m_world.rank() << std::endl;
+			for (int i = 0; i != m_cart.size(); ++i) {
+				if (m_cart.rank() == i) {
+					std::cout << "Rank " << m_cart.rank() << std::endl;
 					for (auto e : my_atypes) {
 						std::cout << e.atomic_number << " ";
 					} std::cout << std::endl;
 				}
-				MPI_Barrier(m_world.comm());
+				MPI_Barrier(m_cart.comm());
 			}
 		}
 		
 		MPI_Comm mycomm;
 		
-		MPI_Comm_split(m_world.comm(), m_world.rank(), m_world.rank(), &mycomm);
+		MPI_Comm_split(m_cart.comm(), m_cart.rank(), m_cart.rank(), &mycomm);
 		
 		// set up new scalapack grid
 //#ifdef USE_SCALAPACK
 		int sysctxt = -1;
 		c_blacs_get(0, 0, &sysctxt);
 		
-		std::vector<int> contexts(m_world.size(),0);
+		std::vector<int> contexts(m_cart.size(),0);
 		int prevctxt = scalapack::global_grid.ctx();
 		
-		for (int r = 0; r != m_world.size(); ++r) {
+		for (int r = 0; r != m_cart.size(); ++r) {
 			contexts[r] = sysctxt;
 			int usermap[1] = {r};
 			c_blacs_gridmap(&contexts[r], &usermap[0], 1, 1, 1);
 		}
 		
-		scalapack::global_grid.set(contexts[m_world.rank()]);
+		scalapack::global_grid.set(contexts[m_cart.rank()]);
 		
 //#endif
 		
-		//for (int r = 0; r != m_world.size(); ++r) {
+		//for (int r = 0; r != m_cart.size(); ++r) {
 			
-		//if (r == m_world.rank()) {
+		//if (r == m_cart.rank()) {
 		
 		for (int I = 0; I != my_atypes.size(); ++I) {
 			
@@ -279,7 +279,7 @@ void hfmod::compute_guess() {
 				
 			}*/
 			
-			std::string name = "ATOM_rank" + std::to_string(m_world.rank()) + "_" + std::to_string(Z);
+			std::string name = "ATOM_rank" + std::to_string(m_cart.rank()) + "_" + std::to_string(Z);
 			
 			bool spinav = m_opt.get<bool>("SAD_spin_average",HF_SAD_SPIN_AVERAGE);
 			
@@ -301,13 +301,13 @@ void hfmod::compute_guess() {
 				at_smol->print_info(LOG.global_plev());
 			}
 			
-			dbcsr::world at_world(mycomm);
+			dbcsr::cart at_cart(mycomm);
 			
-			hf::hfmod atomic_hf(at_world,at_smol,at_opt);
+			hf::hfmod atomic_hf(at_cart,at_smol,at_opt);
 			
-			LOG(m_world.rank()).os<1>("Starting Atomic UHF for atom nr. ", I, " on rank ", m_world.rank(), '\n');
+			LOG(m_cart.rank()).os<1>("Starting Atomic UHF for atom nr. ", I, " on rank ", m_cart.rank(), '\n');
 			atomic_hf.compute();
-			LOG(m_world.rank()).os<1>("Done with Atomic UHF for atom nr. ", I, " on rank ", m_world.rank(), "\n");
+			LOG(m_cart.rank()).os<1>("Done with Atomic UHF for atom nr. ", I, " on rank ", m_cart.rank(), "\n");
 			
 			auto at_wfn = atomic_hf.wfn();
 			
@@ -317,7 +317,7 @@ void hfmod::compute_guess() {
 			auto b = at_smol->dims().b();
 			auto pA = dbcsr::matrix<>::create()
 				.name("p_bb_A")
-				.set_world(at_world)
+				.set_cart(at_cart)
 				.row_blk_sizes(b)
 				.col_blk_sizes(b)
 				.matrix_type(dbcsr::type::symmetric)
@@ -355,33 +355,33 @@ void hfmod::compute_guess() {
 		
 		//}
 		
-		//MPI_Barrier(m_world.comm());
+		//MPI_Barrier(m_cart.comm());
 		
 		//}
 		
-		MPI_Barrier(m_world.comm());
+		MPI_Barrier(m_cart.comm());
 		
 //#ifdef USE_SCALAPACK
 		scalapack::global_grid.free();
 		scalapack::global_grid.set(prevctxt);
 //#endif
 		
-		MPI_Barrier(m_world.comm());
+		MPI_Barrier(m_cart.comm());
 		
 		//std::cout << "DISTRIBUTING" << std::endl;
 		
 		// distribute to other nodes
-		for (int i = 0; i != m_world.size(); ++i) {
+		for (int i = 0; i != m_cart.size(); ++i) {
 			
 			//std::cout << "LOOP: " << i << std::endl;
 			
-			if (i == m_world.rank()) {
+			if (i == m_cart.rank()) {
 				
 				int n = locdensitymap.size();
 				
 				//std::cout << "N: " << n << std::endl;
 				
-				MPI_Bcast(&n,1,MPI_INT,i,m_world.comm());
+				MPI_Bcast(&n,1,MPI_INT,i,m_cart.comm());
 				
 				for (auto& den : locdensitymap) {
 					
@@ -389,18 +389,18 @@ void hfmod::compute_guess() {
 					size_t size = den.second.size();
 					
 					//std::cout << "B1 " << Z << std::endl;
-					MPI_Bcast(&Z,1,MPI_INT,i,m_world.comm());
+					MPI_Bcast(&Z,1,MPI_INT,i,m_cart.comm());
 					//std::cout << "B2 " << size << std::endl;
-					MPI_Bcast(&size,1,MPI_UNSIGNED,i,m_world.comm());
+					MPI_Bcast(&size,1,MPI_UNSIGNED,i,m_cart.comm());
 					
 					auto& mat = den.second;
 					
 					//std::cout << "B3" << std::endl;
-					MPI_Bcast(mat.data(),size,MPI_DOUBLE,i,m_world.comm());
+					MPI_Bcast(mat.data(),size,MPI_DOUBLE,i,m_cart.comm());
 					
 					densitymap[Z] = mat;
 					
-					MPI_Barrier(m_world.comm());
+					MPI_Barrier(m_cart.comm());
 					
 				 }
 				
@@ -408,31 +408,31 @@ void hfmod::compute_guess() {
 				
 				int n = -1;
 				
-				MPI_Bcast(&n,1,MPI_INT,i,m_world.comm());
+				MPI_Bcast(&n,1,MPI_INT,i,m_cart.comm());
 				
 				for (int ni = 0; ni != n; ++ni) {
 					
 					size_t size = 0;
 					int Z = 0;
 					
-					MPI_Bcast(&Z,1,MPI_INT,i,m_world.comm());
-					MPI_Bcast(&size,1,MPI_UNSIGNED,i,m_world.comm());
+					MPI_Bcast(&Z,1,MPI_INT,i,m_cart.comm());
+					MPI_Bcast(&size,1,MPI_UNSIGNED,i,m_cart.comm());
 					
 					//std::cout << "Other rank: " << Z << " " << size << std::endl;
 					
 					Eigen::MatrixXd mat((int)sqrt(size),(int)sqrt(size));
 					
-					MPI_Bcast(mat.data(),size,MPI_DOUBLE,i,m_world.comm());
+					MPI_Bcast(mat.data(),size,MPI_DOUBLE,i,m_cart.comm());
 					
 					densitymap[Z] = mat;
 					
-					MPI_Barrier(m_world.comm());
+					MPI_Barrier(m_cart.comm());
 					
 				}
 				
 			}
 			
-			MPI_Barrier(m_world.comm());
+			MPI_Barrier(m_cart.comm());
 			
 		}
 			
@@ -458,7 +458,7 @@ void hfmod::compute_guess() {
 		
 		
 		auto b = m_mol->dims().b();
-		m_p_bb_A = dbcsr::eigen_to_matrix(ptot_eigen, m_world, "p_bb_A", b, b, dbcsr::type::symmetric);
+		m_p_bb_A = dbcsr::eigen_to_matrix(ptot_eigen, m_cart, "p_bb_A", b, b, dbcsr::type::symmetric);
 		
 		if (m_guess == "SADNO") {
 			
@@ -542,7 +542,7 @@ void hfmod::compute_guess() {
 		}
 		
 		auto mol_sub = desc::molecule::create()
-			.comm(m_world.comm())
+			.comm(m_cart.comm())
 			.name("SUB")
 			.atoms(m_mol->atoms())
 			.cluster_basis(cbas2)
@@ -563,7 +563,7 @@ void hfmod::compute_guess() {
 			opt2.set<std::string>("dfbasis", m_opt.get<std::string>("dfbasis2"));
 		}
 		
-		hfmod subhf(m_world, mol_sub, opt2);
+		hfmod subhf(m_cart, mol_sub, opt2);
 		subhf.compute();
 		
 		LOG.os<>("Finished Hartree Fock computation with secondary basis set.\n");
@@ -584,13 +584,13 @@ void hfmod::compute_guess() {
 		lltsolver.compute();
 		auto s_inv_bb = lltsolver.inverse(b);
 		
-		ints::aofactory aofac(m_mol, m_world);
+		ints::aofactory aofac(m_mol, m_cart);
 		auto s_bb2 = aofac.ao_overlap2();
 		
 		//dbcsr::print(*s_bb2);
 		
 		auto x_bb2 = dbcsr::matrix<double>::create()
-			.set_world(m_world)
+			.set_cart(m_cart)
 			.name("x_bb2")
 			.row_blk_sizes(b)
 			.col_blk_sizes(b2)
@@ -601,7 +601,7 @@ void hfmod::compute_guess() {
 			.perform();
 			
 		auto c_bo_A = dbcsr::matrix<double>::create()
-			.set_world(m_world)
+			.set_cart(m_cart)
 			.name("c_bo_A")
 			.row_blk_sizes(b)
 			.col_blk_sizes(oa)
@@ -621,7 +621,7 @@ void hfmod::compute_guess() {
 			int ncols = c_bm->nfullcols_total();
 			Eigen::MatrixXd c_bm_eigen = Eigen::MatrixXd::Zero(nrows,ncols);
 			c_bm_eigen.block(0,0,c_bo_eigen.rows(),c_bo_eigen.cols()) = c_bo_eigen;
-			c_bm = dbcsr::eigen_to_matrix(c_bm_eigen, m_world, c_bm->name(), 
+			c_bm = dbcsr::eigen_to_matrix(c_bm_eigen, m_cart, c_bm->name(), 
 				b, m, dbcsr::type::no_symmetry);
 		};
 		
@@ -637,7 +637,7 @@ void hfmod::compute_guess() {
 		if (m_c_bm_B) {
 			
 			auto c_bo_B = dbcsr::matrix<double>::create()
-				.set_world(m_world)
+				.set_cart(m_cart)
 				.name("c_bo_B")
 				.row_blk_sizes(b)
 				.col_blk_sizes(ob)

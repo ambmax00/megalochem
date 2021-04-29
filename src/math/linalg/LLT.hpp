@@ -23,7 +23,7 @@ private:
 public:
 
 	LLT(dbcsr::shared_matrix<double>& mat, int print) : 
-		m_mat_in(mat), LOG(m_mat_in->get_world().comm(),print) {}
+		m_mat_in(mat), LOG(m_mat_in->get_cart().comm(),print) {}
 	~LLT() {}
 	
 	void compute();

@@ -9,11 +9,11 @@ smat transform(smat c, smat dip) {
 		
 	auto b = c->row_blk_sizes();
 	auto m = c->col_blk_sizes();
-	auto w = c->get_world();
+	auto w = c->get_cart();
 	
 	auto temp = dbcsr::create<double>()
 		.name("temp")
-		.set_world(w)
+		.set_cart(w)
 		.row_blk_sizes(b)
 		.col_blk_sizes(m)
 		.matrix_type(dbcsr::type::no_symmetry)
@@ -21,7 +21,7 @@ smat transform(smat c, smat dip) {
 		
 	auto dip_mm = dbcsr::create<double>()
 		.name("dip_mm")
-		.set_world(w)
+		.set_cart(w)
 		.row_blk_sizes(m)
 		.col_blk_sizes(m)
 		.matrix_type(dbcsr::type::no_symmetry)
@@ -67,7 +67,7 @@ double jacobi_sweep_serial(smat& c_dist, smat& x_dist, smat& y_dist, smat& z_dis
 	auto x = dbcsr::matrix_to_eigen(x_dist);
 	auto y = dbcsr::matrix_to_eigen(y_dist);
 	auto z = dbcsr::matrix_to_eigen(z_dist);
-	auto w = c_dist->get_world();
+	auto w = c_dist->get_cart();
 	
 	int nbas = c_dist->nfullrows_total();
 	int norb = c_dist->nfullcols_total();
@@ -695,7 +695,7 @@ void form_type() {
 
 double jacobi_sweep_mpi(smat& c_dist, smat& x_dist, smat& y_dist, smat& z_dist) {
 	
-	auto w = c_dist->get_world();
+	auto w = c_dist->get_cart();
 	int mpi_rank = w.rank();
 	int mpi_size = w.size();
 	
@@ -953,7 +953,7 @@ std::pair<smat_d,smat_d>
 	form_type();
 	
 	auto moms = m_aofac->ao_emultipole();
-	int nproc = c_bm->get_world().size();
+	int nproc = c_bm->get_cart().size();
 	
 	auto dip_bb_x = moms[0];
 	auto dip_bb_y = moms[1];

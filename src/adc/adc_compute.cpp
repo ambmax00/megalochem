@@ -16,14 +16,14 @@ dbcsr::shared_matrix<double> canonicalize(dbcsr::shared_matrix<double> u_lm,
 	
 	std::cout << "CANONICALIZING!!!" << std::endl;
 	
-	auto w = u_lm->get_world();
+	auto w = u_lm->get_cart();
 	
 	auto l = u_lm->row_blk_sizes();
 	auto m = u_lm->col_blk_sizes();
 	
 	auto f_mm = dbcsr::matrix<>::create()
 		.name("f_mm")
-		.set_world(w)
+		.set_cart(w)
 		.row_blk_sizes(m)
 		.col_blk_sizes(m)
 		.matrix_type(dbcsr::type::no_symmetry)
@@ -113,7 +113,7 @@ void adcmod::compute() {
 		
 		std::string name = "guess_" + std::to_string(i);
 		
-		auto guessmat = dbcsr::eigen_to_matrix(mat, m_world, name,
+		auto guessmat = dbcsr::eigen_to_matrix(mat, m_cart, name,
 			o, v, dbcsr::type::no_symmetry);
 		
 		dav_eigvecs[i] = guessmat;
@@ -142,7 +142,7 @@ void adcmod::compute() {
 	if (do_adc1) {
 	
 		auto adc1_mvp = create_adc1();
-		math::davidson<MVP> dav(m_world.comm(), LOG.global_plev());
+		math::davidson<MVP> dav(m_cart.comm(), LOG.global_plev());
 		
 		dav.set_factory(adc1_mvp);
 		dav.set_diag(m_d_ov);
@@ -155,7 +155,7 @@ void adcmod::compute() {
 		auto& t_davidson = TIME.sub("Davidson diagonalization");
 		
 		/*
-		auto r = filio::read_matrix("lauric.dat", "name", m_world, o, v,
+		auto r = filio::read_matrix("lauric.dat", "name", m_cart, o, v,
 			dbcsr::type::no_symmetry);
 			
 		auto nto = get_canon_pao(r, m_hfwfn->c_bo_A(),
@@ -197,7 +197,7 @@ void adcmod::compute() {
 		}
 		LOG.os<>('\n');
 		
-		locorb::mo_localizer moloc(m_world, m_hfwfn->mol());
+		locorb::mo_localizer moloc(m_cart, m_hfwfn->mol());
 		
 		auto reg = m_ao.get_registry();
 		auto s_bb = reg.get<dbcsr::shared_matrix<double>>(ints::key::ovlp_bb);
@@ -223,7 +223,7 @@ void adcmod::compute() {
 		
 		LOG.os<>("OCCUP: ", pv->occupation(), " ", pvloc->occupation(), '\n');
 		
-		MPI_Barrier(m_world.comm());
+		MPI_Barrier(m_cart.comm());
 		exit(0);
 		
 		int nbas = m_hfwfn->mol()->c_basis()->nbf();
@@ -261,7 +261,7 @@ void adcmod::compute() {
 		}
 		
 		
-		ints::aoloader fragloader(m_world, mol_frag, m_opt);
+		ints::aoloader fragloader(m_cart, mol_frag, m_opt);
 		
 		fock::load_jints(fock::jmethod::dfao, ints::metric::coulomb, fragloader);
 		fock::load_kints(fock::kmethod::dfao, ints::metric::coulomb, fragloader);
@@ -273,7 +273,7 @@ void adcmod::compute() {
 		auto v_xx = freg.get<dbcsr::shared_matrix<double>>(ints::key::coul_xx_inv);
 		auto fitbatched = freg.get<dbcsr::sbtensor<3,double>>(ints::key::dfit_coul_xbb);
 		
-		auto ptr = create_MVP_AOADC1(m_world, mol_frag, LOG.global_plev())
+		auto ptr = create_MVP_AOADC1(m_cart, mol_frag, LOG.global_plev())
 			.c_bo(co_pr)
 			.c_bv(cv_ps)
 			.eps_occ(epso_r)
@@ -300,7 +300,7 @@ void adcmod::compute() {
 		
 		LOG.os<>("ENERGY: ", energy, '\n');
 			
-		MPI_Barrier(m_world.comm());
+		MPI_Barrier(m_cart.comm());
 		exit(0);*/
 		
 		LOG.os<>("==== Starting ADC(1) Computation ====\n\n"); 
@@ -358,7 +358,7 @@ void adcmod::compute() {
 	
 	LOG.os<>("==== Starting ADC(2) Computation ====\n\n"); 
 	
-	math::diis_davidson<MVP> mdav(m_world.comm(), LOG.global_plev());
+	math::diis_davidson<MVP> mdav(m_cart.comm(), LOG.global_plev());
 	
 	double conv_micro_adc2 = m_opt.get<double>("adc2/micro_conv", ADC_ADC2_MICRO_CONV);
 	double conv_macro_adc2 = m_opt.get<double>("adc2(macro_conv", ADC_ADC2_MACRO_CONV);
@@ -440,8 +440,8 @@ std::tuple<std::vector<int>, std::vector<int>>
 		
 	//return std::make_tuple(retmol,retvec);
 	
-	auto dims = m_world.dims();
-    auto dist = dbcsr::default_dist(b.size(), m_world.size(), b);
+	auto dims = m_cart.dims();
+    auto dist = dbcsr::default_dist(b.size(), m_cart.size(), b);
     
     double norm = u_bb_a->norm(dbcsr_norm_frobenius);
     
@@ -462,7 +462,7 @@ std::tuple<std::vector<int>, std::vector<int>>
     // loop over blocks rows/cols
     for (int iblk = 0; iblk != b.size(); ++iblk) {
 		
-		if (dist[iblk] == m_world.rank()) {
+		if (dist[iblk] == m_cart.rank()) {
 			
 			int blksize_i = b[iblk];
 			
@@ -510,10 +510,10 @@ std::tuple<std::vector<int>, std::vector<int>>
 	
 	// communicate to all processes
 	MPI_Allreduce(MPI_IN_PLACE, occ_norms.data(), b.size(), MPI_DOUBLE,
-		MPI_SUM, m_world.comm());
+		MPI_SUM, m_cart.comm());
 		
 	MPI_Allreduce(MPI_IN_PLACE, vir_norms.data(), b.size(), MPI_DOUBLE,
-		MPI_SUM, m_world.comm());
+		MPI_SUM, m_cart.comm());
 	
 	LOG.os<2>("NORMS ALL (OCC): \n");
 	for (auto v : occ_norms) {
@@ -601,14 +601,14 @@ std::tuple<std::vector<int>, std::vector<int>>
 		
 	LOG.os<>("IDX ALL: \n");
 	
-	MPI_Barrier(m_world.comm());
-	for (int ip = 0; ip != m_world.size(); ++ip) {
-		if (ip == m_world.rank()) {
+	MPI_Barrier(m_cart.comm());
+	for (int ip = 0; ip != m_cart.size(); ++ip) {
+		if (ip == m_cart.rank()) {
 			for (auto v : idx_all) {
 				std::cout << v << " ";
 			} std::cout << std::endl;
 		}
-		MPI_Barrier(m_world.comm());
+		MPI_Barrier(m_cart.comm());
 	}
 	
 	return std::make_tuple(atoms_all, idx_all);
@@ -618,7 +618,7 @@ std::tuple<std::vector<int>, std::vector<int>>
 	
 	// now add blocks connected to indices by metric
 		
-	MPI_Comm comm = m_world.comm();
+	MPI_Comm comm = m_cart.comm();
 	
 	auto idx_check_aug = idx_check;
 	int nblk = idx_check.size();
@@ -713,12 +713,12 @@ adcmod::canon_lmo adcmod::get_canon_nto(dbcsr::shared_matrix<double> u_ia,
 	
 	LOG.os<>("-- Forming Fock matrices\n"); 
 	
-	auto wrd = c_bo->get_world();
+	auto wrd = c_bo->get_cart();
 	
 	auto form_fock = [&](std::vector<int> m, std::vector<double> eps_m) {
 		
 		auto f = dbcsr::matrix<>::create()
-			.set_world(wrd)
+			.set_cart(wrd)
 			.name("fock")
 			.row_blk_sizes(m)
 			.col_blk_sizes(m)
@@ -756,7 +756,7 @@ adcmod::canon_lmo adcmod::get_canon_nto(dbcsr::shared_matrix<double> u_ia,
 	
 	auto trans_ot = dbcsr::matrix<>::create()
 		.name("trans ot")
-		.set_world(wrd)
+		.set_cart(wrd)
 		.row_blk_sizes(o)
 		.col_blk_sizes(t)
 		.matrix_type(dbcsr::type::no_symmetry)
@@ -764,7 +764,7 @@ adcmod::canon_lmo adcmod::get_canon_nto(dbcsr::shared_matrix<double> u_ia,
 		
 	auto trans_vs = dbcsr::matrix<>::create()
 		.name("trans vs")
-		.set_world(wrd)
+		.set_cart(wrd)
 		.row_blk_sizes(v)
 		.col_blk_sizes(s)
 		.matrix_type(dbcsr::type::no_symmetry)
@@ -772,7 +772,7 @@ adcmod::canon_lmo adcmod::get_canon_nto(dbcsr::shared_matrix<double> u_ia,
 	
 	auto c_bt = dbcsr::matrix<>::create()
 		.name("SVD c_bo")
-		.set_world(wrd)
+		.set_cart(wrd)
 		.row_blk_sizes(b)
 		.col_blk_sizes(t)
 		.matrix_type(dbcsr::type::no_symmetry)
@@ -780,7 +780,7 @@ adcmod::canon_lmo adcmod::get_canon_nto(dbcsr::shared_matrix<double> u_ia,
 		
 	auto c_bs = dbcsr::matrix<>::create()
 		.name("SVD c_bv")
-		.set_world(wrd)
+		.set_cart(wrd)
 		.row_blk_sizes(b)
 		.col_blk_sizes(s)
 		.matrix_type(dbcsr::type::no_symmetry)
@@ -830,7 +830,7 @@ adcmod::canon_lmo adcmod::get_canon_pao(dbcsr::shared_matrix<double> u_ia,
 	
 	auto [atom_blks, basis_blks] = get_significant_blocks(u_ia, theta, nullptr, 0.0);
 	
-	locorb::mo_localizer moloc(m_world, m_hfwfn->mol());
+	locorb::mo_localizer moloc(m_cart, m_hfwfn->mol());
 	
 	auto reg = m_aoloader->get_registry();
 	auto s_bb = reg.get<dbcsr::shared_matrix<double>>(ints::key::ovlp_bb);

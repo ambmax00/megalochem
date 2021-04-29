@@ -391,6 +391,10 @@ public:
 
 };
 
+struct data_io {
+	std::shared_ptr<data_handler> input_fh, output_fh;
+};
+
 } // end namespace
 
 #endif

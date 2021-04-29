@@ -40,7 +40,7 @@ SMatrixXi get_shellpairs(dbcsr::sbtensor<3,double> eri_batched);
 class Z {
 protected:
 
-	dbcsr::world m_world;
+	dbcsr::cart m_cart;
 	desc::shared_molecule m_mol;
 	util::mpi_log LOG;
 	util::mpi_time TIME;
@@ -59,11 +59,11 @@ protected:
 
 public:
 
-	Z(dbcsr::world w, desc::shared_molecule smol, int nprint, std::string mname) : 
-		m_world(w),
+	Z(dbcsr::cart w, desc::shared_molecule smol, int nprint, std::string mname) : 
+		m_cart(w),
 		m_mol(smol),
-		LOG(m_world.comm(), nprint),
-		TIME (m_world.comm(), mname) {}
+		LOG(m_cart.comm(), nprint),
+		TIME (m_cart.comm(), mname) {}
 
 	Z& set_occ_density(dbcsr::shared_matrix<double>& pocc) {
 		m_pocc = pocc;
@@ -106,12 +106,12 @@ public:
 };
 
 #define Z_INIT_LIST (\
-	((dbcsr::world), set_world),\
+	((dbcsr::cart), set_cart),\
 	((desc::shared_molecule), set_molecule),\
 	((util::optional<int>), print))
 
 #define Z_INIT_CON(name) \
-	Z(p.p_set_world, p.p_set_molecule, (p.p_print) ? *p.p_print : 0, #name)
+	Z(p.p_set_cart, p.p_set_molecule, (p.p_print) ? *p.p_print : 0, #name)
 
 class LLMP_FULL_Z : public Z {
 private:	
@@ -160,7 +160,7 @@ private:
 		
 public:
 
-	LL_Z(dbcsr::world w, desc::shared_molecule smol, int nprint) :
+	LL_Z(dbcsr::cart w, desc::shared_molecule smol, int nprint) :
 		Z(w,smol,nprint,"LL") {}
 
 	void init() override;
@@ -174,7 +174,7 @@ public:
 MAKE_STRUCT(
 	LL_Z, Z,
 	(
-		(world, (dbcsr::world)),
+		(cart, (dbcsr::cart)),
 		(mol, (desc::shared_molecule)),
 		(print, (int))
 	),
@@ -227,7 +227,7 @@ private:
 public:
 
 #:set list = [&
-	['world', 'dbcsr::world', _REQ, _VAL],&
+	['cart', 'dbcsr::cart', _REQ, _VAL],&
 	['molecule', 'desc::shared_molecule', _REQ, _VAL],&
 	['print', 'int', _OPT, _VAL],&
 	['t3c2e_left_batched', 'dbcsr::sbtensor<3,double>', _REQ, _VAL],&
@@ -336,7 +336,7 @@ public:
 		if (*c_method == zmethod::llmp_full) {
 		
 			zbuilder = LLMP_FULL_Z::create()
-				.set_world(c_set_world)
+				.set_cart(c_set_cart)
 				.set_molecule(c_set_molecule)
 				.print((c_print) ? *c_print : 0)
 				.eri3c2e_batched(eri3c2e_batched)
@@ -347,7 +347,7 @@ public:
 		} else if (*c_method == zmethod::llmp_mem) {
 			
 			zbuilder = LLMP_MEM_Z::create()
-				.set_world(c_set_world)
+				.set_cart(c_set_cart)
 				.set_molecule(c_set_molecule)
 				.print((c_print) ? *c_print : 0)
 				.eri3c2e_batched(eri3c2e_batched)
