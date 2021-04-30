@@ -3,6 +3,8 @@
 
 #include <string>
 
+namespace megalochem {
+
 namespace hf {
 
 static const int HF_PRINT_LEVEL = 0;
@@ -28,6 +30,8 @@ static const std::string HF_METRIC = "coulomb";
 static const std::string HF_GUESS = "core";
 static const std::string HF_SAD_GUESS = "core";
 
-} // end namesapce
+} // end namespace hf
+
+} // end namespace mega
 
 #endif

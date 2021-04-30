@@ -1,15 +1,20 @@
 #ifndef MATH_LAPLACE_HELPER
 #define MATH_LAPLACE_HELPER
 
+#include "megalochem.hpp"
 #include <dbcsr_matrix_ops.hpp>
 #include "utils/mpi_log.hpp"
 #include "math/laplace/laplace.hpp"
 #include "math/linalg/piv_cd.hpp"
 
+namespace megalochem {
+
 namespace math {
 	
 class laplace_helper {
 private:
+
+	world m_world;
 	
 	util::mpi_log LOG;
 	
@@ -25,7 +30,8 @@ private:
 		
 public:
 
-	laplace_helper(int nlap, 
+	laplace_helper(
+		world w, int nlap, 
 		dbcsr::shared_matrix<double> c_bo,
 		dbcsr::shared_matrix<double> c_bv, 
 		dbcsr::shared_matrix<double> s_sqrt,
@@ -35,7 +41,7 @@ public:
 		int nprint) :
 	m_nlap(nlap), m_c_bo(c_bo), m_c_bv(c_bv), m_s_sqrt(s_sqrt), m_s_invsqrt(s_invsqrt),
 		m_eps_occ(eps_occ), m_eps_vir(eps_vir),
-		LOG(c_bo->get_cart().comm(), nprint)
+		LOG(c_bo->get_cart().comm(), nprint), m_world(w)
 	{}
 	
 	laplace_helper(const laplace_helper& in) = default;
@@ -99,7 +105,7 @@ public:
 			
 		auto p_ortho = get_density(coeff_ortho);
 		
-		math::pivinc_cd chol(p_ortho, LOG.global_plev());
+		math::pivinc_cd chol(m_world, p_ortho, LOG.global_plev());
 		chol.compute(max_rank);
 		
 		int rank = chol.rank();
@@ -152,7 +158,7 @@ public:
 		LOG.os<1>("eps_min/eps_homo/eps_lumo/eps_max ", emin, " ", ehomo, " ", elumo, " ", emax, '\n');
 		LOG.os<1>("ymin/ymax ", ymin, " ", ymax, '\n');
 		
-		math::laplace lp(m_c_bo->get_cart().comm(), LOG.global_plev());
+		math::laplace lp(m_world.comm(), LOG.global_plev());
 		
 		lp.compute(m_nlap, ymin, ymax);
 			
@@ -217,5 +223,7 @@ public:
 };
 
 } // end namespace
+
+} // end namespace megalochem
 
 #endif

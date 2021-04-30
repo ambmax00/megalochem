@@ -3,6 +3,8 @@
 #include "math/linalg/LLT.hpp"
 #include "math/solvers/hermitian_eigen_solver.hpp"
 
+namespace megalochem {
+
 namespace ints {
 
 using smatd = dbcsr::shared_matrix<double>;
@@ -13,7 +15,7 @@ std::pair<smatd,smatd> aoloader::invert(smatd in) {
 	
 	auto m = in->row_blk_sizes();
 	
-	math::LLT chol(in, LOG.global_plev());
+	math::LLT chol(m_world, in, LOG.global_plev());
 	chol.compute();
 	
 	auto linv = chol.L_inv(m);
@@ -38,9 +40,9 @@ void aoloader::compute() {
 	TIME.start();
 	
 	std::shared_ptr<ints::aofactory> m_aofac 
-		= std::make_shared<ints::aofactory>(m_mol, m_cart);
+		= std::make_shared<ints::aofactory>(m_mol, m_world);
 	
-	ints::dfitting dfit(m_cart, m_mol, LOG.global_plev());
+	ints::dfitting dfit(m_world, m_mol, LOG.global_plev());
 	
 	// setup all pgrids
 	dbcsr::shared_pgrid<2> spgrid2;
@@ -287,7 +289,7 @@ void aoloader::compute() {
 		std::shared_ptr<ints::screener> scr;
 		//if (comp(key::coul_xbb)) 
 		//if (comp(key::erfc_xbb)) scr.reset(new ints::schwarz_screener(m_aofac,"erfc_coulomb"));
-		scr.reset(new ints::schwarz_screener(m_cart, m_mol));		
+		scr.reset(new ints::schwarz_screener(m_world, m_mol));		
 		scr->compute();
 				
 		m_reg.insert(key::scr_xbb,scr);
@@ -541,3 +543,5 @@ void aoloader::compute() {
 }
 	
 } // end namespace
+
+} // end megalochem

@@ -3,6 +3,8 @@
 #include "math/linalg/LLT.hpp"
 #include <dbcsr_tensor_ops.hpp>
 
+namespace megalochem {
+
 namespace fock {
 
 void EXACT_J::init() {
@@ -163,5 +165,6 @@ void EXACT_K::compute_K() {
 		
 }
 	
-	
 } // end namespace
+
+} // end mega

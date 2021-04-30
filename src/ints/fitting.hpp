@@ -1,7 +1,6 @@
 #ifndef INTS_FITTING_H
 #define INTS_FITTING_H
 
-#include "utils/registry.hpp"
 #include "desc/molecule.hpp"
 #include "desc/options.hpp"
 #include "ints/screening.hpp"
@@ -11,11 +10,14 @@
 #include <dbcsr_matrix.hpp>
 #include "utils/mpi_time.hpp"
 
+namespace megalochem {
+
 namespace ints {
 
 class dfitting {
 private:
 
+	world m_world;
 	dbcsr::cart m_cart;
 	desc::shared_molecule m_mol;
 	util::mpi_log LOG;
@@ -23,8 +25,8 @@ private:
 
 public:
 
-	dfitting(dbcsr::cart w, desc::shared_molecule smol, int print = 0) :
-		m_cart(w),
+	dfitting(world w, desc::shared_molecule smol, int print = 0) :
+		m_world(w), m_cart(w.dbcsr_grid()),
 		m_mol(smol),
 		LOG(w.comm(), print),
 		TIME(w.comm(), "Fitting Coefficients")
@@ -58,5 +60,7 @@ public:
 };
 	
 } // end namespace
+
+} // end megalochem
 
 #endif

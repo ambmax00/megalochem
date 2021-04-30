@@ -1,17 +1,20 @@
 #ifndef ADC_ADCMOD_H 
 #define ADC_ADCMOD_H
 
+#include "megalochem.hpp"
 #include "desc/options.hpp"
 #include "hf/hf_wfn.hpp"
 #include "utils/mpi_time.hpp"
 #include "adc/adc_defaults.hpp"
 #include "adc/adc_mvp.hpp"
-#include "utils/registry.hpp"
+#include "ints/registry.hpp"
 #include "ints/fitting.hpp"
 #include <dbcsr_matrix.hpp>
 #include <dbcsr_tensor.hpp>
 
 #include <mpi.h>
+
+namespace megalochem {
 
 namespace adc {
 
@@ -25,6 +28,7 @@ private:
 
 	hf::shared_hf_wfn m_hfwfn;
 	desc::options m_opt;
+	megalochem::world m_world;
 	dbcsr::cart m_cart;
 	
 	util::mpi_time TIME;
@@ -65,7 +69,7 @@ private:
 	
 public:	
 
-	adcmod(dbcsr::cart w, hf::shared_hf_wfn hfref, desc::options& opt);
+	adcmod(world w, hf::shared_hf_wfn hfref, desc::options& opt);
 	~adcmod() {}
 	
 	void compute();
@@ -73,6 +77,8 @@ public:
 };
 
 } // end namespace
+
+} // end namespace mega
 
 #endif
 	

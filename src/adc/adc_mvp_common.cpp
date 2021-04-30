@@ -1,5 +1,7 @@
 #include "adc/adc_mvp.hpp"
 
+namespace megalochem {
+
 namespace adc {
 	
 /* transforms u */
@@ -37,8 +39,8 @@ smat u_transform(smat& u, char to, smat& c_bo, char tv, smat& c_bv) {
 	
 }
 	
-MVP::MVP(dbcsr::cart w, desc::shared_molecule smol, int nprint, std::string name) :
-	m_cart(w), m_mol(smol), 
+MVP::MVP(megalochem::world w, desc::shared_molecule smol, int nprint, std::string name) :
+	m_world(w), m_cart(w.dbcsr_grid()), m_mol(smol), 
 	LOG(w.comm(), nprint),
 	TIME(w.comm(), name)
 {}
@@ -67,3 +69,5 @@ smat MVP::compute_sigma_0(smat& u_ia, std::vector<double> epso,
 }
 
 } // end namespace
+
+} // end mega

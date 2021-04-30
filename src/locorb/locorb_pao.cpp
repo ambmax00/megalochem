@@ -4,6 +4,8 @@
 #include "math/solvers/hermitian_eigen_solver.hpp"
 #include "utils/matrix_plot.hpp"
 
+namespace megalochem {
+
 namespace locorb {
 
 std::pair<smat_d,smat_d> mo_localizer::compute_pao(smat_d c_bm, smat_d s_bb) {
@@ -67,7 +69,7 @@ std::tuple<smat_d, smat_d, std::vector<double>>
 	
 	auto s_pp = dbcsr::matrix<>::create()
 		.name("s_pp")
-		.set_cart(m_cart)
+		.set_cart(m_world.dbcsr_grid())
 		.row_blk_sizes(p)
 		.col_blk_sizes(p)
 		.matrix_type(dbcsr::type::no_symmetry)
@@ -75,7 +77,7 @@ std::tuple<smat_d, smat_d, std::vector<double>>
 	
 	auto s_pb = dbcsr::matrix<>::create()
 		.name("s_pb")
-		.set_cart(m_cart)
+		.set_cart(m_world.dbcsr_grid())
 		.row_blk_sizes(p)
 		.col_blk_sizes(b)
 		.matrix_type(dbcsr::type::no_symmetry)
@@ -132,10 +134,10 @@ std::tuple<smat_d, smat_d, std::vector<double>>
 	
 	iterpb.stop();
 			
-	math::LLT llt(s_pp, LOG.global_plev());
+	math::LLT llt(m_world, s_pp, LOG.global_plev());
 	llt.compute();
 	
-	math::LLT lltfull(s_bb, LOG.global_plev());
+	math::LLT lltfull(m_world, s_bb, LOG.global_plev());
 	lltfull.compute();
 	
 	auto s_sqrt_pp = llt.L(p);
@@ -154,7 +156,7 @@ std::tuple<smat_d, smat_d, std::vector<double>>
 	
 	auto q_pm = dbcsr::matrix<>::create()
 		.name("q_pm")
-		.set_cart(m_cart)
+		.set_cart(m_world.dbcsr_grid())
 		.row_blk_sizes(p)
 		.col_blk_sizes(m)
 		.matrix_type(dbcsr::type::no_symmetry)
@@ -162,7 +164,7 @@ std::tuple<smat_d, smat_d, std::vector<double>>
 		
 	auto temp_pb = dbcsr::matrix<>::create()
 		.name("temp_pb")
-		.set_cart(m_cart)
+		.set_cart(m_world.dbcsr_grid())
 		.row_blk_sizes(p)
 		.col_blk_sizes(b)
 		.matrix_type(dbcsr::type::no_symmetry)
@@ -181,7 +183,7 @@ std::tuple<smat_d, smat_d, std::vector<double>>
 	
 	//dbcsr::print(*q_pm);
 	
-	math::SVD svd(q_pm, 'V', 'V', LOG.global_plev());
+	math::SVD svd(m_world, q_pm, 'V', 'V', LOG.global_plev());
 	svd.compute();
 	
 	auto s = svd.s();
@@ -207,7 +209,7 @@ std::tuple<smat_d, smat_d, std::vector<double>>
 	
 	auto f_mm = dbcsr::matrix<>::create()
 		.name("Fock")
-		.set_cart(m_cart)
+		.set_cart(m_world.dbcsr_grid())
 		.row_blk_sizes(m)
 		.col_blk_sizes(m)
 		.matrix_type(dbcsr::type::no_symmetry)
@@ -215,7 +217,7 @@ std::tuple<smat_d, smat_d, std::vector<double>>
 		
 	auto f_ht_rm = dbcsr::matrix<>::create()
 		.name("Fock_HT")
-		.set_cart(m_cart)
+		.set_cart(m_world.dbcsr_grid())
 		.row_blk_sizes(r)
 		.col_blk_sizes(m)
 		.matrix_type(dbcsr::type::no_symmetry)
@@ -223,7 +225,7 @@ std::tuple<smat_d, smat_d, std::vector<double>>
 		
 	auto f_rr = dbcsr::matrix<>::create()
 		.name("Fock_HT")
-		.set_cart(m_cart)
+		.set_cart(m_world.dbcsr_grid())
 		.row_blk_sizes(r)
 		.col_blk_sizes(r)
 		.matrix_type(dbcsr::type::no_symmetry)
@@ -238,13 +240,13 @@ std::tuple<smat_d, smat_d, std::vector<double>>
 	dbcsr::multiply('N', 'T', 1.0, *f_ht_rm, *vt_rm, 0.0, *f_rr)
 		.perform();
 		
-	math::hermitian_eigen_solver hermsolver(f_rr, 'V', LOG.global_plev());
+	math::hermitian_eigen_solver hermsolver(m_world, f_rr, 'V', LOG.global_plev());
 	hermsolver.compute();
 	
 	// new molecular energies
 	auto eps_s = hermsolver.eigvals();
 	
-	if (m_cart.rank() == 0) {
+	if (m_world.rank() == 0) {
 		std::cout << "Old molecular energies: " << std::endl;
 		for (auto e : eps_m) {
 			std::cout << e << " ";
@@ -262,7 +264,7 @@ std::tuple<smat_d, smat_d, std::vector<double>>
 	// T_sm = T_rs^t Σ_r Vt_rm
 	
 	auto T_ms = dbcsr::matrix<>::create()
-		.set_cart(m_cart)
+		.set_cart(m_world.dbcsr_grid())
 		.row_blk_sizes(m)
 		.col_blk_sizes(r)
 		.name("Transformation matrix canon. MOs -> canon. truncated MOs")
@@ -276,7 +278,7 @@ std::tuple<smat_d, smat_d, std::vector<double>>
 	
 	auto c_bs = dbcsr::matrix<>::create()
 		.name(c_bm->name() + "_truncated")
-		.set_cart(m_cart)
+		.set_cart(m_world.dbcsr_grid())
 		.row_blk_sizes(b)
 		.col_blk_sizes(r)
 		.matrix_type(dbcsr::type::no_symmetry)
@@ -378,3 +380,5 @@ double mo_localizer::pop_mulliken(dbcsr::matrix<double>& c_bo,
 }*/
 
 } // end namespace
+
+} // end namespace megalochem

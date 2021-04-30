@@ -1,5 +1,7 @@
 #include "mp/z_builder.hpp"
 
+namespace megalochem {
+
 namespace mp {
 
 void LLMP_MEM_Z::init() {
@@ -611,3 +613,5 @@ void LLMP_ASYM_Z::compute() {
 }*/
 	
 } // end namespace
+
+} // end megalochem

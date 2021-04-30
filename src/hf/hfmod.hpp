@@ -1,6 +1,7 @@
 #ifndef HF_MOD_H
 #define HF_MOD_H
 
+#include "megalochem.hpp"
 #include "desc/molecule.hpp"
 #include "desc/options.hpp"
 #include "hf/hf_wfn.hpp"
@@ -16,14 +17,18 @@
 using mat_d = dbcsr::matrix<double>;
 using smat_d = dbcsr::shared_matrix<double>;
 
+namespace megalochem {
+
 namespace hf {
 	
 class hfmod {
 private:
 	
 	// descriptors
+	world m_world;
 	desc::shared_molecule m_mol;
 	desc::options m_opt;
+	
 	dbcsr::cart m_cart;
 	util::mpi_log LOG;
 	util::mpi_time TIME;
@@ -79,7 +84,7 @@ private:
 
 public:
 
-	hfmod(dbcsr::cart wrd, desc::shared_molecule mol, desc::options opt);
+	hfmod(world wrd, desc::shared_molecule mol, desc::options opt);
 	
 	hfmod() = delete;
 	hfmod(hfmod& hfmod_in) = delete;
@@ -163,5 +168,7 @@ public:
 };
 
 } // end namespace hf
+
+} // end namespace megalochem
 
 #endif

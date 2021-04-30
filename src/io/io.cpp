@@ -1,7 +1,10 @@
 #include "io/io.hpp"
 #include <Eigen/Core>
 
+namespace megalochem {
+
 namespace filio {
+	
 bool fexists(const std::string& filename) {
 		std::ifstream ifile(filename.c_str());
 		return (bool)ifile;
@@ -126,3 +129,5 @@ bool compare_outputs(std::string filename, std::string ref_filename) {
 }
 
 } // end namesapce 
+
+} // end namespace megalochem

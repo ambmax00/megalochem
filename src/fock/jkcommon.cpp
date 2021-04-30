@@ -3,10 +3,12 @@
 #include "math/linalg/LLT.hpp"
 #include <dbcsr_tensor_ops.hpp>
 
+namespace megalochem {
+
 namespace fock {
 	
-JK_common::JK_common(dbcsr::cart w, desc::shared_molecule mol, int print, std::string name) :
-	m_cart(w), m_mol(mol),
+JK_common::JK_common(world w, desc::shared_molecule mol, int print, std::string name) :
+	m_world(w), m_cart(w.dbcsr_grid()), m_mol(mol),
 	LOG(m_cart.comm(),print),
 	TIME(m_cart.comm(), name, print) {}
 	
@@ -51,3 +53,5 @@ void K::init_base() {
 }
 	
 } // end namespace
+
+} // end megalochem

@@ -1,5 +1,7 @@
 #include "mp/z_builder.hpp"
 
+namespace megalochem {
+
 namespace mp {
 
 void LLMP_FULL_Z::init() {
@@ -779,3 +781,5 @@ void LL_Z::compute() {
 #endif
 	
 } // end namespace
+
+} // end mega

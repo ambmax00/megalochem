@@ -24,6 +24,9 @@
 #include <Eigen/Eigenvalues>
 #include <Eigen/Core>
 
+#include "megalochem.hpp"
+#include "megalochem_driver.hpp"
+
 /*
 namespace megalochem {
 	
@@ -59,6 +62,38 @@ public:
 	
 };
 
+
+	
+}
+
+int main(int argc, char** argv) {
+	
+	MPI_Init(&argc,&argv);
+	MPI_Comm comm = MPI_COMM_WORLD;
+	
+	// init SCALPACK, DBCSR, etc...
+	auto megaworld = megalochem::init(comm);
+	
+	megalochem::print_devinfo(comm);
+	
+	/*
+	// init file output? checks if hdf5 present, returns fistream, fostream, logstream
+	mg::fhandle fh = megalochem::init_io(comm, hdf5name, logname);
+	
+	// stack/job controller
+	// saves file data, checks for errors.
+	
+	
+	stack = megalochem::parse_file(megaworld, file);
+	
+	stack.run(fh);
+	
+	megalochem::finalize();
+	
+}*/
+
+using namespace megalochem;
+
 void print_devinfo(MPI_Comm comm) {
 
 	util::mpi_log LOG(comm, 0);
@@ -91,116 +126,65 @@ void print_devinfo(MPI_Comm comm) {
 
 }
 	
-}
-
-int main(int argc, char** argv) {
-	
-	MPI_Init(&argc,&argv);
-	MPI_Comm comm = MPI_COMM_WORLD;
-	
-	// init SCALPACK, DBCSR, etc...
-	auto megaworld = megalochem::init(comm);
-	
-	megalochem::print_devinfo(comm);
-	
-	/*
-	// init file output? checks if hdf5 present, returns fistream, fostream, logstream
-	mg::fhandle fh = megalochem::init_io(comm, hdf5name, logname);
-	
-	// stack/job controller
-	// saves file data, checks for errors.
-	
-	
-	stack = megalochem::parse_file(megaworld, file);
-	
-	stack.run(fh);
-	
-	megalochem::finalize();
-	
-}*/
-	
 int main(int argc, char** argv) {
 
 	MPI_Init(&argc, &argv);
 	MPI_Comm comm = MPI_COMM_WORLD;
 	
-	dbcsr::init();
-	dbcsr::cart wrd(comm);
-	
 	util::mpi_time time(comm, "Megalochem");
 	util::mpi_log LOG(comm ,0);
 	
-	//std::cout << std::scientific;
-
-#ifndef DO_TESTING
 	if (argc != 3) {
 		LOG.os<>("Usage: ./chem [filename] [working_directory]\n");
 		exit(0);
 	}
-#else
-	LOG.os<>("MEGALOCHEM TEST RUN.\n");
-#endif
 	
-	std::string s = R"(|  \/  ||  ___|  __ \ / _ \ | |   |  _  /  __ \| | | ||  ___|  \/  |)""\n"
-					R"(| .  . || |__ | |  \// /_\ \| |   | | | | /  \/| |_| || |__ | .  . |)""\n"
-					R"(| |\/| ||  __|| | __ |  _  || |   | | | | |    |  _  ||  __|| |\/| |)""\n"
-					R"(| |  | || |___| |_\ \| | | || |___\ \_/ / \__/\| | | || |___| |  | |)""\n"
-					R"(\_|  |_/\____/ \____/\_| |_/\_____/\___/ \____/\_| |_/\____/\_|  |_/)";
-	
-	LOG.banner(s,90,'*');
-	LOG.os<>('\n');
-	
-#ifndef NDEBUG
-	LOG.os<>("Build type: DEBUG\n\n");
-#else 
-	LOG.os<>("Build type: RELEASE\n\n");
-#endif
-
-	LOG.os<>("Authors: \n \t M. A. Ambroise\n\n");
-	LOG.os<>("Commit: ", GitMetadata::CommitSHA1(), '\n'); 
-
-
 	std::string filename(argv[1]);
 	std::string workdir(argv[2]);
 	
-	if (!std::filesystem::exists(workdir))
-		throw std::runtime_error("Working directory does not exist.");
+	megalochem::init(comm, workdir);
 	
-	//set working directory
-	std::filesystem::current_path(workdir);
+	megalochem::world mega_world(comm);
+	
+	
+	
+	print_devinfo(comm);
+	
+	LOG.os<>("Running ", mega_world.size(), " MPI processes with ", 
+		omp_get_max_threads(), " threads each.\n\n");
 	
 	// set up files
 	std::string hdf5file = filename + ".hdf5";
 	std::string hdf5backup = filename + ".back.hdf5";
 	
-	filio::data_handler *dh, *dh_back;
+	std::shared_ptr<filio::data_handler> dh, dh_back;
 	
 	if (std::filesystem::exists(hdf5file)) {
-		if (wrd.rank() == 0 && std::filesystem::exists(hdf5backup))
+		if (mega_world.rank() == 0 && std::filesystem::exists(hdf5backup))
 			std::filesystem::remove(hdf5backup);
 		
-		if (wrd.rank() == 0) std::filesystem::copy(hdf5file, hdf5backup);
+		if (mega_world.rank() == 0) std::filesystem::copy(hdf5file, hdf5backup);
 		
-		dh_back = new filio::data_handler(hdf5backup, 
+		dh_back = std::make_shared<filio::data_handler>(hdf5backup, 
 			filio::create_mode::append, comm);
 	}
 	
-	dh = new filio::data_handler(hdf5file, filio::create_mode::truncate, 
-		comm);
+	dh = std::make_shared<filio::data_handler>(hdf5file, 
+		filio::create_mode::truncate, comm);
+		
+	filio::data_io fh = {dh_back,dh};
+		
+	megalochem::driver d(mega_world, fh);
 	
-	LOG.os<>("Running ", wrd.size(), " MPI processes with ", omp_get_max_threads(), " threads each.\n\n");
+	d.parse_file(filename + ".json");
+	
+	exit(0);
 	
 	time.start();
 	
 	char* emergency_buffer = new char[1000];
 
 	try { // BEGIN MAIN CONTEXT
-	
-	int sysctxt = -1;
-	c_blacs_get(0, 0, &sysctxt);
-	int gridctxt = sysctxt;
-	c_blacs_gridinit(&gridctxt, 'R', wrd.nprow(), wrd.npcol());
-	scalapack::global_grid.set(gridctxt);
 	
 	std::string input_file = filename + ".json";
 	if (!std::filesystem::exists(input_file)) {
@@ -245,14 +229,14 @@ int main(int argc, char** argv) {
 	
 	desc::write_molecule("molecule", *mol, *dh);
 	
-	if (wrd.rank() == 0) {
+	if (mega_world.rank() == 0) {
 		opt.print();
 	}
 	
 	auto hfopt = opt.subtext("hf");
 	
 	hf::shared_hf_wfn myhfwfn;
-	hf::hfmod myhf(wrd,mol,hfopt);
+	hf::hfmod myhf(mega_world,mol,hfopt);
 
 	bool skip_hf = hfopt.get<bool>("skip", false);
 	bool do_hf = opt.get<bool>("do_hf", true);
@@ -266,7 +250,7 @@ int main(int argc, char** argv) {
 	} else {
 		
 		LOG.os<>("Reading HF info from files...\n");
-		myhfwfn = hf::read_hfwfn("hf_wfn", mol, wrd, *dh_back);
+		myhfwfn = hf::read_hfwfn("hf_wfn", mol, mega_world, *dh_back);
 		hf::write_hfwfn("hf_wfn", *myhfwfn, *dh);
 		LOG.os<>("Done.\n");
 		
@@ -280,7 +264,7 @@ int main(int argc, char** argv) {
 	
 	if (do_mp) {
 	
-		mp::mpmod mymp(wrd,myhfwfn,mpopt);
+		mp::mpmod mymp(mega_world,myhfwfn,mpopt);
 		mymp.compute();
 		
 	}
@@ -290,16 +274,16 @@ int main(int argc, char** argv) {
 	
 	if (do_adc) {
 		
-		adc::adcmod myadc(wrd,myhfwfn,adcopt);
+		adc::adcmod myadc(mega_world,myhfwfn,adcopt);
 		myadc.compute();
 	}
 	
-	scalapack::global_grid.free();
+	mega_world.free();
 
    } catch (std::exception& e) {
 	
 	   	delete [] emergency_buffer;
-		if (wrd.rank() == 0) {
+		if (mega_world.rank() == 0) {
 			std::cout << "ERROR: ";
 			std::cout << e.what() << std::endl;
 			std::string skull = R"(
@@ -323,11 +307,11 @@ int main(int argc, char** argv) {
             =====================================
 		)";
 			std::cout << skull << std::endl;
-			MPI_Abort(wrd.comm(), MPI_ERR_OTHER);
+			MPI_Abort(mega_world.comm(), MPI_ERR_OTHER);
 		} else {
 		
 			std::this_thread::sleep_for(std::chrono::milliseconds(10000));
-			MPI_Abort(wrd.comm(), MPI_ERR_OTHER);
+			MPI_Abort(mega_world.comm(), MPI_ERR_OTHER);
 			
 		}
 	   
@@ -340,6 +324,11 @@ int main(int argc, char** argv) {
 	time.print_info();
 	
 	dbcsr::print_statistics(true);
+	
+	// close hdf5 files
+	
+	dh.reset();
+	dh_back.reset();
 
 	//dbcsr::finalize();
 
@@ -349,12 +338,12 @@ int main(int argc, char** argv) {
 	LOG.os<>("Now comparing reference to output\n");
 	std::string output_ref(argv[3]);
 	
-	if (wrd.rank() == 0) {
+	if (mega_world.rank() == 0) {
 		bool is_same = filio::compare_outputs(
 			filename + "_data/out.json", output_ref);
 		if (!is_same) {
 			LOG.os<>("Not the same\n");
-			MPI_Abort(wrd.comm(), MPI_ERR_OTHER);
+			MPI_Abort(mega_world.comm(), MPI_ERR_OTHER);
 		}
 	}
 #endif 

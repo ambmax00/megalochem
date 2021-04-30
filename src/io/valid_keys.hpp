@@ -2,6 +2,8 @@
 #define IO_VALID_KEYS_H
 #include "utils/json.hpp"
 
+namespace megalochem {
+
 namespace filio {
 
 using json = nlohmann::json;
@@ -125,6 +127,8 @@ static const json valid_keys =
 	{"_required", {"molecule", "hf"}}	
 };
 
-}
+} // namespace filio
+
+} // namespace megalochem
 
 #endif

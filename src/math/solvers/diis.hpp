@@ -7,7 +7,10 @@
 #include <Eigen/QR>
 
 #include <dbcsr_matrix_ops.hpp>
+#include "megalochem.hpp"
 #include "utils/mpi_log.hpp"
+
+namespace megalochem {
 
 namespace math {
 
@@ -15,8 +18,9 @@ using smat_d = dbcsr::shared_matrix<double>;
 
 template <int N>
 class diis_helper {
-
 private: 
+
+	world m_world;
 
 	std::deque<smat_d> m_delta;
 	std::deque<smat_d> m_trialvecs;
@@ -35,9 +39,9 @@ private:
 
 public:
 
-	diis_helper(MPI_Comm comm, int start, int min, int max, bool print = false) :
+	diis_helper(world w, int start, int min, int max, bool print = false) :
 		m_min(min), m_max(max), m_print(print), m_start(start), m_B(0,0), m_coeffs(0,0),
-		LOG(comm, m_print == false ? 0 : 999) {};
+		m_world(w), LOG(w.comm(), m_print == false ? 0 : 999) {};
 	
 	
 	void compute_extrapolation_parameters(smat_d& T, smat_d& err, int iter) {
@@ -243,5 +247,7 @@ public:
 	
 	
 } // end namespace math
+
+} // end mega
 
 #endif

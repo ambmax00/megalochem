@@ -8,12 +8,15 @@
 
 #include <type_traits>
 
+namespace megalochem {
+
 namespace adc {
 		
-adcmod::adcmod(dbcsr::cart w, hf::shared_hf_wfn hfref, desc::options& opt) :
+adcmod::adcmod(world w, hf::shared_hf_wfn hfref, desc::options& opt) :
 	m_hfwfn(hfref), 
 	m_opt(opt), 
-	m_cart(w),
+	m_world(w),
+	m_cart(w.dbcsr_grid()),
 	LOG(w.comm(), m_opt.get<int>("print", ADC_PRINT_LEVEL)),
 	TIME(w.comm(), "ADC Module", LOG.global_plev())
 {
@@ -47,7 +50,7 @@ adcmod::adcmod(dbcsr::cart w, hf::shared_hf_wfn hfref, desc::options& opt) :
 		std::nullopt;
 	
 	m_aoloader = ints::aoloader::create()
-		.set_cart(m_cart)
+		.set_world(m_world)
 		.set_molecule(m_hfwfn->mol())
 		.print(LOG.global_plev())
 		.nbatches_b(nbatches_b_opt)
@@ -182,7 +185,7 @@ std::shared_ptr<MVP> adcmod::create_adc1() {
 	}
 	
 	auto ptr = MVP_AORIADC1::create()
-		.set_cart(m_cart)
+		.set_world(m_world)
 		.set_molecule( m_hfwfn->mol())
 		.print(LOG.global_plev())
 		.c_bo(m_hfwfn->c_bo_A())
@@ -290,7 +293,7 @@ std::shared_ptr<MVP> adcmod::create_adc2(std::optional<canon_lmo> clmo) {
 	}
 
 	auto ptr = MVP_AORISOSADC2::create()
-		.set_cart(m_cart)
+		.set_world(m_world)
 		.set_molecule(mol)
 		.print(LOG.global_plev())
 		.c_bo(c_bo)
@@ -317,3 +320,5 @@ std::shared_ptr<MVP> adcmod::create_adc2(std::optional<canon_lmo> clmo) {
 }
 
 } // end namespace
+
+} // end namespace mega

@@ -1,22 +1,19 @@
 #include "math/solvers/hermitian_eigen_solver.hpp"
 #include <dbcsr_matrix_ops.hpp>
-
-//#ifdef USE_SCALAPACK
 #include "extern/scalapack.hpp"
-//#else
-//#include <Eigen/Eigenvalues>
-//#endif
 
 #include <dbcsr_conversions.hpp>
 #include <cmath>
 
+namespace megalochem {
+
 namespace math {
 	
-//#ifdef USE_SCALAPACK
-
 void hermitian_eigen_solver::compute() {
 	
 	int lwork;
+	
+	auto sgrid = m_world.scalapack_grid();
 	
 	int n = m_mat_in->nfullrows_total();
 	int nb = scalapack::global::block_size;
@@ -42,20 +39,20 @@ void hermitian_eigen_solver::compute() {
 	int ori_proc = m_mat_in->proc(0,0);
 	int ori_coord[2];
 	
-	if (m_mat_in->get_cart().rank() == ori_proc) {
-		ori_coord[0] = scalapack::global_grid.myprow();
-		ori_coord[1] = scalapack::global_grid.mypcol();
+	if (m_world.rank() == ori_proc) {
+		ori_coord[0] = sgrid.myprow();
+		ori_coord[1] = sgrid.mypcol();
 	}
 	
-	MPI_Bcast(&ori_coord[0],2,MPI_INT,ori_proc,m_mat_in->get_cart().comm());
+	MPI_Bcast(&ori_coord[0],2,MPI_INT,ori_proc,m_world.comm());
 		
 	scalapack::distmat<double> sca_mat_in = dbcsr::matrix_to_scalapack(m_mat_in, 
-		m_mat_in->name() + "_scalapack", nb, nb, ori_coord[0], ori_coord[1]);
+		sgrid, m_mat_in->name() + "_scalapack", nb, nb, ori_coord[0], ori_coord[1]);
 	
 	std::optional<scalapack::distmat<double>> sca_eigvec_opt;
 	
 	if (m_jobz == 'V') {
-		sca_eigvec_opt.emplace(n, n, nb, nb, ori_coord[0], ori_coord[1]);
+		sca_eigvec_opt.emplace(sgrid, n, n, nb, nb, ori_coord[0], ori_coord[1]);
 	} else {
 		sca_eigvec_opt = std::nullopt;
 	}
@@ -87,7 +84,7 @@ void hermitian_eigen_solver::compute() {
 		//sca_eigvec_opt->print();
 		
 		m_eigvec = dbcsr::scalapack_to_matrix(*sca_eigvec_opt, 
-			"eigenvectors", m_cart, rowblksizes, colblksizes); 
+			m_cart, "eigenvectors", rowblksizes, colblksizes); 
 				
 		sca_eigvec_opt->release();
 		
@@ -157,5 +154,7 @@ smatrix hermitian_eigen_solver::inverse_sqrt() {
 }
 	
 } //end namepace
+
+} // end megalochem
 	
 	

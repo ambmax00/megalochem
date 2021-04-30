@@ -4,12 +4,15 @@
 #include "math/solvers/diis.hpp"
 #include "math/linalg/piv_cd.hpp"
 
+namespace megalochem {
+
 namespace hf {
 	
-hfmod::hfmod(dbcsr::cart w, desc::shared_molecule mol, desc::options opt) 
+hfmod::hfmod(world w, desc::shared_molecule mol, desc::options opt) 
 	: m_mol(mol), 
 	  m_opt(opt), 
-	  m_cart(w),
+	  m_world(w),
+	  m_cart(w.dbcsr_grid()),
 	  LOG(m_cart.comm(),m_opt.get<int>("print", HF_PRINT_LEVEL)),
 	  TIME(m_cart.comm(), "Hartree Fock", LOG.global_plev()),
 	  m_guess(m_opt.get<std::string>("guess", HF_GUESS)),
@@ -108,7 +111,7 @@ hfmod::hfmod(dbcsr::cart w, desc::shared_molecule mol, desc::options opt)
 		auto dfbasis = std::make_shared<desc::cluster_basis>(
 			basname, atoms, smethod, nsplit, augmented);
 			
-		auto newdfbasis = ints::remove_lindep(m_cart, dfbasis, m_mol->atoms());
+		auto newdfbasis = ints::remove_lindep(m_world, dfbasis, m_mol->atoms());
 	
 		//exit(0);
 	
@@ -142,7 +145,7 @@ hfmod::hfmod(dbcsr::cart w, desc::shared_molecule mol, desc::options opt)
 		std::nullopt;
 	
 	m_aoloader = ints::aoloader::create()
-		.set_cart(m_cart)
+		.set_world(m_world)
 		.set_molecule(m_mol)
 		.print(LOG.global_plev())
 		.nbatches_b(nbatches_b)
@@ -189,7 +192,7 @@ void hfmod::one_electron() {
 	
 	TIME_1e.start();
 	
-	ints::aofactory int_engine(m_mol, m_cart);
+	ints::aofactory int_engine(m_mol, m_world);
 	
 	// overlap			 
 	m_s_bb = int_engine.ao_overlap();	
@@ -201,7 +204,7 @@ void hfmod::one_electron() {
 	m_v_bb = int_engine.ao_nuclear();
 	
 	// get X
-	math::orthogonalizer og(m_s_bb, (LOG.global_plev() >= 2) ? true : false);
+	math::orthogonalizer og(m_world, m_s_bb, (LOG.global_plev() >= 2) ? true : false);
 	og.compute();
 	m_x_bb = og.result();
 	
@@ -259,7 +262,7 @@ void hfmod::two_electron() {
 		m_opt.get<int>("occ_nbatches") : 1;
 	
 	m_jbuilder = fock::create_j()
-		.set_cart(m_cart)
+		.set_world(m_world)
 		.molecule(m_mol)
 		.print(LOG.global_plev())
 		.aoloader(*m_aoloader)
@@ -268,7 +271,7 @@ void hfmod::two_electron() {
 		.build();
 	
 	m_kbuilder = fock::create_k()
-		.set_cart(m_cart)
+		.set_world(m_world)
 		.molecule(m_mol)
 		.print(LOG.global_plev())
 		.aoloader(*m_aoloader)
@@ -526,4 +529,6 @@ void hfmod::compute() {
 }
 
 } // end namespace
+
+} // namespace megalochem
 	

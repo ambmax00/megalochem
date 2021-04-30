@@ -3,6 +3,8 @@
 
 #include "hf/hf_wfn.hpp"
 
+namespace megalochem {
+
 namespace mp {
 	
 class mpmod;
@@ -24,6 +26,8 @@ public:
 
 using smp_wfn = std::shared_ptr<mp_wfn>;
 
-}
+} // namespace mp
+
+} // namespace megalochem
 	
 #endif

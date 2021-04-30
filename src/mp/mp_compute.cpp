@@ -12,14 +12,16 @@
 
 #define _ORTHOGONALIZE
 
+namespace megalochem {
+
 namespace mp {
 	
-mpmod::mpmod(dbcsr::cart w, hf::shared_hf_wfn wfn_in, desc::options& opt_in) :
+mpmod::mpmod(world w, hf::shared_hf_wfn wfn_in, desc::options& opt_in) :
 	m_hfwfn(wfn_in),
-	m_cart(w),
+	m_world(w),
 	m_opt(opt_in),
-	LOG(m_cart.comm(),m_opt.get<int>("print", MP_PRINT_LEVEL)),
-	TIME(m_cart.comm(), "Moller Plesset", LOG.global_plev())
+	LOG(w.comm(),m_opt.get<int>("print", MP_PRINT_LEVEL)),
+	TIME(w.comm(), "Moller Plesset", LOG.global_plev())
 {
 	std::string dfbasname = m_opt.get<std::string>("dfbasis");
 	
@@ -98,7 +100,7 @@ void mpmod::compute() {
 	LOG.os<>("eps_min/eps_homo/eps_lumo/eps_max ", emin, " ", ehomo, " ", elumo, " ", emax, '\n');
 	LOG.os<>("ymin/ymax ", ymin, " ", ymax, '\n');
 	
-	math::laplace lp(m_cart.comm(), LOG.global_plev());
+	math::laplace lp(m_world.comm(), LOG.global_plev());
 	
 	laptime.start();
 	lp.compute(nlap, ymin, ymax);
@@ -111,11 +113,11 @@ void mpmod::compute() {
 	//                        PGRIDS
 	//==================================================================
 	
-	auto spgrid2 = dbcsr::pgrid<2>::create(m_cart.comm()).build();
+	auto spgrid2 = dbcsr::pgrid<2>::create(m_world.comm()).build();
 	
 	std::array<int,3> xbb_sizes = {dfnbf, nbf, nbf};
 	
-	auto spgrid3_xbb = dbcsr::pgrid<3>::create(m_cart.comm()).tensor_dims(xbb_sizes).build();
+	auto spgrid3_xbb = dbcsr::pgrid<3>::create(m_world.comm()).tensor_dims(xbb_sizes).build();
 	
 	//==================================================================
 	//                        INTEGRALS
@@ -141,7 +143,7 @@ void mpmod::compute() {
 	
 	std::shared_ptr<ints::aoloader> ao
 		= ints::aoloader::create()
-		.set_cart(m_cart)
+		.set_world(m_world)
 		.set_molecule(mol)
 		.print(LOG.global_plev())
 		.nbatches_b(nbatches_b_opt)
@@ -165,7 +167,7 @@ void mpmod::compute() {
 	ao->compute();
 	
 	auto zbuilder = create_z()
-		.set_cart(m_cart)
+		.set_world(m_world)
 		.set_molecule(mol)
 		.print(LOG.global_plev())
 		.aoloader(*ao)
@@ -199,7 +201,7 @@ void mpmod::compute() {
 	
 	LOG.os<1>("Computing square root and square root inverse of S using LLT.\n");
 	
-	math::LLT lltsolver(s_bb, LOG.global_plev());
+	math::LLT lltsolver(m_world, s_bb, LOG.global_plev());
 	lltsolver.compute();
 	
 	auto Sllt_bb = lltsolver.L(b);
@@ -224,7 +226,7 @@ void mpmod::compute() {
 		
 	auto pseudo_occ = dbcsr::matrix<>::create()
 		.name("Pseudo Density (OCC)")
-		.set_cart(m_cart)
+		.set_cart(m_world.dbcsr_grid())
 		.row_blk_sizes(b)
 		.col_blk_sizes(b)
 		.matrix_type(dbcsr::type::symmetric)
@@ -308,7 +310,7 @@ void mpmod::compute() {
 		//=============== CHOLESKY DECOMPOSITION =======================
 		pcholtime.start();
 		
-		math::pivinc_cd chol(pseudo_occ, LOG.global_plev());
+		math::pivinc_cd chol(m_world, pseudo_occ, LOG.global_plev());
 		//chol.reorder("value");
 		
 		chol.compute();
@@ -405,3 +407,5 @@ void mpmod::compute() {
 }
 
 } // end namespace 
+
+} // end mega

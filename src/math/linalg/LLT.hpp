@@ -2,13 +2,18 @@
 #define MATH_LLT_H
 
 #include <dbcsr_matrix_ops.hpp>
+#include "megalochem.hpp"
 #include "extern/scalapack.hpp"
 #include "utils/mpi_log.hpp"
+
+namespace megalochem {
 
 namespace math {
 	
 class LLT {
 private:
+
+	world m_world;
 
 	dbcsr::shared_matrix<double> m_mat_in;
 	std::shared_ptr<
@@ -22,8 +27,8 @@ private:
 	 
 public:
 
-	LLT(dbcsr::shared_matrix<double>& mat, int print) : 
-		m_mat_in(mat), LOG(m_mat_in->get_cart().comm(),print) {}
+	LLT(world w, dbcsr::shared_matrix<double>& mat, int print) : 
+		m_world(w), m_mat_in(mat), LOG(w.comm(),print) {}
 	~LLT() {}
 	
 	void compute();
@@ -36,6 +41,8 @@ public:
 	
 };
 
-} // end namespace
+} // namespace math 
+
+} // namespace megalochem
 
 #endif

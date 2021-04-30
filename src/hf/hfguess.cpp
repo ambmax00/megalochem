@@ -8,10 +8,9 @@
 
 #include <dbcsr_matrix_ops.hpp>
 
-
-//#ifdef USE_SCALAPACK
 #include "extern/scalapack.hpp"
-//#endif
+
+namespace megalochem {
 
 namespace hf {
 
@@ -65,7 +64,7 @@ void scale_huckel(dbcsr::tensor<2>& t, std::vector<double>& v) {
 	
 }	
 */
-
+/*
 void gram_schmidt(dbcsr::shared_matrix<double>& mat) {
 	
 	int nrows = mat->nfullrows_total();
@@ -117,7 +116,7 @@ void gram_schmidt(dbcsr::shared_matrix<double>& mat) {
 	
 	mat = mat_ortho;
 	
-}
+}*/
 
 void hfmod::compute_guess() {
 	
@@ -200,31 +199,8 @@ void hfmod::compute_guess() {
 			}
 		}
 		
-		MPI_Comm mycomm;
-		
-		MPI_Comm_split(m_cart.comm(), m_cart.rank(), m_cart.rank(), &mycomm);
-		
-		// set up new scalapack grid
-//#ifdef USE_SCALAPACK
-		int sysctxt = -1;
-		c_blacs_get(0, 0, &sysctxt);
-		
-		std::vector<int> contexts(m_cart.size(),0);
-		int prevctxt = scalapack::global_grid.ctx();
-		
-		for (int r = 0; r != m_cart.size(); ++r) {
-			contexts[r] = sysctxt;
-			int usermap[1] = {r};
-			c_blacs_gridmap(&contexts[r], &usermap[0], 1, 1, 1);
-		}
-		
-		scalapack::global_grid.set(contexts[m_cart.rank()]);
-		
-//#endif
-		
-		//for (int r = 0; r != m_cart.size(); ++r) {
-			
-		//if (r == m_cart.rank()) {
+		// set up new grid
+		world wself(MPI_COMM_SELF);
 		
 		for (int I = 0; I != my_atypes.size(); ++I) {
 			
@@ -284,7 +260,7 @@ void hfmod::compute_guess() {
 			bool spinav = m_opt.get<bool>("SAD_spin_average",HF_SAD_SPIN_AVERAGE);
 			
 			desc::shared_molecule at_smol = desc::molecule::create()
-				.comm(mycomm)
+				.comm(MPI_COMM_SELF)
 				.name(name)
 				.cluster_basis(at_basis)
 				.atoms(atvec)
@@ -301,9 +277,7 @@ void hfmod::compute_guess() {
 				at_smol->print_info(LOG.global_plev());
 			}
 			
-			dbcsr::cart at_cart(mycomm);
-			
-			hf::hfmod atomic_hf(at_cart,at_smol,at_opt);
+			hf::hfmod atomic_hf(wself,at_smol,at_opt);
 			
 			LOG(m_cart.rank()).os<1>("Starting Atomic UHF for atom nr. ", I, " on rank ", m_cart.rank(), '\n');
 			atomic_hf.compute();
@@ -317,7 +291,7 @@ void hfmod::compute_guess() {
 			auto b = at_smol->dims().b();
 			auto pA = dbcsr::matrix<>::create()
 				.name("p_bb_A")
-				.set_cart(at_cart)
+				.set_cart(wself.dbcsr_grid())
 				.row_blk_sizes(b)
 				.col_blk_sizes(b)
 				.matrix_type(dbcsr::type::symmetric)
@@ -359,14 +333,11 @@ void hfmod::compute_guess() {
 		
 		//}
 		
-		MPI_Barrier(m_cart.comm());
+		MPI_Barrier(m_world.comm());
 		
-//#ifdef USE_SCALAPACK
-		scalapack::global_grid.free();
-		scalapack::global_grid.set(prevctxt);
-//#endif
+		wself.free();		
 		
-		MPI_Barrier(m_cart.comm());
+		MPI_Barrier(m_world.comm());
 		
 		//std::cout << "DISTRIBUTING" << std::endl;
 		
@@ -464,7 +435,8 @@ void hfmod::compute_guess() {
 			
 			LOG.os<>("Forming natural orbitals from SAD guess density.\n");
 		
-			math::hermitian_eigen_solver solver(m_p_bb_A, 'V', (LOG.global_plev() >= 2) ? true : false);
+			math::hermitian_eigen_solver solver(m_world, m_p_bb_A, 'V', 
+				(LOG.global_plev() >= 2) ? true : false);
 			
 			m_SAD_rank = m_mol->c_basis()->nbf();
 			auto m = dbcsr::split_range(m_SAD_rank,m_mol->mo_split());
@@ -489,7 +461,7 @@ void hfmod::compute_guess() {
 			
 			LOG.os<>("Forming cholesky orbitals from SAD guess.");
 			
-			math::pivinc_cd cd(m_p_bb_A, LOG.global_plev());
+			math::pivinc_cd cd(m_world, m_p_bb_A, LOG.global_plev());
 			
 			cd.compute();
 			
@@ -563,7 +535,7 @@ void hfmod::compute_guess() {
 			opt2.set<std::string>("dfbasis", m_opt.get<std::string>("dfbasis2"));
 		}
 		
-		hfmod subhf(m_cart, mol_sub, opt2);
+		hfmod subhf(m_world, mol_sub, opt2);
 		subhf.compute();
 		
 		LOG.os<>("Finished Hartree Fock computation with secondary basis set.\n");
@@ -580,11 +552,11 @@ void hfmod::compute_guess() {
 		auto c_b2o_A = subwfn->c_bo_A();
 		auto c_b2o_B = subwfn->c_bo_B();
 		
-		math::LLT lltsolver(m_s_bb, 0);
+		math::LLT lltsolver(m_world, m_s_bb, 0);
 		lltsolver.compute();
 		auto s_inv_bb = lltsolver.inverse(b);
 		
-		ints::aofactory aofac(m_mol, m_cart);
+		ints::aofactory aofac(m_mol, m_world);
 		auto s_bb2 = aofac.ao_overlap2();
 		
 		//dbcsr::print(*s_bb2);
@@ -666,4 +638,7 @@ void hfmod::compute_guess() {
 	
 }
 
-}
+} // namespace hf
+
+} // namespace megalochem
+

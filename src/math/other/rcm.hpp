@@ -7,6 +7,8 @@
 #include <stdexcept>
 #include <Eigen/Core>
 
+namespace megalochem {
+
 namespace math {
 	
 /* RCM: takes in a set of coordinates, and a function, then reduces
@@ -248,6 +250,8 @@ public:
 }; // end class
 
 } // end namespace
+
+} // namespace megalochem
 
 
 

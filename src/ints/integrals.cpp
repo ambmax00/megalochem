@@ -6,6 +6,8 @@
 
 #include <iostream>
 
+namespace megalochem {
+
 namespace ints {
 
 // =====================================================================
@@ -657,4 +659,6 @@ void calc_ints_schwarz_x(dbcsr::matrix<double>& m_out, std::vector<std::vector<i
 	
 }
 
-}
+} 
+
+} // end namespace megalochem

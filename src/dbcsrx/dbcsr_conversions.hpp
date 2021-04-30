@@ -147,7 +147,7 @@ MatrixX<T,StorageOrder> matrix_to_eigen(matrix<T>& mat_in) {
 template <typename Derived, typename T = double>
 shared_matrix<typename Derived::Scalar> eigen_to_matrix(
 	const Eigen::MatrixBase<Derived>& mat, 
-	cart& w, std::string name, vec<int>& row_blk_sizes, 
+	cart w, std::string name, vec<int>& row_blk_sizes, 
 	vec<int>& col_blk_sizes, type mtype) 
 {
 	
@@ -258,7 +258,8 @@ shared_matrix<typename Derived::Scalar> eigen_to_matrix(
 //#ifdef USE_SCALAPACK
 
 template <typename T = double>
-scalapack::distmat<T> matrix_to_scalapack(shared_matrix<T> mat_in, std::string nameint, 
+scalapack::distmat<T> matrix_to_scalapack(shared_matrix<T> mat_in, 
+	scalapack::grid sgrid, std::string nameint, 
 	int nsplitrow, int nsplitcol, int ori_row, int ori_col) {
 	
 	cart mcart = mat_in->get_cart();	
@@ -296,9 +297,8 @@ scalapack::distmat<T> matrix_to_scalapack(shared_matrix<T> mat_in, std::string n
 	}
 	
 	//dbcsr::print(mat_out);
-	scalapack::distmat<double> scamat(nrows,ncols,nsplitrow,nsplitcol,ori_row,ori_col);
-	
-	
+	scalapack::distmat<double> scamat(sgrid,nrows,ncols,nsplitrow,nsplitcol,
+		ori_row,ori_col);
 
 #pragma omp parallel
 {
@@ -335,9 +335,9 @@ scalapack::distmat<T> matrix_to_scalapack(shared_matrix<T> mat_in, std::string n
 }
 
 template <typename T = double>
-shared_matrix<T> scalapack_to_matrix(scalapack::distmat<T>& sca_mat_in, std::string nameint, 
-								cart& cart_in, vec<int>& rowblksizes, vec<int>& colblksizes, 
-								std::string type = "") 
+shared_matrix<T> scalapack_to_matrix(scalapack::distmat<T>& sca_mat_in, 
+	cart cart_in, std::string nameint, vec<int>& rowblksizes, 
+	vec<int>& colblksizes, std::string type = "") 
 {
 	// form block-cyclic distribution
 	

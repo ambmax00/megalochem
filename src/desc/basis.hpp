@@ -11,6 +11,8 @@
 #include <cassert>
 #include <cmath>
 
+namespace megalochem {
+
 namespace desc {
 	
 /// df_Kminus1[k] = (k-1)!!
@@ -110,6 +112,9 @@ inline int atom_of(Shell& s, std::vector<Atom>& atoms) {
 	return -1;
 }
 
+inline static const int DEFAULT_NSPLIT = 8;
+inline static const std::string DEFAULT_SPLIT_METHOD = "multi_shell_strict_sp";
+
 class cluster_basis {
 private:
 
@@ -132,9 +137,13 @@ public:
 	cluster_basis() {}
 	
 	cluster_basis(std::string basname, std::vector<desc::Atom>& atoms, 
-		std::string method, int nsplit, bool augmented = false);
+		std::optional<std::string> method = std::nullopt, 
+		std::optional<int> nsplit = std::nullopt, 
+		std::optional<bool> augmented = std::nullopt);
 	
-	cluster_basis(vshell basis, std::string method, int nsplit,
+	cluster_basis(vshell basis, 
+		std::optional<std::string> method = std::nullopt, 
+		std::optional<int> nsplit = std::nullopt, 
 		std::optional<vshell> augbasis = std::nullopt);
 	
 	cluster_basis(const cluster_basis& cbasis) : 
@@ -235,5 +244,7 @@ public:
 using shared_cluster_basis = std::shared_ptr<cluster_basis>;
 
 }
+
+} // end mega
 
 #endif

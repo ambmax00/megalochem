@@ -9,6 +9,8 @@
 #include <dbcsr_conversions.hpp>
 #include "utils/json.hpp"
 
+namespace megalochem {
+
 namespace filio {
 
 template <typename T>
@@ -47,6 +49,8 @@ void read_vector(svector<double>& v_in, std::string filename);
 
 bool compare_outputs(std::string filename, std::string ref_filename);
 
-} // end namespace
+} // namespace filio
+
+} // namespace megalochem
 
 #endif

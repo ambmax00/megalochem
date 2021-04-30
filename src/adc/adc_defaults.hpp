@@ -3,6 +3,8 @@
 
 #include <string>
 
+namespace megalochem {
+
 namespace adc {
 
 // global 
@@ -48,5 +50,7 @@ inline const double ADC_ADC2_MICRO_CONV = 1e-6;
 inline const double ADC_ADC2_MACRO_CONV = 1e-6;
 
 } // end namespace
+
+} // end namespace mega
 
 #endif

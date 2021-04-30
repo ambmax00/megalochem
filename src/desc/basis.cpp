@@ -8,6 +8,8 @@
 
 #cmakedefine BASIS_ROOT "@BASIS_ROOT@"
 
+namespace megalochem {
+
 namespace desc {
 
 const int MAX_L = 6;
@@ -279,12 +281,18 @@ double cluster_min_alpha(const vshell& shells) {
 }
 
 cluster_basis::cluster_basis(std::string basname, std::vector<desc::Atom>& atoms_in,
-	std::string method, int nsplit, bool augmented) {
+	std::optional<std::string> method, 
+	std::optional<int> nsplit, 
+	std::optional<bool> augmented) {
 	
 	auto basis = make_basis(basname, atoms_in);
-	std::optional<vshell> augbasis = (augmented) ? 
-		std::make_optional<vshell>(make_basis("aug-" + basname, atoms_in)) :
-		std::nullopt;
+	
+	std::optional<vshell> augbasis;
+	
+	if (augmented && *augmented) {
+		std::optional<vshell> augbasis = std::make_optional<vshell>(
+			make_basis("aug-" + basname, atoms_in));
+	}
 	
 	*this = cluster_basis(basis, method, nsplit, augbasis);
 	
@@ -316,9 +324,12 @@ vshell extract(vshell& basis, vshell& augbasis) {
 	
 }			
 
-cluster_basis::cluster_basis(vshell basis, std::string method, int nsplit,
-	std::optional<vshell> augbasis)
-	: m_nsplit(nsplit), m_split_method(method) {
+cluster_basis::cluster_basis(vshell basis, 
+	std::optional<std::string> opt_method, 
+	std::optional<int> opt_nsplit,
+	std::optional<vshell> augbasis) : 
+	m_nsplit(opt_nsplit ? *opt_nsplit : DEFAULT_NSPLIT), 
+	m_split_method(opt_method ? *opt_method : DEFAULT_SPLIT_METHOD) {
 	
 	auto nbas = desc::nbf(basis);
 	auto vsize = basis.size();
@@ -328,41 +339,41 @@ cluster_basis::cluster_basis(vshell basis, std::string method, int nsplit,
 	
 	auto get_cluster = [&](vshell t_basis, int t_nsplit) {
 	
-		if (method == "atomic") {
+		if (m_split_method == "atomic") {
 			
 			return split_atomic(t_basis);
 			
-		} else if (method == "shell") {
+		} else if (m_split_method == "shell") {
 			
 			return split_shell(t_basis);
 		
-		} else if (method == "multi_shell") {
+		} else if (m_split_method == "multi_shell") {
 			
-			return split_multi_shell(t_basis,t_nsplit,false,false);
+			return split_multi_shell(t_basis,m_nsplit,false,false);
 			
-		} else if (method == "multi_shell_strict") {
+		} else if (m_split_method == "multi_shell_strict") {
 			
-			return split_multi_shell(t_basis,t_nsplit,true,false);
+			return split_multi_shell(t_basis,m_nsplit,true,false);
 
-		} else if (method == "multi_shell_strict_sp") {
+		} else if (m_split_method == "multi_shell_strict_sp") {
 			
-			return split_multi_shell(t_basis,t_nsplit,true,true);
+			return split_multi_shell(t_basis,m_nsplit,true,true);
 		
 		} else {
 			
-			throw std::runtime_error("Unknown splitting method: " + method);
+			throw std::runtime_error("Unknown splitting method: " + m_split_method);
 			
 		}
 		
 	};
 	
-	auto clusters = get_cluster(basis, nsplit);
+	auto clusters = get_cluster(basis, m_nsplit);
 	if (augbasis) {
 		
 		//std::cout << "PREPPING" << std::endl;
 		auto aug_extract = extract(basis, *augbasis);
 		
-		auto aug_clusters = get_cluster(aug_extract, nsplit);
+		auto aug_clusters = get_cluster(aug_extract, m_nsplit);
 		decltype(clusters) new_clusters;
 		
 		for (int i = 0; i != clusters.size(); ++i) {
@@ -553,3 +564,5 @@ std::shared_ptr<cluster_basis> cluster_basis::fragment(std::vector<int> block_li
 }	
 
 } // end namespace
+
+} // end mega

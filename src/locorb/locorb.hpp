@@ -2,11 +2,13 @@
 #define LOCORB_LOCORB_H
 
 #include <dbcsr_matrix_ops.hpp>
-
+#include "megalochem.hpp"
 #include "utils/mpi_log.hpp"
 #include "desc/molecule.hpp"
 #include "ints/aofactory.hpp"
 #include <utility>
+
+namespace megalochem {
 
 namespace locorb {
 	
@@ -15,7 +17,7 @@ using smat_d = dbcsr::shared_matrix<double>;
 class mo_localizer {
 private:	
 
-	dbcsr::cart m_cart;
+	world m_world;
 	desc::shared_molecule m_mol;
 	
 	std::shared_ptr<ints::aofactory> m_aofac;
@@ -24,8 +26,8 @@ private:
 	
 public:
 
-	mo_localizer(dbcsr::cart w, desc::shared_molecule mol) :
-		m_cart(w),
+	mo_localizer(world w, desc::shared_molecule mol) :
+		m_world(w),
 		m_mol(mol),
 		LOG(w.comm(), 0),
 		m_aofac(std::make_shared<ints::aofactory>(mol,w))
@@ -73,6 +75,8 @@ public:
 	
 };
 	
+} // end namespace
+
 } // end namespace
 
 #endif

@@ -14,6 +14,8 @@ extern "C" {
 #include <iostream>
 #include <limits>
 	
+namespace megalochem {	
+
 namespace ints {
 
 enum class op {
@@ -120,16 +122,16 @@ private:
 			mem += x[res[0][i]] * b[res[1][i]] * b[res[2][i]] * 8;
 		}
 		
-		for (int ip = 0; ip != m_cart.size(); ++ip) {
-			if (ip == m_cart.rank()) {
+		for (int ip = 0; ip != m_world.size(); ++ip) {
+			if (ip == m_world.rank()) {
 				std::cout << "RANK: " << mem/1e+9 << " GB will be reserved. Total number of blocks: "
 				<< totblk << std::endl;
 			}
-			MPI_Barrier(m_cart.comm());
+			MPI_Barrier(m_world.comm());
 		}
 		
-		MPI_Allreduce(&mem, &mem_tot, 1, MPI_DOUBLE, MPI_SUM, m_cart.comm());
-		if (m_cart.rank() == 0) std::cout << "TOTAL MEM: " << mem_tot << std::endl;
+		MPI_Allreduce(&mem, &mem_tot, 1, MPI_DOUBLE, MPI_SUM, m_world.comm());
+		if (m_world.rank() == 0) std::cout << "TOTAL MEM: " << mem_tot << std::endl;
    
 		t_in->reserve(res);
 		
@@ -245,6 +247,8 @@ public:
 	
 protected:
 
+	world m_world;
+	
 	dbcsr::cart m_cart;
 	
 	std::vector<desc::Atom> m_atoms;
@@ -316,8 +320,9 @@ protected:
 
 public:
 	
-	impl(desc::shared_molecule mol, dbcsr::cart w) :
-		m_cart(w),
+	impl(desc::shared_molecule mol, world w) :
+		m_world(w),
+		m_cart(w.dbcsr_grid()),
 		m_atoms(mol->atoms()),
 		m_cbas(mol->c_basis()),
 		m_cdfbas(mol->c_dfbasis()),
@@ -328,10 +333,11 @@ public:
 		TIME(w.comm(), "integrals")
 	{ init(); }
 	
-	impl(dbcsr::cart w, desc::shared_cluster_basis cbas,
+	impl(world w, desc::shared_cluster_basis cbas,
 		desc::shared_cluster_basis cdfbas,
 		desc::shared_cluster_basis cbas2) :
-		m_cart(w),
+		m_world(w),
+		m_cart(w.dbcsr_grid()),
 		m_cbas(cbas),
 		m_cdfbas(cdfbas),
 		m_cbas2(cbas2),
@@ -745,7 +751,7 @@ public:
 			
 			for (int i = 0; i != nblks; ++i) {
 				for (int j = 0; j != nblks; ++j) {
-					if (m_ints->proc(i,j) == m_cart.rank() && i <= j) {
+					if (m_ints->proc(i,j) == m_world.rank() && i <= j) {
 						resrows.push_back(i);
 						rescols.push_back(j);
 					}
@@ -780,10 +786,10 @@ public:
 
 };
 
-aofactory::aofactory(desc::shared_molecule mol, dbcsr::cart& w) : 
+aofactory::aofactory(desc::shared_molecule mol, world w) : 
 	pimpl(new impl(mol, w))  {}
 	
-aofactory::aofactory(dbcsr::cart& w, desc::shared_cluster_basis cbas, 
+aofactory::aofactory(world w, desc::shared_cluster_basis cbas, 
 	desc::shared_cluster_basis cdfbas, 
 	desc::shared_cluster_basis cbas2) :
 	pimpl(new impl(w, cbas, cdfbas, cbas2)) {}
@@ -973,7 +979,7 @@ std::function<void(dbcsr::stensor<3>&,vec<vec<int>>&)>
 }
 
 desc::shared_cluster_basis remove_lindep(
-	dbcsr::cart wrd,
+	world wrd,
 	desc::shared_cluster_basis cbas, 
 	std::vector<desc::Atom> atoms) 
 {
@@ -996,7 +1002,7 @@ desc::shared_cluster_basis remove_lindep(
 	
 	//LOG.os<>("3\n");
 	
-	math::pivinc_cd pivcd(ovlp, 2);
+	math::pivinc_cd pivcd(wrd, ovlp, 2);
 	 
 	pivcd.compute(std::nullopt, 1e-4);
 	
@@ -1071,5 +1077,6 @@ desc::shared_cluster_basis remove_lindep(
 	
 }
 	
-
 } // end namespace ints
+
+} // end magealochem

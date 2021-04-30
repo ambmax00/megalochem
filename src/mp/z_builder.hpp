@@ -2,6 +2,7 @@
 #define MP_Z_BUILDER_H
 
 #ifndef TEST_MACRO
+#include "megalochem.hpp"
 #include <dbcsr_matrix_ops.hpp>
 #include <dbcsr_tensor_ops.hpp>
 #include <dbcsr_conversions.hpp>
@@ -13,6 +14,8 @@
 #endif
 
 #include "utils/ppdirs.hpp"
+
+namespace megalochem {
 
 namespace mp {
 
@@ -40,6 +43,7 @@ SMatrixXi get_shellpairs(dbcsr::sbtensor<3,double> eri_batched);
 class Z {
 protected:
 
+	world m_world;
 	dbcsr::cart m_cart;
 	desc::shared_molecule m_mol;
 	util::mpi_log LOG;
@@ -59,11 +63,12 @@ protected:
 
 public:
 
-	Z(dbcsr::cart w, desc::shared_molecule smol, int nprint, std::string mname) : 
-		m_cart(w),
+	Z(world w, desc::shared_molecule smol, int nprint, std::string mname) : 
+		m_world(w),
+		m_cart(w.dbcsr_grid()),
 		m_mol(smol),
-		LOG(m_cart.comm(), nprint),
-		TIME (m_cart.comm(), mname) {}
+		LOG(w.comm(), nprint),
+		TIME (w.comm(), mname) {}
 
 	Z& set_occ_density(dbcsr::shared_matrix<double>& pocc) {
 		m_pocc = pocc;
@@ -106,12 +111,12 @@ public:
 };
 
 #define Z_INIT_LIST (\
-	((dbcsr::cart), set_cart),\
+	((world), set_world),\
 	((desc::shared_molecule), set_molecule),\
 	((util::optional<int>), print))
 
 #define Z_INIT_CON(name) \
-	Z(p.p_set_cart, p.p_set_molecule, (p.p_print) ? *p.p_print : 0, #name)
+	Z(p.p_set_world, p.p_set_molecule, (p.p_print) ? *p.p_print : 0, #name)
 
 class LLMP_FULL_Z : public Z {
 private:	
@@ -336,7 +341,7 @@ public:
 		if (*c_method == zmethod::llmp_full) {
 		
 			zbuilder = LLMP_FULL_Z::create()
-				.set_cart(c_set_cart)
+				.set_world(c_set_world)
 				.set_molecule(c_set_molecule)
 				.print((c_print) ? *c_print : 0)
 				.eri3c2e_batched(eri3c2e_batched)
@@ -347,7 +352,7 @@ public:
 		} else if (*c_method == zmethod::llmp_mem) {
 			
 			zbuilder = LLMP_MEM_Z::create()
-				.set_cart(c_set_cart)
+				.set_world(c_set_world)
 				.set_molecule(c_set_molecule)
 				.print((c_print) ? *c_print : 0)
 				.eri3c2e_batched(eri3c2e_batched)
@@ -364,5 +369,7 @@ public:
 inline create_z_base create_z() { return create_z_base(); }
 
 } // end namespace
+
+} // end mega
 
 #endif

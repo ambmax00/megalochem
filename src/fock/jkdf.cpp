@@ -6,6 +6,8 @@
 #include "math/linalg/SVD.hpp"
 #include <dbcsr_tensor_ops.hpp>
 
+namespace megalochem {
+
 namespace fock {
 
 void DF_J::init() {
@@ -913,7 +915,7 @@ void DFLMO_K::compute_K() {
 		
 		LOG.os<1>("Computing cholesky decomposition\n");
 		time_chol.start();
-		math::pivinc_cd chol(p_bb, LOG.global_plev());
+		math::pivinc_cd chol(m_world ,p_bb, LOG.global_plev());
 		chol.compute();
 		time_chol.finish();
 		
@@ -1150,7 +1152,7 @@ void DFLMO_K::compute_K() {
 		LOG.os<1>("Computing singular value decomposition\n");
 		
 		time_svd.start();
-		math::SVD solver(p_bb, 'V', 'V', LOG.global_plev());
+		math::SVD solver(m_world, p_bb, 'V', 'V', LOG.global_plev());
 		solver.compute();
 		time_svd.finish();
 		
@@ -1451,3 +1453,5 @@ void DFLMO_K::compute_K() {
 }
 	
 } // end namespace
+
+} // end namespace megalochem

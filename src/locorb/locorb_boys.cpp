@@ -1,6 +1,8 @@
 #include "locorb/locorb.hpp"
 #include "math/solvers/diis.hpp"
 
+namespace megalochem {
+
 namespace locorb {
 #if 0
 using smat = dbcsr::shared_matrix<double>;
@@ -1004,3 +1006,5 @@ std::pair<smat_d,smat_d>
 }	
 #endif
 } // end namespace
+
+} // end namespace megalochem

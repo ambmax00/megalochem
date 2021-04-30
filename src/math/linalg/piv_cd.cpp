@@ -9,6 +9,8 @@
 
 #include "utils/matrix_plot.hpp"
 
+namespace megalochem {
+
 namespace math {
 	
 #ifndef _USE_SPARSE_COMPUTE
@@ -107,19 +109,19 @@ void pivinc_cd::compute() {
 	char top = ' ';
 	int nb = scalapack::global::block_size;
 	
-	auto& _grid = scalapack::global_grid;
+	auto sgrid = m_world.scalapack_grid();
 	
-	MPI_Comm comm = m_mat_in->get_cart().comm();
-	int myrank = m_mat_in->get_cart().rank();
-	int myprow = _grid.myprow();
-	int mypcol = _grid.mypcol();
+	MPI_Comm comm = m_world.comm();
+	int myrank = m_world.rank();
+	int myprow = sgrid.myprow();
+	int mypcol = sgrid.mypcol();
 	
 	int ori_proc = m_mat_in->proc(0,0);
 	int ori_coord[2];
 	
 	if (myrank == ori_proc) {
-		ori_coord[0] = _grid.myprow();
-		ori_coord[1] = _grid.mypcol();
+		ori_coord[0] = sgrid.myprow();
+		ori_coord[1] = sgrid.mypcol();
 	}
 	
 	MPI_Bcast(&ori_coord[0],2,MPI_INT,ori_proc,comm);
@@ -127,9 +129,9 @@ void pivinc_cd::compute() {
 	//util::plot(m_mat_in, 1e-4);
 		
 	scalapack::distmat<double> U = dbcsr::matrix_to_scalapack(m_mat_in, 
-		m_mat_in->name() + "_scalapack", nb, nb, ori_coord[0], ori_coord[1]);
+		sgrid, m_mat_in->name() + "_scalapack", nb, nb, ori_coord[0], ori_coord[1]);
 
-	scalapack::distmat<double> Ucopy(N,N,nb,nb,0,0);
+	scalapack::distmat<double> Ucopy(sgrid,N,N,nb,nb,0,0);
 	
 	c_pdgeadd('N', N, N, 1.0, U.data(), 0, 0, U.desc().data(), 
 		0.0, Ucopy.data(), 0, 0, Ucopy.desc().data());
@@ -141,8 +143,8 @@ void pivinc_cd::compute() {
 	
 	// permutation vector
 	
-	int LOCr = c_numroc(N, nb, _grid.myprow(), 0, _grid.nprow());
-	int LOCc = c_numroc(N, nb, _grid.mypcol(), 0, _grid.npcol());
+	int LOCr = c_numroc(N, nb, sgrid.myprow(), 0, sgrid.nprow());
+	int LOCc = c_numroc(N, nb, sgrid.mypcol(), 0, sgrid.npcol());
 	
 	int lipiv_r = LOCr + nb;
 	int lipiv_c = LOCc + nb;
@@ -154,20 +156,20 @@ void pivinc_cd::compute() {
 	int desc_c[9];
 	
 	int info = 0;
-	c_descinit(&desc_r[0],N + nb*_grid.nprow(),1,nb,nb,0,0,_grid.ctx(),lipiv_r,&info);
-	c_descinit(&desc_c[0],1,N + nb*_grid.npcol(),nb,nb,0,0,_grid.ctx(),1,&info);
+	c_descinit(&desc_r[0],N + nb*sgrid.nprow(),1,nb,nb,0,0,sgrid.ctx(),lipiv_r,&info);
+	c_descinit(&desc_c[0],1,N + nb*sgrid.npcol(),nb,nb,0,0,sgrid.ctx(),1,&info);
 	
 	// vector to keep track of permutations
 	std::vector<int> perms(N);
 	std::iota(perms.begin(),perms.end(),1);
 	
 	// chol mat
-	scalapack::distmat<double> L(N,N,nb,nb,0,0);
+	scalapack::distmat<double> L(sgrid,N,N,nb,nb,0,0);
 	
-	auto printp = [&_grid](int* p, int n) {
-		for (int ir = 0; ir != _grid.nprow(); ++ir) {
-			for (int ic = 0; ic != _grid.npcol(); ++ic) {
-				if (ir == _grid.myprow() && ic == _grid.mypcol()) {
+	auto printp = [&sgrid](int* p, int n) {
+		for (int ir = 0; ir != sgrid.nprow(); ++ir) {
+			for (int ic = 0; ic != sgrid.npcol(); ++ic) {
+				if (ir == sgrid.myprow() && ic == sgrid.mypcol()) {
 					std::cout << ir << " " << ic << std::endl;
 					for (int i = 0; i != n; ++i) {
 						std::cout << p[i] << " ";
@@ -292,7 +294,7 @@ void pivinc_cd::compute() {
 	
 		// a) get u
 		// u_i
-		scalapack::distmat<double> u_i(N,1,nb,nb,0,0);
+		scalapack::distmat<double> u_i(sgrid,N,1,nb,nb,0,0);
 		c_pdgeadd('N', N-I-1, 1, 1.0, U.data(), I+1, I, U.desc().data(), 0.0, u_i.data(), I+1, 0, u_i.desc().data());
 		
 		// b) form Utilde
@@ -387,10 +389,9 @@ void pivinc_cd::compute() {
 	
 dbcsr::shared_matrix<double> pivinc_cd::L(std::vector<int> rowblksizes, std::vector<int> colblksizes) {
 	
-	auto w = m_mat_in->get_cart();
-	
-	auto out = dbcsr::scalapack_to_matrix(*m_L, "Inc. Chol. Decom. of " + m_mat_in->name(), 
-		w, rowblksizes, colblksizes);
+	auto out = dbcsr::scalapack_to_matrix(*m_L, 
+		"Inc. Chol. Decom. of " + m_mat_in->name(), 
+		m_world.dbcsr_grid(), rowblksizes, colblksizes);
 		
 	m_L->release();
 	
@@ -780,7 +781,7 @@ void pivinc_cd::compute(std::optional<int> force_rank,
 	
 	double filter_100 = dbcsr::global::filter_eps/100;
 	
-	auto wrd = m_mat_in->get_cart();
+	auto dcart = m_world.dbcsr_grid();
 	
 	int nrows = m_mat_in->nfullrows_total();
 	int ncols = m_mat_in->nfullcols_total();
@@ -790,17 +791,17 @@ void pivinc_cd::compute(std::optional<int> force_rank,
 	auto splitrange = dbcsr::split_range(nrows, 4);
 	vec<int> single = {1};
 		
-	auto U = xmatrix<double>::create(wrd, N, N, nb, nb);
-	auto L = xmatrix<double>::create(wrd, N, N, nb, nb);
+	auto U = xmatrix<double>::create(dcart, N, N, nb, nb);
+	auto L = xmatrix<double>::create(dcart, N, N, nb, nb);
 	
-	auto tmp0 = xmatrix<double>::create(wrd, N, N, nb, nb);
-	auto tmp1 = xmatrix<double>::create(wrd, N, N, nb, nb);
+	auto tmp0 = xmatrix<double>::create(dcart, N, N, nb, nb);
+	auto tmp1 = xmatrix<double>::create(dcart, N, N, nb, nb);
 	
-	auto rvec0 = xmatrix<double>::create(wrd, 1, N, 1, nb);
-	auto rvec1 = xmatrix<double>::create(wrd, 1, N, 1, nb);
+	auto rvec0 = xmatrix<double>::create(dcart, 1, N, 1, nb);
+	auto rvec1 = xmatrix<double>::create(dcart, 1, N, 1, nb);
 	
-	auto cvec0 = xmatrix<double>::create(wrd, N, 1, nb, 1);
-	auto cvec1 = xmatrix<double>::create(wrd, N, 1, nb, 1);
+	auto cvec0 = xmatrix<double>::create(dcart, N, 1, nb, 1);
+	auto cvec1 = xmatrix<double>::create(dcart, N, 1, nb, 1);
 		
 	L->reserve_all();
 	
@@ -905,7 +906,7 @@ void pivinc_cd::compute(std::optional<int> force_rank,
 		// u_i
 		U->get_col(*cvec0, I);
 				
-		auto ui = xmatrix<double>::create(wrd, N, 1, nb, 1);
+		auto ui = xmatrix<double>::create(dcart, N, 1, nb, 1);
 		ui->copy_in(*cvec0);
 				
 		// b) form Utilde
@@ -945,7 +946,7 @@ void pivinc_cd::compute(std::optional<int> force_rank,
 		
 		//std::cout << eigencolperm << '\n' << std::endl;
 		
-		auto colvecperm = dbcsr::eigen_to_matrix(eigencolperm, wrd, "colperm", 
+		auto colvecperm = dbcsr::eigen_to_matrix(eigencolperm, dcart, "colperm", 
 			splitrange, single, dbcsr::type::no_symmetry);
 		colvecperm->filter(filter_100);
 		
@@ -971,8 +972,8 @@ void pivinc_cd::compute(std::optional<int> force_rank,
 	//auto Leigen = dbcsr::matrix_to_eigen(L);
 	//if (wrd.rank() == 0) std::cout << Leigen << std::endl;
 	
-	auto L_reo0 = xmatrix<double>::create(wrd, N, N, nb, nb);
-	auto L_reo1 = xmatrix<double>::create(wrd, N, N, nb, nb);
+	auto L_reo0 = xmatrix<double>::create(dcart, N, N, nb, nb);
+	auto L_reo1 = xmatrix<double>::create(dcart, N, N, nb, nb);
 	
 	// reorder rows to restore initial order
 	for (int irow = 0; irow != N; ++irow) {
@@ -1064,14 +1065,14 @@ void pivinc_cd::compute(std::optional<int> force_rank,
 	}
 	
 	MPI_Reduce(startpos_comm.data(), startpos_red.data(), m_rank, MPI_INT,
-		MPI_MIN, 0, wrd.comm());
+		MPI_MIN, 0, m_world.comm());
 		
 	MPI_Reduce(stoppos_comm.data(), stoppos_red.data(), m_rank, MPI_INT,
-		MPI_MAX, 0, wrd.comm());
+		MPI_MAX, 0, m_world.comm());
 
 	std::vector<int> lmo_perm(m_rank,0);
 
-	if (wrd.rank() == 0) {
+	if (m_world.rank() == 0) {
 		
 		std::iota(lmo_perm.begin(), lmo_perm.end(), 0);
 		std::vector<double> lmo_pos(m_rank);
@@ -1099,7 +1100,7 @@ void pivinc_cd::compute(std::optional<int> force_rank,
 		
 	}
 	
-	MPI_Bcast(lmo_perm.data(), m_rank, MPI_INT, 0, wrd.comm());
+	MPI_Bcast(lmo_perm.data(), m_rank, MPI_INT, 0, m_world.comm());
 		
 	// reorder rows to restore initial order
 	for (int icol = 0; icol != m_rank; ++icol) {
@@ -1141,7 +1142,7 @@ void pivinc_cd::compute(std::optional<int> force_rank,
 	auto rvec = dbcsr::split_range(nrows, 8);
 	
 	auto Lredist = dbcsr::matrix<double>::create()
-		.set_cart(wrd)
+		.set_cart(dcart)
 		.name("Cholesky decomposition")
 		.row_blk_sizes(matrowblksizes)
 		.col_blk_sizes(rvec)
@@ -1176,11 +1177,9 @@ dbcsr::shared_matrix<double> pivinc_cd::L(std::vector<int> rowblksizes, std::vec
 	
 	static int i = 0;
 	i++;
-	
-	auto wrd = m_L->get_cart();
-	
+		
 	auto Lredist = dbcsr::matrix<>::create()
-		.set_cart(wrd)
+		.set_cart(m_world.dbcsr_grid())
 		.name("Cholesky decomposition")
 		.row_blk_sizes(rowblksizes)
 		.col_blk_sizes(colblksizes)
@@ -1200,4 +1199,6 @@ void reorder_and_reduce(scalapack::distmat<double>& L) {}
 
 #endif
 	
-}
+} // end math
+
+} // end mega

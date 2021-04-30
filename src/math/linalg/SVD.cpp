@@ -3,19 +3,21 @@
 
 #include "utils/matrix_plot.hpp"
 
+namespace megalochem {
 
 namespace math {
 
 void SVD::compute(double eps) {
 	
-	auto wrd = m_mat_in->get_cart();
+	auto dcart = m_world.dbcsr_grid();
+	auto sgrid = m_world.scalapack_grid();
+
 	int m = m_mat_in->nfullrows_total();
 	int n = m_mat_in->nfullcols_total();
 	int nb = scalapack::global::block_size;
-	int nprow = wrd.dims()[0];
-	int npcol = wrd.dims()[1];
+	int nprow = dcart.dims()[0];
+	int npcol = dcart.dims()[1];
 	int size = std::min(m,n);
-	auto& _grid = scalapack::global_grid;
 	
 	LOG.os<1>("Running SCALAPACK pdgesvd calculation\n");
 	
@@ -27,15 +29,16 @@ void SVD::compute(double eps) {
 	int ori_proc = m_mat_in->proc(0,0);
 	int ori_coord[2];
 	
-	if (wrd.rank() == ori_proc) {
-		ori_coord[0] = _grid.myprow();
-		ori_coord[1] = _grid.mypcol();
+	if (m_world.rank() == ori_proc) {
+		ori_coord[0] = sgrid.myprow();
+		ori_coord[1] = sgrid.mypcol();
 	}
 	
-	MPI_Bcast(&ori_coord[0],2,MPI_INT,ori_proc,wrd.comm());
+	MPI_Bcast(&ori_coord[0],2,MPI_INT,ori_proc,m_world.comm());
 		
 	auto sca_mat_in = std::make_shared<scalapack::distmat<double>>(
-		dbcsr::matrix_to_scalapack(m_mat_in, m_mat_in->name() + "_scalapack", 
+		dbcsr::matrix_to_scalapack(m_mat_in, sgrid, 
+		m_mat_in->name() + "_scalapack", 
 		nb, nb, ori_coord[0], ori_coord[1])
 	);
 	
@@ -46,10 +49,10 @@ void SVD::compute(double eps) {
 	LOG.os<1>("-- Setting up other arrays.\n");
 	
 	m_U = std::make_shared<scalapack::distmat<double>>(
-		m,size,nb,nb,ori_coord[0],ori_coord[1]);
+		sgrid,m,size,nb,nb,ori_coord[0],ori_coord[1]);
 		
 	m_Vt = std::make_shared<scalapack::distmat<double>>(
-		size,n,nb,nb,ori_coord[0],ori_coord[1]);
+		sgrid,size,n,nb,nb,ori_coord[0],ori_coord[1]);
 	
 	m_s = std::make_shared<std::vector<double>>(size,0.0);
 	
@@ -100,7 +103,7 @@ void SVD::compute(double eps) {
 		LOG.os<1>("Truncating U\n");
 		
 		auto newU = std::make_shared<scalapack::distmat<double>>(
-			m,m_rank,nb,nb,ori_coord[0],ori_coord[1]);
+			sgrid,m,m_rank,nb,nb,ori_coord[0],ori_coord[1]);
 			
 		c_pdgeadd('N', m, m_rank, 1.0, m_U->data(), 0, 0,
 			m_U->desc().data(), 0.0, newU->data(), 0, 0, newU->desc().data());
@@ -114,7 +117,7 @@ void SVD::compute(double eps) {
 		LOG.os<1>("Truncating Vt\n");
 		
 		auto newVt = std::make_shared<scalapack::distmat<double>>(
-			m_rank,n,nb,nb,ori_coord[0],ori_coord[1]);
+			sgrid, m_rank,n,nb,nb,ori_coord[0],ori_coord[1]);
 			
 		c_pdgeadd('N', m_rank, n, 1.0, m_Vt->data(), 0, 0,
 			m_Vt->desc().data(), 0.0, newVt->data(), 0, 0, newVt->desc().data());
@@ -138,21 +141,21 @@ dbcsr::shared_matrix<double> SVD::inverse() {
 	
 	vec<int> sizes = (m < n) ? rowsizes : colsizes;
 	
-	auto w = m_mat_in->get_cart();
+	auto dcart = m_mat_in->get_cart();
 	
 	dbcsr::shared_matrix<double> U =
-		dbcsr::scalapack_to_matrix(*m_U, "U", w, 
+		dbcsr::scalapack_to_matrix(*m_U, dcart, "U", 
 			rowsizes, sizes);
 	
 	dbcsr::shared_matrix<double> Vt =
-		dbcsr::scalapack_to_matrix(*m_Vt, "Vt", w, 
+		dbcsr::scalapack_to_matrix(*m_Vt, dcart, "Vt", 
 			sizes, colsizes);
 			
 	//dbcsr::print(*U);
 	//dbcsr::print(*Vt);
 			
 	auto out = dbcsr::matrix<>::create()
-		.set_cart(w)
+		.set_cart(dcart)
 		.name("SVD inverse of " + m_mat_in->name())
 		.row_blk_sizes(colsizes)
 		.col_blk_sizes(rowsizes)
@@ -175,7 +178,7 @@ dbcsr::shared_matrix<double> SVD::inverse() {
 	//dbcsr::print(*out);
 	
 	auto ide = dbcsr::matrix<>::create()
-		.set_cart(w)
+		.set_cart(dcart)
 		.name("IDE1")
 		.row_blk_sizes(rowsizes)
 		.col_blk_sizes(rowsizes)
@@ -209,13 +212,12 @@ dbcsr::shared_matrix<double> SVD::inverse() {
 
 dbcsr::shared_matrix<double> SVD::U(std::vector<int> rowblksizes, 
 	std::vector<int> colblksizes) {
-	
-	auto w = m_mat_in->get_cart();
-	
+		
 	//m_U->print();
+	auto dcart = m_world.dbcsr_grid();
 	
-	auto out = dbcsr::scalapack_to_matrix(*m_U, "SVD U matrix of " + m_mat_in->name(), 
-		w, rowblksizes, colblksizes);
+	auto out = dbcsr::scalapack_to_matrix(*m_U, dcart, 
+		"SVD U matrix of " + m_mat_in->name(), rowblksizes, colblksizes);
 			
 	//dbcsr::print(*out);
 	
@@ -228,10 +230,10 @@ dbcsr::shared_matrix<double> SVD::U(std::vector<int> rowblksizes,
 dbcsr::shared_matrix<double> SVD::Vt(std::vector<int> rowblksizes, 
 	std::vector<int> colblksizes) {
 	
-	auto w = m_mat_in->get_cart();
+	auto dcart = m_mat_in->get_cart();
 	
-	auto out = dbcsr::scalapack_to_matrix(*m_Vt, "SVD Vt matrix of " + m_mat_in->name(), 
-		w, rowblksizes, colblksizes);
+	auto out = dbcsr::scalapack_to_matrix(*m_Vt, dcart, 
+		"SVD Vt matrix of " + m_mat_in->name(), rowblksizes, colblksizes);
 			
 	//util::plot(out, 1e-4);
 	
@@ -248,3 +250,5 @@ std::vector<double> SVD::s() {
 }
 	
 } // end namespace
+
+} // end megalochem

@@ -6,12 +6,14 @@
 #include "ints/aofactory.hpp"
 #include "ints/screening.hpp"
 #include "utils/mpi_time.hpp"
-#include "utils/registry.hpp"
+#include "ints/registry.hpp"
 #include "desc/options.hpp"
 #include "desc/molecule.hpp"
 #endif
 
 #include "utils/ppdirs.hpp"
+
+namespace megalochem {
 
 namespace ints {
 
@@ -47,6 +49,7 @@ enum class key {
 class aoloader {
 private:
 	
+	world m_world;
 	dbcsr::cart m_cart;
 	desc::shared_molecule m_mol;
 	dbcsr::btype m_btype_eris;
@@ -57,7 +60,7 @@ private:
 	util::mpi_log LOG;
 	util::mpi_time TIME;
 	
-	util::key_registry<key> m_reg;
+	ints::key_registry<key> m_reg;
 
 	std::array<bool,static_cast<const int>(key::NUM_KEYS)> m_to_compute;
 	std::array<bool,static_cast<const int>(key::NUM_KEYS)> m_to_keep;
@@ -72,7 +75,7 @@ private:
 public:
 
 #define AOLOADER_CREATE_LIST (\
-	((dbcsr::cart), set_cart),\
+	((world), set_world),\
 	((desc::shared_molecule), set_molecule),\
 	((util::optional<int>), print),\
 	((util::optional<int>), nbatches_b),\
@@ -84,9 +87,10 @@ public:
 	MAKE_BUILDER_CLASS(aoloader, create, AOLOADER_CREATE_LIST, ())
 
 	aoloader(create_pack&& p) :
-		m_cart(p.p_set_cart), m_mol(p.p_set_molecule),
-		LOG(p.p_set_cart.comm(), (p.p_print) ? *p.p_print : 0),
-		TIME(p.p_set_cart.comm(), "AO-loader"),
+		m_world(p.p_set_world), m_cart(p.p_set_world.dbcsr_grid()), 
+		m_mol(p.p_set_molecule),
+		LOG(p.p_set_world.comm(), (p.p_print) ? *p.p_print : 0),
+		TIME(p.p_set_world.comm(), "AO-loader"),
 		m_btype_eris((p.p_btype_eris) ? *p.p_btype_eris : dbcsr::btype::core),
 		m_btype_intermeds((p.p_btype_intermeds) ? *p.p_btype_intermeds 
 			: dbcsr::btype::core),
@@ -113,7 +117,7 @@ public:
 		TIME.print_info();
 	}
 	
-	const util::key_registry<key> get_registry() {
+	const ints::key_registry<key> get_registry() {
 		return m_reg;
 	}
 	
@@ -121,5 +125,7 @@ public:
 	
 	
 } // end namespace
+
+} // end namespace megalochem
 
 #endif

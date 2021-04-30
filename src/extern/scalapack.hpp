@@ -1,6 +1,7 @@
 #ifndef EXTERN_SCALAPACK_H
 #define EXTERN_SCALAPACK_H
 
+#include <mpi.h>
 #include <iostream>
 #include <iomanip>
 #include <stdexcept>
@@ -8,14 +9,24 @@
 
 extern "C" {
 	
+	int sys2blacs_handle_(int *SysCtxt);
+	
 	void blacs_pinfo_(int* mypnum, int* nprocs);
+	
 	void blacs_get_(int* icontxt, int* what, int* val);
+	
 	int blacs_pnum_(int* icontxt, int* prow, int* pcol);
+	
 	void blacs_gridinit_(int* icontxt, char* layout, int* nprow, int* npcol);
+	
 	void blacs_gridmap_(int* icontxt, int* usermap, int* ldumap, int* nprow, int* npcol);
+	
 	void blacs_barrier_(int* icontxt, char* scope);
+	
 	void blacs_gridinfo_(int* icontxt, int* nprow, int* npcol, int* myprow, int* mypcol);
+	
 	void blacs_gridexit_(int* ctxt);
+	
 	void blacs_exit_(int* cont);
 	
 	int numroc_(int* n, int* nb, int* iproc, int* isrcproc, int* nprocs);
@@ -64,6 +75,11 @@ extern "C" {
 	void Cigebr2d(int ConTxt, char *scope, char *top, int m, int n, int *A,
                int lda, int rsrc, int csrc);
 }
+
+inline int c_sys2blacs_handle(MPI_Comm comm) {
+	MPI_Fint fcomm = MPI_Comm_c2f(comm);
+	return sys2blacs_handle_(&fcomm);
+};
 
 inline void c_blacs_pinfo(int* mypnum, int* nprocs)
 {
@@ -273,26 +289,38 @@ namespace scalapack {
 struct global {
 	inline static int block_size = 5;
 };
-	
+
 class grid {
 private: 
 
-	inline static int m_ctxt = -1;
-	inline static int m_nprow, m_npcol;
-	inline static int m_myprow, m_mypcol;
-	inline static int m_nprocs = -1;
-	inline static int m_mypnum = -1;
-
-public:
-
-	void set(int ictxt) {
+	int m_ctxt = -1;
+	int m_nprow, m_npcol;
+	int m_myprow, m_mypcol;
+	int m_nprocs = -1;
+	int m_mypnum = -1;
+	
+	void init(int ctx) {
 		
-		m_ctxt = ictxt;
+		m_ctxt = ctx;
+	
 		c_blacs_pinfo(&m_mypnum, &m_nprocs);
 		c_blacs_gridinfo(m_ctxt, &m_nprow, &m_npcol, &m_myprow, &m_mypcol);
 		
-		//std::cout << m_nprow << " " << m_npcol << std::endl;
+	}
+
+public:
+
+	grid(MPI_Comm comm, char top, int nrows, int ncols) {
 		
+		int ctx = c_sys2blacs_handle(comm);
+		c_blacs_gridinit(&ctx, top, nrows, ncols);
+		
+		init(ctx);
+		
+	}
+		
+	grid(int ctx) {
+		init(ctx);
 	}
 	
 	void free() {
@@ -303,31 +331,33 @@ public:
 		m_ctxt = -1;
 		
 	}
-
-	grid() {}
 	
-	grid(grid& g_in) = delete;
+	// TO DO: should duplicate communicator (?)
+	grid(const grid& g_in) = default;
+		
+	grid(grid&& g_in) = default;
 	
 	~grid() {}
 	
-	int ctx() { return m_ctxt; }
-	int nprow() { return m_nprow; }
-	int npcol() { return m_npcol; }
-	int myprow() { return m_myprow; }
-	int mypcol() { return m_mypcol; }
-	int mypnum() { return m_mypnum; }
-	int nprocs() { return m_nprocs; }
-	int get_pnum(int i, int j) { return c_blacs_pnum(m_ctxt,i,j); }
+	int ctx() const { return m_ctxt; }
+	int nprow() const { return m_nprow; }
+	int npcol() const { return m_npcol; }
+	int myprow() const { return m_myprow; }
+	int mypcol() const { return m_mypcol; }
+	int mypnum() const { return m_mypnum; }
+	int nprocs() const { return m_nprocs; }
+	int get_pnum(int i, int j) const { return c_blacs_pnum(m_ctxt,i,j); }
 	
 };
-
-inline static grid global_grid;
 
 template <typename T>
 class distmat {
 private:
 	
 	T* m_data;
+	
+	grid m_grid;
+	
 	int m_nrowstot;
 	int m_ncolstot;
 	int m_nrowsloc;
@@ -341,10 +371,9 @@ private:
 	
 public:
 
-	distmat() : m_data(nullptr) {}
-
-	distmat(int nrows, int ncols, int rowblksize, int colblksize, int irsrc, int icsrc) :
-		m_nrowstot(nrows), m_ncolstot(ncols), 
+	distmat(grid igrid, int nrows, int ncols, int rowblksize, 
+		int colblksize, int irsrc, int icsrc) :
+		m_grid(igrid), m_nrowstot(nrows), m_ncolstot(ncols), 
 		m_rowblk_size(rowblksize), m_colblk_size(colblksize),
 		m_rsrc(irsrc), m_csrc(icsrc)
 	{
@@ -354,10 +383,10 @@ public:
 		//		<< " " << colblksize << std::endl;
 		//	}
 		
-		m_nrowsloc = std::max(1,c_numroc(m_nrowstot, m_rowblk_size, global_grid.myprow(), 
-			irsrc, global_grid.nprow()));
-		m_ncolsloc = std::max(1,c_numroc(m_ncolstot, m_colblk_size, global_grid.mypcol(), 
-			icsrc, global_grid.npcol()));
+		m_nrowsloc = std::max(1,c_numroc(m_nrowstot, m_rowblk_size, m_grid.myprow(), 
+			irsrc, m_grid.nprow()));
+		m_ncolsloc = std::max(1,c_numroc(m_ncolstot, m_colblk_size, m_grid.mypcol(), 
+			icsrc, m_grid.npcol()));
 		
 		/*	
 		for (int i = 0; i != global_grid.nprow(); ++i) {
@@ -383,7 +412,7 @@ public:
 		
 		int info = 0;
 		c_descinit(&m_desc[0],m_nrowstot,m_ncolstot,m_rowblk_size,
-					m_colblk_size,irsrc,icsrc,global_grid.ctx(),m_nrowsloc,&info);
+					m_colblk_size,irsrc,icsrc,m_grid.ctx(),m_nrowsloc,&info);
 					
 		m_data = new T[m_nrowsloc*m_ncolsloc]();
 		
@@ -396,33 +425,33 @@ public:
 	}
 	
 	inline T& global_access(int iglob, int jglob) {
-		int iloc = c_indxg2l(iglob, m_rowblk_size, 0, 0, global_grid.nprow());
-		int jloc = c_indxg2l(jglob, m_colblk_size, 0, 0, global_grid.npcol());
+		int iloc = c_indxg2l(iglob, m_rowblk_size, 0, 0, m_grid.nprow());
+		int jloc = c_indxg2l(jglob, m_colblk_size, 0, 0, m_grid.npcol());
 		return m_data[iloc + m_nrowsloc*jloc];
 	}
 	
-	int iloc(int iglob) {
-		return c_indxg2l(iglob, m_rowblk_size, 0, 0, global_grid.nprow());
+	int iloc (int iglob) const {
+		return c_indxg2l(iglob, m_rowblk_size, 0, 0, m_grid.nprow());
 	}
 	
-	int jloc(int jglob) {
-		return c_indxg2l(jglob, m_colblk_size, 0, 0, global_grid.npcol());
+	int jloc (int jglob) const {
+		return c_indxg2l(jglob, m_colblk_size, 0, 0, m_grid.npcol());
 	}
 	
-	int iproc(int iglob) {
-		return c_indxg2p(iglob, m_rowblk_size, 0, m_rsrc, global_grid.nprow());
+	int iproc (int iglob) const {
+		return c_indxg2p(iglob, m_rowblk_size, 0, m_rsrc, m_grid.nprow());
 	}
 	
-	int jproc(int jglob) {
-		return c_indxg2p(jglob, m_colblk_size, 0, m_csrc, global_grid.npcol());
+	int jproc (int jglob) const {
+		return c_indxg2p(jglob, m_colblk_size, 0, m_csrc, m_grid.npcol());
 	}
 	
-	int iglob(int iloc) {
-		return c_indxl2g(iloc,m_rowblk_size,global_grid.myprow(),m_rsrc,global_grid.nprow());
+	int iglob (int iloc) const {
+		return c_indxl2g(iloc,m_rowblk_size,m_grid.myprow(),m_rsrc,m_grid.nprow());
 	}
-	
-	int jglob(int jloc) {
-		return c_indxl2g(jloc,m_colblk_size,global_grid.mypcol(),m_csrc,global_grid.npcol());
+	 
+	int jglob (int jloc) const {
+		return c_indxl2g(jloc,m_colblk_size,m_grid.mypcol(),m_csrc,m_grid.npcol());
 	}
 	
 	template <typename D = T, typename = typename std::enable_if<std::is_same<D,int>::value,int>::type>
@@ -440,7 +469,7 @@ public:
 	}
 	
 	template <typename D = T, typename = typename std::enable_if<std::is_same<D,double>::value,int>::type>
-	double get(char scope, char top, int i, int j) {
+	double get (char scope, char top, int i, int j) const {
 		double out;
 		c_pdelget(scope, top, &out, m_data, i, j, &m_desc[0]);
 		return out;
@@ -449,7 +478,7 @@ public:
 	distmat(const distmat& d) = delete;
 	
 	distmat(distmat&& d) :
-		m_data(d.m_data), m_nrowstot(d.m_nrowstot), 
+		m_grid(d.m_grid), m_data(d.m_data), m_nrowstot(d.m_nrowstot), 
 		m_ncolstot(d.m_ncolstot), m_nrowsloc(d.m_nrowsloc),
 		m_ncolsloc(d.m_ncolsloc), m_rowblk_size(d.m_rowblk_size),
 		m_colblk_size(d.m_colblk_size), m_desc(d.m_desc),
@@ -467,17 +496,17 @@ public:
 		m_data = nullptr;
 	}
 	
-	int nfull_loc() {
+	int nfull_loc() const {
 		return m_nrowsloc*m_ncolsloc;
 	}
 	
-	T* data() { return m_data; }
+	T* data() const { return m_data; }
 	
-	std::array<int,9> desc() { return m_desc; }
+	std::array<int,9> desc() const { return m_desc; }
 	
-	void print() {
+	void print() const {
 		
-		c_blacs_barrier(global_grid.ctx(),'A');
+		c_blacs_barrier(m_grid.ctx(),'A');
 		
 		/*if (global_grid.mypnum() == 0) 
 			std::cout << "MATRIX SIZE: " << m_nrowstot 
@@ -487,10 +516,10 @@ public:
 			std::cout << "LOCAL MATRIX SIZE: " << m_nrowsloc 
 				<< " " << m_ncolsloc << std::endl;*/
 		
-		for (int pi = 0; pi != global_grid.nprow(); ++pi) {
-			for (int pj = 0; pj != global_grid.npcol(); ++pj) {
+		for (int pi = 0; pi != m_grid.nprow(); ++pi) {
+			for (int pj = 0; pj != m_grid.npcol(); ++pj) {
 				
-				if (pi == global_grid.myprow() && pj == global_grid.mypcol()) {
+				if (pi == m_grid.myprow() && pj == m_grid.mypcol()) {
 					
 					std::cout << "PROW/PCOL: " << pi << " " << pj << std::endl;
 					
@@ -501,22 +530,22 @@ public:
 					}
 				}
 				
-				c_blacs_barrier(global_grid.ctx(),'A');
+				c_blacs_barrier(m_grid.ctx(),'A');
 			}
 		}
 		
-		c_blacs_barrier(global_grid.ctx(),'A');
+		c_blacs_barrier(m_grid.ctx(),'A');
 		
 	}
 	
-	int nrowstot() { return m_nrowstot; }
-	int ncolstot() { return m_ncolstot; }
+	int nrowstot() const { return m_nrowstot; }
+	int ncolstot() const { return m_ncolstot; }
 	
-	int rowblk_size() { return m_rowblk_size; }
-	int colblk_size() { return m_colblk_size; }
+	int rowblk_size() const { return m_rowblk_size; }
+	int colblk_size() const { return m_colblk_size; }
 	
-	int rsrc() { return m_rsrc; }
-	int csrc() { return m_csrc; }
+	int rsrc() const { return m_rsrc; }
+	int csrc() const { return m_csrc; }
 	
 };
 

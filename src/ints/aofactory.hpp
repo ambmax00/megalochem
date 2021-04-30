@@ -1,6 +1,7 @@
 #ifndef INTS_AOFACTORY_H
 #define INTS_AOFACTORY_H
 
+#include "megalochem.hpp"
 #include <dbcsr_tensor.hpp>
 #include <dbcsr_conversions.hpp>
 #include "desc/molecule.hpp"
@@ -16,6 +17,8 @@
 */
 
 using eigen_smat_f = std::shared_ptr<Eigen::MatrixXf>;
+
+namespace megalochem {
 
 namespace ints {
 	
@@ -52,9 +55,9 @@ private:
 	
 public:
 
-	aofactory(desc::shared_molecule mol, dbcsr::cart& w);
+	aofactory(desc::shared_molecule mol, world w);
 	
-	aofactory(dbcsr::cart& w, desc::shared_cluster_basis cbas, 
+	aofactory(world w, desc::shared_cluster_basis cbas, 
 		desc::shared_cluster_basis cdfbas = nullptr, 
 		desc::shared_cluster_basis cbas2 = nullptr);
 	
@@ -108,11 +111,13 @@ public:
 }; // end class aofactory
 
 desc::shared_cluster_basis remove_lindep(
-	dbcsr::cart w,
+	world w,
 	desc::shared_cluster_basis cbas, 
 	std::vector<desc::Atom> atoms);
 
 } // end namespace ints
+
+} // end namespace mega
 			
 		
 #endif

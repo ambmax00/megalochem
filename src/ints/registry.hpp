@@ -1,5 +1,5 @@
-#ifndef UTILS_REGISTRY_H
-#define UTILS_REGISTRY_H
+#ifndef INTS_REGISTRY_H
+#define INTS_REGISTRY_H
 
 #include <any>
 #include <map>
@@ -8,7 +8,9 @@
 #include "ints/screening.hpp"
 #include <stdexcept>
 
-namespace util {
+namespace megalochem {
+
+namespace ints {
 	
 class registry {
 private:
@@ -188,6 +190,8 @@ public:
 		
 };
 
-} // end namespace
+} // namespace ints
+
+} // namespace megalochem
 
 #endif

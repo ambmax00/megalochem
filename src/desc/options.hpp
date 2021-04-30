@@ -12,6 +12,8 @@
 // a fancy "any" map
 #include <iostream>
 
+namespace megalochem {
+
 namespace desc {
 
 template <typename T, typename U = void>
@@ -141,6 +143,8 @@ public:
 	}		
 			
 };
+
+}
 
 }
 

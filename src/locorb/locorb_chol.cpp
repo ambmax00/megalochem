@@ -1,6 +1,8 @@
 #include "locorb/locorb.hpp"
 #include "math/linalg/piv_cd.hpp"
 
+namespace megalochem {
+
 namespace locorb {
 
 std::pair<smat_d,smat_d>  
@@ -13,7 +15,7 @@ std::pair<smat_d,smat_d>
 	
 	auto p_bb = dbcsr::matrix<>::create()
 		.name("p_bb")
-		.set_cart(m_cart)
+		.set_cart(c_bm->get_cart())
 		.row_blk_sizes(b)
 		.col_blk_sizes(b)
 		.matrix_type(dbcsr::type::symmetric)
@@ -21,7 +23,7 @@ std::pair<smat_d,smat_d>
 		
 	dbcsr::multiply('N', 'T', 1.0, *c_bm, *c_bm, 0.0, *p_bb).perform();
 	
-	math::pivinc_cd piv(p_bb, 0);
+	math::pivinc_cd piv(m_world, p_bb, 0);
 	
 	piv.compute();
 	
@@ -38,5 +40,7 @@ std::pair<smat_d,smat_d>
 	);
 			
 }
+
+} // end namespace
 
 } // end namespace

@@ -7,6 +7,8 @@
 #include "math/laplace/laplace_minimax_c.hpp"
 #include <optional>
 
+namespace megalochem {
+
 namespace math {
 	
 class laplace {
@@ -119,5 +121,7 @@ public:
 };
 		
 } // end namespace
+
+} // end megalochem
 
 #endif

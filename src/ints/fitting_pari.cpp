@@ -7,12 +7,14 @@
 #include <Eigen/SVD>
 #include <Eigen/Dense>
 
+namespace megalochem {
+
 namespace ints {
 
 dbcsr::sbtensor<3,double> dfitting::compute_pari(dbcsr::shared_matrix<double> s_xx, 
 	shared_screener scr_s, std::array<int,3> bdims, dbcsr::btype mytype) {
 	
-	auto aofac = std::make_shared<aofactory>(m_mol, m_cart);
+	auto aofac = std::make_shared<aofactory>(m_mol, m_world);
 	aofac->ao_3c2e_setup(metric::coulomb);
 	
 	auto& time_setup = TIME.sub("Setting up preliminary data");
@@ -421,6 +423,8 @@ dbcsr::sbtensor<3,double> dfitting::compute_pari(dbcsr::shared_matrix<double> s_
 	
 	return c_xbb_batched;
 	
+}
+
 }
 	
 } // end namespace ints

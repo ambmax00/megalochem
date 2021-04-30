@@ -1,6 +1,8 @@
 #include "adc/adc_mvp.hpp"
 #include "ints/aoloader.hpp"
 
+namespace megalochem {
+
 namespace adc {
 	
 //#define _DLOG
@@ -17,7 +19,7 @@ void MVP_AORIADC1::init() {
 		case fock::jmethod::dfao: 
 		{
 			m_jbuilder = fock::DF_J::create()
-				.set_cart(m_cart)
+				.set_world(m_world)
 				.molecule(m_mol)
 				.print(nprint)
 				.eri3c2e_batched(m_eri3c2e_batched)
@@ -35,7 +37,7 @@ void MVP_AORIADC1::init() {
 		case fock::kmethod::dfao:
 		{
 			m_kbuilder = fock::DFAO_K::create()
-				.set_cart(m_cart)
+				.set_world(m_world)
 				.molecule(m_mol)
 				.print(nprint)
 				.eri3c2e_batched(m_eri3c2e_batched)
@@ -46,7 +48,7 @@ void MVP_AORIADC1::init() {
 		case fock::kmethod::dfmem:
 		{
 			m_kbuilder = fock::DFMEM_K::create()
-				.set_cart(m_cart)
+				.set_world(m_world)
 				.molecule(m_mol)
 				.print(nprint)
 				.eri3c2e_batched(m_eri3c2e_batched)
@@ -56,7 +58,7 @@ void MVP_AORIADC1::init() {
 		}
 		case fock::kmethod::dflmo:
 			m_kbuilder = fock::DFLMO_K::create()
-				.set_cart(m_cart)
+				.set_world(m_world)
 				.molecule(m_mol)
 				.print(nprint)
 				.eri3c2e_batched(m_eri3c2e_batched)
@@ -136,3 +138,5 @@ smat MVP_AORIADC1::compute(smat u_ia, double omega) {
 }
 	
 } // end namespace
+
+} // end namespace mega

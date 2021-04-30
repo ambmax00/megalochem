@@ -4,11 +4,16 @@
 #include <dbcsr_matrix.hpp>
 #include <string>
 #include <Eigen/Core>
+#include "megalochem.hpp"
+
+namespace megalochem {
 
 namespace math {
 	
 class orthogonalizer {
 private:
+
+	world m_world;
 
 	dbcsr::shared_matrix<double> m_mat_in;
 	dbcsr::shared_matrix<double> m_mat_out;
@@ -16,7 +21,8 @@ private:
 
 public:
 
-	orthogonalizer(dbcsr::shared_matrix<double>& m, bool print = false) : m_mat_in(m), m_print(print) {};
+	orthogonalizer(world w, dbcsr::shared_matrix<double>& m, bool print = false) 
+		: m_world(w), m_mat_in(m), m_print(print) {};
 	
 	void compute();
 
@@ -25,5 +31,7 @@ public:
 };
 
 } // end namespace
+
+} // end mega
 
 #endif

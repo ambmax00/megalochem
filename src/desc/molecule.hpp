@@ -12,6 +12,8 @@
 
 #include "utils/ppdirs.hpp"
 
+namespace megalochem {
+
 namespace desc {
 
 // defaults
@@ -309,5 +311,7 @@ inline void write_molecule(std::string name, desc::molecule& mol, filio::data_ha
 }
 
 } // end namespace
+
+} // end mega
 
 #endif

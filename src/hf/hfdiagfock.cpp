@@ -5,6 +5,8 @@
 #include "math/linalg/piv_cd.hpp"
 #include <algorithm> 
 
+namespace megalochem {
+
 namespace hf { 
 	
 void hfmod::diag_fock() {
@@ -37,7 +39,7 @@ void hfmod::diag_fock() {
 		if (LOG.global_plev() >= 2) 
 			dbcsr::print(*XFX);
 		
-		math::hermitian_eigen_solver solver(XFX, 'V', (LOG.global_plev() >= 2) ? true : false);
+		math::hermitian_eigen_solver solver(m_world, XFX, 'V', (LOG.global_plev() >= 2) ? true : false);
 		
 		vec<int> m = (x == "A") ? m_mol->dims().ma() : m_mol->dims().mb();
 		
@@ -103,7 +105,7 @@ void hfmod::diag_fock() {
 		
 		LOG.os<1>("Localizing occupied ", x, " MO orbitals.\n");
 		
-		math::pivinc_cd pcd(p_bb, LOG.global_plev());
+		math::pivinc_cd pcd(m_world, p_bb, LOG.global_plev());
 		
 		pcd.compute();
 		
@@ -276,5 +278,6 @@ void hfmod::compute_virtual_density() {
 	
 }
 	
-
 } //end namespace
+
+} // end namespace

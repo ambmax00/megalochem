@@ -6,6 +6,8 @@
 #include <Eigen/Core>
 #include <Eigen/SVD>
 
+namespace megalochem {
+
 namespace fock {
 
 void DFROBUST_K::init() {
@@ -264,3 +266,5 @@ void DFROBUST_K::compute_K() {
 }
 
 } // end namespace
+
+} // end namespace mega

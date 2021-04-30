@@ -1,6 +1,8 @@
 #include "ints/fitting.hpp"
 #include "utils/constants.hpp"
 
+namespace megalochem {
+
 namespace ints {
 	
 auto get_sum = [](auto& in, auto comm) {
@@ -170,3 +172,5 @@ dbcsr::sbtensor<3,double> dfitting::compute(dbcsr::sbtensor<3,double> eri_batche
 }
 	
 } // end namespace
+
+} // end namespace megalochem

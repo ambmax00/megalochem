@@ -8,6 +8,8 @@
 
 //#define _DLOG
 
+namespace megalochem {
+
 namespace adc {
 
 /* =====================================================================
@@ -24,7 +26,7 @@ void MVP_AORISOSADC2::init() {
 	t_init.start();
 
 	LOG.os<1>("Computing Cholesky decomposition of S\n");
-	math::LLT chol(m_s_bb, LOG.global_plev());
+	math::LLT chol(m_world, m_s_bb, LOG.global_plev());
 	
 	chol.compute();
 	auto b = m_mol->dims().b();
@@ -38,11 +40,13 @@ void MVP_AORISOSADC2::init() {
 	auto& t_chol = TIME.sub("Computing cholesky decomposition (ss)");
 	t_chol.start();
 	
-	m_laphelper_ss = std::make_shared<math::laplace_helper>(m_nlap, m_c_bo, 
+	m_laphelper_ss = std::make_shared<math::laplace_helper>(
+		m_world, m_nlap, m_c_bo, 
 		m_c_bv, m_s_sqrt_bb, m_s_invsqrt_bb, m_eps_occ, m_eps_vir, 
 		LOG.global_plev());
 		
-	m_laphelper_dd = std::make_shared<math::laplace_helper>(m_nlap, m_c_bo, 
+	m_laphelper_dd = std::make_shared<math::laplace_helper>(
+		m_world, m_nlap, m_c_bo, 
 		m_c_bv, m_s_sqrt_bb, m_s_invsqrt_bb, m_eps_occ, m_eps_vir, 
 		LOG.global_plev());
 		
@@ -59,7 +63,7 @@ void MVP_AORISOSADC2::init() {
 		case fock::jmethod::dfao:
 		{
 			m_jbuilder = fock::DF_J::create()
-				.set_cart(m_cart)
+				.set_world(m_world)
 				.molecule(m_mol)
 				.print(nprint)
 				.eri3c2e_batched(m_eri3c2e_batched)
@@ -78,7 +82,7 @@ void MVP_AORISOSADC2::init() {
 		case fock::kmethod::dfao:
 		{
 			m_kbuilder = fock::DFAO_K::create()
-				.set_cart(m_cart)
+				.set_world(m_world)
 				.molecule(m_mol)
 				.print(nprint)
 				.eri3c2e_batched(m_eri3c2e_batched)
@@ -89,7 +93,7 @@ void MVP_AORISOSADC2::init() {
 		case fock::kmethod::dfmem:
 		{
 			m_kbuilder = fock::DFMEM_K::create()
-				.set_cart(m_cart)
+				.set_world(m_world)
 				.molecule(m_mol)
 				.print(nprint)
 				.eri3c2e_batched(m_eri3c2e_batched)
@@ -110,7 +114,7 @@ void MVP_AORISOSADC2::init() {
 		case mp::zmethod::llmp_full:
 		{
 			m_zbuilder = mp::LLMP_FULL_Z::create()
-				.set_cart(m_cart)
+				.set_world(m_world)
 				.set_molecule(m_mol)
 				.print(LOG.global_plev())
 				.eri3c2e_batched(m_eri3c2e_batched)
@@ -121,7 +125,7 @@ void MVP_AORISOSADC2::init() {
 		case mp::zmethod::llmp_mem:
 		{
 			m_zbuilder = mp::LLMP_MEM_Z::create()
-				.set_cart(m_cart)
+				.set_world(m_world)
 				.set_molecule(m_mol)
 				.print(LOG.global_plev())
 				.eri3c2e_batched(m_eri3c2e_batched)
@@ -147,7 +151,7 @@ void MVP_AORISOSADC2::init() {
 	LOG.os<1>("Computing intermediates.\n");
 	compute_intermeds();
 	
-	m_spgrid2 = dbcsr::pgrid<2>::create(m_cart.comm()).build();
+	m_spgrid2 = dbcsr::pgrid<2>::create(m_world.comm()).build();
 	
 	t_init.finish();
 	TIME.finish();
@@ -325,11 +329,11 @@ void MVP_AORISOSADC2::compute_intermeds() {
 		switch (m_kmethod) {
 			case fock::kmethod::dfao: 
 			{
-				ints::dfitting dfit(m_cart, m_mol, nprint);
+				ints::dfitting dfit(m_world, m_mol, nprint);
 				auto I_fit_xbb = dfit.compute(m_eri3c2e_batched, f_xx_ilap, m_btype);
 				LOG.os<1>("Occupancy of Ifit: ", I_fit_xbb->occupation() * 100, '\n');
 				k_inter = fock::DFAO_K::create()
-					.set_cart(m_cart)
+					.set_world(m_world)
 					.molecule(m_mol)
 					.print(nprint)
 					.eri3c2e_batched(m_eri3c2e_batched)
@@ -340,7 +344,7 @@ void MVP_AORISOSADC2::compute_intermeds() {
 			case fock::kmethod::dfmem:
 			{
 				k_inter = fock::DFMEM_K::create()
-					.set_cart(m_cart)
+					.set_world(m_world)
 					.molecule(m_mol)
 					.print(nprint)
 					.eri3c2e_batched(m_eri3c2e_batched)
@@ -2544,3 +2548,5 @@ smat MVP_AORISOSADC2::compute(smat u_ia, double omega) {
 }
 
 } // end namespace
+
+} // end namespace mega

@@ -29,8 +29,6 @@ public:
     
     template <typename D>
     friend class matrix_copy_base;
-
-	dist() {}
 	
 	dist(const dist& d) = delete;
 	
@@ -79,16 +77,13 @@ protected:
     matrix(void* ptr, cart& w) : m_matrix_ptr(ptr), m_cart(w) {}
     
 public:
-
-    matrix() : m_matrix_ptr(nullptr) {}
     
     matrix(const matrix& m) = delete;
     
-    matrix(matrix&& m) : m_matrix_ptr(nullptr)
+    matrix(matrix&& m) : m_matrix_ptr(nullptr), m_cart(m.m_cart)
 	{
 		this->release();
 		this->m_matrix_ptr = m.m_matrix_ptr;
-		this->m_cart = m.m_cart;
 		m.m_matrix_ptr = nullptr;
 	}
 
@@ -126,11 +121,11 @@ public:
 	
 	MAKE_BUILDER_CLASS(matrix, create, MATRIX_CREATE_LIST, ())
 
-	matrix(create_pack&& p) : m_matrix_ptr(nullptr) {
-		
-		m_cart = (p.p_set_cart) ? (*p.p_set_cart) : 
-			(*p.p_set_dist).m_cart;
-		
+	matrix(create_pack&& p) : 
+		m_matrix_ptr(nullptr),
+		m_cart((p.p_set_cart) ? (*p.p_set_cart) : 
+			(*p.p_set_dist).m_cart) 
+	{
         dist* dist_ptr = nullptr;
         
         if (!p.p_set_dist) {
@@ -195,10 +190,9 @@ public:
 	MAKE_BUILDER_CLASS(matrix, create_template, MATRIX_TEMPLATE_PLIST,
 		MATRIX_TEMPLATE_ILIST)
     
-	matrix(create_template_pack&& p) {
+	matrix(create_template_pack&& p) : m_cart(p.p_templet.m_cart) {
 		
 		m_matrix_ptr = nullptr;
-		m_cart = p.p_templet.m_cart;
 		
 		char mat_type = (p.p_matrix_type) ? 
 			static_cast<char>(*p.p_matrix_type) : '0';
@@ -236,10 +230,9 @@ public:
 	MAKE_BUILDER_CLASS(matrix, transpose, MATRIX_TRANSPOSE_PLIST,
 		MATRIX_TRANSPOSE_ILIST)
 
-    matrix(transpose_pack&& p) {
+    matrix(transpose_pack&& p)  : m_cart(p.p_matrix_in.m_cart) {
     
 		m_matrix_ptr = nullptr;
-        m_cart = p.p_matrix_in.m_cart;
         
         c_dbcsr_transposed(&m_matrix_ptr, p.p_matrix_in.m_matrix_ptr, 
                             (p.p_shallow_copy) ? &*p.p_shallow_copy : nullptr,
@@ -264,10 +257,9 @@ public:
 	MAKE_BUILDER_CLASS(matrix, copy, MATRIX_COPY_PLIST,
 		MATRIX_COPY_ILIST)
 	
-	matrix(copy_pack&& p) {
+	matrix(copy_pack&& p) : m_cart(p.p_matrix_in.m_cart) {
 		
 		m_matrix_ptr = nullptr;
-		m_cart = p.p_matrix_in.m_cart;
 		
 		char mat_type = (p.p_matrix_type) ? 
 			static_cast<char>(*p.p_matrix_type) : '0';
@@ -290,10 +282,9 @@ public:
 	
 	MAKE_BUILDER_CLASS(matrix, read, MATRIX_READ_PLIST, ())
 
-	matrix(read_pack&& p) {
+	matrix(read_pack&& p)  : m_cart(p.p_set_cart) {
 				
 		m_matrix_ptr = nullptr;
-		m_cart = p.p_set_cart;
 		
         c_dbcsr_binary_read(p.p_filepath.c_str(), p.p_distribution.m_dist_ptr, 
 			m_cart.comm(), &m_matrix_ptr);
@@ -343,7 +334,7 @@ public:
         c_dbcsr_set_diag(m_matrix_ptr, diag.data(), diag.size());
     }
    
-    std::vector<T> get_diag() {
+    std::vector<T> get_diag() const {
 		int diagsize = this->nfullrows_total();
 		std::vector<T> diag(diagsize);
 		c_dbcsr_get_diag (m_matrix_ptr, diag.data(), diagsize);
@@ -367,7 +358,7 @@ public:
         c_dbcsr_hadamard_product(a.m_matrix_ptr, b.m_matrix_ptr, m_matrix_ptr, (assume_value) ? &*assume_value : nullptr); 
     }
     
-    block<2,T> get_block_p(const int row, const int col, bool& found) {
+    block<2,T> get_block_p(const int row, const int col, bool& found) const {
         T* data = nullptr;
         std::array<int,2> size = {0,0};
     
@@ -377,7 +368,7 @@ public:
         return block<2,T>(size, data);
     }
     
-    T* get_block_data(const int row, const int col, bool& found) {
+    T* get_block_data(const int row, const int col, bool& found) const {
         T* data = nullptr;
         std::array<int,2> size = {0,0};
     
@@ -407,10 +398,10 @@ public:
                         (filter_diag) ? &*filter_diag : nullptr);
     }
 
-    std::shared_ptr<matrix<T>> get_block_diag(matrix<T>& in) { 
+    std::shared_ptr<matrix<T>> get_block_diag() const { 
 		auto out = std::make_shared<matrix<T>>();
-        c_dbcsr_get_block_diag(in.m_matrix_ptr, &out->m_matrix_ptr);
-        out->m_cart = in.m_cart;
+        c_dbcsr_get_block_diag(m_matrix_ptr, &out->m_matrix_ptr);
+        out->m_cart = m_cart;
         return out;
     }
     
@@ -428,10 +419,11 @@ public:
     }
     
     std::shared_ptr<matrix<T>> desymmetrize() {
-		auto out = std::make_shared<matrix<T>>();
-        c_dbcsr_desymmetrize(m_matrix_ptr, &out->m_matrix_ptr);
-        out->m_cart = this->m_cart;
-        return out;
+		
+		matrix<T> out(nullptr, this->m_cart);
+        c_dbcsr_desymmetrize(m_matrix_ptr, &out.m_matrix_ptr);
+        
+        return std::make_shared<matrix<T>>(std::move(out));
     }
     
     void clear() {
@@ -488,7 +480,8 @@ public:
                             (sum) ? &*sum : nullptr, (scale) ? &*scale : nullptr);
     }
     
-    T* data(long long int& data_size, std::optional<int> lb = std::nullopt, std::optional<int> ub = std::nullopt) {
+    T* data(long long int& data_size, std::optional<int> lb = std::nullopt, 
+		std::optional<int> ub = std::nullopt) const {
         T data_type = T();
         T* ptr = nullptr;
         c_dbcsr_get_data(m_matrix_ptr, &ptr, &data_size, &data_type, 
@@ -708,7 +701,7 @@ public:
 			(a0) ? &*a0 : nullptr, (a1) ? &*a1 : nullptr, (a2) ? &*a2 : nullptr);		
 	}
 	
-	std::shared_ptr<matrix<T>> get_ptr() {
+	std::shared_ptr<matrix<T>> get_ptr() const {
 		return this->shared_from_this();
 	}
     
@@ -756,7 +749,7 @@ public:
        c_dbcsr_iterator_stop(&m_iter_ptr);
     }
 
-    bool blocks_left() {
+    bool blocks_left() const {
         return c_dbcsr_iterator_blocks_left(m_iter_ptr);
     }
     
@@ -773,7 +766,7 @@ public:
         return m_blk_ptr[i + m_row_size * j];
     }
     
-    double norm() {
+    double norm() const {
 		double out = 0.0;
 		for (int n = 0; n != m_row_size*m_col_size; ++n) {
 			out += pow(m_blk_ptr[n],2);
@@ -785,11 +778,11 @@ public:
 	row, col, iblk, blk_p, row_size, col_size, row_offset, col_offset)
 	
 #define ECHO_FUNC(var) \
-	int var() { return CAT(m_, var); }
+	int var() const { return CAT(m_, var); }
 	
 	ITERATE_LIST(ECHO_FUNC, (), (), ITER_LIST)
 
-    T* data() { return m_blk_ptr; }	
+    T* data() const { return m_blk_ptr; }	
     
 };
 

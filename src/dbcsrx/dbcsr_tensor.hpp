@@ -74,7 +74,7 @@ public:
 	
 	pgrid<N>& operator=(pgrid<N>& rhs) = delete;	
 	
-	vec<int> dims() {
+	vec<int> dims() const {
 		
 		return m_dims;
 		
@@ -89,7 +89,7 @@ public:
 		
 	}
 	
-	MPI_Comm comm() {
+	MPI_Comm comm() const {
 		return m_comm;
 	}
 	
@@ -97,7 +97,7 @@ public:
 		destroy(false);
 	}
 	
-	std::shared_ptr<pgrid<N>> get_ptr() {
+	std::shared_ptr<pgrid<N>> get_ptr() const {
 		return this->shared_from_this();
 	}
 	
@@ -364,7 +364,7 @@ public:
 	pdims, my_ploc)
 	
 #define GEN_TENSOR_INFO_1(x,n) \
-	arr<int,N> ECHO(CAT(GET_,n) TENSOR_INFO_1) () { \
+	arr<int,N> ECHO(CAT(GET_,n) TENSOR_INFO_1) () const { \
 		arr<int,N> out; \
 		c_dbcsr_t_get_info(m_tensor_ptr, N, \
 			REPEAT_SECOND(ECHO_P, nullptr, 0, SUB(n,1), (PPDIRS_COMMA), (PPDIRS_COMMA)) \
@@ -406,7 +406,7 @@ public:
 #define GEN_TENSOR_INFO_2_BASE(idim,ivar) \
 	template <int M = N> \
 	typename std::enable_if<M == idim, arrvec<int,N>>::type \
-	ECHO(CAT(GET_,ivar) TENSOR_INFO_2) () { \
+	ECHO(CAT(GET_,ivar) TENSOR_INFO_2) () const { \
 		arrvec<int,N> out; \
 		vec<int> sizes(N); \
 		if constexpr (STRING_EQUAL(GET(TENSOR_INFO_2,ivar),blks_local)) \
@@ -454,7 +454,7 @@ public:
 #define TENSOR_MAPINFO_1 (ndim_nd, ndim1_2d, ndim2_2d)
 
 #define GEN_TENSOR_MAPINFO_1(x,n) \
-	int GET(TENSOR_MAPINFO_1,n) () { \
+	int GET(TENSOR_MAPINFO_1,n) () const { \
 		int c_out; \
 		c_dbcsr_t_get_mapping_info(m_tensor_ptr, N, 0, 0, \
 			REPEAT_SECOND(ECHO_P, nullptr, 0, SUB(n,1), (,), (,)) \
@@ -472,7 +472,7 @@ public:
 	(int, dims2_2d), (int, map1_2d), (int, map2_2d), (int, map_nd))
 
 #define GEN_TENSOR_MAPINFO_2_BASE(ctype,var,i) \
-	vec< ctype > var() { \
+	vec< ctype > var() const { \
 		int nd_size = N; \
         int nd_row_size = c_dbcsr_t_ndims_matrix_row(m_tensor_ptr); \
         int nd_col_size = c_dbcsr_t_ndims_matrix_column(m_tensor_ptr); \
@@ -574,7 +574,8 @@ public:
 		c_dbcsr_t_put_block(m_tensor_ptr, idx.data(), size.data(), data, nullptr, nullptr);
 	}
 	
-	block<N,T> get_block(const index<N>& idx, const index<N>& blk_size, bool& found) {
+	block<N,T> get_block(const index<N>& idx, const index<N>& blk_size, 
+		bool& found) const {
         
 		block<N,T> blk_out(blk_size);
         
@@ -585,14 +586,15 @@ public:
 			
 	}
 	
-	void get_block(T* data_ptr, const index<N>& idx, const index<N>& blk_size, bool& found) {
+	void get_block(T* data_ptr, const index<N>& idx, const index<N>& blk_size, 
+		bool& found) const {
 		
 		c_dbcsr_t_get_block(m_tensor_ptr, idx.data(), blk_size.data(), data_ptr, &found);
 		
 	}
 	
 
-	T* get_block_p(const index<N>& idx, bool& found) {
+	T* get_block_p(const index<N>& idx, bool& found) const {
 		
 		T* out = nullptr;
 		
@@ -602,13 +604,13 @@ public:
 		
 	}
 
-	int proc(const index<N>& idx) {
+	int proc(const index<N>& idx) const {
 		int p = -1;
 		c_dbcsr_t_get_stored_coordinates(m_tensor_ptr, idx.data(), &p);
 		return p;
 	}
 	
-	T* data(long long int& data_size) {
+	T* data(long long int& data_size) const {
 		
 		T* data_ptr;
 		T data_type = T();
@@ -623,7 +625,7 @@ public:
 		c_dbcsr_t_clear(m_tensor_ptr);
 	}
 	
-	MPI_Comm comm() {
+	MPI_Comm comm() const {
 		return m_comm;
 	}
 	
@@ -651,7 +653,7 @@ public:
 		return c_dbcsr_t_get_num_blocks_total(m_tensor_ptr);
 	}
 	
-	int num_nze() {
+	int num_nze() const {
 		return c_dbcsr_t_get_nze(m_tensor_ptr);
 	}
 	
@@ -671,7 +673,7 @@ public:
 		
 	}
 	
-	double occupation() {
+	double occupation() const {
 		
 		auto nfull = this->nfull_total();
 		long long int tote = std::accumulate(nfull.begin(), nfull.end(), 1, std::multiplies<long long int>());
@@ -681,7 +683,7 @@ public:
 		
 	}
 	
-	double long_sum() {
+	double long_sum() const {
 	
 		long long int num_nze;
 		T* data = this->data(num_nze);
@@ -716,7 +718,7 @@ public:
 		c_dbcsr_t_batched_contract_finalize(m_tensor_ptr,nullptr);
 	}
 	
-	vec<int> idx_speed() {
+	vec<int> idx_speed() const {
 		// returns order of speed of indices
 		auto map1 = this->map1_2d();
 		auto map2 = this->map2_2d();
@@ -725,7 +727,7 @@ public:
 		return map2;
 	}
 	
-	std::shared_ptr<tensor<N,T>> get_ptr() {
+	std::shared_ptr<tensor<N,T>> get_ptr() const {
 		return this->shared_from_this();
 	}
     
@@ -779,7 +781,7 @@ public:
 		
 	}
 	
-	bool blocks_left() {	
+	bool blocks_left() const {	
 		return c_dbcsr_t_iterator_blocks_left(m_iter_ptr);	
 	}
 	
@@ -795,11 +797,11 @@ public:
 		return m_offset;		
 	}
 	
-	int blk_n() {		
+	int blk_n() const {		
 		return m_blk_n;		
 	}
 	
-	int blk_p() {	
+	int blk_p() const {	
 		return m_blk_p;	
 	}
 		

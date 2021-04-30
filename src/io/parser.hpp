@@ -10,12 +10,16 @@
 
 #include "utils/json.hpp"
 
+namespace megalochem {
+
 namespace filio {
 
 desc::shared_molecule parse_molecule(nlohmann::json& j, MPI_Comm comm, int nprint);
 
 desc::options parse_options(nlohmann::json& j, MPI_Comm comm, int nprint);
 
-}
+} // namespace filio
+
+} // namespace megalochem
 
 #endif

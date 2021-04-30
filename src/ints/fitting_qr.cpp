@@ -13,6 +13,8 @@
 #define _USE_QR
 #define _CHUNK_SIZE 2
 
+namespace megalochem {
+
 namespace ints {
 	
 static constexpr bool use_qr = true;
@@ -57,7 +59,7 @@ dbcsr::sbtensor<3,double> dfitting::compute_qr_new(
 	auto& work_time = TIME.sub("Worker function");
 	auto& comp_time = TIME.sub("Compression");
 	
-	auto aofac = std::make_shared<aofactory>(m_mol, m_cart);
+	auto aofac = std::make_shared<aofactory>(m_mol, m_world);
 	
 	double qr_theta = global::qr_theta;
 	double qr_rho = global::qr_rho;
@@ -892,3 +894,5 @@ std::shared_ptr<Eigen::MatrixXi> dfitting::compute_idx(
 }	
 	
 } // end namespace
+
+} // end megalochem 

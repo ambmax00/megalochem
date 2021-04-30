@@ -2,8 +2,11 @@
 #define MATH_HERMITIAN_EIGEN_SOLVER_H
 
 #include <dbcsr_matrix.hpp>
+#include "megalochem.hpp"
 #include "extern/scalapack.hpp"
 #include "utils/mpi_log.hpp"
+
+namespace megalochem {
 
 namespace math {
 
@@ -12,6 +15,8 @@ using matrix = dbcsr::matrix<double>;
 
 class hermitian_eigen_solver {
 private:
+
+	world m_world;
 
 	dbcsr::shared_matrix<double> m_mat_in;
 	dbcsr::shared_matrix<double> m_eigvec;
@@ -38,9 +43,9 @@ public:
 		return *this;
 	}
 
-	hermitian_eigen_solver(dbcsr::shared_matrix<double>& mat_in, 
+	hermitian_eigen_solver(world w, dbcsr::shared_matrix<double>& mat_in, 
 		char jobz, bool print = false) :
-		m_mat_in(mat_in), m_cart(mat_in->get_cart()),
+		m_world(w), m_mat_in(mat_in), m_cart(mat_in->get_cart()),
 		LOG(m_cart.comm(), (print) ? 0 : -1),
 		m_jobz(jobz) {}
 
@@ -61,5 +66,7 @@ public:
 };
 
 }
+
+} // end megalochem
 
 #endif

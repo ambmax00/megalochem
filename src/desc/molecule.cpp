@@ -10,6 +10,8 @@
 		LOG.os<n>(x, " "); \
 	} LOG.os<n>('\n');
 
+namespace megalochem {
+
 namespace desc {
 	
 // Taken from PSI4
@@ -241,3 +243,5 @@ std::shared_ptr<desc::molecule> molecule::fragment(int noa, int nob, int nva,
 }
 
 }
+
+} // end mega

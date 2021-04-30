@@ -258,8 +258,8 @@ inline void print_statistics(const bool print_timers = false) {
 class cart {
 private:
 
-    std::shared_ptr<MPI_Comm> m_comm_ptr;
-    std::shared_ptr<MPI_Comm> m_group_ptr;
+    MPI_Comm m_comm;
+    MPI_Comm m_group;
     int m_rank;
     int m_size;
     std::array<int,2> m_dims;
@@ -269,21 +269,19 @@ private:
     
 public:
 
-    cart(MPI_Comm comm) {
-		
-		m_comm_ptr = std::make_shared<MPI_Comm>(comm);
-		m_group_ptr = std::make_shared<MPI_Comm>(); 
+    cart(MPI_Comm comm) : m_comm(comm) {
         
-        MPI_Comm_rank(*m_comm_ptr, &m_rank);
-        MPI_Comm_size(*m_comm_ptr, &m_size);
+        MPI_Comm_rank(m_comm, &m_rank);
+        MPI_Comm_size(m_comm, &m_size);
+        
         int dims[2] = {0};
         MPI_Dims_create(m_size, 2, dims);
         int periods[2] = {1};
         int reorder = 0;
-        MPI_Cart_create(*m_comm_ptr, 2, dims, periods, reorder, &*m_group_ptr);
+        MPI_Cart_create(m_comm, 2, dims, periods, reorder, &m_group);
         
         int coord[2];
-        MPI_Cart_coords(*m_group_ptr, m_rank, 2, coord);
+        MPI_Cart_coords(m_group, m_rank, 2, coord);
         
         m_dims[0] = dims[0];
         m_dims[1] = dims[1];
@@ -292,19 +290,16 @@ public:
         
     }
     
-    cart(MPI_Comm comm, MPI_Comm group) {
+    cart(MPI_Comm comm, MPI_Comm group) : m_comm(comm), m_group(group) {
 		
-		m_comm_ptr = std::make_shared<MPI_Comm>(comm);
-		m_group_ptr = std::make_shared<MPI_Comm>(group); 
-        
-        MPI_Comm_rank(*m_comm_ptr, &m_rank);
-        MPI_Comm_size(*m_comm_ptr, &m_size);
+        MPI_Comm_rank(m_comm, &m_rank);
+        MPI_Comm_size(m_comm, &m_size);
         
         int dims[2] = {0};
         MPI_Dims_create(m_size, 2, dims);
         
         int coord[2];
-        MPI_Cart_coords(*m_group_ptr, m_rank, 2, coord);
+        MPI_Cart_coords(m_group, m_rank, 2, coord);
         
         m_dims[0] = dims[0];
         m_dims[1] = dims[1];
@@ -312,34 +307,29 @@ public:
         m_coord[1] = coord[1];
          
 	}
-    
-    cart() {}
-    
-    cart(const cart& w) :
-		m_comm_ptr(w.m_comm_ptr), m_group_ptr(w.m_group_ptr),
-		m_rank(w.m_rank), m_size(w.m_size),
-		m_dims(w.m_dims), m_coord(w.m_coord) {}
+        
+    cart(const cart& w) = default;
     
     void free() {
-        if (*m_group_ptr != MPI_COMM_NULL) MPI_Comm_free(&*m_group_ptr);
+        if (m_group != MPI_COMM_NULL) MPI_Comm_free(&m_group);
         //if (*m_comm_ptr != MPI_COMM_NULL) MPI_Comm_free(&*m_comm_ptr);
     }
     
     ~cart() {}
     
-    MPI_Comm comm() { return *m_comm_ptr; }
-    MPI_Comm group() { return *m_group_ptr; }
+    MPI_Comm comm() const { return m_comm; }
+    MPI_Comm group() const { return m_group; }
     
-    int rank() { return m_rank; }
-    int size() { return m_size; }
+    int rank() const { return m_rank; }
+    int size() const { return m_size; }
     
-    int myprow() { return m_coord[0]; }
-    int mypcol() { return m_coord[1]; }
-    int nprow() { return m_dims[0]; }
-    int npcol() { return m_dims[1]; }
+    int myprow() const { return m_coord[0]; }
+    int mypcol() const { return m_coord[1]; }
+    int nprow() const { return m_dims[0]; }
+    int npcol() const { return m_dims[1]; }
     
-    std::array<int,2> dims() { return m_dims; }
-    std::array<int,2> coord() { return m_coord; }
+    std::array<int,2> dims() const { return m_dims; }
+    std::array<int,2> coord() const { return m_coord; }
     
 };
 

@@ -24,7 +24,11 @@
 
 //#include <Python.h>
 
+namespace megalochem {
+
 namespace filio {
+	
+using json = nlohmann::json;
 
 void validate(std::string section, const json& j, const json& compare) {
 			
@@ -322,3 +326,5 @@ desc::options parse_options(json& jdata, MPI_Comm comm, int nprint) {
 }
 
 }
+
+} // end namespace megalochem

@@ -8,8 +8,10 @@
 
 #include <dbcsr_conversions.hpp>
 
-namespace adc {
+namespace megalochem {
 
+namespace adc {
+/*
 dbcsr::shared_matrix<double> canonicalize(dbcsr::shared_matrix<double> u_lm,
 	std::vector<double> eps_m)
 {
@@ -41,7 +43,7 @@ dbcsr::shared_matrix<double> canonicalize(dbcsr::shared_matrix<double> u_lm,
 	
 	dbcsr::print(*f_ll);
 	
-	math::hermitian_eigen_solver solver(f_ll, 'V', 1);
+	math::hermitian_eigen_solver solver(m_world, f_ll, 'V', 1);
 	solver.compute();
 	
 	auto u_cl = solver.eigvecs();
@@ -60,7 +62,7 @@ dbcsr::shared_matrix<double> canonicalize(dbcsr::shared_matrix<double> u_lm,
 	
 	return u_cl;
 	
-}
+}*/
 
 void adcmod::compute() {
 	
@@ -142,7 +144,7 @@ void adcmod::compute() {
 	if (do_adc1) {
 	
 		auto adc1_mvp = create_adc1();
-		math::davidson<MVP> dav(m_cart.comm(), LOG.global_plev());
+		math::davidson<MVP> dav(m_world.comm(), LOG.global_plev());
 		
 		dav.set_factory(adc1_mvp);
 		dav.set_diag(m_d_ov);
@@ -358,7 +360,7 @@ void adcmod::compute() {
 	
 	LOG.os<>("==== Starting ADC(2) Computation ====\n\n"); 
 	
-	math::diis_davidson<MVP> mdav(m_cart.comm(), LOG.global_plev());
+	math::diis_davidson<MVP> mdav(m_world.comm(), LOG.global_plev());
 	
 	double conv_micro_adc2 = m_opt.get<double>("adc2/micro_conv", ADC_ADC2_MICRO_CONV);
 	double conv_macro_adc2 = m_opt.get<double>("adc2(macro_conv", ADC_ADC2_MACRO_CONV);
@@ -510,10 +512,10 @@ std::tuple<std::vector<int>, std::vector<int>>
 	
 	// communicate to all processes
 	MPI_Allreduce(MPI_IN_PLACE, occ_norms.data(), b.size(), MPI_DOUBLE,
-		MPI_SUM, m_cart.comm());
+		MPI_SUM, m_world.comm());
 		
 	MPI_Allreduce(MPI_IN_PLACE, vir_norms.data(), b.size(), MPI_DOUBLE,
-		MPI_SUM, m_cart.comm());
+		MPI_SUM, m_world.comm());
 	
 	LOG.os<2>("NORMS ALL (OCC): \n");
 	for (auto v : occ_norms) {
@@ -601,14 +603,14 @@ std::tuple<std::vector<int>, std::vector<int>>
 		
 	LOG.os<>("IDX ALL: \n");
 	
-	MPI_Barrier(m_cart.comm());
-	for (int ip = 0; ip != m_cart.size(); ++ip) {
-		if (ip == m_cart.rank()) {
+	MPI_Barrier(m_world.comm());
+	for (int ip = 0; ip != m_world.size(); ++ip) {
+		if (ip == m_world.rank()) {
 			for (auto v : idx_all) {
 				std::cout << v << " ";
 			} std::cout << std::endl;
 		}
-		MPI_Barrier(m_cart.comm());
+		MPI_Barrier(m_world.comm());
 	}
 	
 	return std::make_tuple(atoms_all, idx_all);
@@ -684,7 +686,7 @@ adcmod::canon_lmo adcmod::get_canon_nto(dbcsr::shared_matrix<double> u_ia,
 	double norm = 1.0/sqrt(u_ia->dot(*u_ia));
 	u_ia_copy->scale(norm);
 	
-	math::SVD svd_decomp(u_ia_copy, 'V', 'V', 0);
+	math::SVD svd_decomp(m_world, u_ia_copy, 'V', 'V', 0);
 	svd_decomp.compute(theta);
 	int rank = svd_decomp.rank();
 	
@@ -697,8 +699,8 @@ adcmod::canon_lmo adcmod::get_canon_nto(dbcsr::shared_matrix<double> u_ia,
 	
 	LOG.os<>("-- Orthogonalizing new MOs\n"); 
 	
-	math::SVD svd_o(u_ir, 'V', 'V', 0);
-	math::SVD svd_v(vt_rv, 'V', 'V', 0);
+	math::SVD svd_o(m_world, u_ir, 'V', 'V', 0);
+	math::SVD svd_v(m_world, vt_rv, 'V', 'V', 0);
 	
 	svd_o.compute(1e-10);
 	svd_v.compute(1e-10);
@@ -742,8 +744,8 @@ adcmod::canon_lmo adcmod::get_canon_nto(dbcsr::shared_matrix<double> u_ia,
 	
 	LOG.os<>("-- Canonicalizing NTOs\n"); 
 	
-	math::hermitian_eigen_solver hsolver_o(f_tt, 'V', false);
-	math::hermitian_eigen_solver hsolver_v(f_ss, 'V', false);
+	math::hermitian_eigen_solver hsolver_o(m_world, f_tt, 'V', false);
+	math::hermitian_eigen_solver hsolver_v(m_world, f_ss, 'V', false);
 	
 	hsolver_o.compute();
 	hsolver_v.compute();
@@ -830,7 +832,7 @@ adcmod::canon_lmo adcmod::get_canon_pao(dbcsr::shared_matrix<double> u_ia,
 	
 	auto [atom_blks, basis_blks] = get_significant_blocks(u_ia, theta, nullptr, 0.0);
 	
-	locorb::mo_localizer moloc(m_cart, m_hfwfn->mol());
+	locorb::mo_localizer moloc(m_world, m_hfwfn->mol());
 	
 	auto reg = m_aoloader->get_registry();
 	auto s_bb = reg.get<dbcsr::shared_matrix<double>>(ints::key::ovlp_bb);
@@ -851,4 +853,6 @@ adcmod::canon_lmo adcmod::get_canon_pao(dbcsr::shared_matrix<double> u_ia,
 	
 }
 
-} // end namespace
+} // end namespace adc
+
+} // end namespace megalo

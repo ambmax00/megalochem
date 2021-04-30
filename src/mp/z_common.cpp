@@ -1,5 +1,7 @@
 #include "mp/z_builder.hpp"
 
+namespace megalochem {
+
 namespace mp {
 	
 SMatrixXi get_shellpairs(dbcsr::sbtensor<3,double> eri_batched) {
@@ -64,3 +66,5 @@ SMatrixXi get_shellpairs(dbcsr::sbtensor<3,double> eri_batched) {
 }
 		
 } // end namespace
+
+} // end mega

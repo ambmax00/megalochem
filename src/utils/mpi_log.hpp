@@ -191,7 +191,6 @@ public:
 
 } // end namespace
 
-
 #endif  /* LOG_H */
 
 

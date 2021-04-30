@@ -3,6 +3,8 @@
 
 #include <string>
 
+namespace megalochem {
+
 namespace mp {
 	
 inline const int MP_PRINT_LEVEL = 0;
@@ -17,6 +19,8 @@ inline const std::string MP_ERIS = "core";
 inline const std::string MP_INTERMEDS = "core";
 inline const std::string MP_BUILD_Z = "llmpfull";
 inline const std::string MP_METRIC = "coulomb";
+
+}
 
 }
 

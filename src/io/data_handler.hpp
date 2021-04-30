@@ -12,6 +12,8 @@ extern "C" {
 #include <hdf5.h>
 }
 
+namespace megalochem {
+
 namespace filio {
 
 enum class create_mode {
@@ -396,6 +398,8 @@ struct data_io {
 };
 
 } // end namespace
+
+} // end megalochem 
 
 #endif
 

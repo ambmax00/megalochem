@@ -7,8 +7,11 @@
 #include <Eigen/Eigenvalues>
 #include <dbcsr_matrix_ops.hpp>
 #include <dbcsr_conversions.hpp>
+#include "megalochem.hpp"
 #include "utils/mpi_log.hpp"
 #include "math/solvers/diis.hpp"
+
+namespace megalochem {
 
 namespace math {
 
@@ -17,6 +20,8 @@ using smat = dbcsr::shared_matrix<double>;
 template <class MVFactory>
 class davidson {
 private:
+
+	world m_world;
 	
 	util::mpi_log LOG;
 	smat m_diag; // diagonal of matrix
@@ -79,8 +84,9 @@ public:
 		return *this;
 	}
 	
-	davidson(MPI_Comm comm, int nprint) : 
-		LOG(comm, nprint),
+	davidson(world w, int nprint) : 
+		m_world(w),
+		LOG(w.comm(), nprint),
 		m_converged(false),
 		m_pseudo(false),
 		m_conv(1e-5),
@@ -528,7 +534,7 @@ template <class MVFactory>
 class diis_davidson {
 private:
 	
-	MPI_Comm m_comm;
+	world m_world;
 	util::mpi_log LOG;
 	
 	int m_macro_maxiter = 30;
@@ -574,10 +580,9 @@ public:
 		return *this;
 	}
 	
-	diis_davidson(MPI_Comm comm, int nprint) : 
-		LOG(comm, nprint),
-		m_comm(comm),
-		m_dav(comm, nprint)
+	diis_davidson(world w, int nprint) : 
+		m_world(w), LOG(w.comm(), nprint),
+		m_dav(m_world, nprint)
 	{
 		m_dav.pseudo(true);
 		m_dav.block(false);
@@ -624,7 +629,7 @@ public:
 						
 		LOG.os<>("================= PERFORMING DIIS=================\n");
 		
-		diis_helper<2> dsolver(m_comm, 10, 5, 12, true);
+		diis_helper<2> dsolver(m_world, 10, 5, 12, true);
 		
 		current_omega = eigval;
 		dbcsr::shared_matrix<double> prev_u, prev_b;
@@ -844,5 +849,7 @@ public:
 
 
 } // end namespace
+
+} // end mega
 
 #endif

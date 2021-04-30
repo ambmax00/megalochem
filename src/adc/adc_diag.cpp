@@ -2,6 +2,8 @@
 #include "ints/aofactory.hpp"
 #include <dbcsr_matrix_ops.hpp>
 
+namespace megalochem {
+
 namespace adc {
 
 dbcsr::shared_matrix<double> adcmod::compute_diag_0() {
@@ -59,8 +61,8 @@ dbcsr::shared_matrix<double> adcmod::compute_diag_0() {
 
 dbcsr::shared_matrix<double> adcmod::compute_diag_1() {
 	
-	ints::aofactory aofac(m_hfwfn->mol(), m_cart);
-	ints::screener* scr = new ints::schwarz_screener(m_cart, m_hfwfn->mol());
+	ints::aofactory aofac(m_hfwfn->mol(), m_world);
+	ints::screener* scr = new ints::schwarz_screener(m_world, m_hfwfn->mol());
 	ints::shared_screener s_scr(scr);
 	
 	s_scr->compute();
@@ -589,4 +591,6 @@ void adcmod::compute_diag() {
 }
 
 } // end namespace
+
+} // end mega
 		

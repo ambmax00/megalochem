@@ -1,6 +1,8 @@
 #include "ints/screening.hpp"
 #include <dbcsr_matrix_ops.hpp>
 
+namespace megalochem {
+
 namespace ints {
 
 void schwarz_screener::compute() {
@@ -128,3 +130,5 @@ bool atomic_screener::skip_bbbb(int i, int j, int k, int l) {
 }
 
 } // end namespace
+
+} // end namspace megalochem

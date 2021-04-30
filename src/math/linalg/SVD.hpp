@@ -2,13 +2,18 @@
 #define MATH_SVD_H
 
 #include <dbcsr_matrix_ops.hpp>
+#include "megalochem.hpp"
 #include "extern/scalapack.hpp"
 #include "utils/mpi_log.hpp"
+
+namespace megalochem {
 
 namespace math {
 	
 class SVD {
 private:
+
+	world m_world;
 
 	dbcsr::shared_matrix<double> m_mat_in;
 	char m_jobu, m_jobvt;
@@ -23,9 +28,9 @@ private:
 	 
 public:
 
-	SVD(dbcsr::shared_matrix<double>& mat, char jobu, char jobvt, 
+	SVD(world w, dbcsr::shared_matrix<double>& mat, char jobu, char jobvt, 
 		int print) : 
-		m_mat_in(mat), LOG(m_mat_in->get_cart().comm(),print),
+		m_world(w), m_mat_in(mat), LOG(m_mat_in->get_cart().comm(),print),
 		m_jobu(jobu), m_jobvt(jobvt) {}
 	~SVD() {}
 	
@@ -43,4 +48,6 @@ public:
 
 } // end namespace
 
+} // end megalochem
+ 
 #endif

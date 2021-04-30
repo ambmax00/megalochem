@@ -13,6 +13,8 @@
 #include <fstream>
 #include <filesystem>
 
+namespace megalochem {
+
 namespace hf {
 	
 class hfmod;
@@ -124,7 +126,7 @@ inline void write_hfwfn(std::string name, hf_wfn& hfwfn, filio::data_handler& dh
 }
 
 inline shared_hf_wfn read_hfwfn(std::string name, desc::shared_molecule mol, 
-	dbcsr::cart w, filio::data_handler& dh) 
+	world w, filio::data_handler& dh) 
 {
 	
 	dh.open(filio::access_mode::rdonly);
@@ -156,7 +158,7 @@ inline shared_hf_wfn read_hfwfn(std::string name, desc::shared_molecule mol,
 		Eigen::Map<MatrixX<double,Eigen::RowMajor>>
 			emap(darray.data.data(), nrows, ncols);
 		
-		auto mat = dbcsr::eigen_to_matrix(emap, w, name, r, c, 
+		auto mat = dbcsr::eigen_to_matrix(emap, w.dbcsr_grid(), name, r, c, 
 			dbcsr::type::no_symmetry);
 		
 		return mat;
@@ -209,7 +211,9 @@ inline shared_hf_wfn read_hfwfn(std::string name, desc::shared_molecule mol,
 	
 }
 
-}
+} // end namespace hf 
+
+} // end namespace megalochem
 	
 #endif
 	

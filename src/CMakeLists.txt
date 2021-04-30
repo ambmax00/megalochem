@@ -30,11 +30,13 @@ add_dependencies(git check_git)
 add_executable(
         chem
         main.cpp
+	megalochem_driver.cpp
 )
 
 add_executable(
 	chem_test
 	main.cpp
+	megalochem_driver.cpp
 )
 
 set_target_properties(
