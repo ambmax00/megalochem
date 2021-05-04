@@ -16,9 +16,11 @@ set(CPP_SOURCES
         aoloader.hpp
 )
 
-add_cpp_sources(chem_ints_cpp ${CPP_SOURCES})
+add_cpp_sources(ints ${CPP_SOURCES})
 
 add_library(chem_ints ${SOURCES})
+
+add_dependencies(chem_ints cpp_ints)
 
 set_source_files_properties(fitting_qr.cpp PROPERTIES COMPILE_FLAGS -fno-math-errno)
 

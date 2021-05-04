@@ -35,15 +35,15 @@ inline megatype str_to_type(std::string str) {
 	} else if (str == "mpwfn") {
 		return megatype::mpwfn;
 	} else if (str == "adcwfn") {
-		return megatype::atoms;
+		return megatype::adcwfn;
 	} else {
 		throw std::runtime_error("Unknown type");
 	}
 };  	
 
-struct job {
-	megatype m_type;
-	nlohmann::json m_data;
+struct megajob {
+	megatype mtype;
+	nlohmann::json jdata;
 };
 	
 class driver {
@@ -55,7 +55,14 @@ private:
 	util::mpi_log LOG;
 	
 	std::map<std::string,std::any> m_stack; // variables 
-	std::deque<job> m_jobs; // job queue
+	
+	std::deque<megajob> m_jobs; // job queue
+	
+	void run_hfmod(megajob& j);
+	
+	void run_mpmod(megajob& j);
+	
+	void run_adcmod(megajob& j);
 	
 public:
 

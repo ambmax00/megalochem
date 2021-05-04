@@ -113,8 +113,8 @@ smat MVP_AORIADC1::compute(smat u_ia, double omega) {
 	u_ao->add(0.0, 1.0, *jmat);
 	u_ao->add(1.0, 1.0, *kmat);
 	
-	LOG.os<>("Sigma adc1 ao:\n");
-	dbcsr::print(*u_ao);
+	//LOG.os<>("Sigma adc1 ao:\n");
+	//dbcsr::print(*u_ao);
 	
 	// transform back
 	smat sig_1 = u_transform(u_ao, 'T', m_c_bo, 'N', m_c_bv);

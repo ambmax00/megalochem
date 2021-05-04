@@ -10,11 +10,14 @@ set(SOURCES
 
 set(CPP_SOURCES
         adc_mvp.hpp
+	adcmod.hpp
 )
 
-add_cpp_sources(chem_adc_cpp ${CPP_SOURCES})
+add_cpp_sources(chem_adc ${CPP_SOURCES})
 
 add_library(chem_adc ${SOURCES})
+
+add_dependencies(chem_adc cpp_chem_adc)
 
 target_link_libraries(
 	chem_adc

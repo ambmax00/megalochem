@@ -5,7 +5,15 @@ set(SOURCES
 	hfdiagfock.cpp
 )
 
+set(CPP_SOURCES
+	hfmod.hpp
+)
+
+add_cpp_sources(hf ${CPP_SOURCES})
+
 add_library(chem_hf ${SOURCES})
+
+add_dependencies(chem_hf cpp_hf)
 
 target_link_libraries(
 	chem_hf

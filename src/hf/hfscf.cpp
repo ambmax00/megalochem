@@ -8,23 +8,9 @@ namespace megalochem {
 
 namespace hf {
 	
-hfmod::hfmod(world w, desc::shared_molecule mol, desc::options opt) 
-	: m_mol(mol), 
-	  m_opt(opt), 
-	  m_world(w),
-	  m_cart(w.dbcsr_grid()),
-	  LOG(m_cart.comm(),m_opt.get<int>("print", HF_PRINT_LEVEL)),
-	  TIME(m_cart.comm(), "Hartree Fock", LOG.global_plev()),
-	  m_guess(m_opt.get<std::string>("guess", HF_GUESS)),
-	  m_max_iter(m_opt.get<int>("max_iter", HF_MAX_ITER)),
-	  m_scf_threshold(m_opt.get<double>("scf_thresh", HF_SCF_THRESH)),
-	  m_diis(m_opt.get<bool>("diis", HF_SCF_DIIS)),
-	  m_diis_beta(m_opt.get<bool>("diis_beta", HF_DIIS_BETA)),
-	  m_scf_energy(0.0),
-	  m_nobetaorb(false),
-	  m_locc(m_opt.get<bool>("locc", HF_LOCC)),
-	  m_lvir(m_opt.get<bool>("lvir", HF_LVIR))
-{
+//hfmod::hfmod(hfmod::create_pack&& p) {}
+	
+void hfmod::init() {
 	
 	m_restricted = (m_mol->nele_alpha() == m_mol->nele_beta()) ? true : false; 
 	
@@ -98,58 +84,22 @@ hfmod::hfmod(world w, desc::shared_molecule mol, desc::options opt)
 	if (!m_restricted) m_eps_B = std::make_shared<std::vector<double>>(std::vector<double>(0));
 	
 	// basis set
-	if (m_opt.present("dfbasis")) {
-		 
-		std::string basname = m_opt.get<std::string>("dfbasis");
-		bool augmented = m_opt.get<bool>("df_augmentation", false);
-		
-		int nsplit = m_mol->c_basis()->nsplit();
-		auto smethod = m_mol->c_basis()->split_method();
-		auto atoms = m_mol->atoms();
-		
-		LOG.os<>("Setting df basis: ", basname, "\n\n");
-		auto dfbasis = std::make_shared<desc::cluster_basis>(
-			basname, atoms, smethod, nsplit, augmented);
-			
-		auto newdfbasis = ints::remove_lindep(m_world, dfbasis, m_mol->atoms());
+	if (m_df_basis) {
 	
-		//exit(0);
-	
-		m_mol->set_cluster_dfbasis(newdfbasis);
-		
-		auto x = m_mol->dims().x();
-		if (LOG.global_plev() >= 1) {
-			for (auto i : x) {
-				LOG.os<1>(i, " ");
-			} LOG.os<1>("\n");
-		}
+		m_mol->set_cluster_dfbasis(m_df_basis);
 		
 	}
 	
-	// integral machine
-	
-	std::optional<int> nbatches_b = m_opt.present("nbatches_b") ? 
-		std::make_optional<int>(m_opt.get<int>("nbatches_b")) : 
-		std::nullopt;
+	dbcsr::btype btype_e = dbcsr::get_btype(m_eris);
 		
-	std::optional<int> nbatches_x = m_opt.present("nbatches_x") ? 
-		std::make_optional<int>(m_opt.get<int>("nbatches_x")) : 
-		std::nullopt;
-		
-	std::optional<dbcsr::btype> btype_e = m_opt.present("eris") ?
-		std::make_optional<dbcsr::btype>(dbcsr::get_btype(m_opt.get<std::string>("eris"))) :
-		std::nullopt;
-		
-	std::optional<dbcsr::btype> btype_i = m_opt.present("intermeds") ?
-		std::make_optional<dbcsr::btype>(dbcsr::get_btype(m_opt.get<std::string>("intermeds"))) :
-		std::nullopt;
+	dbcsr::btype btype_i = dbcsr::get_btype(m_imeds);
 	
 	m_aoloader = ints::aoloader::create()
 		.set_world(m_world)
 		.set_molecule(m_mol)
 		.print(LOG.global_plev())
-		.nbatches_b(nbatches_b)
-		.nbatches_x(nbatches_x)
+		.nbatches_b(m_nbatches_b)
+		.nbatches_x(m_nbatches_x)
 		.btype_eris(btype_e)
 		.btype_intermeds(btype_i)
 		.build();
@@ -244,22 +194,16 @@ void hfmod::two_electron() {
 	
 	TIME_2e.start();
 	
-	fock::jmethod jmeth = fock::str_to_jmethod(
-		m_opt.get<std::string>("build_J"));
+	fock::jmethod jmeth = fock::str_to_jmethod(m_build_J);
 		
-	fock::kmethod kmeth = fock::str_to_kmethod(
-		m_opt.get<std::string>("build_K"));
+	fock::kmethod kmeth = fock::str_to_kmethod(m_build_K);
 		
-	ints::metric metr = ints::str_to_metric(
-		m_opt.get<std::string>("df_metric", HF_METRIC));
+	ints::metric metr = ints::str_to_metric(m_df_metric);
 	
 	fock::load_jints(jmeth, metr, *m_aoloader);
 	fock::load_kints(kmeth, metr, *m_aoloader);
 	
 	m_aoloader->compute();
-	
-	std::optional<int> nocc_batches = (m_opt.present("occ_nbatches")) ?
-		m_opt.get<int>("occ_nbatches") : 1;
 	
 	m_jbuilder = fock::create_j()
 		.set_world(m_world)
@@ -277,7 +221,7 @@ void hfmod::two_electron() {
 		.aoloader(*m_aoloader)
 		.method(kmeth)
 		.metric(metr)
-		.occ_nbatches(nocc_batches)
+		.occ_nbatches(m_nbatches_occ)
 		.build();
 		
 	m_jbuilder->init();
@@ -406,12 +350,10 @@ void hfmod::compute() {
 	int iter = 0;
 	bool converged = false;
 	
-	int dmax = m_opt.get<int>("diis_max_vecs", HF_DIIS_MAX_VECS);
-	int dmin = m_opt.get<int>("diis_min_vecs", HF_DIIS_MIN_VECS);
-	int dstart = m_opt.get<int>("diis_start", HF_DIIS_START);
-	
-	math::diis_helper<2> diis_A(m_cart.comm(),dstart, dmin, dmax, (LOG.global_plev() >= 2) ? true : false );
-	math::diis_helper<2> diis_B(m_cart.comm(),dstart, dmin, dmax, (LOG.global_plev() >= 2) ? true : false );
+	math::diis_helper<2> diis_A(m_cart.comm(),m_diis_start, 
+		m_diis_min_vecs, m_diis_max_vecs, (LOG.global_plev() >= 2) ? true : false );
+	math::diis_helper<2> diis_B(m_cart.comm(),m_diis_start, 
+		m_diis_min_vecs, m_diis_max_vecs, (LOG.global_plev() >= 2) ? true : false );
 	
 	// ERROR MATRICES
 	dbcsr::shared_matrix<double> e_A;
@@ -476,12 +418,12 @@ void hfmod::compute() {
 		if (norm_A < m_scf_threshold && norm_B < m_scf_threshold && iter > 0) break;
 		if (iter > m_max_iter) break;
 		
-		if (m_diis) {
+		if (m_do_diis) {
 			diis_A.compute_extrapolation_parameters(m_f_bb_A, e_A, iter);
 			diis_A.extrapolate(m_f_bb_A, iter);
 			if (!m_restricted && !m_nobetaorb) {
 				
-				if (m_diis_beta) {	
+				if (m_do_diis_beta) {	
 					// separate diis optimization for beta
 					diis_B.compute_extrapolation_parameters(m_f_bb_B, e_B, iter);
 					diis_B.extrapolate(m_f_bb_B, iter);

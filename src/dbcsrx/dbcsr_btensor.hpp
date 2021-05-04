@@ -34,13 +34,19 @@ inline btype get_btype(std::string str) {
 
 inline vec<vec<int>> make_blk_bounds(std::vector<int> blksizes, 
 	int nbatches, std::optional<std::vector<int>> blkmap = std::nullopt) {
+	
+	std::cout << "A1 " << "Making bounds" << std::endl;
 		
 	int nblks = blksizes.size();
 	int nele = std::accumulate(blksizes.begin(),blksizes.end(),0);
 	
+	std::cout << "A2 " << nblks << " " << nele << " " << nbatches << std::endl;
+	
 	if (nblks < nbatches) nbatches = nblks;
 			
 	double nele_per_batch = (double) nele / (double) nbatches;
+	
+	std::cout << "A2 " << nbatches << " " << nele << std::endl;
 	
 	if (blkmap && blksizes.size() != blkmap->size()) 
 		throw std::runtime_error(
@@ -80,10 +86,10 @@ inline vec<vec<int>> make_blk_bounds(std::vector<int> blksizes,
 		
 	}
 	
-	/*std::cout << "BOUNDS: " << out.size() << std::endl;
+	std::cout << "BOUNDS: " << out.size() << std::endl;
 	for (auto p : out) {
 		std::cout << p[0] << " " << p[1] << std::endl;
-	}*/
+	}
 	
 	if (out.size() == 0) throw std::runtime_error("Block bounds are zero.");
 	

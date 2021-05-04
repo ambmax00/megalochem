@@ -9,9 +9,11 @@ set(CPP_SOURCES
 	jkbuilder.hpp
 )
 
-add_cpp_sources(chem_fock_pp ${CPP_SOURCES})
+add_cpp_sources(fock ${CPP_SOURCES})
 
 add_library(chem_fock ${SOURCES})
+
+add_dependencies(chem_fock cpp_fock)
 
 target_link_libraries(
 	chem_fock

@@ -192,7 +192,7 @@ void hfmod::diag_fock() {
 	
 	t_density.finish();
 	
-	if (m_locc) {
+	/*if (m_locc) {
 		
 		auto& t_loc = TIME.sub("MO localization");
 		t_loc.start();
@@ -202,7 +202,7 @@ void hfmod::diag_fock() {
 		
 		t_loc.finish();
 		
-	}
+	}*/
 	
 	m_c_bm_A->filter(dbcsr::global::filter_eps);
 	m_p_bb_A->filter(dbcsr::global::filter_eps);

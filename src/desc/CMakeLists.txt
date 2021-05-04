@@ -15,9 +15,11 @@ set(CPP_SOURCES
 	molecule.hpp
 )
 
-add_cpp_sources(chem_desc_cpp ${CPP_SOURCES})
+add_cpp_sources(desc ${CPP_SOURCES})
 
 add_library(chem_desc ${SOURCES})
+
+add_dependencies(chem_desc cpp_desc)
 
 target_link_libraries(
 	chem_desc

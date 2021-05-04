@@ -178,6 +178,8 @@ int main(int argc, char** argv) {
 	
 	d.parse_file(filename + ".json");
 	
+	d.run();
+	
 	exit(0);
 	
 	time.start();
@@ -264,8 +266,8 @@ int main(int argc, char** argv) {
 	
 	if (do_mp) {
 	
-		mp::mpmod mymp(mega_world,myhfwfn,mpopt);
-		mymp.compute();
+		//mp::mpmod mymp(mega_world,myhfwfn,mpopt);
+		//mymp.compute();
 		
 	}
 
@@ -274,8 +276,8 @@ int main(int argc, char** argv) {
 	
 	if (do_adc) {
 		
-		adc::adcmod myadc(mega_world,myhfwfn,adcopt);
-		myadc.compute();
+		//adc::adcmod myadc(mega_world,myhfwfn,adcopt);
+		//myadc.compute();
 	}
 	
 	mega_world.free();

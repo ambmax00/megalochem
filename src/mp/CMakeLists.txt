@@ -7,12 +7,15 @@ set(SOURCES
 )
 
 set(CPP_SOURCES
+	mpmod.hpp
         z_builder.hpp
 )
 
-add_cpp_sources(chem_mp_cpp ${CPP_SOURCES})
+add_cpp_sources(mp ${CPP_SOURCES})
 
 add_library(chem_mp ${SOURCES})
+
+add_dependencies(chem_mp cpp_mp)
 
 target_link_libraries(
 	chem_mp

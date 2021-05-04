@@ -16,27 +16,14 @@ namespace megalochem {
 
 namespace mp {
 	
-mpmod::mpmod(world w, hf::shared_hf_wfn wfn_in, desc::options& opt_in) :
-	m_hfwfn(wfn_in),
-	m_world(w),
-	m_opt(opt_in),
-	LOG(w.comm(),m_opt.get<int>("print", MP_PRINT_LEVEL)),
-	TIME(w.comm(), "Moller Plesset", LOG.global_plev())
-{
-	std::string dfbasname = m_opt.get<std::string>("dfbasis");
+void mpmod::init() {
 	
-	int nsplit = m_hfwfn->mol()->c_basis()->nsplit();
-	std::string splitmethod = m_hfwfn->mol()->c_basis()->split_method();
-	auto atoms = m_hfwfn->mol()->atoms(); 
+	m_hfwfn->mol()->set_cluster_dfbasis(m_df_basis);
 	
-	bool augmented = m_opt.get<bool>("df_augmentation", false);
-	auto dfbasis = std::make_shared<desc::cluster_basis>(
-		dfbasname, atoms, splitmethod, nsplit, augmented);
+	std::cout << "NLAP: " << m_nlap << std::endl;
 	
-	m_hfwfn->mol()->set_cluster_dfbasis(dfbasis);
-	
-	//std::cout << "SIZE: " << dfbasis->size() << std::endl;
-	
+	std::cout << "NBATCHES: " << m_nbatches_b << " " << m_nbatches_x << std::endl;
+		
 }
 
 void mpmod::compute() {
@@ -77,16 +64,6 @@ void mpmod::compute() {
 	int dfnbf = std::accumulate(x.begin(), x.end(), 0);
 	
 	//std::cout << "NBFS: " << nbf << " " << dfnbf << std::endl;
-	
-	// options
-	int nlap = m_opt.get<int>("nlap",MP_NLAP);
-	double c_os = m_opt.get<double>("c_os",MP_C_OS);
-	
-	int nbatches_x = m_opt.get<int>("nbatches_x", MP_NBATCHES_X);
-	int nbatches_b = m_opt.get<int>("nbatches_b", MP_NBATCHES_B);
-	
-	std::string eri_method = m_opt.get<std::string>("eris", MP_ERIS);
-	std::string intermed_method = m_opt.get<std::string>("intermeds", MP_INTERMEDS);
 		
 	// laplace
 	double emin = eps_o->front();
@@ -103,7 +80,7 @@ void mpmod::compute() {
 	math::laplace lp(m_world.comm(), LOG.global_plev());
 	
 	laptime.start();
-	lp.compute(nlap, ymin, ymax);
+	lp.compute(m_nlap, ymin, ymax);
 	laptime.finish();
 	
 	auto lp_omega = lp.omega();
@@ -124,39 +101,24 @@ void mpmod::compute() {
 	//==================================================================
 	
 	// integral machine
-	
-	std::optional<int> nbatches_b_opt = m_opt.present("nbatches_b") ? 
-		std::make_optional<int>(m_opt.get<int>("nbatches_b")) : 
-		std::nullopt;
 		
-	std::optional<int> nbatches_x_opt = m_opt.present("nbatches_x") ? 
-		std::make_optional<int>(m_opt.get<int>("nbatches_x")) : 
-		std::nullopt;
+	dbcsr::btype btype_e = dbcsr::get_btype(m_eris);
+	dbcsr::btype btype_i = dbcsr::get_btype(m_imeds);
 		
-	std::optional<dbcsr::btype> btype_e = m_opt.present("eris") ?
-		std::make_optional<dbcsr::btype>(dbcsr::get_btype(m_opt.get<std::string>("eris"))) :
-		std::nullopt;
-		
-	std::optional<dbcsr::btype> btype_i = m_opt.present("intermeds") ?
-		std::make_optional<dbcsr::btype>(dbcsr::get_btype(m_opt.get<std::string>("intermeds"))) :
-		std::nullopt;
-	
 	std::shared_ptr<ints::aoloader> ao
 		= ints::aoloader::create()
 		.set_world(m_world)
 		.set_molecule(mol)
 		.print(LOG.global_plev())
-		.nbatches_b(nbatches_b_opt)
-		.nbatches_x(nbatches_x_opt)
+		.nbatches_b(m_nbatches_b)
+		.nbatches_x(m_nbatches_x)
 		.btype_eris(btype_e)
 		.btype_intermeds(btype_i)
 		.build();
 
-	auto zmeth = str_to_zmethod(
-		m_opt.get<std::string>("build_Z", MP_BUILD_Z));
+	auto zmeth = str_to_zmethod(m_build_Z);
 		
-	auto zmetr = ints::str_to_metric(
-		m_opt.get<std::string>("df_metric", MP_METRIC));
+	auto zmetr = ints::str_to_metric(m_df_metric);
 	
 	#ifdef _ORTHOGONALIZE
 	ao->request(ints::key::ovlp_bb, true);
@@ -252,7 +214,7 @@ void mpmod::compute() {
 	//                      BEGIN LAPLACE QUADRATURE
 	//==================================================================
 	
-	for (int ilap = 0; ilap != nlap; ++ilap) {
+	for (int ilap = 0; ilap != m_nlap; ++ilap) {
 		
 		LOG.os<>("LAPLACE POINT ", ilap, '\n');
 		
@@ -390,7 +352,7 @@ void mpmod::compute() {
 	
 	LOG.setprecision(12);
 	LOG.os<>("Final MP2 energy: ", mp2_energy, '\n');
-	LOG.os<>("Final MP2 energy (scaled): ", mp2_energy * c_os, '\n');
+	LOG.os<>("Final MP2 energy (scaled): ", mp2_energy * m_c_os, '\n');
 	LOG.reset();
 
 	TIME.finish();
@@ -402,7 +364,7 @@ void mpmod::compute() {
 	m_mpwfn = std::make_shared<mp_wfn>(*m_hfwfn);
 	m_mpwfn->m_mp_ss_energy = 0.0;
 	m_mpwfn->m_mp_os_energy = mp2_energy;
-	m_mpwfn->m_mp_energy = c_os * mp2_energy;
+	m_mpwfn->m_mp_energy = m_c_os * mp2_energy;
 	
 }
 

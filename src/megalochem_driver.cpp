@@ -5,11 +5,21 @@
 #include "adc/adcmod.hpp"
 #include "utils/ele_to_int.hpp"
 #include "utils/constants.hpp"
+#include "utils/ppdirs.hpp"
 
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <fstream>
 #include <filesystem>
+
+#define SINGLE_REFLECTION_DETAIL(ctype, name) \
+	.name(json_optional<util::base_type< UNPAREN ctype >::type>(job.jdata, STR(name)))
+
+#define SINGLE_REFLECTION(param) \
+	SINGLE_REFLECTION_DETAIL(GET_1 param, GET_2 param)
+	
+#define JSON_REFLECTION(list) \
+	ITERATE_LIST(SINGLE_REFLECTION, (), (), list)
 
 namespace megalochem {
 
@@ -77,8 +87,8 @@ static const nlohmann::json valid_hfwfn =
 	{"SAD_guess", "core"},
 	{"SAD_diis", true},
 	{"SAD_spin_average", true},
-	{"dfbasis", "string"},
-	{"dfbasis2", "string"},
+	{"df_basis", "string"},
+	{"df_basis2", "string"},
 	{"_required", {"tag", "type", "molecule"}}
 };
 	
@@ -92,12 +102,12 @@ static const nlohmann::json valid_mpwfn =
 	{"nlap", 5u}, // number of laplace points
 	{"nbatches_b", 3u},
 	{"nbatches_x", 3u},
-	{"dfbasis", "basis"},
+	{"df_basis", "basis"},
 	{"c_os", 1.3},
 	{"eris", "core"},
 	{"intermeds", "core"},
 	{"build_Z", "LLMPFULL"},
-	{"_required", {"tag", "type", "hfwfn", "dfbasis"}}
+	{"_required", {"tag", "type", "hfwfn", "df_basis"}}
 };
 	
 	
@@ -106,43 +116,30 @@ static const nlohmann::json valid_adcwfn =
 	{"tag", "string"},
 	{"type", "string"},
 	{"hfwfn", "string"},
+	{"method", "sos-cd-ri-adc2"},
 	{"print", 1u},
 	{"nbatches_b", 3u},
 	{"nbatches_x", 3u},
-	{"dfbasis", "basis"},
+	{"df_basis", "basis"},
 	{"nroots", 1u},
 	{"block", true},
 	{"balanced", true},
 	{"nguesses", 1},
 	{"do_adc1", true},
 	{"do_adc2", true},
-	// first go through adc1
-	{"adc1", {
-		{"df_metric", "string"},
-		{"dav_conv", 1e-5},
-		{"jmethod", "dfao"},
-		{"kmethod", "dfao"},
-		{"eris", "core"},
-		{"intermeds", "core"},
-		{"max_iter", 100},
-		{"_required", {"none"}}
-	}},
-	// then go through adc2
-	{"adc2", {
-		{"c_os", 1.3},
-		{"c_os_coupling", 1.15},
-		{"df_metric", "string"},
-		{"local", true},
-		{"dav_conv", 1e-5},
-		{"jmethod", "dfao"},
-		{"kmethod", "dfao"},
-		{"zmethod", "llmpfull"},
-		{"eris", "core"},
-		{"intermeds", "core"},
-		{"nlap", 5u},
-		{"_required", {"none"}}
-	}},
-	{"_required", {"tag", "type", "hfwfn", "nroots", "dfbasis"}}
+	{"df_metric", "string"},
+	{"dav_conv", 1e-5},
+	{"build_J", "dfao"},
+	{"build_K", "dfao"},
+	{"build_Z", "llmp_full"},
+	{"eris", "core"},
+	{"imeds", "core"},
+	{"dav_max_iter", 100},
+	{"diis_max_iter", 100},
+	{"c_os", 1.3},
+	{"c_os_coupling", 1.15},
+	{"nlap", 5u},
+	{"_required", {"tag", "type", "hfwfn", "nroots", "df_basis"}}
 };
 
 template <typename T>
@@ -434,7 +431,7 @@ void driver::parse_hfwfn(nlohmann::json& jdata) {
 		auto myhfwfn = hf::read_hfwfn("hf_wfn", mol, m_world, *m_fh.input_fh);
 		m_stack[jdata["tag"]] = std::any(myhfwfn);
 	} else {
-		job j = {megatype::hfwfn, jdata};
+		megajob j = {megatype::hfwfn, jdata};
 		m_jobs.push_back(std::move(j));
 	}
 
@@ -444,7 +441,7 @@ void driver::parse_mpwfn(nlohmann::json& jdata) {
 	
 	validate("mpwfn", jdata, valid_mpwfn);
 	
-	job j = {megatype::mpwfn, jdata};
+	megajob j = {megatype::mpwfn, jdata};
 	m_jobs.push_back(std::move(j));
 	
 }
@@ -453,9 +450,108 @@ void driver::parse_adcwfn(nlohmann::json& jdata) {
 	
 	validate("adcwfn", jdata, valid_adcwfn);
 	
-	job j = {megatype::adcwfn, jdata};
+	megajob j = {megatype::adcwfn, jdata};
 	m_jobs.push_back(std::move(j));
 	
+}
+
+void driver::run() {
+	
+	for (auto& j : m_jobs) {
+		
+		switch (j.mtype) {
+			case megatype::hfwfn: {
+				run_hfmod(j);
+				break;
+			}
+			case megatype::mpwfn: {
+				run_mpmod(j);
+				break;
+			}
+			case megatype::adcwfn: {
+				run_adcmod(j);
+				break;
+			}
+			default: 
+				throw std::runtime_error("Unknown driver method.");
+		}
+		
+	}
+	
+}
+
+void driver::run_hfmod(megajob& job) {
+	
+	auto mol = get<desc::shared_molecule>(job.jdata["molecule"]);
+	
+	std::optional<desc::shared_cluster_basis> dfbas, dfbas2;
+	
+	if (job.jdata.find("df_basis") != job.jdata.end()) {
+		dfbas = get<desc::shared_cluster_basis>(job.jdata["df_basis"]);
+	}
+	
+	std::cout << job.jdata["build_J"] << std::endl;
+	
+	if (job.jdata.find("df_basis2") != job.jdata.end()) {
+		dfbas2 = get<desc::shared_cluster_basis>(job.jdata["df_basis2"]);
+	}
+	
+	auto myhfmod = hf::hfmod::create()
+		.set_world(m_world)
+		.set_molecule(mol)
+		.df_basis(dfbas)
+		.df_basis2(dfbas2)
+		JSON_REFLECTION(HFMOD_LIST_OPT)
+		.build();
+		
+	myhfmod->compute();
+	
+	auto myhfwfn = myhfmod->wfn();
+	
+	m_stack[job.jdata["tag"]] = std::any(myhfwfn);
+	
+}
+
+void driver::run_mpmod(megajob& job) {
+	
+	auto hfwfn = get<hf::shared_hf_wfn>(job.jdata["hfwfn"]);
+	
+	std::optional<desc::shared_cluster_basis> dfbas;
+	
+	if (job.jdata.find("df_basis") != job.jdata.end()) {
+		dfbas = get<desc::shared_cluster_basis>(job.jdata["df_basis"]);
+	}
+	
+	auto mympmod = mp::mpmod::create()
+		.set_world(m_world)
+		.set_hf_wfn(hfwfn)
+		.df_basis(dfbas)
+		JSON_REFLECTION(MPMOD_OPTLIST)
+		.build();
+		
+	mympmod->compute();	
+	
+}
+
+void driver::run_adcmod(megajob& job) {
+	
+	auto hfwfn = get<hf::shared_hf_wfn>(job.jdata["hfwfn"]);
+	
+	std::optional<desc::shared_cluster_basis> dfbas;
+	
+	if (job.jdata.find("df_basis") != job.jdata.end()) {
+		dfbas = get<desc::shared_cluster_basis>(job.jdata["df_basis"]);
+	}
+	
+	auto myadcmod = adc::adcmod::create()
+		.set_world(m_world)
+		.set_hfwfn(hfwfn)
+		.df_basis(dfbas)
+		JSON_REFLECTION(ADCMOD_OPTLIST)
+		.build();
+		
+	myadcmod->compute();
+		
 }
 
 } // namespace megalochem

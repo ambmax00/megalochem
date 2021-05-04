@@ -44,7 +44,6 @@ include_directories(
 )
 
 add_subdirectory(src)
-add_dependencies(chem cpp_target)
 
 target_link_libraries(
 	chem

@@ -58,7 +58,7 @@ dbcsr::shared_matrix<double> adcmod::compute_diag_0() {
 	return d_ov_0;
 	
 }
-
+/*
 dbcsr::shared_matrix<double> adcmod::compute_diag_1() {
 	
 	ints::aofactory aofac(m_hfwfn->mol(), m_world);
@@ -567,26 +567,19 @@ dbcsr::shared_matrix<double> adcmod::compute_diag_1() {
 	
 	return d_iaia;
 	
-}
+}*/
 	
 void adcmod::compute_diag() {
 	
 	auto& diag_time = TIME.sub("Computing ADC diagonal elements");
 	
 	diag_time.start();
-	int diag_order = m_opt.get<int>("diag_order", 0);
 	
 	auto d_ov_0 = compute_diag_0();
 	
-	if (diag_order > 0) {
-		//auto d_ov_1 = compute_diag_1();
-		//d_ov_0->add(1.0, 1.0, *d_ov_1);
-		m_d_ov = d_ov_0;
-		m_d_ov->setname("diag_ov_1");
-	} else {
-		m_d_ov = d_ov_0;
-	}
 	diag_time.finish();
+	
+	m_d_ov = d_ov_0;
 	
 }
 

@@ -11,6 +11,8 @@ add_cpp_sources(dbcsrx_cpp ${CPP_SOURCES})
 
 add_library(chem_dbcsrx INTERFACE)
 
+add_dependencies(chem_dbcsrx cpp_dbcsrx)
+
 target_link_libraries(
 	chem_dbcsrx
 	INTERFACE

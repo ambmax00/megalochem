@@ -335,6 +335,17 @@ void aoloader::compute() {
 		
 		arrvec<int,3> blkmaps = {blkmap_x, blkmap_b, blkmap_b};
 		
+		std::cout << "NBATCHES A: " << bdims[0] << " " << bdims[1] << " " << bdims[2]
+			<< std::endl;
+		
+		for (auto a : b) {
+			std::cout << a << " ";
+		} std::cout << std::endl;
+		
+		for (auto a : blkmap_b) {
+			std::cout << a << " ";
+		} std::cout << std::endl;
+		
 		auto eri_batched = dbcsr::btensor<3>::create()
 			.name(m_mol->name() + "_eri_batched")
 			.set_pgrid(spgrid3)

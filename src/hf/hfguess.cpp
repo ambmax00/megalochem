@@ -207,20 +207,7 @@ void hfmod::compute_guess() {
 			auto atom = my_atypes[I];
 			int Z = atom.atomic_number;
 			
-			//set up options
-			desc::options at_opt(m_opt);
-			
 			int atprint = LOG.global_plev() - 2;
-			at_opt.set<int>("print", atprint);
-			at_opt.set<std::string>("guess", m_opt.get<std::string>("SAD_guess", HF_SAD_GUESS));
-			at_opt.set<std::string>("build_J", "exact");
-			at_opt.set<std::string>("build_K", "exact");
-			at_opt.set<bool>("diis", m_opt.get<bool>("SAD_diis", HF_SAD_SCF_DIIS));
-			at_opt.set<bool>("use_df", m_opt.get<bool>("SAD_use_df", HF_SAD_USE_DF));
-			at_opt.set<double>("scf_thresh",m_opt.get<double>("SAD_scf_thresh", HF_SAD_SCF_THRESH));
-			at_opt.set<bool>("locc",false);
-			at_opt.set<bool>("lvir",false);
-			
 			int charge = 0;
 			int mult = 0; // will be overwritten
 			
@@ -257,8 +244,6 @@ void hfmod::compute_guess() {
 			
 			std::string name = "ATOM_rank" + std::to_string(m_cart.rank()) + "_" + std::to_string(Z);
 			
-			bool spinav = m_opt.get<bool>("SAD_spin_average",HF_SAD_SPIN_AVERAGE);
-			
 			desc::shared_molecule at_smol = desc::molecule::create()
 				.comm(MPI_COMM_SELF)
 				.name(name)
@@ -268,7 +253,7 @@ void hfmod::compute_guess() {
 				.mo_split(10)
 				.mult(mult)
 				.fractional(true)
-				.spin_average(spinav)
+				.spin_average(m_SAD_spin_average)
 				.build();
 				
 			if (at_dfbasis) at_smol->set_cluster_dfbasis(at_dfbasis);
@@ -277,13 +262,24 @@ void hfmod::compute_guess() {
 				at_smol->print_info(LOG.global_plev());
 			}
 			
-			hf::hfmod atomic_hf(wself,at_smol,at_opt);
+			auto athfmod = hf::hfmod::create()
+				.set_world(wself)
+				.set_molecule(at_smol)
+				.guess(m_SAD_guess)
+				.scf_threshold(m_SAD_scf_threshold)
+				.do_diis(m_SAD_do_diis)
+				.build_J("exact")
+				.build_K("exact")
+				.eris("core")
+				.imeds("core")
+				.print(atprint)
+				.build();
 			
 			LOG(m_cart.rank()).os<1>("Starting Atomic UHF for atom nr. ", I, " on rank ", m_cart.rank(), '\n');
-			atomic_hf.compute();
+			athfmod->compute();
 			LOG(m_cart.rank()).os<1>("Done with Atomic UHF for atom nr. ", I, " on rank ", m_cart.rank(), "\n");
 			
-			auto at_wfn = atomic_hf.wfn();
+			auto at_wfn = athfmod->wfn();
 			
 			auto coA = at_wfn->c_bo_A();
 			auto coB = at_wfn->c_bo_B();
@@ -522,26 +518,35 @@ void hfmod::compute_guess() {
 			.mult(m_mol->mult())
 			.mo_split(m_mol->mo_split())
 			.build();
-		
-		desc::options opt2(m_opt);
-			
+					
 		int print = LOG.global_plev(); // - 1;
 		
-		opt2.set<int>("print", print);
+		auto subhf = hfmod::create()
+			.set_world(m_world)
+			.set_molecule(mol_sub)
+			.df_basis(m_df_basis2)
+			.guess("SAD")
+			.scf_threshold(10 * m_scf_threshold)
+			.max_iter(m_max_iter)
+			.do_diis(m_do_diis)
+			.diis_max_vecs(m_diis_max_vecs)
+			.diis_min_vecs(m_diis_min_vecs)
+			.build_J(m_build_J)
+			.build_K(m_build_K)
+			.eris(m_eris)
+			.imeds(m_imeds)
+			.df_metric(m_df_metric)
+			.print(m_print)
+			.nbatches_b(m_nbatches_b)
+			.nbatches_x(m_nbatches_x)
+			.build();
 		
-		opt2.set<std::string>("guess", "SAD");
-		opt2.set<double>("scf_thresh", 10 * m_opt.get<double>("scf_thresh", HF_SCF_THRESH));
-		if (m_opt.present("dfbasis2")) {
-			opt2.set<std::string>("dfbasis", m_opt.get<std::string>("dfbasis2"));
-		}
-		
-		hfmod subhf(m_world, mol_sub, opt2);
-		subhf.compute();
+		subhf->compute();
 		
 		LOG.os<>("Finished Hartree Fock computation with secondary basis set.\n");
 		LOG.os<>("Now computing projected MO coefficient matrices");
 		
-		auto subwfn = subhf.wfn();
+		auto subwfn = subhf->wfn();
 		
 		auto b = m_mol->dims().b();
 		auto b2 = m_mol->dims().b2();

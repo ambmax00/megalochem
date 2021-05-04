@@ -427,6 +427,25 @@
 		return CAT(structname, _base) (std::forward<Types>(p)...);\
 	}
 	
+#define MAKE_INIT_BASE(name, value) \
+	CAT(m_, name)((CAT(p.p_, name)) ? *(CAT(p.p_, name)) : value)
+		
+#define MAKE_INIT(param) \
+	MAKE_INIT_BASE(GET_2 param, GET_3 param)
+		
+#define MAKE_INIT_LIST_OPT(list) \
+	ITERATE_LIST(MAKE_INIT, (,), (), list)
+
+#define CAT_M_BASE(ctype, name) \
+	util::base_type< UNPAREN ctype >::type CAT(m_, name)
+	
+#define CAT_M(params) \
+	CAT_M_BASE(GET_1 params, GET_2 params)
+
+#define MAKE_MEMBER_VARS(list) \
+	ITERATE_LIST(CAT_M, (;), (;), list)
+	
+	
 /***********************************************************************
  *                          CPP FUNCTIONS
  **********************************************************************/
