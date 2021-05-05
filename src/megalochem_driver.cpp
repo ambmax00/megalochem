@@ -129,6 +129,7 @@ static const nlohmann::json valid_adcwfn =
 	{"tag", "string"},
 	{"type", "string"},
 	{"wfn", "string"},
+	{"read", false},
 	{"method", "sos-cd-ri-adc2"},
 	{"print", 1u},
 	{"nbatches_b", 3u},
@@ -498,8 +499,27 @@ void driver::parse_adcwfn(nlohmann::json& jdata) {
 	
 	validate("adcwfn", jdata, valid_adcwfn);
 	
-	megajob j = {megatype::adcwfn, jdata};
-	m_jobs.push_back(std::move(j));
+	auto read = json_optional<bool>(jdata, "read");
+	
+	if (read && *read) {
+		
+		auto wfn = get<desc::shared_wavefunction>(jdata["wfn"]);
+		auto adcwfn = desc::read_adcwfn(jdata["tag"], wfn->mol, m_world, *m_fh.input_fh);
+		
+		auto rwfn = std::make_shared<desc::wavefunction>();
+		
+		rwfn->mol = wfn->mol;
+		rwfn->hf_wfn = wfn->hf_wfn;
+		rwfn->adc_wfn = adcwfn;
+		
+		m_stack[jdata["tag"]] = std::any(rwfn);
+		
+	} else { 
+	
+		megajob j = {megatype::adcwfn, jdata};
+		m_jobs.push_back(std::move(j));
+	
+	}	
 	
 }
 
@@ -603,6 +623,8 @@ void driver::run_adcmod(megajob& job) {
 	auto newwfn = myadcmod->compute();
 	
 	m_stack[job.jdata["tag"]] = std::any(newwfn);
+	
+	write_adcwfn(job.jdata["tag"], *newwfn->adc_wfn, *m_fh.output_fh); 
 		
 }
 
