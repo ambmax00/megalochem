@@ -27,16 +27,31 @@ target_include_directories(
 )
 add_dependencies(git check_git)
 
+set(MEGALOCHEM_SRC
+	megalochem_driver.hpp
+	megalochem_driver.cpp
+)
+
+add_library(megalochem ${MEGALOCHEM_SRC})
+
+target_link_libraries(
+	megalochem
+	MPI::MPI_CXX
+	chem_dbcsrx
+        chem_io
+        chem_hf
+        chem_mp
+        chem_adc
+)
+
 add_executable(
         chem
         main.cpp
-	megalochem_driver.cpp
 )
 
 add_executable(
 	chem_test
 	main.cpp
-	megalochem_driver.cpp
 )
 
 set_target_properties(

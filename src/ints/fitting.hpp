@@ -2,7 +2,6 @@
 #define INTS_FITTING_H
 
 #include "desc/molecule.hpp"
-#include "desc/options.hpp"
 #include "ints/screening.hpp"
 #include "ints/aofactory.hpp"
 #include <dbcsr_btensor.hpp>

@@ -3,6 +3,7 @@
 #include "hf/hfmod.hpp"
 #include "mp/mpmod.hpp"
 #include "adc/adcmod.hpp"
+#include "ints/aofactory.hpp"
 #include "desc/wfn.hpp"
 #include "utils/ele_to_int.hpp"
 #include "utils/constants.hpp"
@@ -31,6 +32,7 @@ static const nlohmann::json valid_basis =
 	{"name", "string"},
 	{"atoms", "name"},
 	{"augmentation", false}, 
+	{"cutoff", 1e-16},
 	{"ao_split_method", "atomic"},
 	{"ao_split", 10u},
 	{"_required", {"tag", "type", "name", "atoms"}}
@@ -140,6 +142,7 @@ static const nlohmann::json valid_adcwfn =
 	{"c_os", 1.3},
 	{"c_os_coupling", 1.15},
 	{"nlap", 5u},
+	{"guess", "hf"},
 	{"_required", {"tag", "type", "wfn", "nroots", "df_basis"}}
 };
 
@@ -381,6 +384,10 @@ void driver::parse_basis(nlohmann::json& jdata) {
 	
 	auto cbas = std::make_shared<desc::cluster_basis>(jdata["name"], atoms, 
 		ao_split_method, ao_split, augmentation);
+		
+	if (jdata.find("cutoff") != jdata.end()) {
+		cbas = ints::remove_lindep(m_world, cbas, (double)jdata["cutoff"]);
+	}
 	
 	m_stack[jdata["tag"]] = std::any(cbas);
 	

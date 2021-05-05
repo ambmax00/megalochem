@@ -120,9 +120,12 @@ eigenpair adcmod::guess() {
 		
 		LOG.os<1>('\n');
 		
-	} else if (m_guess == "adc1") {
+	} else if (m_guess == "adc") {
 		
-		throw std::runtime_error("NYI");
+		LOG.os<>("Taking eigenvalues and eigenvectors from a previous computation as guess.\n");
+		
+		dav_eigvals = m_wfn->adc_wfn->davidson_eigenvalues();
+		dav_eigvecs = m_wfn->adc_wfn->davidson_eigenvectors();
 		
 	} else {
 		
@@ -243,10 +246,18 @@ desc::shared_wavefunction adcmod::compute() {
 			out = run_adc2(guess_pairs);
 			break;
 	}
+	
+	auto wfn_out = std::make_shared<desc::wavefunction>();
+	
+	wfn_out->mol = m_wfn->mol;
+	wfn_out->hf_wfn = m_wfn->hf_wfn;
+	wfn_out->mp_wfn = m_wfn->mp_wfn;
+	wfn_out->adc_wfn = std::make_shared<desc::adc_wavefunction>(
+		m_block, out.eigvals, out.eigvecs);
 			
 	TIME.print_info();
 		
-	return nullptr; // TO DO
+	return wfn_out;
 }
 
 /*

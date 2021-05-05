@@ -4,7 +4,6 @@
 #include "ints/integrals.hpp"
 #include "ints/screening.hpp"
 #include "utils/mpi_time.hpp"
-#include "utils/pool.hpp"
 #include "math/linalg/piv_cd.hpp"
 
 extern "C" {
@@ -978,37 +977,21 @@ std::function<void(dbcsr::stensor<3>&,vec<vec<int>>&)>
 		
 }
 
-desc::shared_cluster_basis remove_lindep(
-	world wrd,
-	desc::shared_cluster_basis cbas, 
-	std::vector<desc::Atom> atoms) 
+desc::shared_cluster_basis remove_lindep(world wrd,
+	desc::shared_cluster_basis cbas, double cutoff) 
 {
-	
-	return cbas;
 	
 	util::mpi_log LOG(wrd.comm(), 0);
 	
-	LOG.os<>("Computing lindep...\n");
-	
-	//LOG.os<>("1\n");
-	
+	LOG.os<>("Removing linear dependencies in basis set...\n");
+		
 	ints::aofactory aofac(wrd, cbas);
-	
-	//ints::aofactory aofac(mol, wrd);
-	
-	//LOG.os<>("2\n");
 	
 	auto ovlp = aofac.ao_overlap();
 	
-	//LOG.os<>("3\n");
-	
 	math::pivinc_cd pivcd(wrd, ovlp, 2);
 	 
-	pivcd.compute(std::nullopt, 1e-4);
-	
-	//LOG.os<>("4\n");
-	
-	//LOG.os<>("RANK: ", pivcd.rank(), '\n');
+	pivcd.compute(std::nullopt, cutoff);
 	
 	int prank = pivcd.rank();
 	auto perm = pivcd.perm();
@@ -1039,13 +1022,14 @@ desc::shared_cluster_basis remove_lindep(
 		}
 	}
 	
+	/*
 	for (auto i : shell_s2b) {
 		std::cout << i << " ";
 	} std::cout << std::endl;
 	
 	for (auto i : shell_b2s) {
 		std::cout << i << " ";
-	} std::cout << std::endl;
+	} std::cout << std::endl;*/
 	
 	// check which shells we are keeping
 	
@@ -1066,13 +1050,11 @@ desc::shared_cluster_basis remove_lindep(
 		}
 	}
 	
-	LOG.os<>("REMOVED ", vshell.size() - newvshell.size(), " of ", vshell.size(), " SHELLS.\n");
+	LOG.os<>("Removed ", vshell.size() - newvshell.size(), " of ", vshell.size(), " shells.\n");
 	
 	auto newcbas = std::make_shared<desc::cluster_basis>(
 		newvshell, cbas->split_method(), cbas->nsplit());
-		
-	//exit(0);	
-		
+				
 	return newcbas;
 	
 }

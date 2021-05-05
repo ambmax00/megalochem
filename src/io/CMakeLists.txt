@@ -1,15 +1,7 @@
-set (SOURCES
-	parser.hpp
-	parser.cpp
-	io.hpp
-	io.cpp
-)
+add_library(chem_io INTERFACE)
 
-add_library(chem_io ${SOURCES})
-
-target_link_libraries(chem_io 
-	chem_desc
-	chem_dbcsrx
-	Eigen3::Eigen
-	${PYTHON_LIBRARIES}
+target_link_libraries(
+	chem_io 
+	INTERFACE
+	${HDF5_LIBRARIES}
 )

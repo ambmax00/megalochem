@@ -40,7 +40,7 @@ void LLMP_FULL_Z::init() {
 		
 	auto spgrid3_xbb = m_eri3c2e_batched->spgrid();	
 
-	std::cout << "NBATCHES B: " << bdims[0] << " " << bdims[1] << " "
+	/*std::cout << "NBATCHES B: " << bdims[0] << " " << bdims[1] << " "
 		<< bdims[2] << std::endl;
 
 	for (auto a : b) {
@@ -49,7 +49,7 @@ void LLMP_FULL_Z::init() {
 
 	for (auto a : blkmap_b) {
 		std::cout << a << " ";
-	} std::cout << std::endl;
+	} std::cout << std::endl;*/
 	
 	m_FT3c2e_batched = dbcsr::btensor<3>::create()
 		.set_pgrid(spgrid3_xbb)

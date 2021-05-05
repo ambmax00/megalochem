@@ -49,25 +49,12 @@ target_link_libraries(
 	chem
 	PUBLIC
 	git
-	chem_dbcsrx
-	chem_io
-	MPI::MPI_CXX	
-	chem_hf
-	chem_mp
-	chem_adc
-	${HDF5_LIBRARIES}
+	megalochem
 )
 
 target_link_libraries(
         chem_test
         PUBLIC
 	git
-        chem_dbcsrx
-        chem_io
-        MPI::MPI_CXX
-	chem_hf
-	chem_mp
-	chem_adc
-	${HDF5_LIBRARIES}
+	megalochem
 )
-

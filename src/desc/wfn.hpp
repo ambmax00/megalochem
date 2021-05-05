@@ -3,7 +3,6 @@
 
 #include "desc/molecule.hpp"
 #include "io/data_handler.hpp"
-#include "io/io.hpp"
 
 #include <dbcsr_matrix.hpp>
 #include <dbcsr_conversions.hpp>

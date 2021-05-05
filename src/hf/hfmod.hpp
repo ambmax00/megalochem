@@ -4,7 +4,6 @@
 #ifndef TEST_MACRO
 #include "megalochem.hpp"
 #include "desc/molecule.hpp"
-#include "desc/options.hpp"
 #include "desc/wfn.hpp"
 #include <dbcsr_conversions.hpp>
 #include "utils/mpi_time.hpp"
@@ -123,8 +122,6 @@ public:
 
 	MAKE_PARAM_STRUCT(create, CONCAT(HFMOD_LIST, HFMOD_LIST_OPT), ())
 	MAKE_BUILDER_CLASS(hfmod, create, CONCAT(HFMOD_LIST, HFMOD_LIST_OPT), ())
-
-	hfmod(world wrd, desc::shared_molecule mol, desc::options opt);
 	
 	hfmod(create_pack&& p) : 
 		m_world(p.p_set_world),

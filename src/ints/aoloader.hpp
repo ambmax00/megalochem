@@ -7,7 +7,6 @@
 #include "ints/screening.hpp"
 #include "utils/mpi_time.hpp"
 #include "ints/registry.hpp"
-#include "desc/options.hpp"
 #include "desc/molecule.hpp"
 #endif
 

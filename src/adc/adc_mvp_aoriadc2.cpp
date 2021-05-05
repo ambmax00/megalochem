@@ -2,7 +2,6 @@
 #include "math/laplace/laplace.hpp"
 #include "math/linalg/piv_cd.hpp"
 #include "math/linalg/LLT.hpp"
-#include "adc/adc_defaults.hpp"
 #include "ints/fitting.hpp"
 #include "utils/matrix_plot.hpp"
 

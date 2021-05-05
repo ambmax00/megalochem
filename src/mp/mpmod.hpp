@@ -4,7 +4,6 @@
 #ifndef TEST_MACRO
 #include "megalochem.hpp"
 #include "desc/wfn.hpp"
-#include "desc/options.hpp"
 #include "utils/mpi_time.hpp"
 #include <dbcsr_common.hpp>
 #endif

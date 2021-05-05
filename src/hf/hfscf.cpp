@@ -1,5 +1,4 @@
 #include "hf/hfmod.hpp"
-#include "hf/hfdefaults.hpp"
 #include "math/linalg/orthogonalizer.hpp"
 #include "math/solvers/diis.hpp"
 #include "math/linalg/piv_cd.hpp"

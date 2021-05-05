@@ -1,48 +1,88 @@
 {
-	"name": "test",
-	"global": 
-	{
-		"batchsize": 0.2,
-		"block_threshold": 1e-9
-	},
-	"molecule": 
-	{	
-		"name": "H2O",
-		"mult": 1,
-		"charge": 0,
-		"unit": "angstrom",
-		"geometry": [
-          0.00000,        0.00000,        0.11779,
-          0.00000,        0.75545,       -0.47116,
-          0.00000,       -0.75545,       -0.47116
-		],
-		"symbols": ["O", "H", "H"],
-		"basis": "cc-pvdz",
-		"ao_split_method": "shell",
-		"reorder": false
-	},
-	"hf": 
-	{
-		"diis": true,
-		"guess": "SAD",
-		"scf_thresh": 1e-6,
-		"diis_start": 0, 
-		"build_J": "batchdf",
-		"build_K": "batchdfao",
-		"direct": false,
-		"print": 1,
-		"df_metric": "coulomb",
-		"SAD_diis": true, 
-		"dfbasis": "cc-pvdz-ri", 
-		"skip": false
-	},
-	"mp": 
-	{
-		"dfbasis": "cc-pvdz-ri",
-		"print": 2
-	},
-	"adc":
-	{
-		"nroots": 1
-	}
+	"megalochem": [
+		{
+			"type": "atoms",
+			"tag": "xyz",
+			"unit": "angstrom",
+                	"geometry": [
+	          		0.00000,        0.00000,        0.11779,
+	          		0.00000,        0.75545,       -0.47116,
+	          		0.00000,       -0.75545,       -0.47116
+        	        ],
+               	 	"symbols": ["O", "H", "H"]
+		},
+		{
+			"type": "basis",
+			"atoms": "xyz",
+			"tag": "basis1",
+			"name": "cc-pvdz"
+		},
+		{
+			"type": "basis",
+                        "tag": "dfbasis",
+			"atoms": "xyz",
+                        "name": "cc-pvdz-ri"
+                },
+		{
+			"type": "molecule",
+			"tag": "mol",
+			"atoms": "xyz",
+			"basis": "basis1",
+                	"mult": 1,
+                	"charge": 0,
+                	"mo_split": 5
+        	},
+		{
+			"type": "hfwfn",
+			"tag": "hfwfn",
+			"molecule": "mol",
+                	"diis": true,
+               	 	"guess": "SAD",
+	                "scf_thresh": 1e-6,
+	                "diis_start": 0,
+	                "build_J": "dfao",
+	                "build_K": "dfao",
+	                "print": 1,
+	                "df_metric": "coulomb",
+ 	                "SAD_diis": true,
+	                "occ_nbatches": 2,
+	                "df_basis": "dfbasis",
+	                "read": false,
+	                "eris": "core",
+	                "intermeds": "core",
+	                "nbatches_x": 2,
+	                "nbatches_b": 2
+        	},
+		{
+			"type": "adcwfn",
+			"tag": "adcwfn",
+			"wfn": "hfwfn",
+			"df_metric": "coulomb",
+			"method": "ri_ao_adc1",
+			"df_basis": "dfbasis",
+			"nbatches_b": 2,
+			"nbatches_x": 2,
+			"build_J": "dfao",
+			"build_K": "dfao",
+			"build_Z": "llmp_full",
+			"nroots": 1,
+			"nguesses": 1
+		},
+		{
+                        "type": "adcwfn",
+                        "tag": "adc2wfn",
+                        "wfn": "adcwfn",
+			"guess": "adc",
+                        "df_metric": "coulomb",
+                        "method": "sos_cd_ri_adc2",
+                        "df_basis": "dfbasis",
+                        "nbatches_b": 2,
+                        "nbatches_x": 2,
+                        "build_J": "dfao",
+                        "build_K": "dfao",
+                        "build_Z": "llmp_full",
+                        "nroots": 1,
+                        "nguesses": 1
+                }
+	]
 }

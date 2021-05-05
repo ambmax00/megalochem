@@ -3,7 +3,6 @@
 
 #include <dbcsr_matrix.hpp>
 #include <dbcsr_tensor.hpp>
-#include "utils/pool.hpp"
 #include "desc/basis.hpp"
 #include "ints/screening.hpp"
 #include <vector>

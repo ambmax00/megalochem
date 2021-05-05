@@ -1,5 +1,4 @@
 #include "mp/mpmod.hpp"
-#include "mp/mp_defaults.hpp"
 #include "mp/z_builder.hpp"
 #include "math/laplace/laplace.hpp"
 #include "math/linalg/piv_cd.hpp"

@@ -5,10 +5,8 @@
 #include "megalochem.hpp"
 #include <dbcsr_matrix_ops.hpp>
 #include <dbcsr_tensor_ops.hpp>
-#include "desc/options.hpp"
 #include "fock/jkbuilder.hpp"
 #include "mp/z_builder.hpp"
-#include "adc/adc_defaults.hpp"
 #include "math/laplace/laplace_helper.hpp"
 #endif
 
@@ -247,9 +245,9 @@ public:
 	((mp::zmethod), zmethod),\
 	((fock::jmethod), jmethod),\
 	((dbcsr::btype), btype),\
-	((util::optional<int>), nlap),\
-	((util::optional<double>),c_os),\
-	((util::optional<double>),c_os_coupling))
+	((int), nlap),\
+	((double), c_os),\
+	((double), c_os_coupling))
 
 	MAKE_PARAM_STRUCT(create, AORIADC2_LIST, ())
 	MAKE_BUILDER_CLASS(MVP_AORISOSADC2, create, AORIADC2_LIST, ())
@@ -261,10 +259,9 @@ public:
 		m_fitting_batched(p.p_fitting_batched),
 		m_kmethod(p.p_kmethod), m_jmethod(p.p_jmethod), m_zmethod(p.p_zmethod),
 		m_btype(p.p_btype), 
-		m_nlap((p.p_nlap) ? *p.p_nlap : ADC_ADC2_NLAP),
-		m_c_os((p.p_c_os) ? *p.p_c_os : ADC_ADC2_C_OS),
-		m_c_os_coupling((p.p_c_os_coupling) ? 
-			*p.p_c_os_coupling : ADC_ADC2_C_OS_COUPLING),
+		m_nlap((p.p_nlap)),
+		m_c_os((p.p_c_os)),
+		m_c_os_coupling((p.p_c_os_coupling)),
 		MVP(p.p_set_world, p.p_set_molecule, (p.p_print) ? *p.p_print : 0, 
 			"MVP_AORISOSADC2") {}
 		

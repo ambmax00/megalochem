@@ -6,7 +6,6 @@
 #include "ints/aoloader.hpp"
 #include "ints/registry.hpp"
 #include "desc/molecule.hpp"
-#include "desc/options.hpp"
 #include "utils/mpi_time.hpp"
 #include <dbcsr_btensor.hpp>
 #include <dbcsr_matrix.hpp>

@@ -3,10 +3,8 @@
 
 #ifndef TEST_MACRO
 #include "megalochem.hpp"
-#include "desc/options.hpp"
 #include "desc/wfn.hpp"
 #include "utils/mpi_time.hpp"
-#include "adc/adc_defaults.hpp"
 #include "adc/adc_mvp.hpp"
 #include "ints/registry.hpp"
 #include "ints/fitting.hpp"

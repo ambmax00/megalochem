@@ -2,7 +2,6 @@
 #define DESC_BASIS_H
 
 #include "desc/atom.hpp"
-#include "io/data_handler.hpp"
 #include <vector>
 #include <array>
 #include <memory>

@@ -1,28 +1,16 @@
 #include <mpi.h>
-#include <omp.h>
-#include <random>
 #include <stdexcept>
 #include <string>
-#include <dbcsr_matrix.hpp>
-#include <dbcsr_conversions.hpp>
-#include <dbcsr_matrix_ops.hpp>
-#include "io/parser.hpp"
+#include <filesystem>
+#include <thread>
+
 #include "io/data_handler.hpp"
 #include "hf/hfmod.hpp"
 #include "mp/mpmod.hpp"
 #include "adc/adcmod.hpp"
 #include "utils/mpi_time.hpp"
-#include "utils/unique.hpp"
 #include "extern/scalapack.hpp"
 #include "git.hpp"
-
-#include <filesystem>
-#include <chrono>
-#include <thread>
-
-#include "math/solvers/davidson.hpp"
-#include <Eigen/Eigenvalues>
-#include <Eigen/Core>
 
 #include "megalochem.hpp"
 #include "megalochem_driver.hpp"
@@ -179,12 +167,7 @@ int main(int argc, char** argv) {
 	std::string output_ref(argv[3]);
 	
 	if (mega_world.rank() == 0) {
-		bool is_same = filio::compare_outputs(
-			filename + "_data/out.json", output_ref);
-		if (!is_same) {
-			LOG.os<>("Not the same\n");
-			MPI_Abort(mega_world.comm(), MPI_ERR_OTHER);
-		}
+		// something
 	}
 #endif 
 

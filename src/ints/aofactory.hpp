@@ -111,9 +111,8 @@ public:
 }; // end class aofactory
 
 desc::shared_cluster_basis remove_lindep(
-	world w,
-	desc::shared_cluster_basis cbas, 
-	std::vector<desc::Atom> atoms);
+	world w, desc::shared_cluster_basis cbas, 
+	double cutoff);
 
 } // end namespace ints
 
