@@ -3,7 +3,7 @@
 
 #ifndef TEST_MACRO
 #include "megalochem.hpp"
-#include "mp/mp_wfn.hpp"
+#include "desc/wfn.hpp"
 #include "desc/options.hpp"
 #include "utils/mpi_time.hpp"
 #include <dbcsr_common.hpp>
@@ -17,7 +17,7 @@ namespace mp {
 
 #define MPMOD_LIST (\
 	((world), set_world),\
-	((hf::shared_hf_wfn), set_hf_wfn),\
+	((desc::shared_wavefunction), set_wfn),\
 	((util::optional<desc::shared_cluster_basis>), df_basis)) 
 
 #define MPMOD_OPTLIST (\
@@ -35,16 +35,14 @@ class mpmod {
 private:
 
 	world m_world;
-	hf::shared_hf_wfn m_hfwfn;
+	desc::shared_wavefunction m_wfn;
 	desc::shared_cluster_basis m_df_basis;
 	
 	MAKE_MEMBER_VARS(MPMOD_OPTLIST)
 	
 	util::mpi_time TIME;
 	util::mpi_log LOG;
-	
-	smp_wfn m_mpwfn;
-	
+		
 	void init();
 	
 public:
@@ -54,7 +52,7 @@ public:
 	
 	mpmod(create_pack&& p) :
 		m_world(p.p_set_world),
-		m_hfwfn(p.p_set_hf_wfn),
+		m_wfn(p.p_set_wfn),
 		m_df_basis(p.p_df_basis ? *p.p_df_basis : nullptr),
 		LOG(m_world.comm(), m_print),
 		TIME(m_world.comm(), "mpmod", m_print),
@@ -63,11 +61,7 @@ public:
 	
 	~mpmod() {}
 	
-	void compute();
-	
-	smp_wfn wfn() {
-		return m_mpwfn;
-	}
+	desc::shared_wavefunction compute();
 	
 };
 

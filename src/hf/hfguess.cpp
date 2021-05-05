@@ -276,13 +276,11 @@ void hfmod::compute_guess() {
 				.build();
 			
 			LOG(m_cart.rank()).os<1>("Starting Atomic UHF for atom nr. ", I, " on rank ", m_cart.rank(), '\n');
-			athfmod->compute();
+			auto at_wfn = athfmod->compute();
 			LOG(m_cart.rank()).os<1>("Done with Atomic UHF for atom nr. ", I, " on rank ", m_cart.rank(), "\n");
 			
-			auto at_wfn = athfmod->wfn();
-			
-			auto coA = at_wfn->c_bo_A();
-			auto coB = at_wfn->c_bo_B();
+			auto coA = at_wfn->hf_wfn->c_bo_A();
+			auto coB = at_wfn->hf_wfn->c_bo_B();
 			
 			auto b = at_smol->dims().b();
 			auto pA = dbcsr::matrix<>::create()
@@ -541,12 +539,10 @@ void hfmod::compute_guess() {
 			.nbatches_x(m_nbatches_x)
 			.build();
 		
-		subhf->compute();
+		auto subwfn = subhf->compute();
 		
 		LOG.os<>("Finished Hartree Fock computation with secondary basis set.\n");
 		LOG.os<>("Now computing projected MO coefficient matrices");
-		
-		auto subwfn = subhf->wfn();
 		
 		auto b = m_mol->dims().b();
 		auto b2 = m_mol->dims().b2();
@@ -554,8 +550,8 @@ void hfmod::compute_guess() {
 		auto oa = m_mol->dims().oa();
 		auto ob = m_mol->dims().ob();
 		
-		auto c_b2o_A = subwfn->c_bo_A();
-		auto c_b2o_B = subwfn->c_bo_B();
+		auto c_b2o_A = subwfn->hf_wfn->c_bo_A();
+		auto c_b2o_B = subwfn->hf_wfn->c_bo_B();
 		
 		math::LLT lltsolver(m_world, m_s_bb, 0);
 		lltsolver.compute();

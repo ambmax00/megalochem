@@ -1,5 +1,5 @@
-#ifndef HF_HF_WFN_H
-#define HF_HF_WFN_H
+#ifndef DESC_WFN_H
+#define DESC_WFN_H
 
 #include "desc/molecule.hpp"
 #include "io/data_handler.hpp"
@@ -15,14 +15,10 @@
 
 namespace megalochem {
 
-namespace hf {
+namespace desc {
 	
-class hfmod;
-
-class hf_wfn {
+class hf_wavefunction {
 private:
-
-	desc::shared_molecule m_mol;
 	
 	dbcsr::smatrix<double> m_c_bo_A;
 	dbcsr::smatrix<double> m_c_bv_A;
@@ -41,8 +37,7 @@ private:
 		
 public:
 
-	hf_wfn(
-		desc::shared_molecule mol,
+	hf_wavefunction(
 		dbcsr::smatrix<double> c_bo_A,
 		dbcsr::smatrix<double> c_bo_B,
 		dbcsr::smatrix<double> c_bv_A,
@@ -55,18 +50,13 @@ public:
 		double nuc_energy,
 		double wfn_energy
 	) : 
-		m_mol(mol), m_c_bo_A(c_bo_A), m_c_bv_A(c_bv_A), m_c_bo_B(c_bo_B), 
+		m_c_bo_A(c_bo_A), m_c_bv_A(c_bv_A), m_c_bo_B(c_bo_B), 
 		m_c_bv_B(c_bv_B), m_eps_occ_A(eps_occ_A), 
 		m_eps_occ_B(eps_occ_B), m_eps_vir_A(eps_vir_A), 
 		m_eps_vir_B(eps_vir_B), m_scf_energy(scf_energy),
 		m_nuc_energy(nuc_energy), m_wfn_energy(wfn_energy)
-	{};
-	hf_wfn(const hf_wfn& wfn_in) = default;
-	
-	desc::shared_molecule mol() { return m_mol; }
-	
-	//dbcsr::smatrix<double> s_bb() { return m_s_bb; }
-	
+	{}
+				
 	dbcsr::smatrix<double> c_bo_A() { return m_c_bo_A; }
 	dbcsr::smatrix<double> c_bv_A() { return m_c_bv_A; }
 	
@@ -84,9 +74,82 @@ public:
 	
 };
 
-using shared_hf_wfn = std::shared_ptr<hf_wfn>;
+class mp_wavefunction {
+protected:
 
-inline void write_hfwfn(std::string name, hf_wfn& hfwfn, filio::data_handler& dh) {
+	double m_mp_os_energy;
+	double m_mp_ss_energy;
+	double m_mp_energy; 
+	
+public:
+
+	mp_wavefunction(
+		double mp_os_energy,
+		double mp_ss_energy,
+		double mp_energy) :
+		m_mp_os_energy(mp_os_energy),
+		m_mp_ss_energy(mp_ss_energy),
+		m_mp_energy(mp_energy)
+	{}
+	
+	double mp_os_energy() { return m_mp_os_energy; }
+	double mp_ss_energy() { return m_mp_ss_energy; }
+	double mp_energy() { return m_mp_energy; }
+	
+	~mp_wavefunction() {}
+	
+};
+
+class adc_wavefunction {
+private:
+
+	std::vector<double> m_dav_eigvals;
+	std::vector<dbcsr::shared_matrix<double>> m_dav_eigvecs;
+	
+	bool m_blocked; // indicates if all roots are converged
+	
+public:
+
+	adc_wavefunction(
+		bool blocked,
+		std::vector<double> dav_eigvals,
+		std::vector<dbcsr::shared_matrix<double>> dav_eigvecs) :
+		m_blocked(blocked),
+		m_dav_eigvals(dav_eigvals),
+		m_dav_eigvecs(dav_eigvecs)
+	{}
+	
+	bool blocked() { return m_blocked; }
+	
+	std::vector<double> davidson_eigenvalues() {
+		return m_dav_eigvals;
+	}
+	
+	std::vector<dbcsr::shared_matrix<double>> davidson_eigenvectors() {
+		return m_dav_eigvecs;
+	}
+		
+	~adc_wavefunction() {}
+	
+	
+};
+
+using shared_adc_wavefunction = std::shared_ptr<adc_wavefunction>;
+using shared_mp_wavefunction = std::shared_ptr<mp_wavefunction>;
+using shared_hf_wavefunction = std::shared_ptr<hf_wavefunction>;
+
+struct wavefunction {
+
+	shared_molecule mol;
+	shared_hf_wavefunction hf_wfn;
+	shared_mp_wavefunction mp_wfn;
+	shared_adc_wavefunction adc_wfn;
+	
+};
+
+using shared_wavefunction = std::shared_ptr<wavefunction>;
+
+inline void write_hfwfn(std::string name, hf_wavefunction& hfwfn, filio::data_handler& dh) {
 	
 	dh.open(filio::access_mode::rdwr);
 	dh.create_group(name);
@@ -125,7 +188,7 @@ inline void write_hfwfn(std::string name, hf_wfn& hfwfn, filio::data_handler& dh
 
 }
 
-inline shared_hf_wfn read_hfwfn(std::string name, desc::shared_molecule mol, 
+inline desc::shared_hf_wavefunction read_hfwfn(std::string name, desc::shared_molecule mol, 
 	world w, filio::data_handler& dh) 
 {
 	
@@ -202,8 +265,8 @@ inline shared_hf_wfn read_hfwfn(std::string name, desc::shared_molecule mol,
 	double nuc_energy = dh.read_single<double>(name + "/nuc_energy");
 	double wfn_energy = dh.read_single<double>(name + "/wfn_energy");
 	
-	auto hfwfn = std::make_shared<hf_wfn>(
-		mol, c_bo_A, c_bo_B, c_bv_A, c_bv_B, eps_occ_A, eps_occ_B,
+	auto hfwfn = std::make_shared<desc::hf_wavefunction>(
+		c_bo_A, c_bo_B, c_bv_A, c_bv_B, eps_occ_A, eps_occ_B,
 		eps_vir_A, eps_vir_B, scf_energy, nuc_energy, wfn_energy
 	);
 		

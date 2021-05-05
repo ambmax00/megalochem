@@ -10,11 +10,11 @@ dbcsr::shared_matrix<double> adcmod::compute_diag_0() {
 	
 	LOG.os<>("Computing zeroth order diagonal.\n");
 	
-	auto epso = m_hfwfn->eps_occ_A();
-	auto epsv = m_hfwfn->eps_vir_A();
+	auto epso = m_wfn->hf_wfn->eps_occ_A();
+	auto epsv = m_wfn->hf_wfn->eps_vir_A();
 	
-	auto o = m_hfwfn->mol()->dims().oa();
-	auto v = m_hfwfn->mol()->dims().va();
+	auto o = m_wfn->mol->dims().oa();
+	auto v = m_wfn->mol->dims().va();
 	
 	auto d_ov_0 = dbcsr::matrix<>::create()
 		.name("diag_ov_0")

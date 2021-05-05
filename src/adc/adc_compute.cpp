@@ -64,10 +64,7 @@ dbcsr::shared_matrix<double> canonicalize(dbcsr::shared_matrix<double> u_lm,
 	
 }*/
 
-std::tuple<
-	std::vector<dbcsr::shared_matrix<double>>,
-	std::vector<double>>
-adcmod::guess() {
+eigenpair adcmod::guess() {
 	
 	LOG.os<>("Setting up guess vectors...\n");
 	
@@ -93,11 +90,11 @@ adcmod::guess() {
 		dav_eigvecs.resize(m_nguesses);
 		dav_eigvals.resize(m_nroots);
 		
-		auto o = m_hfwfn->mol()->dims().oa();
-		auto v = m_hfwfn->mol()->dims().va();
+		auto o = m_wfn->mol->dims().oa();
+		auto v = m_wfn->mol->dims().va();
 		
-		int nocc = m_hfwfn->mol()->nocc_alpha();
-		int nvir = m_hfwfn->mol()->nvir_alpha();
+		int nocc = m_wfn->mol->nocc_alpha();
+		int nvir = m_wfn->mol->nvir_alpha();
 		
 		for (int i = 0; i != m_nguesses; ++i) {
 			
@@ -133,13 +130,11 @@ adcmod::guess() {
 		
 	}
 	
-	return std::make_tuple(dav_eigvecs, dav_eigvals);
+	return {dav_eigvals, dav_eigvecs};
 	
 }	
 
-void adcmod::run_adc1(
-	std::vector<dbcsr::shared_matrix<double>> dav_eigvecs, 
-	std::vector<double> dav_eigvals) {
+eigenpair adcmod::run_adc1(eigenpair& epairs) {
 	
 	auto adc1_mvp = create_adc1();
 	math::davidson<MVP> dav(m_world.comm(), LOG.global_plev());
@@ -157,13 +152,13 @@ void adcmod::run_adc1(
 	LOG.os<>("==== Starting ADC(1) Computation ====\n\n"); 
 	
 	t_davidson.start();
-	dav.compute(dav_eigvecs, m_nroots);
+	dav.compute(epairs.eigvecs, m_nroots);
 	t_davidson.finish();
 	
 	adc1_mvp->print_info();
 			
-	dav_eigvecs = dav.ritz_vectors();
-	dav_eigvals = dav.eigvals();
+	auto adc1_dav_eigvecs = dav.ritz_vectors();
+	auto adc1_dav_eigvals = dav.eigvals();
 	
 	LOG.os<>("==== Finished ADC(1) Computation ====\n\n"); 
 
@@ -171,16 +166,21 @@ void adcmod::run_adc1(
 
 	LOG.os<>("ADC(1) Excitation energies:\n");
 	for (int iroot = istart; iroot != m_nroots; ++iroot) {
-		LOG.os<>("Excitation nr. ", iroot+1, " : ", dav_eigvals[iroot], '\n');
+		LOG.os<>("Excitation nr. ", iroot+1, " : ", adc1_dav_eigvals[iroot], '\n');
 	}
+	
+	return {adc1_dav_eigvals, adc1_dav_eigvecs};
 	
 }
 
-void adcmod::run_adc2(
-	std::vector<dbcsr::shared_matrix<double>> dav_eigvecs, 
-	std::vector<double> dav_eigvals) {
+eigenpair adcmod::run_adc2(eigenpair& epairs) {
 	
 	math::diis_davidson<MVP> mdav(m_world.comm(), LOG.global_plev());
+	
+	eigenpair adc2_epair = {
+		std::vector<double>(m_nroots, 0),
+		std::vector<dbcsr::shared_matrix<double>>(m_nroots, nullptr)
+	};
 	
 	mdav.macro_maxiter(m_diis_max_iter);
 	mdav.macro_conv(m_conv);
@@ -190,8 +190,7 @@ void adcmod::run_adc2(
 	mdav.micro_maxiter(m_dav_max_iter);
 	
 	int istart = (m_block) ? 0 : m_nroots-1;
-	std::vector<double> ex_adc2(m_nroots,0.0);
-	
+		
 	std::shared_ptr<MVP> adc2_mvp; 
 	
 	LOG.os<>("==== Starting ADC(2) Computation ====\n\n"); 
@@ -207,10 +206,10 @@ void adcmod::run_adc2(
 		
 		LOG.os<>("Setting up ADC(2) MVP builder.\n");
 		
-		mdav.compute(dav_eigvecs, iroot+1, dav_eigvals[iroot]);
+		mdav.compute(epairs.eigvecs, iroot+1, epairs.eigvals[iroot]);
 		
-		double en = mdav.eigval()[iroot];
-		ex_adc2[iroot] = en;
+		adc2_epair.eigvals[iroot] = mdav.eigval()[iroot];
+		adc2_epair.eigvecs[iroot] = nullptr; // TO DO
 		
 	}
 	
@@ -218,12 +217,14 @@ void adcmod::run_adc2(
 			
 	LOG.os<>("ADC(2) Excitation energies:\n");
 	for (int iroot = istart; iroot != m_nroots; ++iroot) {
-		LOG.os<>("Excitation nr. ", iroot+1, " : ", ex_adc2[iroot], '\n');
+		LOG.os<>("Excitation nr. ", iroot+1, " : ", adc2_epair.eigvals[iroot], '\n');
 	}
+	
+	return adc2_epair;
 	
 }
 
-void adcmod::compute() {
+desc::shared_wavefunction adcmod::compute() {
 	
 	// Generate guesses
 	
@@ -231,19 +232,21 @@ void adcmod::compute() {
 	
 	LOG.os<>("--- Starting Computation ---\n\n");
 	
-	auto [dav_eigvecs, dav_eigvals] = guess();
+	auto guess_pairs = guess();
+	eigenpair out;
 	
 	switch (m_adcmethod) {
 		case adcmethod::ri_ao_adc1: 
-			run_adc1(dav_eigvecs, dav_eigvals);
+			out = run_adc1(guess_pairs);
 			break;
 		case adcmethod::sos_cd_ri_adc2:
-			run_adc2(dav_eigvecs, dav_eigvals);
+			out = run_adc2(guess_pairs);
 			break;
 	}
 			
 	TIME.print_info();
 		
+	return nullptr; // TO DO
 }
 
 /*

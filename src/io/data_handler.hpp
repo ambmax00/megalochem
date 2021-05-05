@@ -387,8 +387,8 @@ public:
 	}
 
 	~data_handler() {
-		H5Pclose(_plist_id);
-		if (_is_open) close();
+		//H5Pclose(_plist_id);
+		//if (_is_open) close();
 	}	
 
 };

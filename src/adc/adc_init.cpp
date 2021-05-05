@@ -17,7 +17,7 @@ void adcmod::init()
 	
 	LOG.banner("ADC MODULE",50,'*');
 	
-	m_hfwfn->mol()->set_cluster_dfbasis(m_df_basis);
+	m_wfn->mol->set_cluster_dfbasis(m_df_basis);
 		
 	dbcsr::btype btype_e = dbcsr::get_btype(m_eris);
 		
@@ -25,7 +25,7 @@ void adcmod::init()
 	
 	m_aoloader = ints::aoloader::create()
 		.set_world(m_world)
-		.set_molecule(m_hfwfn->mol())
+		.set_molecule(m_wfn->mol)
 		.print(LOG.global_plev())
 		.nbatches_b(m_nbatches_b)
 		.nbatches_x(m_nbatches_x)
@@ -131,12 +131,12 @@ std::shared_ptr<MVP> adcmod::create_adc1() {
 	
 	auto ptr = MVP_AORIADC1::create()
 		.set_world(m_world)
-		.set_molecule(m_hfwfn->mol())
+		.set_molecule(m_wfn->mol)
 		.print(LOG.global_plev())
-		.c_bo(m_hfwfn->c_bo_A())
-		.c_bv(m_hfwfn->c_bv_A())
-		.eps_occ(*m_hfwfn->eps_occ_A())
-		.eps_vir(*m_hfwfn->eps_vir_A())
+		.c_bo(m_wfn->hf_wfn->c_bo_A())
+		.c_bv(m_wfn->hf_wfn->c_bv_A())
+		.eps_occ(*m_wfn->hf_wfn->eps_occ_A())
+		.eps_vir(*m_wfn->hf_wfn->eps_vir_A())
 		.eri3c2e_batched(eri3c2e)
 		.fitting_batched(fitting)
 		.metric_inv(v_xx)
@@ -227,11 +227,11 @@ std::shared_ptr<MVP> adcmod::create_adc2(std::optional<canon_lmo> clmo) {
 		
 	} else {*/
 		
-	mol = m_hfwfn->mol();
-	c_bo = m_hfwfn->c_bo_A();
-	c_bv = m_hfwfn->c_bv_A();
-	eps_o = m_hfwfn->eps_occ_A();
-	eps_v = m_hfwfn->eps_vir_A();
+	mol = m_wfn->mol;
+	c_bo = m_wfn->hf_wfn->c_bo_A();
+	c_bv = m_wfn->hf_wfn->c_bv_A();
+	eps_o = m_wfn->hf_wfn->eps_occ_A();
+	eps_v = m_wfn->hf_wfn->eps_vir_A();
 
 	auto ptr = MVP_AORISOSADC2::create()
 		.set_world(m_world)

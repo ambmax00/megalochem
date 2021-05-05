@@ -4,7 +4,7 @@
 #ifndef TEST_MACRO
 #include "megalochem.hpp"
 #include "desc/options.hpp"
-#include "hf/hf_wfn.hpp"
+#include "desc/wfn.hpp"
 #include "utils/mpi_time.hpp"
 #include "adc/adc_defaults.hpp"
 #include "adc/adc_mvp.hpp"
@@ -39,7 +39,7 @@ inline adcmethod str_to_adcmethod(std::string str) {
 	
 #define ADCMOD_LIST (\
 	((world), set_world),\
-	((hf::shared_hf_wfn), set_hfwfn),\
+	((desc::shared_wavefunction), set_wfn),\
 	((util::optional<desc::shared_cluster_basis>), df_basis))
 	
 #define ADCMOD_OPTLIST (\
@@ -64,6 +64,11 @@ inline adcmethod str_to_adcmethod(std::string str) {
 	((util::optional<double>), c_os_coupling, 1.17),\
 	((util::optional<int>), nlap, 5),\
 	((util::optional<std::string>), guess, "hf"))
+	
+struct eigenpair {
+	std::vector<double> eigvals;
+	std::vector<dbcsr::shared_matrix<double>> eigvecs;
+};
 
 class adcmod {
 private:
@@ -73,7 +78,7 @@ private:
 		std::vector<double> eps_r, eps_s;
 	};
 
-	hf::shared_hf_wfn m_hfwfn;
+	desc::shared_wavefunction m_wfn;
 	megalochem::world m_world;
 	desc::shared_cluster_basis m_df_basis;
 	
@@ -103,18 +108,11 @@ private:
 	
 	void compute_diag();
 	
-	std::tuple<
-		std::vector<dbcsr::shared_matrix<double>>,
-		std::vector<double>
-	> guess();
+	eigenpair guess();
 		
-	void run_adc1(
-		std::vector<dbcsr::shared_matrix<double>> dav_eigvecs, 
-		std::vector<double> dav_eigvals);
+	eigenpair run_adc1(eigenpair& dav);
 		
-	void run_adc2(
-		std::vector<dbcsr::shared_matrix<double>> dav_eigvecs, 
-		std::vector<double> dav_eigvals);
+	eigenpair run_adc2(eigenpair& dav);
 	
 	dbcsr::shared_matrix<double> compute_diag_0();
 	
@@ -145,7 +143,7 @@ public:
 	
 	adcmod(create_pack&& p) :
 		m_world(p.p_set_world),
-		m_hfwfn(p.p_set_hfwfn),
+		m_wfn(p.p_set_wfn),
 		m_cart(m_world.dbcsr_grid()),
 		m_df_basis(p.p_df_basis ? *p.p_df_basis : nullptr),
 		MAKE_INIT_LIST_OPT(ADCMOD_OPTLIST),
@@ -157,7 +155,7 @@ public:
 	
 	~adcmod() {}
 	
-	void compute();
+	desc::shared_wavefunction compute();
 	
 };
 

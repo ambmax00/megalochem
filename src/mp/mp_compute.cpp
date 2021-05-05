@@ -18,7 +18,7 @@ namespace mp {
 	
 void mpmod::init() {
 	
-	m_hfwfn->mol()->set_cluster_dfbasis(m_df_basis);
+	m_wfn->mol->set_cluster_dfbasis(m_df_basis);
 	
 	std::cout << "NLAP: " << m_nlap << std::endl;
 	
@@ -26,7 +26,7 @@ void mpmod::init() {
 		
 }
 
-void mpmod::compute() {
+desc::shared_wavefunction mpmod::compute() {
 
 	LOG.banner<>("Batched CD-LT-SOS-RI-MP2", 50, '*');
 	
@@ -48,10 +48,10 @@ void mpmod::compute() {
 	// 3. LOGging and TIMEing
 	
 	// get energies
-	auto eps_o = m_hfwfn->eps_occ_A();
-	auto eps_v = m_hfwfn->eps_vir_A();
+	auto eps_o = m_wfn->hf_wfn->eps_occ_A();
+	auto eps_v = m_wfn->hf_wfn->eps_vir_A();
 	
-	auto mol = m_hfwfn->mol();
+	auto mol = m_wfn->mol;
 	
 	auto o = mol->dims().oa();
 	auto v = mol->dims().va();
@@ -175,8 +175,8 @@ void mpmod::compute() {
 	//                         SETUP OTHER TENSORS
 	//==================================================================
 	
-	auto c_occ = m_hfwfn->c_bo_A();
-	auto c_vir = m_hfwfn->c_bv_A();
+	auto c_occ = m_wfn->hf_wfn->c_bo_A();
+	auto c_vir = m_wfn->hf_wfn->c_bv_A();
 	
 	// matrices and tensors
 	
@@ -361,10 +361,15 @@ void mpmod::compute() {
 	zbuilder->print_info();
 	TIME.print_info();
 		
-	m_mpwfn = std::make_shared<mp_wfn>(*m_hfwfn);
-	m_mpwfn->m_mp_ss_energy = 0.0;
-	m_mpwfn->m_mp_os_energy = mp2_energy;
-	m_mpwfn->m_mp_energy = m_c_os * mp2_energy;
+	auto mpwfn = std::make_shared<desc::mp_wavefunction>(0.0, mp2_energy, m_c_os * mp2_energy);
+	
+	auto out = std::make_shared<desc::wavefunction>();
+	
+	out->mol = m_wfn->mol;
+	out->hf_wfn = m_wfn->hf_wfn;
+	out->mp_wfn = mpwfn;
+	
+	return out;
 	
 }
 

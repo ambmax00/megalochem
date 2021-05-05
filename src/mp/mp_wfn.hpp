@@ -1,14 +1,10 @@
 #ifndef MP_MP_WFN_H
 #define MP_MP_WFN_H
 
-#include "hf/hf_wfn.hpp"
-
 namespace megalochem {
 
 namespace mp {
 	
-class mpmod;
-
 class mp_wfn : hf::hf_wfn {
 protected:
 
@@ -18,13 +14,24 @@ protected:
 	
 public:
 
-	mp_wfn(const hf::hf_wfn& in) : hf_wfn(in) {}
+	mp_wfn(
+		double mp_os_energy,
+		double mp_ss_energy,
+		double mp_energy) :
+		m_mp_os_energy(mp_os_energy),
+		m_mp_ss_energy(mp_ss_energy),
+		m_mp_energy(mp_energy)
+	{}
 	
-	friend class mpmod;
+	double mp_os_energy() { return m_mp_os_energy; }
+	double mp_ss_energy() { return m_mp_ss_energy; }
+	double mp_energy() { return m_mp_energy; }
+	
+	~mp_wfn() {}
 	
 };
 
-using smp_wfn = std::shared_ptr<mp_wfn>;
+using shared_mp_wfn = std::shared_ptr<mp_wfn>;
 
 } // namespace mp
 

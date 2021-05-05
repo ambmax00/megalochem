@@ -3,6 +3,7 @@
 #include "hf/hfmod.hpp"
 #include "mp/mpmod.hpp"
 #include "adc/adcmod.hpp"
+#include "desc/wfn.hpp"
 #include "utils/ele_to_int.hpp"
 #include "utils/constants.hpp"
 #include "utils/ppdirs.hpp"
@@ -96,7 +97,7 @@ static const nlohmann::json valid_mpwfn =
 {
 	{"tag", "string"},
 	{"type", "string"},
-	{"hfwfn", "string"},
+	{"wfn", "string"},
 	{"print", 0u},
 	{"df_metric", "string"},
 	{"nlap", 5u}, // number of laplace points
@@ -107,7 +108,7 @@ static const nlohmann::json valid_mpwfn =
 	{"eris", "core"},
 	{"intermeds", "core"},
 	{"build_Z", "LLMPFULL"},
-	{"_required", {"tag", "type", "hfwfn", "df_basis"}}
+	{"_required", {"tag", "type", "wfn", "df_basis"}}
 };
 	
 	
@@ -115,7 +116,7 @@ static const nlohmann::json valid_adcwfn =
 {
 	{"tag", "string"},
 	{"type", "string"},
-	{"hfwfn", "string"},
+	{"wfn", "string"},
 	{"method", "sos-cd-ri-adc2"},
 	{"print", 1u},
 	{"nbatches_b", 3u},
@@ -139,7 +140,7 @@ static const nlohmann::json valid_adcwfn =
 	{"c_os", 1.3},
 	{"c_os_coupling", 1.15},
 	{"nlap", 5u},
-	{"_required", {"tag", "type", "hfwfn", "nroots", "df_basis"}}
+	{"_required", {"tag", "type", "wfn", "nroots", "df_basis"}}
 };
 
 template <typename T>
@@ -417,6 +418,8 @@ void driver::parse_molecule(nlohmann::json& jdata) {
 	mol->print_info();
 	
 	m_stack[jdata["tag"]] = std::any(mol);
+	
+	desc::write_molecule(jdata["tag"], *mol, *m_fh.output_fh);
 
 }
 	
@@ -428,11 +431,19 @@ void driver::parse_hfwfn(nlohmann::json& jdata) {
 	auto mol = get<desc::shared_molecule>(jdata["molecule"]);
 	
 	if (read && *read) {
-		auto myhfwfn = hf::read_hfwfn("hf_wfn", mol, m_world, *m_fh.input_fh);
-		m_stack[jdata["tag"]] = std::any(myhfwfn);
+		auto myhfwfn = desc::read_hfwfn(jdata["tag"], mol, m_world, *m_fh.input_fh);
+		
+		auto mywfn = std::make_shared<desc::wavefunction>();
+		
+		mywfn->mol = mol;
+		mywfn->hf_wfn = myhfwfn;
+		
+		m_stack[jdata["tag"]] = std::any(mywfn);
+		
 	} else {
 		megajob j = {megatype::hfwfn, jdata};
 		m_jobs.push_back(std::move(j));
+		
 	}
 
 }
@@ -504,17 +515,17 @@ void driver::run_hfmod(megajob& job) {
 		JSON_REFLECTION(HFMOD_LIST_OPT)
 		.build();
 		
-	myhfmod->compute();
+	auto wfn = myhfmod->compute();
+		
+	m_stack[job.jdata["tag"]] = std::any(wfn);
 	
-	auto myhfwfn = myhfmod->wfn();
-	
-	m_stack[job.jdata["tag"]] = std::any(myhfwfn);
+	desc::write_hfwfn(job.jdata["tag"], *wfn->hf_wfn, *m_fh.output_fh); 
 	
 }
 
 void driver::run_mpmod(megajob& job) {
 	
-	auto hfwfn = get<hf::shared_hf_wfn>(job.jdata["hfwfn"]);
+	auto wfn = get<desc::shared_wavefunction>(job.jdata["wfn"]);
 	
 	std::optional<desc::shared_cluster_basis> dfbas;
 	
@@ -524,18 +535,20 @@ void driver::run_mpmod(megajob& job) {
 	
 	auto mympmod = mp::mpmod::create()
 		.set_world(m_world)
-		.set_hf_wfn(hfwfn)
+		.set_wfn(wfn)
 		.df_basis(dfbas)
 		JSON_REFLECTION(MPMOD_OPTLIST)
 		.build();
 		
-	mympmod->compute();	
+	auto newwfn = mympmod->compute();
+	
+	m_stack[job.jdata["tag"]] = std::any(newwfn);	
 	
 }
 
 void driver::run_adcmod(megajob& job) {
 	
-	auto hfwfn = get<hf::shared_hf_wfn>(job.jdata["hfwfn"]);
+	auto wfn = get<desc::shared_wavefunction>(job.jdata["wfn"]);
 	
 	std::optional<desc::shared_cluster_basis> dfbas;
 	
@@ -545,12 +558,14 @@ void driver::run_adcmod(megajob& job) {
 	
 	auto myadcmod = adc::adcmod::create()
 		.set_world(m_world)
-		.set_hfwfn(hfwfn)
+		.set_wfn(wfn)
 		.df_basis(dfbas)
 		JSON_REFLECTION(ADCMOD_OPTLIST)
 		.build();
 		
-	myadcmod->compute();
+	auto newwfn = myadcmod->compute();
+	
+	m_stack[job.jdata["tag"]] = std::any(newwfn);
 		
 }
 
