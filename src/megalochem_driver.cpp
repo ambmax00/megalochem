@@ -24,6 +24,16 @@
 	ITERATE_LIST(SINGLE_REFLECTION, (), (), list)
 
 namespace megalochem {
+	
+static const nlohmann::json valid_globals = 
+{
+	{"type", "globals"},
+	{"block_threshold", 1-6},
+	{"integral_omega", 0.1},
+	{"qr_T", 1e-6},
+	{"qr_R", 40},
+	{"_required", {"type"}}
+};
 
 static const nlohmann::json valid_basis = 
 {
@@ -222,6 +232,10 @@ void driver::parse_json_section(nlohmann::json& jdata) {
 	megatype mtype = str_to_type(strtype);
 	
 	switch (mtype) {
+		case megatype::globals: {
+			parse_globals(jdata);
+			break;
+		}
 		case megatype::basis: {
 			parse_basis(jdata);
 			break;
@@ -251,6 +265,22 @@ void driver::parse_json_section(nlohmann::json& jdata) {
 		}
 	}
 		
+}
+
+void driver::parse_globals(nlohmann::json& jdata) {
+	
+	validate("globals", jdata, valid_globals);
+	
+	auto block_t = json_optional<double>(jdata, "block_threshold");
+	auto omega = json_optional<double>(jdata, "integral_omega");
+	auto qrT = json_optional<double>(jdata, "qr_T");
+	auto qrR = json_optional<double>(jdata, "qr_R");
+	
+	if (block_t) dbcsr::global::filter_eps = *block_t;
+	if (omega) ints::global::omega = *omega;
+	if (qrT) ints::global::qr_theta = *qrT;
+	if (qrR) ints::global::qr_rho = *qrR;
+	
 }
 
 void driver::parse_atoms(nlohmann::json& jdata) {
