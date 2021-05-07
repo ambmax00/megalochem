@@ -260,19 +260,16 @@ desc::shared_wavefunction adcmod::compute() {
 	return wfn_out;
 }
 
-/*
-std::tuple<std::vector<int>, std::vector<int>> 
-	adcmod::get_significant_blocks(dbcsr::shared_matrix<double> u_ia, 
-	double theta, dbcsr::shared_matrix<double> metric_bb, double gamma) 
-{
+std::vector<bool> adcmod::get_significant_blocks(dbcsr::shared_matrix<double> u_ia, 
+	double theta) {
 	
-	auto c_bo = m_hfwfn->c_bo_A();
-	auto c_bv = m_hfwfn->c_bv_A(); 
+	auto c_bo = m_wfn->hf_wfn->c_bo_A();
+	auto c_bv = m_wfn->hf_wfn->c_bv_A(); 
 	
 	auto u_bb_a = u_transform(u_ia, 'N', c_bo, 'T', c_bv);
 	
-	auto b = m_hfwfn->mol()->dims().b();
-	auto atoms = m_hfwfn->mol()->atoms();
+	auto b = m_wfn->mol->dims().b();
+	auto atoms = m_wfn->mol->atoms();
     int natoms = atoms.size();
 
 	auto retvec = b;
@@ -300,7 +297,7 @@ std::tuple<std::vector<int>, std::vector<int>>
     std::iota(idx_occ.begin(), idx_occ.end(), 0);
     std::iota(idx_vir.begin(), idx_vir.end(), 0);
     
-    auto blkmap = m_hfwfn->mol()->c_basis()->block_to_atom(atoms);
+    auto blkmap = m_wfn->mol->c_basis()->block_to_atom(atoms);
     
     // loop over blocks rows/cols
     for (int iblk = 0; iblk != b.size(); ++iblk) {
@@ -381,15 +378,14 @@ std::tuple<std::vector<int>, std::vector<int>>
 	double totnorm_occ = 0.0;
 	double totnorm_vir = 0.0;
 	
-	std::vector<int> atoms_check(natoms,0);
-	std::vector<int> atoms_all;
+	std::vector<bool> atoms_check(natoms,false);
 	
 	for (auto idx : idx_occ) {
 		//std::cout << totnorm << std::endl;
 		if (totnorm_occ < theta) {
 			totnorm_occ += occ_norms[idx];
 			int iatom = blkmap[idx];
-			atoms_check[iatom] = 1;
+			atoms_check[iatom] = true;
 		} else {
 			break;
 		}
@@ -400,7 +396,7 @@ std::tuple<std::vector<int>, std::vector<int>>
 		if (totnorm_vir < theta) {
 			totnorm_vir += vir_norms[idx];
 			int iatom = blkmap[idx];
-			atoms_check[iatom] = 1;
+			atoms_check[iatom] = true;
 		} else {
 			break;
 		}
@@ -410,101 +406,11 @@ std::tuple<std::vector<int>, std::vector<int>>
 	for (auto v : atoms_check) {
 		LOG.os<1>(v, " ");
 	} LOG.os<1>('\n');
-	
-	u_bb_a->distribute();
-	u_bb_a->clear();
-	
-	// add all blocks centered on atoms
-	vec<int> idx_check(b.size(),0);
-	vec<int> idx_all;
-	
-	for (int iblk = 0; iblk != b.size(); ++iblk) {
-		for (int iatom = 0; iatom != natoms; ++iatom) {
-			if (!atoms_check[iatom]) continue;
-			if (blkmap[iblk] == iatom) idx_check[iblk] = 1;
-		}
-	}
-	
-	LOG.os<1>("IDX CHECK: \n");
-	for (auto v : idx_check) {
-		LOG.os<1>(v, " ");
-	} LOG.os<1>('\n');
-	
-	int idx = 0;
-	for (auto b : idx_check) {
-		if (b) idx_all.push_back(idx);
-		idx++;
-	}
-	
-	idx = 0;
-	for (auto a : atoms_check) {
-		if (a) atoms_all.push_back(idx);
-		idx++;
-	}
 		
-	LOG.os<>("IDX ALL: \n");
-	
-	MPI_Barrier(m_world.comm());
-	for (int ip = 0; ip != m_world.size(); ++ip) {
-		if (ip == m_world.rank()) {
-			for (auto v : idx_all) {
-				std::cout << v << " ";
-			} std::cout << std::endl;
-		}
-		MPI_Barrier(m_world.comm());
-	}
-	
-	return std::make_tuple(atoms_all, idx_all);
-	
-	/*
-	if (metric_bb == nullptr) return idx_all;
-	
-	// now add blocks connected to indices by metric
-		
-	MPI_Comm comm = m_cart.comm();
-	
-	auto idx_check_aug = idx_check;
-	int nblk = idx_check.size();
-		
-	for (int iblk = 0; iblk != nblk; ++iblk) {
-		if (!idx_check[iblk]) continue;
-		for (int jblk = 0; jblk != nblk; ++jblk) {
-			bool found = false;
-			
-			int i = (iblk <= jblk) ? iblk : jblk;
-			int j = (iblk <= jblk) ? jblk : iblk;
-			
-			auto blk_p = metric_bb->get_block_p(i,j,found);
-			if (!found) continue;
-			double max = blk_p.max_abs();
-			if (max > gamma) idx_check_aug[jblk] = 1;
-		}
-	}
-	
-	MPI_Allreduce(MPI_IN_PLACE, idx_check_aug.data(), idx_check_aug.size(), 
-		MPI_INT, MPI_LOR, comm);
-			
-	LOG.os<1>("IDX CHECK NEW: \n");
-	for (auto v : idx_check_aug) {
-		LOG.os<1>(v, " ");
-	} LOG.os<1>('\n');
-	
-	vec<int> idx_all_aug;
-	idx = 0;
-	for (auto b : idx_check_aug) {
-		if (b) idx_all_aug.push_back(idx);
-		++idx;
-	}
-	
-	LOG.os<1>("IDX ALL (AUG): \n");
-	for (auto v : idx_all_aug) {
-		LOG.os<1>(v, " ");
-	} LOG.os<1>('\n');
-	
-	return idx_all_aug;	
+	return atoms_check;
 	
 }
-
+/*
 adcmod::canon_lmo adcmod::get_canon_nto(dbcsr::shared_matrix<double> u_ia, 
 	dbcsr::shared_matrix<double> c_bo, dbcsr::shared_matrix<double> c_bv, 
 	std::vector<double> eps_o, std::vector<double> eps_v,

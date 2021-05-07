@@ -146,6 +146,7 @@ static const nlohmann::json valid_adcwfn =
 	{"build_J", "dfao"},
 	{"build_K", "dfao"},
 	{"build_Z", "llmp_full"},
+	{"local", false},
 	{"eris", "core"},
 	{"imeds", "core"},
 	{"dav_max_iter", 100},
@@ -154,6 +155,7 @@ static const nlohmann::json valid_adcwfn =
 	{"c_os_coupling", 1.15},
 	{"nlap", 5u},
 	{"guess", "hf"},
+	{"cutoff", 1e-6},
 	{"_required", {"tag", "type", "wfn", "nroots", "df_basis"}}
 };
 
@@ -478,7 +480,10 @@ void driver::parse_hfwfn(nlohmann::json& jdata) {
 		
 		m_stack[jdata["tag"]] = std::any(mywfn);
 		
+		desc::write_hfwfn(jdata["tag"], *myhfwfn, *m_fh.output_fh); 
+		
 	} else {
+		
 		megajob j = {megatype::hfwfn, jdata};
 		m_jobs.push_back(std::move(j));
 		
@@ -513,6 +518,8 @@ void driver::parse_adcwfn(nlohmann::json& jdata) {
 		rwfn->adc_wfn = adcwfn;
 		
 		m_stack[jdata["tag"]] = std::any(rwfn);
+		
+		desc::write_adcwfn(jdata["tag"], *adcwfn, *m_fh.output_fh); 
 		
 	} else { 
 	

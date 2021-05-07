@@ -61,6 +61,8 @@ inline adcmethod str_to_adcmethod(std::string str) {
 	((util::optional<double>), c_os, 1.3),\
 	((util::optional<double>), c_os_coupling, 1.17),\
 	((util::optional<int>), nlap, 5),\
+	((util::optional<bool>), local, false),\
+	((util::optional<double>), cutoff, 1.0),\
 	((util::optional<std::string>), guess, "hf"))
 	
 struct eigenpair {
@@ -116,14 +118,11 @@ private:
 	
 	//dbcsr::shared_matrix<double> compute_diag_1();
 	
-	/*	
-	std::tuple<
-		std::vector<int>, 
-		std::vector<int>> 
-	get_significant_blocks(dbcsr::shared_matrix<double> u_bb, 
-		double theta, dbcsr::shared_matrix<double> metric_bb, double gamma);
+	std::vector<bool> get_significant_blocks(
+		dbcsr::shared_matrix<double> u_ia, 
+		double theta);
 		
-	canon_lmo get_canon_nto(dbcsr::shared_matrix<double> u_ia, dbcsr::shared_matrix<double> c_bo,
+	/*canon_lmo get_canon_nto(dbcsr::shared_matrix<double> u_ia, dbcsr::shared_matrix<double> c_bo,
 		dbcsr::shared_matrix<double> c_bv, std::vector<double> eps_o, std::vector<double> eps_v,
 		double theta);
 		
@@ -132,6 +131,11 @@ private:
 		double theta);*/
 	
 	void init();
+	
+	std::tuple<dbcsr::shared_matrix<double>, dbcsr::sbtensor<3,double>>
+	test_fitting(std::vector<bool> atom_idx);
+	
+	dbcsr::sbtensor<3,double> m_fit;
 	
 public:	
 

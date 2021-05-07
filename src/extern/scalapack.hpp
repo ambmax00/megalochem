@@ -65,11 +65,25 @@ extern "C" {
 		
 	void pdpotrf_(char* uplo, int* n, double* a, int* ia, int* ja, int* desca, int* info);
 	
+	void pdgeqrf_(int* m, int* n, double* a, int* ia, int* ja, int* desca, 
+		double* tau, double* work, int* lwork, int* info);
+	
+	void pdormqr_(char* side, char* trans, int* m, int* n, int* k, double* a,
+		int* ia, int* ja, int* desca, double* tau, double* c, int* ic, int* jc,
+		int* descc, double* work, int* lwork, int* info);
+	
+	void pdtrtrs_(char* uplo, char* trans, char* diag, int* n, int* nhrs,
+		double* a, int* ia, int* ja, int* desca, double* b, int* ib, int* jb,
+		int* descb, int* info);
+	
 	void pdtrtri_(char* uplo, char* diag, int* n, double* a, int* ia, int* ja, int* desca, int* info);
 	
 	void pdgesvd_(char* jobu, char* jobvt, int* m, int* n, double* a, int* ia, int* ja,
 		int* desca, double* s, double* u, int* iu, int* ju, int* descu, double* vt,
 		int* ivt, int* jvt, int* descvt, double* work, int* lwork, int* info);
+		
+	void pdgemr2d_(int* m, int* n, double* a, int* ia, int* ja, int* desca, 
+		double* b, int* ib, int* jb, int* descb, int* ictxt);
 		
 	void Cigebs2d(int ConTxt, char *scope, char *top, int m, int n, int *A, int lda);
 	void Cigebr2d(int ConTxt, char *scope, char *top, int m, int n, int *A,
@@ -282,6 +296,56 @@ inline void c_pdgesvd(char jobu, char jobvt, int m, int n, double* a, int ia, in
 		
 	pdgesvd_(&jobu, &jobvt, &m, &n, a, &f_ia, &f_ja, desca, s, u, &f_iu, &f_ju, descu, 
 		vt, &f_ivt, &f_jvt, descvt, work, &lwork, info);
+}
+
+inline void c_pdgeqrf(int m, int n, double* a, int ia, int ja, int* desca, 
+	double* tau, double* work, int lwork, int* info) {
+		
+	int fia = ia + 1;
+	int fja = ja + 1;
+	
+	pdgeqrf_(&m, &n, a, &fia, &fja, desca, tau, work, &lwork, info);
+	
+}
+		
+inline void c_pdormqr(char side, char trans, int m, int n, int k, double* a,
+	int ia, int ja, int* desca, double* tau, double* c, int ic, int jc,
+	int* descc, double* work, int lwork, int* info) {
+		
+	int fia = ia + 1;
+	int fja = ja + 1;
+	int fic = ic + 1;
+	int fjc = jc + 1;	
+		
+	pdormqr_(&side, &trans, &m, &n, &k, a, &fia, &fja, desca, tau, c, &fic,
+		&fjc, descc, work, &lwork, info);
+		
+}
+	
+inline void c_pdtrtrs(char uplo, char trans, char diag, int n, int nhrs,
+	double* a, int ia, int ja, int* desca, double* b, int ib, int jb,
+	int* descb, int* info) {
+		
+	int fia = ia + 1;
+	int fja = ja + 1;
+	int fib = ib + 1;
+	int fjb = jb + 1;
+
+	pdtrtrs_(&uplo, &trans, &diag, &n, &nhrs, a, &fia, &fja, desca, b,
+		&fib, &fjb, descb, info);
+		
+}
+
+inline void c_pdgemr2d(int m, int n, double* a, int ia, int ja, int* desca, 
+	double* b, int ib, int jb, int* descb, int ictxt) {
+			
+	int fia = ia + 1;
+	int fja = ja + 1;
+	int fib = ib + 1;
+	int fjb = jb + 1;
+	
+	pdgemr2d_(&m, &n, a, &fia, &fja, desca, b, &fib, &fjb, descb, &ictxt);
+	
 }
 
 namespace scalapack {
@@ -504,7 +568,7 @@ public:
 	
 	std::array<int,9> desc() const { return m_desc; }
 	
-	void print() const {
+	void print() {
 		
 		c_blacs_barrier(m_grid.ctx(),'A');
 		
