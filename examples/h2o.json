@@ -1,4 +1,5 @@
 {
+	"comment": "Water @ DF-Hartree-Fock + DF-AO-ADC(1) + DF-AO-SOS-ADC(2)",
 	"megalochem": [
 		{
 			"type": "atoms",
