@@ -565,7 +565,7 @@ void driver::run_hfmod(megajob& job) {
 		dfbas = get<desc::shared_cluster_basis>(job.jdata["df_basis"]);
 	}
 	
-	std::cout << job.jdata["build_J"] << std::endl;
+	//std::cout << job.jdata["build_J"] << std::endl;
 	
 	if (job.jdata.find("df_basis2") != job.jdata.end()) {
 		dfbas2 = get<desc::shared_cluster_basis>(job.jdata["df_basis2"]);

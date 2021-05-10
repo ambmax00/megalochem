@@ -176,7 +176,7 @@ inline dbcsr::shared_matrix<double> read_mat(
 	std::vector<int> r, std::vector<int> c, bool throw_if_not_present) 
 {
 		
-	std::cout << "Looking for " << name << std::endl;
+	//std::cout << "Looking for " << name << std::endl;
 	
 	int nrows = std::accumulate(r.begin(), r.end(), 0);
 	int ncols = std::accumulate(c.begin(), c.end(), 0);
@@ -184,7 +184,7 @@ inline dbcsr::shared_matrix<double> read_mat(
 	if (throw_if_not_present && !dh.exists(name)) {
 		throw std::runtime_error("Read hfwfn: could not find " + name + ".");
 	} else if (!dh.exists(name)) {
-		std::cout << name << " not present" << std::endl;
+		//std::cout << name << " not present" << std::endl;
 		dbcsr::shared_matrix<double> out = nullptr;
 		return out;
 	}
@@ -208,12 +208,12 @@ inline dbcsr::shared_matrix<double> read_mat(
 inline std::shared_ptr<std::vector<double>> read_vec(
 	filio::data_handler& dh, std::string name, bool throw_if_not_present) {
 		
-	std::cout << "Looking for " << name << std::endl;
+	//std::cout << "Looking for " << name << std::endl;
 	
 	if (throw_if_not_present && !dh.exists(name)) {
 		throw std::runtime_error("Read hfwfn: could not find " + name + ".");
 	} else if (!dh.exists(name)) {
-		std::cout << name << " not present" << std::endl;
+		//std::cout << name << " not present" << std::endl;
 		std::shared_ptr<std::vector<double>> out = nullptr;
 		return out;
 	}

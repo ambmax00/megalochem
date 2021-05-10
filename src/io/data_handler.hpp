@@ -280,7 +280,7 @@ public:
 		for (hsize_t ii = 0; ii != ntot; ++ii) {
 			
 			std::copy(data[ii].begin(), data[ii].end(), c_strings[ii].data);
-			std::cout << c_strings[ii].data << std::endl;
+			//std::cout << c_strings[ii].data << std::endl;
  			c_strings[ii].data[data[ii].size()] = '\0';
 						
 			if (data[ii].size() > _max_strlength-1) {
