@@ -4,7 +4,7 @@
 namespace megalochem {
 
 namespace locorb {
-#if 0
+
 using smat = dbcsr::shared_matrix<double>;
 
 smat transform(smat c, smat dip) {
@@ -13,7 +13,7 @@ smat transform(smat c, smat dip) {
 	auto m = c->col_blk_sizes();
 	auto w = c->get_cart();
 	
-	auto temp = dbcsr::create<double>()
+	auto temp = dbcsr::matrix<double>::create()
 		.name("temp")
 		.set_cart(w)
 		.row_blk_sizes(b)
@@ -21,7 +21,7 @@ smat transform(smat c, smat dip) {
 		.matrix_type(dbcsr::type::no_symmetry)
 		.build();
 		
-	auto dip_mm = dbcsr::create<double>()
+	auto dip_mm = dbcsr::matrix<double>::create()
 		.name("dip_mm")
 		.set_cart(w)
 		.row_blk_sizes(m)
@@ -47,9 +47,9 @@ smat compute_D(smat dip_x, smat dip_y, smat dip_z) {
 	auto diag_y = dip_y->get_diag();
 	auto diag_z = dip_z->get_diag();
 	
-	auto copy_x = dbcsr::copy(dip_x).build();
-	auto copy_y = dbcsr::copy(dip_y).build();
-	auto copy_z = dbcsr::copy(dip_z).build();
+	auto copy_x = dbcsr::matrix<double>::copy(*dip_x).build();
+	auto copy_y = dbcsr::matrix<double>::copy(*dip_y).build();
+	auto copy_z = dbcsr::matrix<double>::copy(*dip_z).build();
 	
 	copy_x->scale(diag_x, "right");
 	copy_y->scale(diag_y, "right");
@@ -65,10 +65,10 @@ smat compute_D(smat dip_x, smat dip_y, smat dip_z) {
 
 double jacobi_sweep_serial(smat& c_dist, smat& x_dist, smat& y_dist, smat& z_dist) {
 	
-	auto c = dbcsr::matrix_to_eigen(c_dist);
-	auto x = dbcsr::matrix_to_eigen(x_dist);
-	auto y = dbcsr::matrix_to_eigen(y_dist);
-	auto z = dbcsr::matrix_to_eigen(z_dist);
+	auto c = dbcsr::matrix_to_eigen(*c_dist);
+	auto x = dbcsr::matrix_to_eigen(*x_dist);
+	auto y = dbcsr::matrix_to_eigen(*y_dist);
+	auto z = dbcsr::matrix_to_eigen(*z_dist);
 	auto w = c_dist->get_cart();
 	
 	int nbas = c_dist->nfullrows_total();
@@ -720,10 +720,10 @@ double jacobi_sweep_mpi(smat& c_dist, smat& x_dist, smat& y_dist, smat& z_dist) 
 	auto b = c_dist->row_blk_sizes();
 	auto m = c_dist->col_blk_sizes();
 	
-	auto c = dbcsr::matrix_to_eigen(c_dist);
-	auto x = dbcsr::matrix_to_eigen(x_dist);
-	auto y = dbcsr::matrix_to_eigen(y_dist);
-	auto z = dbcsr::matrix_to_eigen(z_dist);
+	auto c = dbcsr::matrix_to_eigen(*c_dist);
+	auto x = dbcsr::matrix_to_eigen(*x_dist);
+	auto y = dbcsr::matrix_to_eigen(*y_dist);
+	auto z = dbcsr::matrix_to_eigen(*z_dist);
 	
 	double t12 = 1e-12;
 	double t8 = 1e-8;
@@ -1004,7 +1004,7 @@ std::pair<smat_d,smat_d>
 	);
 			
 }	
-#endif
+
 } // end namespace
 
 } // end namespace megalochem

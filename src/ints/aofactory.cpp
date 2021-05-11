@@ -859,7 +859,7 @@ dbcsr::shared_matrix<double> aofactory::ao_auxoverlap() {
 	pimpl->setup_calc();
 	return pimpl->compute();
 }
-#if 0
+
 std::array<dbcsr::shared_matrix<double>,3>
 	aofactory::ao_emultipole(std::array<int,3> O) {
 		
@@ -871,7 +871,7 @@ std::array<dbcsr::shared_matrix<double>,3>
 	return pimpl->compute_xyz(O);
 	
 }
-#endif
+
 void aofactory::ao_3c2e_setup(metric m) {
 	
 	op iop = op::invalid;
