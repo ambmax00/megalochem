@@ -535,9 +535,10 @@ void adcmod::init_ao_tensors() {
 	
 }
 
-std::shared_ptr<MVP> adcmod::create_adc1() {
+std::shared_ptr<MVP> adcmod::create_adc1(std::optional<canon_lmo> lmo_info) {
 	
-	dbcsr::shared_matrix<double> v_xx;
+	dbcsr::shared_matrix<double> v_xx, c_bo, c_bv;
+	std::vector<double> epso, epsv;
 	dbcsr::sbtensor<3,double> eri3c2e, fitting;
 	
 	auto jmeth = fock::str_to_jmethod(m_build_J);
@@ -587,45 +588,32 @@ std::shared_ptr<MVP> adcmod::create_adc1() {
 		}
 	}
 	
-	/*if (m_local) {
+	if (m_local) {
 		
-		LOG.os<>("Using a cutoff of ", m_cutoff, '\n');
+		LOG.os<>("Setting up local ADC(1) MVP object...\n");
 		
-		auto atom_idx = get_significant_blocks(m_wfn->adc_wfn->davidson_eigenvectors()[0],m_cutoff);
+		c_bo = lmo_info->c_br;
+		c_bv = lmo_info->c_bs;
+		epso = lmo_info->eps_r;
+		epsv = lmo_info->eps_s; 
 		
-		int natoms = 0;
+	} else {
 		
-		for (auto b : atom_idx) {
-			if (b) natoms++;
-		}
+		c_bo = m_wfn->hf_wfn->c_bo_A();
+		c_bv = m_wfn->hf_wfn->c_bv_A();
+		epso = *m_wfn->hf_wfn->eps_occ_A();
+		epsv = *m_wfn->hf_wfn->eps_vir_A();
 		
-		LOG.os<>("Taking ", natoms, " atoms of ", m_wfn->mol->atoms().size(), '\n');
-		
-		auto [vlocal, clocal] = test_fitting(atom_idx);
-		
-		//fitting = eri3c2e;
-		eri3c2e = clocal; //clocal;
-		v_xx = vlocal;
-		
-		v_xx->filter(dbcsr::global::filter_eps);
-		
-		ints::dfitting fit(m_world, m_wfn->mol, 1);
-		
-		fitting = fit.compute(eri3c2e, v_xx, dbcsr::btype::core);
-		
-		eri3c2e->print_info();
-		fitting->print_info();
-		
-	}*/
+	}
 		
 	auto ptr = MVP_AORIADC1::create()
 		.set_world(m_world)
 		.set_molecule(m_wfn->mol)
 		.print(LOG.global_plev())
-		.c_bo(m_wfn->hf_wfn->c_bo_A())
-		.c_bv(m_wfn->hf_wfn->c_bv_A())
-		.eps_occ(*m_wfn->hf_wfn->eps_occ_A())
-		.eps_vir(*m_wfn->hf_wfn->eps_vir_A())
+		.c_bo(c_bo)
+		.c_bv(c_bv)
+		.eps_occ(epso)
+		.eps_vir(epsv)
 		.eri3c2e_batched(eri3c2e)
 		.fitting_batched(fitting)
 		.metric_inv(v_xx)

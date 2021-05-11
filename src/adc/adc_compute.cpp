@@ -4,6 +4,7 @@
 #include "math/linalg/piv_cd.hpp"
 #include "math/linalg/SVD.hpp"
 #include "math/solvers/hermitian_eigen_solver.hpp"
+#include "math/linalg/LLT.hpp"
 #include "locorb/locorb.hpp"
 
 #include <dbcsr_conversions.hpp>
@@ -137,9 +138,9 @@ eigenpair adcmod::guess() {
 	
 }	
 
-eigenpair adcmod::run_adc1(eigenpair& epairs) {
+eigenpair adcmod::run_adc1(eigenpair& epairs, std::optional<canon_lmo> lmo_info) {
 	
-	auto adc1_mvp = create_adc1();
+	auto adc1_mvp = create_adc1(lmo_info);
 	math::davidson<MVP> dav(m_world.comm(), LOG.global_plev());
 		
 	dav.set_factory(adc1_mvp);
@@ -236,11 +237,43 @@ desc::shared_wavefunction adcmod::compute() {
 	LOG.os<>("--- Starting Computation ---\n\n");
 	
 	auto guess_pairs = guess();
+	
 	eigenpair out;
+	std::optional<canon_lmo> lmo_info;
+	
+	if (m_local) {
+		
+		auto u_ia = m_wfn->adc_wfn->davidson_eigenvectors()[0];
+		lmo_info = get_restricted_cmos(u_ia);
+		
+		exit(0);
+		
+		/*
+		LOG.os<>("Performing a local variant ADC calculation...\n");
+	
+		auto u_ia = m_wfn->adc_wfn->davidson_eigenvectors()[0];
+		auto c_bo = m_wfn->hf_wfn->c_bo_A();
+		auto c_bv = m_wfn->hf_wfn->c_bv_A();
+		auto eps_o = m_wfn->hf_wfn->eps_occ_A();
+		auto eps_v = m_wfn->hf_wfn->eps_vir_A();
+		
+		lmo_info = get_canon_nto(u_ia, c_bo, c_bv, *eps_o, *eps_v, m_cutoff);
+	
+		LOG.os<>("Transforming diagonal...\n");
+		
+		m_d_ov = u_transform(m_d_ov, 'T', lmo_info->u_or, 'N', lmo_info->u_vs);
+	
+		LOG.os<>("Transforming guesses...\n");
+		
+		for (auto& v : guess_pairs.eigvecs) {
+			v = u_transform(v, 'T', lmo_info->u_or, 'N', lmo_info->u_vs);
+		}*/
+		
+	}
 	
 	switch (m_adcmethod) {
 		case adcmethod::ri_ao_adc1: 
-			out = run_adc1(guess_pairs);
+			out = run_adc1(guess_pairs, lmo_info);
 			break;
 		case adcmethod::sos_cd_ri_adc2:
 			out = run_adc2(guess_pairs);
@@ -410,10 +443,14 @@ std::vector<bool> adcmod::get_significant_blocks(dbcsr::shared_matrix<double> u_
 	return atoms_check;
 	
 }
+
 /*
-adcmod::canon_lmo adcmod::get_canon_nto(dbcsr::shared_matrix<double> u_ia, 
-	dbcsr::shared_matrix<double> c_bo, dbcsr::shared_matrix<double> c_bv, 
-	std::vector<double> eps_o, std::vector<double> eps_v,
+adcmod::canon_lmo adcmod::get_canon_nto(
+	dbcsr::shared_matrix<double> u_ia, 
+	dbcsr::shared_matrix<double> c_bo, 
+	dbcsr::shared_matrix<double> c_bv, 
+	std::vector<double> eps_o, 
+	std::vector<double> eps_v,
 	double theta)
 {
 	
@@ -433,7 +470,7 @@ adcmod::canon_lmo adcmod::get_canon_nto(dbcsr::shared_matrix<double> u_ia,
 	double norm = 1.0/sqrt(u_ia->dot(*u_ia));
 	u_ia_copy->scale(norm);
 	
-	math::SVD svd_decomp(m_world, u_ia_copy, 'V', 'V', 0);
+	math::SVD svd_decomp(m_world, u_ia_copy, 'V', 'V', 1);
 	svd_decomp.compute(theta);
 	int rank = svd_decomp.rank();
 	
@@ -446,8 +483,8 @@ adcmod::canon_lmo adcmod::get_canon_nto(dbcsr::shared_matrix<double> u_ia,
 	
 	LOG.os<>("-- Orthogonalizing new MOs\n"); 
 	
-	math::SVD svd_o(m_world, u_ir, 'V', 'V', 0);
-	math::SVD svd_v(m_world, vt_rv, 'V', 'V', 0);
+	math::SVD svd_o(m_world, u_ir, 'V', 'V', 1);
+	math::SVD svd_v(m_world, vt_rv, 'V', 'V', 1);
 	
 	svd_o.compute(1e-10);
 	svd_v.compute(1e-10);
@@ -570,7 +607,7 @@ adcmod::canon_lmo adcmod::get_canon_nto(dbcsr::shared_matrix<double> u_ia,
 	return canon_lmo{c_bt, c_bs, trans_ot, trans_vs, eps_t, eps_s};
 
 }
-
+/*
 adcmod::canon_lmo adcmod::get_canon_pao(dbcsr::shared_matrix<double> u_ia, 
 	dbcsr::shared_matrix<double> c_bo, dbcsr::shared_matrix<double> c_bv, 
 	std::vector<double> eps_o, std::vector<double> eps_v,
@@ -599,6 +636,804 @@ adcmod::canon_lmo adcmod::get_canon_pao(dbcsr::shared_matrix<double> u_ia,
 	return canon_lmo{c_br, c_bs, u_or, u_vs, eps_r, eps_s};
 	
 }*/
+/*
+adcmod::canon_lmo adcmod::get_restricted_cmos(dbcsr::shared_matrix<double> u_ia) {
+	
+	LOG.os<>("Computing restricted canonical molecular orbitals.\n");
+	
+	// ======== STEP 1: localize orbitals ==============================
+	
+	LOG.os<>("Localizing orbitals with methods ", m_locc, "/", m_lvir, '\n');
+	
+	locorb::mo_localizer moloc(m_world, m_wfn->mol);
+	
+	ints::aofactory aofac(m_wfn->mol, m_world);
+	auto s_bb = aofac.ao_overlap();
+	
+	auto get_lmos = [&](auto method, auto smat) {
+		
+		std::tuple<decltype(smat),decltype(smat)> out;
+		
+		if (method == "boys") {
+			out = moloc.compute_boys(smat, s_bb);
+		} else if (method == "cholesky") {
+			out = moloc.compute_cholesky(smat, s_bb);
+		} else if (method == "pao") {
+			out = moloc.compute_pao(smat, s_bb);
+		} else {
+			throw std::runtime_error("Unknown localization method");
+		}
+		
+		return out;
+		
+	};
+	
+	auto c_bo = m_wfn->hf_wfn->c_bo_A();
+	auto c_bv = m_wfn->hf_wfn->c_bv_A();
+	
+	auto [locc_bm, c2l_mo] = get_lmos(m_locc, c_bo);
+	auto [lvir_bn, c2l_nv] = get_lmos(m_lvir, c_bv);
+	
+	// ============ STEP 2 : TRANSFORM U ===============================
+	
+	LOG.os<>("Transforming guess vector\n");
+	
+	auto u_mn = u_transform(u_ia, 'N', c2l_mo, 'T', c2l_nv); 
+	
+    double norm = u_mn->norm(dbcsr_norm_frobenius);
+    
+    u_mn->scale(1.0/norm);
+        
+	// ================ STEP 3 : GET NORMS =============================
+	
+	LOG.os<>("Extracting norms form transformed guess vector\n");
+	
+	int nbas = c_bo->nfullrows_total();
+	int noccs = c_bo->nfullcols_total();
+	int nvirs = c_bv->nfullcols_total();
+	int nloccs = u_mn->nfullrows_total();
+	int nlvirs = u_mn->nfullcols_total();
+	
+	std::vector<double> onorms(nloccs,0.0), vnorms(nlvirs,0.0);
+	std::vector<int> oidx(nloccs,0), vidx(nlvirs,0);
+	
+	std::iota(oidx.begin(), oidx.end(), 0);
+	std::iota(vidx.begin(), vidx.end(), 0);
+	
+	dbcsr::iterator iter(*u_mn);
+	iter.start();
+	
+	while (iter.blocks_left()) {
+		
+		iter.next_block();
+		
+		int o_size = iter.row_size();
+		int v_size = iter.col_size();
+		
+		int o_off = iter.row_offset();
+		int v_off = iter.col_offset();
+	
+		for (int iv = 0; iv != v_size; ++iv) {
+			for (int io = 0; io != o_size; ++io) {
+				onorms[o_off + io] += std::pow(iter(io,iv),2.0);
+				vnorms[v_off + iv] += std::pow(iter(io,iv),2.0);
+			}
+		}
+		
+	}
+	
+	// communicate to all processes
+	MPI_Allreduce(MPI_IN_PLACE, onorms.data(), nloccs, MPI_DOUBLE,
+		MPI_SUM, m_world.comm());
+		
+	MPI_Allreduce(MPI_IN_PLACE, vnorms.data(), nlvirs, MPI_DOUBLE,
+		MPI_SUM, m_world.comm());
+	
+	LOG.os<2>("NORMS ALL (OCC): \n");
+	for (auto v : onorms) {
+		LOG.os<2>(v, " ");
+	} LOG.os<2>('\n');
+	
+	LOG.os<2>("NORMS ALL (VIR): \n");
+	for (auto v : vnorms) {
+		LOG.os<2>(v, " ");
+	} LOG.os<2>('\n');
+	
+	// ========== STEP 4 : EXTRACT SIGNIFICANT LMOS ====================
+	
+	LOG.os<>("Copying over significant MOs\n");
+	
+	double threshold = 1 - m_cutoff; 
+	
+	std::sort(oidx.begin(), oidx.end(), 
+		[&onorms](const int a, const int b) {
+			return (onorms[a] > onorms[b]);
+		});
+		
+	std::sort(vidx.begin(), vidx.end(), 
+		[&vnorms](const int a, const int b) {
+			return (vnorms[a] > vnorms[b]);
+		});
+		
+	double totnorm_occ = 0.0;
+	double totnorm_vir = 0.0;
+	
+	int nocc_restricted = 0;
+	int nvir_restricted = 0;
+	
+	while (totnorm_occ < threshold && nocc_restricted < nloccs) {
+		totnorm_occ += onorms[oidx[nocc_restricted++]];
+	}
+	
+	while (totnorm_vir < threshold && nvir_restricted < nlvirs) {
+		totnorm_vir += vnorms[vidx[nvir_restricted++]];
+	}
+	
+	Eigen::MatrixXd eigen_locc_bm = dbcsr::matrix_to_eigen(*locc_bm);
+	Eigen::MatrixXd eigen_lvir_bn = dbcsr::matrix_to_eigen(*lvir_bn);	
+	Eigen::MatrixXd eigen_locc_bm_restr = Eigen::MatrixXd::Zero(nbas,nocc_restricted);
+	Eigen::MatrixXd eigen_lvir_bn_restr = Eigen::MatrixXd::Zero(nbas,nvir_restricted);
+	
+	for (int io = 0; io != nocc_restricted; ++io) {
+		eigen_locc_bm_restr.col(io) = eigen_locc_bm.col(oidx[io]);
+	}
+	
+	for (int iv = 0; iv != nvir_restricted; ++iv) {
+		eigen_lvir_bn_restr.col(iv) = eigen_lvir_bn.col(vidx[iv]);
+	}
+	
+	auto b = c_bo->row_blk_sizes();
+	int mo_split = m_wfn->mol->mo_split();
+	
+	auto m_restr = dbcsr::split_range(nocc_restricted, mo_split);
+	auto n_restr = dbcsr::split_range(nvir_restricted, mo_split);
+	
+	auto locc_bm_restr = dbcsr::eigen_to_matrix(eigen_locc_bm_restr,
+		m_world.dbcsr_grid(), "locc_bm_restr", b, m_restr, dbcsr::type::no_symmetry);
+		
+	auto lvir_bn_restr = dbcsr::eigen_to_matrix(eigen_lvir_bn_restr,
+		m_world.dbcsr_grid(), "lvir_bn_restr", b, n_restr, dbcsr::type::no_symmetry);
+	
+	LOG.os<>("Taking ", nocc_restricted, "/", nvir_restricted, " orbitals of ",
+		noccs, "/", nvirs, '\n');
+	
+	// =============== STEP 5 : ORTHOGONALIZE RESTRICTED COEFFS ========
+	
+	LOG.os<>("Orthogonalizing restricted LMOs\n");
+	
+	math::SVD svd_occ(m_world, locc_bm_restr, 'V', 'V', 0);
+	math::SVD svd_vir(m_world, lvir_bn_restr, 'V', 'V', 0);
+	
+	svd_occ.compute(1e-10);
+	svd_vir.compute(1e-10);
+	
+	int m_rank = svd_occ.rank();
+	int n_rank = svd_vir.rank();
+	
+	auto m_ortho = dbcsr::split_range(m_rank, mo_split);
+	auto n_ortho = dbcsr::split_range(n_rank, mo_split);
+	
+	auto locc_bm_ortho = svd_occ.U(b, m_ortho);
+	auto lvir_bn_ortho = svd_vir.U(b, n_ortho);
+	
+	LOG.os<>("Reduced dimensions from ", noccs, "/", nvirs, " to ",
+		m_rank, "/", n_rank, '\n');
+	
+	// ================ STEP 6 : CANONICALIZE MOs ======================
+	
+	LOG.os<>("Cononicalizing restricted localized molecular orbitals.\n"); 
+	
+	auto t_mo = moloc.compute_conversion(c_bo, s_bb, locc_bm_ortho);
+	auto t_nv = moloc.compute_conversion(c_bv, s_bb, lvir_bn_ortho);
+	
+	auto o = c_bo->col_blk_sizes();
+	auto v = c_bv->col_blk_sizes();
+	
+	auto f_oo = dbcsr::matrix<double>::create()
+		.set_cart(m_world.dbcsr_grid())
+		.name("f_oo")
+		.row_blk_sizes(o)
+		.col_blk_sizes(o)
+		.matrix_type(dbcsr::type::no_symmetry)
+		.build();
+		
+	auto f_vv = dbcsr::matrix<double>::create()
+		.set_cart(m_world.dbcsr_grid())
+		.name("f_vv")
+		.row_blk_sizes(v)
+		.col_blk_sizes(v)
+		.matrix_type(dbcsr::type::no_symmetry)
+		.build();
+		
+	f_oo->reserve_diag_blocks();
+	f_vv->reserve_diag_blocks();
+	
+	f_oo->set_diag(*m_wfn->hf_wfn->eps_occ_A());
+	f_vv->set_diag(*m_wfn->hf_wfn->eps_vir_A());
+	
+	auto f_mm = u_transform(f_oo, 'N', t_mo, 'T', t_mo);
+	auto f_nn = u_transform(f_vv, 'N', t_nv, 'T', t_nv);
+	
+	math::hermitian_eigen_solver hermocc(m_world, f_mm, 'V', true);
+	math::hermitian_eigen_solver hermvir(m_world, f_nn, 'V', true);
+	
+	hermocc.compute();
+	hermvir.compute();
+	
+	auto c_mm = hermocc.eigvecs();
+	auto c_nn = hermvir.eigvecs();
+	
+	auto c_bm = dbcsr::matrix<double>::create_template(*locc_bm_ortho)
+		.name("localized restricted OLMOs")
+		.build();
+	
+	auto c_bn = dbcsr::matrix<double>::create_template(*lvir_bn_ortho)
+		.name("localized restricted VLMOs")
+		.build();	
+	
+	dbcsr::multiply('N', 'N', 1.0, *locc_bm_ortho, *c_mm, 0.0, *c_bm)
+		.perform();
+	dbcsr::multiply('N', 'N', 1.0, *lvir_bn_ortho, *c_nn, 0.0, *c_bn)
+		.perform();
+	
+	LOG.os<>("Finished!");
+	
+	return canon_lmo{};
+
+}*/
+
+adcmod::canon_lmo adcmod::get_restricted_cmos(dbcsr::shared_matrix<double> u_ia) {
+	
+	LOG.os<>("Computing restricted canonical molecular orbitals.\n");
+	
+	// =================================================================
+	// ======== STEP 1: localize orbitals ==============================
+	// =================================================================
+	
+	LOG.os<>("Computing PAOs\n");
+	
+	locorb::mo_localizer moloc(m_world, m_wfn->mol);
+	
+	ints::aofactory aofac(m_wfn->mol, m_world);
+	auto s_bb = aofac.ao_overlap();
+	
+	auto c_bo = m_wfn->hf_wfn->c_bo_A();
+	auto c_bv = m_wfn->hf_wfn->c_bv_A();
+	
+	auto [opao_bm, c2pao_mo] = moloc.compute_pao(c_bo, s_bb);
+	auto [vpao_bn, c2pao_nv] = moloc.compute_pao(c_bv, s_bb);
+	
+	// =================================================================	
+	// ============ STEP 2 : TRANSFORM U ===============================
+	// =================================================================	
+	
+	LOG.os<>("Transforming guess vector\n");
+	
+	auto u_mn = u_transform(u_ia, 'N', c2pao_mo, 'T', c2pao_nv); 
+	
+    double norm = u_mn->norm(dbcsr_norm_frobenius);
+    
+    u_mn->scale(1.0/norm);
+    
+    // =================================================================   
+	// ================ STEP 3 : GET NORMS =============================
+	// =================================================================	
+	
+	LOG.os<>("Extracting norms form transformed guess vector\n");
+	
+	int nbas = c_bo->nfullrows_total();
+	int noccs = c_bo->nfullcols_total();
+	int nvirs = c_bv->nfullcols_total();
+	int n_pao_occs = u_mn->nfullrows_total();
+	int n_pao_virs = u_mn->nfullcols_total();
+	
+	std::vector<double> onorms(n_pao_occs,0.0), vnorms(n_pao_virs,0.0);
+	std::vector<int> oidx(n_pao_occs,0), vidx(n_pao_virs,0);
+	
+	std::iota(oidx.begin(), oidx.end(), 0);
+	std::iota(vidx.begin(), vidx.end(), 0);
+	
+	dbcsr::iterator iter(*u_mn);
+	iter.start();
+	
+	while (iter.blocks_left()) {
+		
+		iter.next_block();
+		
+		int o_size = iter.row_size();
+		int v_size = iter.col_size();
+		
+		int o_off = iter.row_offset();
+		int v_off = iter.col_offset();
+	
+		for (int iv = 0; iv != v_size; ++iv) {
+			for (int io = 0; io != o_size; ++io) {
+				onorms[o_off + io] += std::pow(iter(io,iv),2.0);
+				vnorms[v_off + iv] += std::pow(iter(io,iv),2.0);
+			}
+		}
+		
+	}
+	
+	// communicate to all processes
+	MPI_Allreduce(MPI_IN_PLACE, onorms.data(), n_pao_occs, MPI_DOUBLE,
+		MPI_SUM, m_world.comm());
+		
+	MPI_Allreduce(MPI_IN_PLACE, vnorms.data(), n_pao_virs, MPI_DOUBLE,
+		MPI_SUM, m_world.comm());
+	
+	LOG.os<2>("NORMS ALL (OCC): \n");
+	for (auto v : onorms) {
+		LOG.os<2>(v, " ");
+	} LOG.os<2>('\n');
+	
+	LOG.os<2>("NORMS ALL (VIR): \n");
+	for (auto v : vnorms) {
+		LOG.os<2>(v, " ");
+	} LOG.os<2>('\n');
+	
+	// =================================================================	
+	// ========== STEP 4 : GET SIGNIFICANT ATOMS =======================
+	// =================================================================	
+	
+	LOG.os<>("Finding significant atoms\n");
+	
+	double threshold = 1 - m_cutoff; 
+	
+	std::sort(oidx.begin(), oidx.end(), 
+		[&onorms](const int a, const int b) {
+			return (onorms[a] > onorms[b]);
+		});
+		
+	std::sort(vidx.begin(), vidx.end(), 
+		[&vnorms](const int a, const int b) {
+			return (vnorms[a] > vnorms[b]);
+		});
+		
+	double totnorm_occ = 0.0;
+	double totnorm_vir = 0.0;
+	
+	int nocc_restricted = 0;
+	int nvir_restricted = 0;
+	
+	while (totnorm_occ < threshold && nocc_restricted < n_pao_occs) {
+		totnorm_occ += onorms[oidx[nocc_restricted++]];
+	}
+	
+	while (totnorm_vir < threshold && nvir_restricted < n_pao_virs) {
+		totnorm_vir += vnorms[vidx[nvir_restricted++]];
+	}
+	
+	// get atom centre of PAOs
+	
+	auto cbas = m_wfn->mol->c_basis();
+	auto atoms = m_wfn->mol->atoms();
+	auto blkmap = cbas->block_to_atom(atoms);
+	
+	std::vector<int> func_to_atom_occ;
+	std::vector<int> func_to_atom_vir;
+	
+	int ibas = 0;
+	for (int iblk = 0; iblk != cbas->size(); ++iblk) {
+		int iatom = blkmap[iblk];
+		int nbf = desc::nbf(cbas->at(iblk));
+		
+		std::vector<int> map(nbf,iatom);
+		func_to_atom_occ.insert(func_to_atom_occ.end(), map.begin(), map.end());
+		func_to_atom_vir.insert(func_to_atom_vir.end(), map.begin(), map.end());
+	}
+	
+	std::vector<bool> use_atom(atoms.size(), false);
+	
+	for (int io = 0; io != nocc_restricted; ++io) {
+		int iatom = func_to_atom_occ[oidx[io]];
+		use_atom[iatom] = true;
+	}
+	
+	for (int iv = 0; iv != nvir_restricted; ++iv) {
+		int iatom = func_to_atom_vir[vidx[iv]];
+		use_atom[iatom] = true;
+	}
+	
+	LOG.os<1>("Atoms used:\n");
+	for (int ii = 0; ii != use_atom.size(); ++ii) {
+		if (use_atom[ii]) LOG.os<1>(ii, " ");
+	} LOG.os<1>('\n');
+	
+	// =================================================================	
+	// ========== STEP 5 : PROJECT ONTO SMALLER BASIS SET ==============
+	// =================================================================
+	
+	LOG.os<>("Projecting MOs onto local basis set\n");
+	
+	std::vector<desc::Shell> vshell_sub;
+	
+	for (int ii = 0; ii != cbas->size(); ++ii) {
+		int iatom = blkmap[ii];
+		if (use_atom[iatom]) {
+			vshell_sub.insert(vshell_sub.end(), cbas->at(ii).begin(), cbas->at(ii).end());
+		}
+	}
+	
+	auto cbas_sub = std::make_shared<desc::cluster_basis>(
+		vshell_sub, cbas->split_method(), cbas->nsplit());
+	
+	auto p = cbas_sub->cluster_sizes();
+	
+	ints::aofactory aofac_pp(m_world, cbas_sub);
+	ints::aofactory aofac_bp(m_world, cbas, nullptr, cbas_sub);
+	
+	auto s_pp = aofac_pp.ao_overlap();
+	auto s_bp = aofac_bp.ao_overlap2();
+	
+	math::LLT llt(m_world, s_pp, true);
+	
+	llt.compute();
+	
+	auto s_inv_pp = llt.inverse(p);
+	
+	auto b = m_wfn->mol->dims().b();
+	auto o = m_wfn->mol->dims().oa();
+	auto v = m_wfn->mol->dims().va();
+	
+	auto temp_po = dbcsr::matrix<double>::create()
+		.set_cart(m_world.dbcsr_grid())
+		.name("temp_po")
+		.row_blk_sizes(p)
+		.col_blk_sizes(o)
+		.matrix_type(dbcsr::type::no_symmetry)
+		.build();
+		
+	auto temp_pv = dbcsr::matrix<double>::create()
+		.set_cart(m_world.dbcsr_grid())
+		.name("temp_pv")
+		.row_blk_sizes(p)
+		.col_blk_sizes(v)
+		.matrix_type(dbcsr::type::no_symmetry)
+		.build();
+		
+	auto cortho_po = dbcsr::matrix<double>::create_template(*temp_po)
+		.name("cortho_po")
+		.build();
+		
+	auto cortho_pv = dbcsr::matrix<double>::create_template(*temp_pv)
+		.name("cortho_pv")
+		.build();
+		
+	dbcsr::multiply('T', 'N', 1.0, *s_bp, *c_bo, 0.0, *temp_po).perform();
+	dbcsr::multiply('T', 'N', 1.0, *s_bp, *c_bv, 0.0, *temp_pv).perform();
+	
+	dbcsr::multiply('N', 'N', 1.0, *s_inv_pp, *temp_po, 1.0, *cortho_po)
+		.perform();
+		
+	dbcsr::multiply('N', 'N', 1.0, *s_inv_pp, *temp_pv, 1.0, *cortho_pv)
+		.perform();
+		
+	// =================================================================	
+	// ========== STEP 6 : PERFORM AN SVD                 ==============
+	// =================================================================
+	
+	LOG.os<>("Performing SVD on truncated MO coefficients\n");
+	
+	math::SVD svd_occ(m_world, cortho_po, 'V', 'V', 0);
+	math::SVD svd_vir(m_world, cortho_pv, 'V', 'V', 0);
+	
+	svd_occ.compute(1e-12);
+	svd_vir.compute(1e-12);
+	
+	int nocc_red = svd_occ.rank();
+	int nvir_red = svd_vir.rank();
+	
+	auto o_red = dbcsr::split_range(nocc_red, m_wfn->mol->mo_split());
+	auto v_red = dbcsr::split_range(nvir_red, m_wfn->mol->mo_split());
+	
+	auto red0cmo_oo = svd_occ.Vt(o_red, o);
+	auto red0cmo_vv = svd_vir.Vt(v_red, v);
+	
+	LOG.os<>("Reduced MO space from ", noccs, "/", nvirs, " to ",
+		nocc_red, "/", nvir_red, '\n');
+		
+	// =================================================================	
+	// ========== STEP 6 : CANONICALIZE ================================
+	// =================================================================
+	
+	LOG.os<>("Cononicalizing restricted localized molecular orbitals.\n"); 
+	
+	std::cout << "1" << std::endl;
+	
+	auto f_oo = dbcsr::matrix<double>::create()
+		.set_cart(m_world.dbcsr_grid())
+		.name("f_oo")
+		.row_blk_sizes(o)
+		.col_blk_sizes(o)
+		.matrix_type(dbcsr::type::no_symmetry)
+		.build();
+		
+	auto f_vv = dbcsr::matrix<double>::create()
+		.set_cart(m_world.dbcsr_grid())
+		.name("f_vv")
+		.row_blk_sizes(v)
+		.col_blk_sizes(v)
+		.matrix_type(dbcsr::type::no_symmetry)
+		.build();
+		
+	f_oo->reserve_diag_blocks();
+	f_vv->reserve_diag_blocks();
+	
+	std::cout << "2" << std::endl;
+	
+	auto eps_occ = *m_wfn->hf_wfn->eps_occ_A();
+	auto eps_vir = *m_wfn->hf_wfn->eps_vir_A();
+	
+	f_oo->set_diag(*m_wfn->hf_wfn->eps_occ_A());
+	f_vv->set_diag(*m_wfn->hf_wfn->eps_vir_A());
+	
+	auto f_mm = u_transform(f_oo, 'N', red0cmo_oo, 'T', red0cmo_oo);
+	auto f_nn = u_transform(f_vv, 'N', red0cmo_vv, 'T', red0cmo_vv);
+	
+	std::cout << "3" << std::endl;
+	
+	math::hermitian_eigen_solver hermocc(m_world, f_mm, 'V', true);
+	math::hermitian_eigen_solver hermvir(m_world, f_nn, 'V', true);
+	
+	hermocc.compute();
+	hermvir.compute();
+	
+	auto eps_m = hermocc.eigvals();
+	auto eps_n = hermvir.eigvals();
+	
+	auto red0spade_oo = hermocc.eigvecs();
+	auto red0spade_vv = hermvir.eigvecs();
+	
+	std::cout << "4" << std::endl;
+	
+	auto trans_spade0cmo_oo = dbcsr::matrix<double>::create()
+		.name("trans")
+		.set_cart(m_world.dbcsr_grid())
+		.row_blk_sizes(o_red)
+		.col_blk_sizes(o)
+		.matrix_type(dbcsr::type::no_symmetry)
+		.build();
+		
+	auto trans_spade0cmo_vv = dbcsr::matrix<double>::create()
+		.name("trans")
+		.set_cart(m_world.dbcsr_grid())
+		.row_blk_sizes(v_red)
+		.col_blk_sizes(v)
+		.matrix_type(dbcsr::type::no_symmetry)
+		.build();
+	
+	std::cout << "5" << std::endl;
+	
+	dbcsr::multiply('T', 'N', 1.0, *red0spade_oo, *red0cmo_oo,
+		0.0, *trans_spade0cmo_oo).perform();
+		
+	dbcsr::multiply('T', 'N', 1.0, *red0spade_vv, *red0cmo_vv,
+		0.0, *trans_spade0cmo_vv).perform();
+	
+	std::cout << "6" << std::endl;
+	
+	auto lortho_bo = dbcsr::matrix<double>::create()
+		.set_cart(m_world.dbcsr_grid())
+		.name("localized restricted OLMOs")
+		.row_blk_sizes(b)
+		.col_blk_sizes(o_red)
+		.matrix_type(dbcsr::type::no_symmetry)
+		.build();
+	
+	auto lortho_bv = dbcsr::matrix<double>::create()
+		.set_cart(m_world.dbcsr_grid())
+		.name("localized restricted OLMOs")
+		.row_blk_sizes(b)
+		.col_blk_sizes(v_red)
+		.matrix_type(dbcsr::type::no_symmetry)
+		.build();	
+	
+	std::cout << "7" << std::endl;
+	
+	dbcsr::multiply('N', 'T', 1.0, *c_bo, *trans_spade0cmo_oo, 0.0, *lortho_bo)
+		.perform();
+		
+	dbcsr::multiply('N', 'T', 1.0, *c_bv, *trans_spade0cmo_vv, 0.0, *lortho_bv)
+		.perform();
+	
+	LOG.os<>("Finished!");
+	
+	auto print = [&](auto v) {
+		for (auto ele : v) {
+			LOG.os<>(ele, " ");
+		} LOG.os<>('\n');
+	};
+	
+	LOG.os<>("Old occ energies:\n");
+	print(eps_occ);
+	
+	LOG.os<>("Old vir energies:\n");
+	print(eps_vir);
+	
+	LOG.os<>("New occ energies:\n");
+	print(eps_m);
+	
+	LOG.os<>("New vir energies:\n");
+	print(eps_n);
+	
+	exit(0);
+	
+	/*
+	std::vector<int> functions_occ;
+	std::vector<int> functions_vir;
+	
+	for (int io = 0; io != n_pao_occs; ++io) {
+		int iatom = func_to_atom_occ[io];
+		if (use_atom[iatom]) functions_occ.push_back(io);
+	}
+	
+	for (int iv = 0; iv != n_pao_virs; ++iv) {
+		int iatom = func_to_atom_vir[iv];
+		if (use_atom[iatom]) functions_vir.push_back(iv);
+	}
+	
+	// copy over
+	
+	int nocc_tot = functions_occ.size();
+	int nvir_tot = functions_vir.size();
+	
+	Eigen::MatrixXd eigen_opao_bm = dbcsr::matrix_to_eigen(*opao_bm);
+	Eigen::MatrixXd eigen_vpao_bn = dbcsr::matrix_to_eigen(*vpao_bn);	
+	Eigen::MatrixXd eigen_opao_bm_restr = Eigen::MatrixXd::Zero(nbas,nocc_tot);
+	Eigen::MatrixXd eigen_vpao_bn_restr = Eigen::MatrixXd::Zero(nbas,nvir_tot);
+	
+	int off = 0;
+	
+	for (auto io : functions_occ) {
+		eigen_opao_bm_restr.col(off++) = eigen_opao_bm.col(io);
+	}
+	
+	off = 0;
+	
+	for (auto iv : functions_vir) {
+		eigen_vpao_bn_restr.col(off++) = eigen_vpao_bn.col(iv);
+	}
+	
+	auto b = c_bo->row_blk_sizes();
+	int mo_split = m_wfn->mol->mo_split();
+	
+	auto m_restr = dbcsr::split_range(nocc_tot, mo_split);
+	auto n_restr = dbcsr::split_range(nvir_tot, mo_split);
+	
+	auto opao_bm_restr = dbcsr::eigen_to_matrix(eigen_opao_bm_restr,
+		m_world.dbcsr_grid(), "locc_bm_restr", b, m_restr, dbcsr::type::no_symmetry);
+		
+	auto vpao_bn_restr = dbcsr::eigen_to_matrix(eigen_vpao_bn_restr,
+		m_world.dbcsr_grid(), "lvir_bn_restr", b, n_restr, dbcsr::type::no_symmetry);
+	
+	LOG.os<>("Taking ", nocc_tot, "/", nvir_tot, " PAOs of ",
+		n_pao_occs, "/", n_pao_virs, '\n');
+
+	// =================================================================
+	// =============== STEP 5 : ORTHOGONALIZE RESTRICTED COEFFS ========
+	// =================================================================
+		
+	LOG.os<>("Orthogonalizing restricted PAOs\n");
+	
+	math::SVD svd_occ(m_world, opao_bm_restr, 'V', 'V', 0);
+	math::SVD svd_vir(m_world, vpao_bn_restr, 'V', 'V', 0);
+	
+	svd_occ.compute(1e-12);
+	svd_vir.compute(1e-12);
+	
+	int m_rank = svd_occ.rank();
+	int n_rank = svd_vir.rank();
+	
+	auto m_ortho = dbcsr::split_range(m_rank, mo_split);
+	auto n_ortho = dbcsr::split_range(n_rank, mo_split);
+	
+	auto m_s = svd_occ.s();
+	auto n_s = svd_vir.s();
+	
+	auto opao_bm_ortho = svd_occ.U(b,m_ortho);
+	auto vpao_bn_ortho = svd_vir.U(b,n_ortho);
+	
+	opao_bm_ortho->scale(m_s, "right");
+	vpao_bn_ortho->scale(n_s, "right");
+	
+	LOG.os<>("Reduced dimensions from ", nocc_tot, "/", nvir_tot, " to ",
+		m_rank, "/", n_rank, '\n');
+	
+	// =================================================================	
+	// ================ STEP 6 : CANONICALIZE MOs ======================
+	// =================================================================
+		
+	LOG.os<>("Cononicalizing restricted localized molecular orbitals.\n"); 
+	
+	std::cout << "A1" << std::endl;
+	
+	auto t_mo = moloc.compute_conversion(c_bo, s_bb, opao_bm_ortho);
+	auto t_nv = moloc.compute_conversion(c_bv, s_bb, vpao_bn_ortho);
+	
+	std::cout << "A2" << std::endl;
+	
+	auto o = c_bo->col_blk_sizes();
+	auto v = c_bv->col_blk_sizes();
+	
+	auto f_oo = dbcsr::matrix<double>::create()
+		.set_cart(m_world.dbcsr_grid())
+		.name("f_oo")
+		.row_blk_sizes(o)
+		.col_blk_sizes(o)
+		.matrix_type(dbcsr::type::no_symmetry)
+		.build();
+		
+	auto f_vv = dbcsr::matrix<double>::create()
+		.set_cart(m_world.dbcsr_grid())
+		.name("f_vv")
+		.row_blk_sizes(v)
+		.col_blk_sizes(v)
+		.matrix_type(dbcsr::type::no_symmetry)
+		.build();
+		
+	f_oo->reserve_diag_blocks();
+	f_vv->reserve_diag_blocks();
+	
+	auto eps_occ = *m_wfn->hf_wfn->eps_occ_A();
+	auto eps_vir = *m_wfn->hf_wfn->eps_vir_A();
+	
+	f_oo->set_diag(*m_wfn->hf_wfn->eps_occ_A());
+	f_vv->set_diag(*m_wfn->hf_wfn->eps_vir_A());
+	
+	auto f_mm = u_transform(f_oo, 'N', t_mo, 'T', t_mo);
+	auto f_nn = u_transform(f_vv, 'N', t_nv, 'T', t_nv);
+	
+	math::hermitian_eigen_solver hermocc(m_world, f_mm, 'V', true);
+	math::hermitian_eigen_solver hermvir(m_world, f_nn, 'V', true);
+	
+	hermocc.compute();
+	hermvir.compute();
+	
+	auto eps_m = hermocc.eigvals();
+	auto eps_n = hermvir.eigvals();
+	
+	auto c_mm = hermocc.eigvecs();
+	auto c_nn = hermvir.eigvecs();
+	
+	auto c_bm = dbcsr::matrix<double>::create_template(*opao_bm_ortho)
+		.name("localized restricted OLMOs")
+		.build();
+	
+	auto c_bn = dbcsr::matrix<double>::create_template(*vpao_bn_ortho)
+		.name("localized restricted VLMOs")
+		.build();	
+	
+	dbcsr::multiply('N', 'N', 1.0, *opao_bm_ortho, *c_mm, 0.0, *c_bm)
+		.perform();
+	dbcsr::multiply('N', 'N', 1.0, *vpao_bn_ortho, *c_nn, 0.0, *c_bn)
+		.perform();
+	
+	LOG.os<>("Finished!");
+	
+	auto print = [&](auto v) {
+		for (auto ele : v) {
+			LOG.os<>(ele, " ");
+		} LOG.os<>('\n');
+	};
+	
+	LOG.os<>("Old occ energies:\n");
+	print(eps_occ);
+	
+	LOG.os<>("Old vir energies:\n");
+	print(eps_vir);
+	
+	LOG.os<>("New occ energies:\n");
+	print(eps_m);
+	
+	LOG.os<>("New vir energies:\n");
+	print(eps_n);
+	
+	exit(0);*/
+	
+	return canon_lmo{};
+
+}
 
 } // end namespace adc
 

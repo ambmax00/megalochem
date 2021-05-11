@@ -947,7 +947,7 @@ double jacobi_sweep_mpi(smat& c_dist, smat& x_dist, smat& y_dist, smat& z_dist) 
 	
 }
 
-std::pair<smat_d,smat_d> 
+std::tuple<smat_d,smat_d> 
 	mo_localizer::compute_boys(smat_d c_bm, smat_d s_bb) {
 
 	// compute <chi_i|r|chi_j>
@@ -962,8 +962,7 @@ std::pair<smat_d,smat_d>
 	auto dip_bb_z = moms[2];
 	
 	// guess orbitals
-	auto boys = compute_cholesky(c_bm, s_bb);
-	auto g_bm = boys.first;
+	auto [g_bm, t_mm] = compute_cholesky(c_bm, s_bb);
 	
 	//dbcsr::print(*g_bm);
 	
@@ -999,9 +998,7 @@ std::pair<smat_d,smat_d>
 	
 	auto u_mm = this->compute_conversion(c_bm, s_bb, g_bm);
 		
-	return std::make_pair<smat_d,smat_d>(
-		std::move(g_bm), std::move(u_mm)
-	);
+	return std::make_tuple(g_bm, u_mm);
 			
 }	
 

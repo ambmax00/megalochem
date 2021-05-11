@@ -63,6 +63,8 @@ inline adcmethod str_to_adcmethod(std::string str) {
 	((util::optional<int>), nlap, 5),\
 	((util::optional<bool>), local, false),\
 	((util::optional<double>), cutoff, 1.0),\
+	((util::optional<std::string>), locc, "boys"),\
+	((util::optional<std::string>), lvir, "pao"),\
 	((util::optional<std::string>), guess, "hf"))
 	
 struct eigenpair {
@@ -102,7 +104,7 @@ private:
 		
 	void init_ao_tensors();
 	
-	std::shared_ptr<MVP> create_adc1();
+	std::shared_ptr<MVP> create_adc1(std::optional<canon_lmo> lmo_info = std::nullopt);
 	std::shared_ptr<MVP> create_adc2(std::optional<canon_lmo> clmo = 
 		std::nullopt);
 	
@@ -110,7 +112,7 @@ private:
 	
 	eigenpair guess();
 		
-	eigenpair run_adc1(eigenpair& dav);
+	eigenpair run_adc1(eigenpair& dav, std::optional<canon_lmo> lmo_info = std::nullopt);
 		
 	eigenpair run_adc2(eigenpair& dav);
 	
@@ -124,9 +126,11 @@ private:
 		
 	/*canon_lmo get_canon_nto(dbcsr::shared_matrix<double> u_ia, dbcsr::shared_matrix<double> c_bo,
 		dbcsr::shared_matrix<double> c_bv, std::vector<double> eps_o, std::vector<double> eps_v,
-		double theta);
+		double theta);*/
 		
-	canon_lmo get_canon_pao(dbcsr::shared_matrix<double> u_ia, dbcsr::shared_matrix<double> c_bo,
+	canon_lmo get_restricted_cmos(dbcsr::shared_matrix<double> u_ia);
+		
+	/*canon_lmo get_canon_pao(dbcsr::shared_matrix<double> u_ia, dbcsr::shared_matrix<double> c_bo,
 		dbcsr::shared_matrix<double> c_bv, std::vector<double> eps_o, std::vector<double> eps_v,
 		double theta);*/
 	

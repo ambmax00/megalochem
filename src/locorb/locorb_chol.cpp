@@ -5,7 +5,7 @@ namespace megalochem {
 
 namespace locorb {
 
-std::pair<smat_d,smat_d>  
+std::tuple<smat_d,smat_d>  
 		mo_localizer::compute_cholesky(smat_d c_bm, smat_d s_bb) {
 			
 	auto b = c_bm->row_blk_sizes();
@@ -25,19 +25,17 @@ std::pair<smat_d,smat_d>
 	
 	math::pivinc_cd piv(m_world, p_bb, 0);
 	
-	piv.compute();
+	piv.compute(norb);
 	
-	if (piv.rank() != norb) {
+	/*if (piv.rank() != norb) {
 		throw std::runtime_error("Locorb cholesky has failed.");
-	}
+	}*/
 	
 	auto L_bm = piv.L(b,m);
 	
 	auto u_mm = this->compute_conversion(c_bm, s_bb, L_bm);
 	
-	return std::make_pair<smat_d,smat_d>(
-		std::move(L_bm), std::move(u_mm)
-	);
+	return std::make_tuple(L_bm, u_mm);
 			
 }
 

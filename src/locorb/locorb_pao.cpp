@@ -8,7 +8,7 @@ namespace megalochem {
 
 namespace locorb {
 
-std::pair<smat_d,smat_d> mo_localizer::compute_pao(smat_d c_bm, smat_d s_bb) {
+std::tuple<smat_d,smat_d> mo_localizer::compute_pao(smat_d c_bm, smat_d s_bb) {
 	
 	auto l_bb = dbcsr::matrix<>::create_template(*s_bb)
 		.name("u_bb")
@@ -22,9 +22,7 @@ std::pair<smat_d,smat_d> mo_localizer::compute_pao(smat_d c_bm, smat_d s_bb) {
 	dbcsr::multiply('N', 'N', 1.0, *s_bb, *c_bm, 0.0, *u_bm).perform();
 	dbcsr::multiply('N', 'T', 1.0, *c_bm, *u_bm, 0.0, *l_bb).perform();
 	
-	return std::make_pair<smat_d,smat_d>(
-		std::move(l_bb), std::move(u_bm)
-	);
+	return std::make_tuple(l_bb, u_bm);
 	
 } 
 

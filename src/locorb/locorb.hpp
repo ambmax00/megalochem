@@ -33,11 +33,11 @@ public:
 		m_aofac(std::make_shared<ints::aofactory>(mol,w))
 	{}
 	
-	std::pair<smat_d,smat_d> compute_cholesky(smat_d c_bm, smat_d s_bb);
+	std::tuple<smat_d,smat_d> compute_cholesky(smat_d c_bm, smat_d s_bb);
 	
-	std::pair<smat_d,smat_d> compute_boys(smat_d c_bm, smat_d s_bb);
+	std::tuple<smat_d,smat_d> compute_boys(smat_d c_bm, smat_d s_bb);
 	
-	std::pair<smat_d,smat_d> compute_pao(smat_d c_bm, smat_d s_bb); 
+	std::tuple<smat_d,smat_d> compute_pao(smat_d c_bm, smat_d s_bb); 
 	
 	std::tuple<smat_d, smat_d, std::vector<double>> compute_truncated_pao(
 		smat_d c_bm, smat_d s_bb, std::vector<double> eps_m,
@@ -53,13 +53,14 @@ public:
 			.name("temp").build();
 		
 		auto w = c_bm->get_cart();
-		auto m = c_bm->col_blk_sizes();
+		auto mcanon = c_bm->col_blk_sizes();
+		auto mlocc = l_bm->col_blk_sizes();
 		
 		auto u_mm = dbcsr::matrix<>::create()
 			.name("u_mm")
 			.set_cart(w)
-			.row_blk_sizes(m)
-			.col_blk_sizes(m)
+			.row_blk_sizes(mlocc)
+			.col_blk_sizes(mcanon)
 			.matrix_type(dbcsr::type::no_symmetry)
 			.build();
 		
