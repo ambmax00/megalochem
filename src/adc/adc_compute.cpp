@@ -6,6 +6,7 @@
 #include "math/solvers/hermitian_eigen_solver.hpp"
 #include "math/linalg/LLT.hpp"
 #include "locorb/locorb.hpp"
+#include "io/molden.hpp"
 
 #include <dbcsr_conversions.hpp>
 
@@ -1256,6 +1257,9 @@ adcmod::canon_lmo adcmod::get_restricted_cmos(dbcsr::shared_matrix<double> u_ia)
 	
 	LOG.os<>("New vir energies:\n");
 	print(eps_n);
+	
+	io::write_molden("test.molden", m_world, *m_wfn->mol, *c_bo, *c_bv,
+		eps_occ, eps_vir);
 	
 	exit(0);
 	

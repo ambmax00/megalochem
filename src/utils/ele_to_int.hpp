@@ -21,6 +21,10 @@ static std::map<std::string,int> ele_to_int =
 	{"Ne",10}
 };
 
+static std::vector<std::string> int_to_ele = {
+	"X", "H", "He", "Li", "Be", "B", "C", "N", "O", "F", "Ne"
+};
+
 }
 
 #endif
