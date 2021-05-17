@@ -154,6 +154,9 @@ private:
 	int m_nlap;
 	double m_c_os;
 	double m_c_os_coupling;
+	int m_nbatches_occ;
+	
+	std::vector<int> m_o, m_v, m_b, m_x;
 	
 	dbcsr::btype m_btype;
 	
@@ -178,7 +181,7 @@ private:
 	dbcsr::shared_matrix<double> m_s_sqrt_bb, m_s_invsqrt_bb;
 	
 	// adc 1
-	std::pair<smat,smat> compute_jk(smat& u_ao);
+	std::pair<smat,smat> compute_jk(smat& u_ia, smat& u_ao);
 	smat compute_sigma_1(smat& jmat, smat& kmat);
 	
 	// adc 2
@@ -233,6 +236,8 @@ private:
 	
 public:
 
+	static inline bool TEST_MVP = false;
+
 #define AORIADC2_LIST (\
 	((megalochem::world), set_world),\
 	((desc::shared_molecule), set_molecule),\
@@ -245,6 +250,7 @@ public:
 	((std::vector<double>), eps_vir),\
 	((dbcsr::sbtensor<3,double>),eri3c2e_batched),\
 	((dbcsr::sbtensor<3,double>),fitting_batched),\
+	((util::optional<int>), nbatches_occ),\
 	((fock::kmethod), kmethod),\
 	((mp::zmethod), zmethod),\
 	((fock::jmethod), jmethod),\
@@ -266,6 +272,11 @@ public:
 		m_nlap((p.p_nlap)),
 		m_c_os((p.p_c_os)),
 		m_c_os_coupling((p.p_c_os_coupling)),
+		m_nbatches_occ((p.p_nbatches_occ) ? *p.p_nbatches_occ : 5),
+		m_o(p.p_c_bo->col_blk_sizes()),
+		m_v(p.p_c_bv->col_blk_sizes()),
+		m_b(p.p_c_bo->row_blk_sizes()),
+		m_x(p.p_metric_inv->row_blk_sizes()),
 		MVP(p.p_set_world, p.p_set_molecule, (p.p_print) ? *p.p_print : 0, 
 			"MVP_AORISOSADC2") {}
 		

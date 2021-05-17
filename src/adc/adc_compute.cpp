@@ -281,7 +281,7 @@ eigenpair adcmod::run_adc2_local(eigenpair& epairs) {
 		
 		eigenpair local_epairs;
 		
-		for (auto p : epairs.eigvecs) {
+		for (auto& p : epairs.eigvecs) {
 			auto m = u_transform(p, 'N', lmo_info.u_lmo_cmo_oo, 'T',
 				lmo_info.u_lmo_cmo_vv);
 			local_epairs.eigvecs.push_back(m);
@@ -300,7 +300,7 @@ eigenpair adcmod::run_adc2_local(eigenpair& epairs) {
 		mdav.balancing(m_balanced);
 		mdav.micro_maxiter(m_dav_max_iter);
 		
-		mdav.compute(epairs.eigvecs, iroot+1, epairs.eigvals[iroot]);
+		mdav.compute(local_epairs.eigvecs, iroot+1, epairs.eigvals[iroot]);
 		
 		auto evec = mdav.ritz_vectors()[iroot];
 		auto evec_cmo = u_transform(evec, 'T', lmo_info.u_lmo_cmo_oo, 

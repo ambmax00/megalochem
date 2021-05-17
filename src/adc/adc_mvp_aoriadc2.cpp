@@ -2,6 +2,7 @@
 #include "math/laplace/laplace.hpp"
 #include "math/linalg/piv_cd.hpp"
 #include "math/linalg/LLT.hpp"
+#include "math/linalg/SVD.hpp"
 #include "ints/fitting.hpp"
 #include "utils/matrix_plot.hpp"
 
@@ -28,10 +29,9 @@ void MVP_AORISOSADC2::init() {
 	math::LLT chol(m_world, m_s_bb, LOG.global_plev());
 	
 	chol.compute();
-	auto b = m_mol->dims().b();
 	
-	m_s_sqrt_bb = chol.L(b);
-	m_s_invsqrt_bb = chol.L_inv(b);
+	m_s_sqrt_bb = chol.L(m_b);
+	m_s_invsqrt_bb = chol.L_inv(m_b);
 	
 	// laplace
 	LOG.os<1>("Computing laplace points for ground state densities.\n");
@@ -48,8 +48,12 @@ void MVP_AORISOSADC2::init() {
 		m_world, m_nlap, m_c_bo, 
 		m_c_bv, m_s_sqrt_bb, m_s_invsqrt_bb, m_eps_occ, m_eps_vir, 
 		LOG.global_plev());
-		
-	m_laphelper_ss->compute(true, false, 0.0, m_mol->mo_split());
+	
+	bool do_o = true;
+	bool do_v = (m_kmethod == fock::kmethod::dflmo || m_zmethod == mp::zmethod::ll_full) ?
+		true : false;
+	
+	m_laphelper_ss->compute(do_o, do_v, 0.0, m_mol->mo_split());
 	
 	t_chol.finish();
 	
@@ -100,6 +104,18 @@ void MVP_AORISOSADC2::init() {
 				.build();
 			break;
 		}
+		case fock::kmethod::dflmo:
+		{
+			m_kbuilder = fock::DFLMO_K::create()
+				.set_world(m_world)
+				.molecule(m_mol)
+				.print(nprint)
+				.eri3c2e_batched(m_eri3c2e_batched)
+				.metric_inv(m_v_xx)
+				.occ_nbatches(m_nbatches_occ)
+				.build();
+			break;
+		}
 		default:
 		{
 			throw std::runtime_error("Invalid K method in AO-ADC2.");
@@ -128,6 +144,17 @@ void MVP_AORISOSADC2::init() {
 				.set_molecule(m_mol)
 				.print(LOG.global_plev())
 				.eri3c2e_batched(m_eri3c2e_batched)
+				.build();
+			break;
+		}
+		case mp::zmethod::ll_full:
+		{
+			m_zbuilder = mp::LL_FULL_Z::create()
+				.set_world(m_world)
+				.set_molecule(m_mol)
+				.print(nprint)
+				.eri3c2e_batched(m_eri3c2e_batched)
+				.intermeds(m_btype)
 				.build();
 			break;
 		}
@@ -164,17 +191,38 @@ void MVP_AORISOSADC2::init() {
  * ====================================================================*/
 
 // Computes the pseudo J and K matrices with the excited state density
-std::pair<smat,smat> MVP_AORISOSADC2::compute_jk(smat& u_ao) {
+std::pair<smat,smat> MVP_AORISOSADC2::compute_jk(smat& u_ia, smat& u_ao) {
 	
 	auto& t_jk = TIME.sub("Computing pseudo-JK");
 	t_jk.start();
 	
 	m_jbuilder->set_density_alpha(u_ao);
-	m_kbuilder->set_density_alpha(u_ao);
+		
+	if (m_kmethod != fock::kmethod::dflmo) {
 	
+		m_kbuilder->set_density_alpha(u_ao);
+		
+	} else {
+				
+		auto uc_ob = dbcsr::matrix<double>::create()
+			.set_cart(m_world.dbcsr_grid())
+			.name("uc_ob")
+			.row_blk_sizes(m_o)
+			.col_blk_sizes(m_b)
+			.matrix_type(dbcsr::type::no_symmetry)
+			.build();
+				
+		dbcsr::multiply('N', 'T', 1.0, *u_ia, *m_c_bv, 0.0, *uc_ob)
+			.perform();
+				
+		m_kbuilder->set_coeff_left_alpha(m_c_bo);
+		m_kbuilder->set_coeff_right_alpha(uc_ob);
+	
+	}
+		
 	m_jbuilder->compute_J();
 	m_kbuilder->compute_K();
-	
+		
 	auto jmat = m_jbuilder->get_J();
 	auto kmat = m_kbuilder->get_K_A();
 	
@@ -247,42 +295,37 @@ void MVP_AORISOSADC2::compute_intermeds() {
 	
 	t_intermeds.start();
 	
-	auto b = m_mol->dims().b();
-	auto x = m_mol->dims().x();
-	auto o = m_mol->dims().oa();
-	auto v = m_mol->dims().va();
-	
-	arrvec<int,2> xx = {x,x};
+	arrvec<int,2> xx = {m_x,m_x};
 	
 	m_i_oo = dbcsr::matrix<>::create()
 		.name("I_ij")
 		.set_cart(m_cart)
-		.row_blk_sizes(o)
-		.col_blk_sizes(o)
+		.row_blk_sizes(m_o)
+		.col_blk_sizes(m_o)
 		.matrix_type(dbcsr::type::no_symmetry)
 		.build();
 		
 	m_i_vv = dbcsr::matrix<>::create()
 		.name("I_ab")
 		.set_cart(m_cart)
-		.row_blk_sizes(v)
-		.col_blk_sizes(v)
+		.row_blk_sizes(m_v)
+		.col_blk_sizes(m_v)
 		.matrix_type(dbcsr::type::no_symmetry)
 		.build();
 		
 	auto i_ob = dbcsr::matrix<>::create()
 		.name("I_ij_part")
 		.set_cart(m_cart)
-		.row_blk_sizes(o)
-		.col_blk_sizes(b)
+		.row_blk_sizes(m_o)
+		.col_blk_sizes(m_b)
 		.matrix_type(dbcsr::type::no_symmetry)
 		.build();
 		
 	auto i_vb = dbcsr::matrix<>::create()
 		.name("I_ab_part")
 		.set_cart(m_cart)
-		.row_blk_sizes(v)
-		.col_blk_sizes(b)
+		.row_blk_sizes(m_v)
+		.col_blk_sizes(m_b)
 		.matrix_type(dbcsr::type::no_symmetry)
 		.build();
 		
@@ -291,6 +334,8 @@ void MVP_AORISOSADC2::compute_intermeds() {
 		
 	auto i_vv_tmp = dbcsr::matrix<>::create_template(*m_i_vv)
 		.name("i_vv_temp").build();
+		
+	dbcsr::shared_matrix<double> po, pv, lo, lv;
 	
 	for (int ilap = 0; ilap != m_nlap; ++ilap) {
 		
@@ -298,15 +343,20 @@ void MVP_AORISOSADC2::compute_intermeds() {
 		
 		t_intermeds_1.start();
 		
-		auto po = m_laphelper_ss->pseudo_densities_occ()[ilap];
-		auto pv = m_laphelper_ss->pseudo_densities_vir()[ilap];
-		auto L_bu = m_laphelper_ss->pseudo_cholesky_occ()[ilap];
+		po = m_laphelper_ss->pseudo_densities_occ()[ilap];
+		pv = m_laphelper_ss->pseudo_densities_vir()[ilap];
 		
-		L_bu->filter(dbcsr::global::filter_eps);
+		lo = m_laphelper_ss->pseudo_cholesky_occ()[ilap];
+		if (m_zmethod == mp::zmethod::ll_full || m_kmethod == fock::kmethod::dflmo) {
+			lv = m_laphelper_ss->pseudo_cholesky_vir()[ilap];
+			lv->filter(dbcsr::global::filter_eps);
+		} 
+		
 		po->filter(dbcsr::global::filter_eps);
 		pv->filter(dbcsr::global::filter_eps);
 		
-		m_zbuilder->set_occ_coeff(L_bu);
+		m_zbuilder->set_occ_coeff(lo);
+		m_zbuilder->set_vir_coeff(lv);
 		m_zbuilder->set_vir_density(pv);
 	
 		LOG.os<1>("Computing Z.\n");
@@ -351,11 +401,25 @@ void MVP_AORISOSADC2::compute_intermeds() {
 					.build();
 				break;
 			}
+			case fock::kmethod::dflmo:
+			{
+				k_inter = fock::DFLMO_K::create()
+					.set_world(m_world)
+					.molecule(m_mol)
+					.print(nprint)
+					.eri3c2e_batched(m_eri3c2e_batched)
+					.metric_inv(f_xx_ilap)
+					.occ_nbatches(m_nbatches_occ)
+					.build();
+				break;
+			}
 		}
 			
-		k_inter->set_sym(false);
+		k_inter->set_sym(true);
 		k_inter->init();
+		
 		k_inter->set_density_alpha(pv);
+		k_inter->set_coeff_alpha(lv);
 		
 		LOG.os<1>("Computing K_ilap.\n");
 		
@@ -371,6 +435,8 @@ void MVP_AORISOSADC2::compute_intermeds() {
 			.perform();
 			
 		k_inter->set_density_alpha(po);
+		k_inter->set_coeff_alpha(lo);
+		
 		k_inter->compute_K();
 		
 		auto kv_ilap = k_inter->get_K_A();
@@ -484,8 +550,8 @@ smat MVP_AORISOSADC2::compute_sigma_2c(smat& jmat, smat& kmat) {
 	auto sig_2c = dbcsr::matrix<>::create()
 		.set_cart(m_cart)
 		.name("sig_2c")
-		.row_blk_sizes(o)
-		.col_blk_sizes(v)
+		.row_blk_sizes(m_o)
+		.col_blk_sizes(m_v)
 		.matrix_type(dbcsr::type::no_symmetry)
 		.build();
 		
@@ -570,6 +636,25 @@ smat MVP_AORISOSADC2::compute_sigma_2d(smat& u_ia) {
 	m_jbuilder->set_density_alpha(I_ao);
 	m_kbuilder->set_density_alpha(I_ao);
 	
+	if (m_kmethod == fock::kmethod::dflmo) {
+		
+		math::SVD svd(m_world, I_ao, 'V', 'V', LOG.global_plev());
+		svd.compute();
+		
+		auto r = dbcsr::split_range(svd.rank(), m_mol->mo_split());
+		auto b = I_ao->col_blk_sizes();
+		
+		auto s = svd.s();
+		auto u_br = svd.U(b,r);
+		auto vt_rb = svd.Vt(r,b);
+		
+		vt_rb->scale(s, "left");
+		
+		m_kbuilder->set_coeff_left_alpha(u_br);
+		m_kbuilder->set_coeff_right_alpha(vt_rb);
+	
+	}
+
 	m_jbuilder->compute_J();
 	m_kbuilder->compute_K();
 	
@@ -609,15 +694,13 @@ std::tuple<dbcsr::sbtensor<3,double>,dbcsr::sbtensor<3,double>>
 	time.start();
 	time_setup.start();
 	
-	auto b = m_mol->dims().b();
-	auto x = m_mol->dims().x();
 	auto o_chol = L_bo->col_blk_sizes();
 	
-	arrvec<int,2> bo_chol = {b,o_chol};
-	arrvec<int,2> ob_chol = {o_chol,b};
-	arrvec<int,2> bb = {b,b};
-	arrvec<int,3> xbb = {x,b,b};
-	arrvec<int,3> xob_chol = {x,o_chol,b};
+	arrvec<int,2> bo_chol = {m_b,o_chol};
+	arrvec<int,2> ob_chol = {o_chol,m_b};
+	arrvec<int,2> bb = {m_b,m_b};
+	arrvec<int,3> xbb = {m_x,m_b,m_b};
+	arrvec<int,3> xob_chol = {m_x,o_chol,m_b};
 	
 	int nxbatches = m_eri3c2e_batched->nbatches(0);
 	int nbbatches = m_eri3c2e_batched->nbatches(2);
@@ -739,15 +822,15 @@ std::tuple<dbcsr::sbtensor<3,double>,dbcsr::sbtensor<3,double>>
 		.set_cart(m_cart)
 		.name("u particle")
 		.row_blk_sizes(o_chol)
-		.col_blk_sizes(b)
+		.col_blk_sizes(m_b)
 		.matrix_type(dbcsr::type::no_symmetry)
 		.build();
 		
 	auto uh_bb = dbcsr::matrix<>::create()
 		.set_cart(m_cart)
 		.name("u hole")
-		.row_blk_sizes(b)
-		.col_blk_sizes(b)
+		.row_blk_sizes(m_b)
+		.col_blk_sizes(m_b)
 		.matrix_type(dbcsr::type::no_symmetry)
 		.build();
 		
@@ -905,12 +988,10 @@ std::tuple<dbcsr::shared_tensor<2,double>,dbcsr::shared_tensor<2,double>>
 	time.start();
 	time_setup.start();
 	
-	auto b = m_mol->dims().b();
-	auto x = m_mol->dims().x();
 	auto o_chol = L_bo->col_blk_sizes();
 	
-	arrvec<int,2> xx = {x,x};
-	arrvec<int,2> bo_chol = {b,o_chol};
+	arrvec<int,2> xx = {m_x,m_x};
+	arrvec<int,2> bo_chol = {m_b,o_chol};
 	
 	auto FT_xbb_02_1 = m_eri3c2e_batched->get_template("FT_xbb_02_1",
 		vec<int>{0,2}, vec<int>{1});
@@ -987,7 +1068,7 @@ std::tuple<dbcsr::shared_tensor<2,double>,dbcsr::shared_tensor<2,double>>
 			auto xblkbounds = m_eri3c2e_batched->blk_bounds(0,ix);
 			auto bblkbounds = m_eri3c2e_batched->blk_bounds(2,ib);
 
-			for (int mublk = 0; mublk != b.size(); ++mublk) {
+			for (int mublk = 0; mublk != m_b.size(); ++mublk) {
 				for (int nublk = bblkbounds[0]; nublk != bblkbounds[1]+1; ++nublk) {
 					
 					if (!shellmat(mublk,nublk)) continue;
@@ -1211,13 +1292,11 @@ std::tuple<smat,smat> MVP_AORISOSADC2::compute_sigma_2e_ilap_OB(
 	time.start();
 	
 	auto o_chol = L_bo->col_blk_sizes();
-	auto x = m_mol->dims().x();
-	auto b = m_mol->dims().b();
 	
-	arrvec<int,2> bo_chol = {b,o_chol};
-	arrvec<int,2> ob_chol = {o_chol,b};
-	arrvec<int,3> xob_chol = {x,o_chol,b};
-	arrvec<int,2> bb = {b,b};
+	arrvec<int,2> bo_chol = {m_b,o_chol};
+	arrvec<int,2> ob_chol = {o_chol,m_b};
+	arrvec<int,3> xob_chol = {m_x,o_chol,m_b};
+	arrvec<int,2> bb = {m_b,m_b};
 	
 	auto L_bo_01 = dbcsr::tensor<2>::create()
 		.name("L_bo_01")
@@ -1349,15 +1428,12 @@ std::tuple<smat,smat> MVP_AORISOSADC2::compute_sigma_2e_ilap_OB(
 		
 		m_eri3c2e_batched->decompress_finalize();
 		I_xob_batched->decompress_finalize();
-	
-		auto o = m_mol->dims().oa();
-		auto v = m_mol->dims().va();
 		
 		auto sig_pre_E1_bb = dbcsr::matrix<>::create()
 			.name("sigmaE1_bb")
 			.set_cart(m_cart)
-			.row_blk_sizes(b)
-			.col_blk_sizes(b)
+			.row_blk_sizes(m_b)
+			.col_blk_sizes(m_b)
 			.matrix_type(dbcsr::type::no_symmetry)
 			.build();
 			
@@ -1365,7 +1441,7 @@ std::tuple<smat,smat> MVP_AORISOSADC2::compute_sigma_2e_ilap_OB(
 			.name("sigmaE2_bb")
 			.set_cart(m_cart)
 			.row_blk_sizes(o_chol)
-			.col_blk_sizes(b)
+			.col_blk_sizes(m_b)
 			.matrix_type(dbcsr::type::no_symmetry)
 			.build();
 			
@@ -1378,16 +1454,16 @@ std::tuple<smat,smat> MVP_AORISOSADC2::compute_sigma_2e_ilap_OB(
 		auto SC_bv = dbcsr::matrix<>::create()
 			.name("SC_bv")
 			.set_cart(m_cart)
-			.row_blk_sizes(b)
-			.col_blk_sizes(v)
+			.row_blk_sizes(m_b)
+			.col_blk_sizes(m_v)
 			.matrix_type(dbcsr::type::no_symmetry)
 			.build();
 			
 		auto SC_bo = dbcsr::matrix<>::create()
 			.name("SL_bo")
 			.set_cart(m_cart)
-			.row_blk_sizes(b)
-			.col_blk_sizes(o)
+			.row_blk_sizes(m_b)
+			.col_blk_sizes(m_o)
 			.matrix_type(dbcsr::type::no_symmetry)
 			.build();
 			
@@ -1395,7 +1471,7 @@ std::tuple<smat,smat> MVP_AORISOSADC2::compute_sigma_2e_ilap_OB(
 			.name("LSC_co")
 			.set_cart(m_cart)
 			.row_blk_sizes(o_chol)
-			.col_blk_sizes(o)
+			.col_blk_sizes(m_o)
 			.matrix_type(dbcsr::type::no_symmetry)
 			.build();
 			
@@ -1461,16 +1537,11 @@ smat MVP_AORISOSADC2::compute_sigma_2e_OB(smat& u_ao, double omega) {
 			
 	}
 	
-	auto o = m_mol->dims().oa();
-	auto v = m_mol->dims().va();
-	auto b = m_mol->dims().b();
-	auto x = m_mol->dims().x();
-	
 	auto sigma_2e_A = dbcsr::matrix<>::create()
 		.name("sigma_2e_A")
 		.set_cart(m_cart)
-		.row_blk_sizes(o)
-		.col_blk_sizes(v)
+		.row_blk_sizes(m_o)
+		.col_blk_sizes(m_v)
 		.matrix_type(dbcsr::type::no_symmetry)
 		.build();
 		
@@ -1551,18 +1622,16 @@ std::tuple<dbcsr::sbtensor<3,double>,dbcsr::sbtensor<3,double>>
 	time.start();
 	time_setup.start();
 	
-	auto b = m_mol->dims().b();
-	auto x = m_mol->dims().x();
 	auto o_chol = L_bo->col_blk_sizes();
 	auto v_chol = L_bv->col_blk_sizes();
 	
-	arrvec<int,2> bo_chol = {b,o_chol};
-	arrvec<int,2> ob_chol = {o_chol,b};
-	arrvec<int,2> bv_chol = {b,v_chol};
-	arrvec<int,2> bb = {b,b};
-	arrvec<int,3> xbb = {x,b,b};
-	arrvec<int,3> xob_chol = {x,o_chol,b};
-	arrvec<int,3> xov_chol = {x,o_chol,v_chol};
+	arrvec<int,2> bo_chol = {m_b,o_chol};
+	arrvec<int,2> ob_chol = {o_chol,m_b};
+	arrvec<int,2> bv_chol = {m_b,v_chol};
+	arrvec<int,2> bb = {m_b,m_b};
+	arrvec<int,3> xbb = {m_x,m_b,m_b};
+	arrvec<int,3> xob_chol = {m_x,o_chol,m_b};
+	arrvec<int,3> xov_chol = {m_x,o_chol,v_chol};
 	
 	int nxbatches = m_eri3c2e_batched->nbatches(0);
 	int nbbatches = m_eri3c2e_batched->nbatches(2);
@@ -1694,14 +1763,14 @@ std::tuple<dbcsr::sbtensor<3,double>,dbcsr::sbtensor<3,double>>
 		.set_cart(m_cart)
 		.name("u particle")
 		.row_blk_sizes(o_chol)
-		.col_blk_sizes(b)
+		.col_blk_sizes(m_b)
 		.matrix_type(dbcsr::type::no_symmetry)
 		.build();
 		
 	auto uh_bv = dbcsr::matrix<>::create()
 		.set_cart(m_cart)
 		.name("u hole")
-		.row_blk_sizes(b)
+		.row_blk_sizes(m_b)
 		.col_blk_sizes(v_chol)
 		.matrix_type(dbcsr::type::no_symmetry)
 		.build();
@@ -1852,10 +1921,8 @@ std::tuple<dbcsr::shared_tensor<2,double>,dbcsr::shared_tensor<2,double>>
 
 	time.start();
 	time_setup.start();
-	
-	auto x = m_mol->dims().x();
-	
-	arrvec<int,2> xx = {x,x};
+		
+	arrvec<int,2> xx = {m_x,m_x};
 	
 	auto V_xx_01 = dbcsr::tensor<2>::create()
 		.name("v_xx_01")
@@ -2043,14 +2110,12 @@ std::tuple<smat,smat> MVP_AORISOSADC2::compute_sigma_2e_ilap_OV(
 	
 	auto o_chol = L_bo->col_blk_sizes();
 	auto v_chol = L_bv->col_blk_sizes();
-	auto x = m_mol->dims().x();
-	auto b = m_mol->dims().b();
 	
-	arrvec<int,2> bo_chol = {b,o_chol};
-	arrvec<int,2> bv_chol = {b,v_chol};
-	arrvec<int,2> ob_chol = {o_chol,b};
-	arrvec<int,3> xob_chol = {x,o_chol,b};
-	arrvec<int,3> xvb_chol = {x,v_chol,b};
+	arrvec<int,2> bo_chol = {m_b,o_chol};
+	arrvec<int,2> bv_chol = {m_b,v_chol};
+	arrvec<int,2> ob_chol = {o_chol,m_b};
+	arrvec<int,3> xob_chol = {m_x,o_chol,m_b};
+	arrvec<int,3> xvb_chol = {m_x,v_chol,m_b};
 	
 	auto L_bo_01 = dbcsr::tensor<2>::create()
 		.name("L_bo_01")
@@ -2260,7 +2325,7 @@ std::tuple<smat,smat> MVP_AORISOSADC2::compute_sigma_2e_ilap_OV(
 		auto sigmaE1_HT = dbcsr::matrix<>::create()
 			.name("sigmaE1_HT")
 			.set_cart(m_cart)
-			.row_blk_sizes(b)
+			.row_blk_sizes(m_b)
 			.col_blk_sizes(v_chol)
 			.matrix_type(dbcsr::type::no_symmetry)
 			.build();
@@ -2269,7 +2334,7 @@ std::tuple<smat,smat> MVP_AORISOSADC2::compute_sigma_2e_ilap_OV(
 			.name("sigmaE2_HT")
 			.set_cart(m_cart)
 			.row_blk_sizes(o_chol)
-			.col_blk_sizes(b)
+			.col_blk_sizes(m_b)
 			.matrix_type(dbcsr::type::no_symmetry)
 			.build();
 			
@@ -2282,16 +2347,16 @@ std::tuple<smat,smat> MVP_AORISOSADC2::compute_sigma_2e_ilap_OV(
 		auto Po_bb = dbcsr::matrix<>::create()
 			.name("Po_bb")
 			.set_cart(m_cart)
-			.row_blk_sizes(b)
-			.col_blk_sizes(b)
+			.row_blk_sizes(m_b)
+			.col_blk_sizes(m_b)
 			.matrix_type(dbcsr::type::symmetric)
 			.build();
 			
 		auto Pv_bb = dbcsr::matrix<>::create()
 			.name("Pv_bb")
 			.set_cart(m_cart)
-			.row_blk_sizes(b)
-			.col_blk_sizes(b)
+			.row_blk_sizes(m_b)
+			.col_blk_sizes(m_b)
 			.matrix_type(dbcsr::type::symmetric)
 			.build();
 			
@@ -2371,16 +2436,11 @@ smat MVP_AORISOSADC2::compute_sigma_2e_OV(smat& u_ao, double omega) {
 			
 	}
 	
-	auto o = m_mol->dims().oa();
-	auto v = m_mol->dims().va();
-	auto b = m_mol->dims().b();
-	auto x = m_mol->dims().x();
-	
 	auto sigma_2e_A = dbcsr::matrix<>::create()
 		.name("sigma_2e_A")
 		.set_cart(m_cart)
-		.row_blk_sizes(o)
-		.col_blk_sizes(v)
+		.row_blk_sizes(m_o)
+		.col_blk_sizes(m_v)
 		.matrix_type(dbcsr::type::no_symmetry)
 		.build();
 		
@@ -2477,7 +2537,7 @@ smat MVP_AORISOSADC2::compute(smat u_ia, double omega) {
 	LOG.os<1>("Computing sigma_1 of AO-ADC(2) ... \n");
 
 	auto u_ao = u_transform(u_ia, 'N', m_c_bo, 'T', m_c_bv); 
-	auto jkpair = compute_jk(u_ao);
+	auto jkpair = compute_jk(u_ia, u_ao);
 	auto sigma_1 = compute_sigma_1(jkpair.first, jkpair.second);
 	
 #ifdef _DLOG
@@ -2539,8 +2599,12 @@ smat MVP_AORISOSADC2::compute(smat u_ia, double omega) {
 	
 	LOG.os<>("DOT: ", u_ia->dot(*sigma_0), '\n');
 	
-	//TIME.print_info();
-	//exit(0);
+	if (TEST_MVP) {
+	
+		TIME.print_info();
+		exit(0);
+		
+	}
 	
 	return sigma_0;
 	

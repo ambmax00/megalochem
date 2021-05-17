@@ -914,15 +914,15 @@ void DFLMO_K::compute_K() {
 		auto& time_ints = TIME.sub("Fetching ints");
 		
 		LOG.os<1>("Setting up tensors\n");
-		
+				
 		int nocc = c_bm->nfullcols_total();
 		int nbas = m_mol->c_basis()->nbf();
-		int nxbas = m_mol->c_basis()->nbf();
-		
+		int nxbas = m_mol->c_dfbasis()->nbf();
+				
 		auto x = m_mol->dims().x();
 		auto b = m_mol->dims().b();
 		auto o = c_bm->col_blk_sizes();
-		
+				
 		auto o_bounds = dbcsr::make_blk_bounds(o, m_occ_nbatches);
 		int nobatches = o_bounds.size();
 				
@@ -933,22 +933,24 @@ void DFLMO_K::compute_K() {
 			o_offsets[i] = off;
 			off += o[i];
 		}
-			
+					
 		for (int i = 0; i != o_bounds.size(); ++i) { 
 			o_bounds[i][0] = o_offsets[o_bounds[i][0]];
 			o_bounds[i][1] = o_offsets[o_bounds[i][1]]
 				+ o[o_bounds[i][1]] - 1;
 		}
-		
+				
 		std::array<int,2> dims2 = {nbas, nocc};
 		std::array<int,3> dims3 = {nxbas, nbas, nocc};
-		
+				
 		arrvec<int,3> xbm = {x,b,o};
 		arrvec<int,2> bm = {b,o};
-		
+				
 		auto spgrid2_bm = dbcsr::pgrid<2>::create(m_cart.comm())
-			.tensor_dims(dims2)
+			//.tensor_dims(dims2)
 			.build();
+		
+		LOG.os<1>("9\n");
 		
 		auto spgrid3_xbm = dbcsr::pgrid<3>::create(m_cart.comm())
 			.tensor_dims(dims3)
@@ -1001,10 +1003,10 @@ void DFLMO_K::compute_K() {
 			.map1({0,2})
 			.map2({1})
 			.build();
-		
+						
 		dbcsr::copy_matrix_to_tensor(*c_bm, *c_bm_01);
 		c_bm_01->filter(dbcsr::global::filter_eps);				
-		
+				
 		int nxbatches = m_eri3c2e_batched->nbatches(0);
 		int nbbatches = m_eri3c2e_batched->nbatches(2);
 		

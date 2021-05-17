@@ -159,6 +159,7 @@ static const nlohmann::json valid_adcwfn =
 	{"guess", "hf"},
 	{"cutoff", 1e-6},
 	{"ortho_eps", 1e-12},
+	{"test_mvp", true},
 	{"_required", {"tag", "type", "wfn", "nroots", "df_basis"}}
 };
 
@@ -621,6 +622,10 @@ void driver::run_adcmod(megajob& job) {
 	
 	if (job.jdata.find("df_basis") != job.jdata.end()) {
 		dfbas = get<desc::shared_cluster_basis>(job.jdata["df_basis"]);
+	}
+	
+	if (job.jdata.find("test_mvp") != job.jdata.end()) {
+		adc::MVP_AORISOSADC2::TEST_MVP = job.jdata["test_mvp"];
 	}
 	
 	auto myadcmod = adc::adcmod::create()

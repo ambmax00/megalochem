@@ -688,31 +688,25 @@ std::shared_ptr<MVP> adcmod::create_adc2(std::optional<canon_lmo> clmo) {
 	
 	s_bb = aoreg.get<dbcsr::shared_matrix<double>>(ints::key::ovlp_bb);
 	
-	/*if (clmo) {
+	if (clmo) {
 		
-		int natoms = m_hfwfn->mol()->atoms().size();
-	
-		std::vector<int> iat(natoms, 0);
-		std::iota(iat.begin(), iat.end(), 0);
-	
-		int noa = clmo->c_br->nfullcols_total();
-		int nva = clmo->c_bs->nfullcols_total();
-	
-		mol = m_hfwfn->mol()->fragment(noa, noa, nva, nva, iat);
+		mol = m_wfn->mol;
 		
-		c_bo = clmo->c_br;
-		c_bv = clmo->c_bs;
+		c_bo = clmo->c_ao_lmo_bo;
+		c_bv = clmo->c_ao_lmo_bv;
 		
-		eps_o = std::make_shared<std::vector<double>>(clmo->eps_r);
-		eps_v = std::make_shared<std::vector<double>>(clmo->eps_s);
+		eps_o = std::make_shared<std::vector<double>>(clmo->eps_occ);
+		eps_v = std::make_shared<std::vector<double>>(clmo->eps_vir);
 		
-	} else {*/
+	} else {
 		
-	mol = m_wfn->mol;
-	c_bo = m_wfn->hf_wfn->c_bo_A();
-	c_bv = m_wfn->hf_wfn->c_bv_A();
-	eps_o = m_wfn->hf_wfn->eps_occ_A();
-	eps_v = m_wfn->hf_wfn->eps_vir_A();
+		mol = m_wfn->mol;
+		c_bo = m_wfn->hf_wfn->c_bo_A();
+		c_bv = m_wfn->hf_wfn->c_bv_A();
+		eps_o = m_wfn->hf_wfn->eps_occ_A();
+		eps_v = m_wfn->hf_wfn->eps_vir_A();
+		
+	}
 
 	auto ptr = MVP_AORISOSADC2::create()
 		.set_world(m_world)
@@ -733,6 +727,7 @@ std::shared_ptr<MVP> adcmod::create_adc2(std::optional<canon_lmo> clmo) {
 		.nlap(m_nlap)
 		.c_os(m_c_os)
 		.c_os_coupling(m_c_os_coupling)
+		.nbatches_occ(m_nbatches_occ)
 		.build();
 				
 	ptr->init();
