@@ -196,6 +196,12 @@ desc::shared_wavefunction mpmod::compute() {
 	auto pseudo_vir = dbcsr::matrix<>::create_template(*pseudo_occ)
 		.name("Pseudo Density (VIR)").build();
 		
+	auto pseudo_ortho_occ = dbcsr::matrix<>::create_template(*pseudo_occ)
+		.name("Pseudo Orth. Density (OCC)").build();
+		
+	auto pseudo_ortho_vir = dbcsr::matrix<>::create_template(*pseudo_occ)
+		.name("Pseudo Orth. Density (VIR)").build();
+		
 	auto ztilde_XX = dbcsr::matrix<>::create_template(*metric_matrix)
 		.name("ztilde_xx")
 		.matrix_type(dbcsr::type::no_symmetry)
@@ -244,8 +250,6 @@ desc::shared_wavefunction mpmod::compute() {
 		c_occ_exp->scale(exp_occ, "right");
 		c_vir_exp->scale(exp_vir, "right");
 		
-		#ifdef _ORTHOGONALIZE
-		
 		auto c_occ_ortho = dbcsr::matrix<>::create_template(*c_occ_exp)
 			.name("c_occ_ortho")
 			.build();
@@ -254,14 +258,7 @@ desc::shared_wavefunction mpmod::compute() {
 			*c_occ_ortho).perform();
 				
 		dbcsr::multiply('N', 'T', pow(omega,0.25), *c_occ_ortho, *c_occ_ortho, 
-			0.0, *pseudo_occ).perform();
-			
-		#else 
-		
-		dbcsr::multiply('N', 'T', pow(omega,0.25), *c_occ_exp, *c_occ_exp, 
-			0.0, *pseudo_occ).perform();
-			
-		#endif
+			0.0, *pseudo_ortho_occ).perform();
 		
 		dbcsr::multiply('N', 'T', pow(omega,0.25), *c_vir_exp, *c_vir_exp, 
 			0.0, *pseudo_vir).perform();
@@ -271,7 +268,9 @@ desc::shared_wavefunction mpmod::compute() {
 		//=============== CHOLESKY DECOMPOSITION =======================
 		pcholtime.start();
 		
-		math::pivinc_cd chol(m_world, pseudo_occ, LOG.global_plev());
+		dbcsr::shared_matrix<double> Locc_bu, Lvir_br;
+		
+		math::pivinc_cd chol(m_world, pseudo_ortho_occ, LOG.global_plev());
 		//chol.reorder("value");
 		
 		chol.compute();
@@ -282,34 +281,63 @@ desc::shared_wavefunction mpmod::compute() {
 		
 		LOG.os<>("Cholesky decomposition rank: ", rank, '\n');
 	
-		#ifdef _ORTHOGONALIZE
-	
-		auto L_bu_ortho = chol.L(b, u);
-		auto L_bu = dbcsr::matrix<>::create_template(*L_bu_ortho)
+		auto Locc_bu_ortho = chol.L(b, u);
+		
+		Locc_bu = dbcsr::matrix<>::create_template(*Locc_bu_ortho)
 			.name("L_bu")
 			.build();
 			
-		dbcsr::multiply('N', 'N', 1.0, *Sllt_bb, *L_bu_ortho, 0.0, *L_bu)
+		dbcsr::multiply('N', 'N', 1.0, *Sllt_bb, *Locc_bu_ortho, 0.0, *Locc_bu)
 			.perform();
+		
+		Locc_bu->filter(dbcsr::global::filter_eps);
+
+		if (zmeth == zmethod::ll_full) {
 			
-		#else 
+			auto c_vir_ortho = dbcsr::matrix<>::create_template(*c_vir_exp)
+				.name("c_vir_ortho")
+				.build();
+			
+			dbcsr::multiply('N', 'N', 1.0, *Sllt_inv_bb, *c_vir_exp, 0.0, 
+				*c_vir_ortho).perform();
+					
+			dbcsr::multiply('N', 'T', pow(omega,0.25), *c_vir_ortho, *c_vir_ortho, 
+				0.0, *pseudo_ortho_vir).perform();
+			
+			math::pivinc_cd chol_v(m_world, pseudo_ortho_vir, LOG.global_plev());
+			
+			chol_v.compute();
+			
+			int rank_v = chol_v.rank();
+			
+			auto r = dbcsr::split_range(rank_v, mol->mo_split());
+			
+			LOG.os<>("Cholesky decomposition rank: ", rank_v, '\n');
 		
-		auto L_bu = chol.L(b, u);
-		
-		#endif
-		
-		L_bu->filter(dbcsr::global::filter_eps);
+			auto Lvir_br_ortho = chol_v.L(b, r);
+			
+			Lvir_br = dbcsr::matrix<>::create_template(*Lvir_br_ortho)
+				.name("L_br")
+				.build();
+				
+			dbcsr::multiply('N', 'N', 1.0, *Sllt_bb, *Lvir_br_ortho, 0.0, *Lvir_br)
+				.perform();
+			
+			Lvir_br->filter(dbcsr::global::filter_eps);
+
+		}
 
 		pseudo_occ->filter(dbcsr::global::filter_eps);
 		pseudo_vir->filter(dbcsr::global::filter_eps);
 		
-		LOG.os<>("Occupancy of L: ", L_bu->occupation()*100, "%\n");
+		LOG.os<>("Occupancy of L: ", Locc_bu->occupation()*100, "%\n");
 		
 		pcholtime.finish();
 				
 		//============== B_X,B,B = B_x,b,b * Lo_o,b * Pv_b,b 
 		
-		zbuilder->set_occ_coeff(L_bu);
+		zbuilder->set_occ_coeff(Locc_bu);
+		zbuilder->set_vir_coeff(Lvir_br);
 		zbuilder->set_vir_density(pseudo_vir);
 		
 		zbuilder->compute();

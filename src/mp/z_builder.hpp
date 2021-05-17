@@ -22,7 +22,7 @@ namespace mp {
 enum class zmethod {
 	llmp_full,
 	llmp_mem,
-	llmp_asym
+	ll_full
 };
 
 inline zmethod str_to_zmethod(std::string str) {
@@ -30,8 +30,8 @@ inline zmethod str_to_zmethod(std::string str) {
 		return zmethod::llmp_full;
 	} else if (str == "llmp_mem") {
 		return zmethod::llmp_mem;
-	} else if (str == "llmp_asym") {
-		return zmethod::llmp_asym;
+	} else if (str == "ll_full") {
+		return zmethod::ll_full;
 	} else {
 		throw std::runtime_error("Invalid zbuilder mathod.");
 	}
@@ -148,6 +148,39 @@ public:
 	
 	~LLMP_FULL_Z() override {}
 	
+	
+};
+
+
+
+class LL_FULL_Z : public Z {
+private: 
+	
+	dbcsr::sbtensor<3,double> m_eri3c2e_batched;
+	dbcsr::btype m_intermeds;
+	
+	dbcsr::shared_tensor<2,double> m_locc_01;
+	dbcsr::shared_tensor<2,double> m_lvir_01;
+	
+public:
+
+#define LL_FULL_Z_LIST (\
+	((dbcsr::sbtensor<3,double>),eri3c2e_batched),\
+	((dbcsr::btype), intermeds))
+	
+	MAKE_PARAM_STRUCT(create, CONCAT(Z_INIT_LIST, LL_FULL_Z_LIST), ())
+	MAKE_BUILDER_CLASS(LL_FULL_Z, create, CONCAT(Z_INIT_LIST, LL_FULL_Z_LIST), ())
+
+	LL_FULL_Z(create_pack&& p) : 
+		m_eri3c2e_batched(p.p_eri3c2e_batched),
+		m_intermeds(p.p_intermeds),
+		Z_INIT_CON(LL_FULL_Z)
+	{}
+
+	void init() override;
+	void compute() override;
+	
+	~LL_FULL_Z() override {}
 	
 };
 
@@ -358,6 +391,17 @@ public:
 				.eri3c2e_batched(eri3c2e_batched)
 				.build();
 			
+		} else if (*c_method == zmethod::ll_full) {
+			
+			zbuilder = LL_FULL_Z::create()
+				.set_world(c_set_world)
+				.set_molecule(c_set_molecule)
+				.print((c_print) ? *c_print : 0)
+				.intermeds((c_btype_intermeds) ? 
+					*c_btype_intermeds : dbcsr::btype::core)
+				.eri3c2e_batched(eri3c2e_batched)
+				.build();
+				
 		}
 		
 		return zbuilder;
