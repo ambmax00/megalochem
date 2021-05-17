@@ -63,8 +63,8 @@ inline adcmethod str_to_adcmethod(std::string str) {
 	((util::optional<int>), nlap, 5),\
 	((util::optional<bool>), local, false),\
 	((util::optional<double>), cutoff, 1.0),\
-	((util::optional<std::string>), locc, "boys"),\
-	((util::optional<std::string>), lvir, "pao"),\
+	((util::optional<std::string>), local_method, "pao"),\
+	((util::optional<double>), ortho_eps, 1e-12),\
 	((util::optional<std::string>), guess, "hf"))
 	
 struct eigenpair {
@@ -76,8 +76,16 @@ class adcmod {
 private:
 
 	struct canon_lmo {
-		dbcsr::shared_matrix<double> c_br, c_bs, u_or, u_vs;
-		std::vector<double> eps_r, eps_s;
+		dbcsr::shared_matrix<double> c_ao_lmo_bo, c_ao_lmo_bv, 
+			u_lmo_cmo_oo, u_lmo_cmo_vv;
+		std::vector<double> eps_occ, eps_vir;
+	};
+	
+	struct canon_lmo_mol {
+		desc::shared_molecule mol;
+		dbcsr::shared_matrix<double> c_ao_lmo_bo, c_ao_lmo_bv, 
+			u_lmo_cmo_oo, u_lmo_cmo_vv;
+		std::vector<double> eps_occ, eps_vir;
 	};
 
 	desc::shared_wavefunction m_wfn;
@@ -94,13 +102,6 @@ private:
 	util::mpi_log LOG;
 	
 	std::shared_ptr<ints::aoloader> m_aoloader;
-	
-	dbcsr::shared_pgrid<2> m_spgrid2;
-	dbcsr::shared_pgrid<2> m_spgrid2_bo;
-	dbcsr::shared_pgrid<2> m_spgrid2_bv;
-	dbcsr::shared_pgrid<3> m_spgrid3_xbb;
-
-	dbcsr::shared_matrix<double> m_d_ov;
 		
 	void init_ao_tensors();
 	
@@ -108,15 +109,27 @@ private:
 	std::shared_ptr<MVP> create_adc2(std::optional<canon_lmo> clmo = 
 		std::nullopt);
 	
-	void compute_diag();
+	/*dbcsr::shared_matrix<double> compute_diag(
+		dbcsr::shared_matrix<double> c_bo, 
+		dbcsr::shared_matrix<double> c_bv,
+		std::vector<double> eps_o, 
+		std::vector<double> eps_v);*/
 	
 	eigenpair guess();
 		
-	eigenpair run_adc1(eigenpair& dav, std::optional<canon_lmo> lmo_info = std::nullopt);
+	eigenpair run_adc1(eigenpair& dav);
+	
+	eigenpair run_adc1_local(eigenpair& dav);
 		
 	eigenpair run_adc2(eigenpair& dav);
 	
-	dbcsr::shared_matrix<double> compute_diag_0();
+	eigenpair run_adc2_local(eigenpair& dav);
+	
+	dbcsr::shared_matrix<double> compute_diag_0(
+		std::vector<int> o, std::vector<int> v,
+		std::vector<double> eps_o, 
+		std::vector<double> eps_v
+	);
 	
 	//dbcsr::shared_matrix<double> compute_diag_1();
 	
@@ -124,11 +137,13 @@ private:
 		dbcsr::shared_matrix<double> u_ia, 
 		double theta);
 		
-	/*canon_lmo get_canon_nto(dbcsr::shared_matrix<double> u_ia, dbcsr::shared_matrix<double> c_bo,
-		dbcsr::shared_matrix<double> c_bv, std::vector<double> eps_o, std::vector<double> eps_v,
-		double theta);*/
+	std::vector<bool> get_significant_atoms(dbcsr::shared_matrix<double> u_ia);
 		
-	canon_lmo get_restricted_cmos(dbcsr::shared_matrix<double> u_ia);
+	canon_lmo get_canon_nto(dbcsr::shared_matrix<double> u_ia);
+		
+	canon_lmo get_canon_pao(dbcsr::shared_matrix<double> u_ia);
+	
+	//canon_lmo_mol get_restricted_cmos2(dbcsr::shared_matrix<double> u_ia);
 		
 	/*canon_lmo get_canon_pao(dbcsr::shared_matrix<double> u_ia, dbcsr::shared_matrix<double> c_bo,
 		dbcsr::shared_matrix<double> c_bv, std::vector<double> eps_o, std::vector<double> eps_v,

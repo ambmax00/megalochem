@@ -830,7 +830,7 @@ public:
 		
 		}
 		
-		LOG.os<>("DIIS CONVERGED!!");
+		LOG.os<>("DIIS CONVERGED!!\n");
 			
 			
 	}

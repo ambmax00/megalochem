@@ -233,10 +233,12 @@ std::shared_ptr<desc::molecule> molecule::fragment(int noa, int nob, int nva,
 		} std::cout << std::endl;
 	};
 	
-	print(frag->m_blocks.oa());
+	frag->m_atoms = m_atoms;
+	
+	/*print(frag->m_blocks.oa());
 	print(frag->m_blocks.va());
 	print(frag->m_blocks.b());
-	print(frag->m_blocks.x());
+	print(frag->m_blocks.x());*/
 	
 	return frag;
 	

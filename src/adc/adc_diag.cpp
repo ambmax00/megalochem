@@ -6,15 +6,11 @@ namespace megalochem {
 
 namespace adc {
 
-dbcsr::shared_matrix<double> adcmod::compute_diag_0() {
-	
-	LOG.os<>("Computing zeroth order diagonal.\n");
-	
-	auto epso = m_wfn->hf_wfn->eps_occ_A();
-	auto epsv = m_wfn->hf_wfn->eps_vir_A();
-	
-	auto o = m_wfn->mol->dims().oa();
-	auto v = m_wfn->mol->dims().va();
+dbcsr::shared_matrix<double> adcmod::compute_diag_0(
+	std::vector<int> o,
+	std::vector<int> v,
+	std::vector<double> eps_o, 
+	std::vector<double> eps_v) {
 	
 	auto d_ov_0 = dbcsr::matrix<>::create()
 		.name("diag_ov_0")
@@ -42,8 +38,8 @@ dbcsr::shared_matrix<double> adcmod::compute_diag_0() {
 		
 		for (int i = 0; i != rsize; ++i) {
 			for (int j = 0; j != csize; ++j) {
-				iter(i,j) = - epso->at(i + roff) 
-					+ epsv->at(j + coff);
+				iter(i,j) = - eps_o[i + roff]
+					+ eps_v[j + coff];
 			}
 		}
 		
@@ -53,7 +49,7 @@ dbcsr::shared_matrix<double> adcmod::compute_diag_0() {
 	
 	if (LOG.global_plev() >= 2) dbcsr::print(*d_ov_0);
 	
-	LOG.os<>("Done with diagonal.\n");
+	//LOG.os<>("Done with diagonal.\n");
 	
 	return d_ov_0;
 	
@@ -568,20 +564,25 @@ dbcsr::shared_matrix<double> adcmod::compute_diag_1() {
 	return d_iaia;
 	
 }*/
-	
-void adcmod::compute_diag() {
+
+/*
+dbcsr::shared_matrix<double> adcmod::compute_diag(
+	dbcsr::shared_matrix<double> c_bo, 
+	dbcsr::shared_matrix<double> c_bv,
+	std::vector<double> eps_o, 
+	std::vector<double> eps_v) {
 	
 	auto& diag_time = TIME.sub("Computing ADC diagonal elements");
 	
 	diag_time.start();
 	
-	auto d_ov_0 = compute_diag_0();
+	auto d_ov_0 = compute_diag_0(c_bo, c_bv, eps_o, eps_v);
 	
 	diag_time.finish();
 	
-	m_d_ov = d_ov_0;
+	return d_ov_0;
 	
-}
+}*/
 
 } // end namespace
 

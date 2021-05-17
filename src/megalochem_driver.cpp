@@ -147,8 +147,7 @@ static const nlohmann::json valid_adcwfn =
 	{"build_K", "dfao"},
 	{"build_Z", "llmp_full"},
 	{"local", false},
-	{"locc", "boys"},
-	{"lvir", "pao"},
+	{"local_method", "boys"},
 	{"eris", "core"},
 	{"imeds", "core"},
 	{"dav_max_iter", 100},
@@ -158,6 +157,7 @@ static const nlohmann::json valid_adcwfn =
 	{"nlap", 5u},
 	{"guess", "hf"},
 	{"cutoff", 1e-6},
+	{"ortho_eps", 1e-12},
 	{"_required", {"tag", "type", "wfn", "nroots", "df_basis"}}
 };
 

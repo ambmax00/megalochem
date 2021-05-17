@@ -538,6 +538,7 @@ void adcmod::init_ao_tensors() {
 std::shared_ptr<MVP> adcmod::create_adc1(std::optional<canon_lmo> lmo_info) {
 	
 	dbcsr::shared_matrix<double> v_xx, c_bo, c_bv;
+	desc::shared_molecule mol;
 	std::vector<double> epso, epsv;
 	dbcsr::sbtensor<3,double> eri3c2e, fitting;
 	
@@ -591,14 +592,16 @@ std::shared_ptr<MVP> adcmod::create_adc1(std::optional<canon_lmo> lmo_info) {
 	if (m_local) {
 		
 		LOG.os<>("Setting up local ADC(1) MVP object...\n");
-		
-		c_bo = lmo_info->c_br;
-		c_bv = lmo_info->c_bs;
-		epso = lmo_info->eps_r;
-		epsv = lmo_info->eps_s; 
+	
+		mol = m_wfn->mol;
+		c_bo = lmo_info->c_ao_lmo_bo;
+		c_bv = lmo_info->c_ao_lmo_bv;
+		epso = lmo_info->eps_occ;
+		epsv = lmo_info->eps_vir; 
 		
 	} else {
 		
+		mol = m_wfn->mol;
 		c_bo = m_wfn->hf_wfn->c_bo_A();
 		c_bv = m_wfn->hf_wfn->c_bv_A();
 		epso = *m_wfn->hf_wfn->eps_occ_A();
@@ -608,7 +611,7 @@ std::shared_ptr<MVP> adcmod::create_adc1(std::optional<canon_lmo> lmo_info) {
 		
 	auto ptr = MVP_AORIADC1::create()
 		.set_world(m_world)
-		.set_molecule(m_wfn->mol)
+		.set_molecule(mol)
 		.print(LOG.global_plev())
 		.c_bo(c_bo)
 		.c_bv(c_bv)
