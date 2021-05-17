@@ -134,6 +134,7 @@ static const nlohmann::json valid_adcwfn =
 	{"print", 1u},
 	{"nbatches_b", 3u},
 	{"nbatches_x", 3u},
+	{"nbatches_occ", 4u},
 	{"df_basis", "basis"},
 	{"nroots", 1u},
 	{"block", true},

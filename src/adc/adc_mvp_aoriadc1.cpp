@@ -63,7 +63,7 @@ void MVP_AORIADC1::init() {
 				.print(nprint)
 				.eri3c2e_batched(m_eri3c2e_batched)
 				.metric_inv(m_v_xx)
-				.occ_nbatches(1)
+				.occ_nbatches(m_nbatches_occ)
 				.build();
 			break;
 		default:
@@ -101,7 +101,31 @@ smat MVP_AORIADC1::compute(smat u_ia, double omega) {
 	u_ao->filter(dbcsr::global::filter_eps);
 	
 	m_jbuilder->set_density_alpha(u_ao);
-	m_kbuilder->set_density_alpha(u_ao);
+	
+	if (m_kmethod != fock::kmethod::dflmo) {
+	
+		m_kbuilder->set_density_alpha(u_ao);
+		
+	} else {
+		
+		auto o = u_ia->row_blk_sizes();
+		auto b = m_c_bv->row_blk_sizes();
+		
+		auto uc_ob = dbcsr::matrix<double>::create()
+			.set_cart(m_world.dbcsr_grid())
+			.name("uc_ob")
+			.row_blk_sizes(o)
+			.col_blk_sizes(b)
+			.matrix_type(dbcsr::type::no_symmetry)
+			.build();
+			
+		dbcsr::multiply('N', 'T', 1.0, *u_ia, *m_c_bv, 0.0, *uc_ob)
+			.perform();
+				
+		m_kbuilder->set_coeff_left_alpha(m_c_bo);
+		m_kbuilder->set_coeff_right_alpha(uc_ob);
+	
+	}
 	
 	m_jbuilder->compute_J();
 	m_kbuilder->compute_K();

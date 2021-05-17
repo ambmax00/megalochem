@@ -82,6 +82,8 @@ private:
 
 	smat m_c_bo;
 	smat m_c_bv;
+	
+	int m_nbatches_occ;
 
 public:
 
@@ -97,7 +99,8 @@ public:
 	((dbcsr::sbtensor<3,double>),eri3c2e_batched),\
 	((dbcsr::sbtensor<3,double>),fitting_batched),\
 	((fock::kmethod), kmethod),\
-	((fock::jmethod), jmethod))
+	((fock::jmethod), jmethod),\
+	((util::optional<int>), nbatches_occ))
 
 	MAKE_PARAM_STRUCT(create, AORIADC1_LIST, ())
 	MAKE_BUILDER_CLASS(MVP_AORIADC1, create, AORIADC1_LIST, ())
@@ -108,6 +111,7 @@ public:
 		m_eri3c2e_batched(p.p_eri3c2e_batched),
 		m_fitting_batched(p.p_fitting_batched),
 		m_kmethod(p.p_kmethod), m_jmethod(p.p_jmethod),
+		m_nbatches_occ(p.p_nbatches_occ ? *p.p_nbatches_occ : 5),
 		MVP(p.p_set_world, p.p_set_molecule, (p.p_print) ? *p.p_print : 0,
 			"MVP_AORIADC1") {}
 		

@@ -899,7 +899,7 @@ void DFLMO_K::compute_K() {
 	m_v_xx_01->filter(dbcsr::global::filter_eps);
 		
 	auto compute_K_single_sym = 
-	[&] (dbcsr::shared_matrix<double>& p_bb, 
+	[&] (dbcsr::shared_matrix<double>& c_bm,
 		dbcsr::shared_matrix<double>& k_bb, std::string X) {
 		
 		LOG.os<1>("Computing exchange part (", X, ")\n");
@@ -913,21 +913,15 @@ void DFLMO_K::compute_K() {
 		auto& time_formk = TIME.sub("Final contraction");
 		auto& time_ints = TIME.sub("Fetching ints");
 		
-		LOG.os<1>("Computing cholesky decomposition\n");
-		time_chol.start();
-		math::pivinc_cd chol(m_world ,p_bb, LOG.global_plev());
-		chol.compute();
-		time_chol.finish();
-		
 		LOG.os<1>("Setting up tensors\n");
 		
-		int nocc = chol.rank();
+		int nocc = c_bm->nfullcols_total();
 		int nbas = m_mol->c_basis()->nbf();
 		int nxbas = m_mol->c_basis()->nbf();
 		
 		auto x = m_mol->dims().x();
 		auto b = m_mol->dims().b();
-		auto o = dbcsr::split_range(nocc, 8);
+		auto o = c_bm->col_blk_sizes();
 		
 		auto o_bounds = dbcsr::make_blk_bounds(o, m_occ_nbatches);
 		int nobatches = o_bounds.size();
@@ -1008,9 +1002,7 @@ void DFLMO_K::compute_K() {
 			.map2({1})
 			.build();
 		
-		auto L_bm = chol.L(b,o);
-		
-		dbcsr::copy_matrix_to_tensor(*L_bm, *c_bm_01);
+		dbcsr::copy_matrix_to_tensor(*c_bm, *c_bm_01);
 		c_bm_01->filter(dbcsr::global::filter_eps);				
 		
 		int nxbatches = m_eri3c2e_batched->nbatches(0);
@@ -1134,7 +1126,7 @@ void DFLMO_K::compute_K() {
 	}; // end lambda function sym
 	
 	auto compute_K_single = 
-	[&] (dbcsr::shared_matrix<double>& p_bb, 
+	[&] (dbcsr::shared_matrix<double>& u_bm, dbcsr::shared_matrix<double>& v_mb,
 		dbcsr::shared_matrix<double>& k_bb, std::string X) {
 		
 		auto& time_svd = TIME.sub("Singular value decomposition");
@@ -1149,22 +1141,13 @@ void DFLMO_K::compute_K() {
 		
 		LOG.os<1>("Computing exchange part (", X, "), NON SYMMETRIC\n");
 		
-		LOG.os<1>("Computing singular value decomposition\n");
-		
-		time_svd.start();
-		math::SVD solver(m_world, p_bb, 'V', 'V', LOG.global_plev());
-		solver.compute();
-		time_svd.finish();
-		
-		LOG.os<1>("Setting up tensors\n");
-		
-		int nocc = solver.rank();
+		int nocc = u_bm->nfullcols_total();
 		int nbas = m_mol->c_basis()->nbf();
 		int nxbas = m_mol->c_basis()->nbf();
 		
 		auto x = m_mol->dims().x();
 		auto b = m_mol->dims().b();
-		auto o = dbcsr::split_range(nocc, 8);
+		auto o = u_bm->col_blk_sizes();
 		
 		LOG.os<1>("OCCS:\n");
 		for (auto i : o) {
@@ -1272,32 +1255,11 @@ void DFLMO_K::compute_K() {
 			.map2({1,2})
 			.build();
 		
-		auto U_bm = solver.U(b,o);
-		auto Vt_mb = solver.Vt(o,b);
-		auto sval = solver.s();
-		
-		/*std::for_each(sval.begin(), sval.end(), 
-			[](double& d) {
-				d = sqrt(d);
-			}
-		);*/
-		
-		//U_bm->scale(sval, "right");
-		Vt_mb->scale(sval, "left");
-		
-		U_bm->filter(dbcsr::global::filter_eps);
-		Vt_mb->filter(dbcsr::global::filter_eps);
-		
-		dbcsr::copy_matrix_to_tensor(*U_bm, *u_bm_01);
-		dbcsr::copy_matrix_to_tensor(*Vt_mb, *vt_mb_01);
-		
-		//dbcsr::print(*u_bm_01);
-		
-		U_bm->release();
-		Vt_mb->release();
+		dbcsr::copy_matrix_to_tensor(*u_bm, *u_bm_01);
+		dbcsr::copy_matrix_to_tensor(*v_mb, *vt_mb_01);
 				
-		//u_bm_01->filter(dbcsr::global::filter_eps);				
-		//vt_mb_01->filter(dbcsr::global::filter_eps);						
+		u_bm_01->filter(dbcsr::global::filter_eps);				
+		vt_mb_01->filter(dbcsr::global::filter_eps);						
 		
 		int nxbatches = m_eri3c2e_batched->nbatches(0);
 		int nbbatches = m_eri3c2e_batched->nbatches(2);
@@ -1431,13 +1393,13 @@ void DFLMO_K::compute_K() {
 	
 	if (m_sym) {
 		
-		compute_K_single_sym(m_p_A, m_K_A, "A");
-		if (m_K_B) compute_K_single_sym(m_p_B, m_K_B, "B");
+		compute_K_single_sym(m_c_A, m_K_A, "A");
+		if (m_K_B) compute_K_single_sym(m_c_B, m_K_B, "B");
 		
 	} else {
 		
-		compute_K_single(m_p_A, m_K_A, "A");
-		if (m_K_B) compute_K_single(m_p_B, m_K_B, "B");
+		compute_K_single(m_u_A, m_v_A, m_K_A, "A");
+		if (m_K_B) compute_K_single(m_u_B, m_v_B, m_K_B, "B");
 	
 	}
 	

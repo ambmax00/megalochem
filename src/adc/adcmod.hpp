@@ -44,6 +44,7 @@ inline adcmethod str_to_adcmethod(std::string str) {
 	((util::optional<int>), print, 0),\
 	((util::optional<int>), nbatches_b, 5),\
 	((util::optional<int>), nbatches_x, 5),\
+	((util::optional<int>), nbatches_occ, 5),\
 	((util::optional<int>), nroots, 1),\
 	((util::optional<int>), nguesses, 1),\
 	((util::optional<bool>), block, false),\

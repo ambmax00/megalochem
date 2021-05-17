@@ -74,6 +74,9 @@ protected:
 	dbcsr::shared_matrix<double> m_c_A;
 	dbcsr::shared_matrix<double> m_c_B;
 	
+	dbcsr::shared_matrix<double> m_u_A, m_u_B;
+	dbcsr::shared_matrix<double> m_v_A, m_v_B;
+	
 	bool m_SAD_iter;
 	int m_SAD_rank;
 	
@@ -82,10 +85,31 @@ protected:
 public:
 	
 	JK_common(megalochem::world w, desc::shared_molecule smol, int print, std::string name);
+	
 	void set_density_alpha(dbcsr::shared_matrix<double>& ipA) { m_p_A = ipA; }
+	
 	void set_density_beta(dbcsr::shared_matrix<double>& ipB) { m_p_B = ipB; }
+	
 	void set_coeff_alpha(dbcsr::shared_matrix<double>& icA) { m_c_A = icA; }
+	
 	void set_coeff_beta(dbcsr::shared_matrix<double>& icB) { m_c_B = icB; }
+	
+	void set_coeff_left_alpha(dbcsr::shared_matrix<double>& ilA) {
+		m_u_A = ilA;
+	}
+	
+	void set_coeff_right_alpha(dbcsr::shared_matrix<double>& irA) {
+		m_v_A = irA;
+	}
+	
+	void set_coeff_left_beta(dbcsr::shared_matrix<double>& ilB) {
+		m_u_B = ilB;
+	}
+	
+	void set_coeff_right_beta(dbcsr::shared_matrix<double>& irB) {
+		m_v_B = irB;
+	}
+	
 	void set_sym(bool sym) { m_sym = sym; }
 	
 	void set_SAD(bool SAD, int rank) { 

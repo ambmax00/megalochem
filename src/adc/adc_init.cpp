@@ -620,6 +620,7 @@ std::shared_ptr<MVP> adcmod::create_adc1(std::optional<canon_lmo> lmo_info) {
 		.eri3c2e_batched(eri3c2e)
 		.fitting_batched(fitting)
 		.metric_inv(v_xx)
+		.nbatches_occ(m_nbatches_occ)
 		.jmethod(jmeth)
 		.kmethod(kmeth)
 		.build();
