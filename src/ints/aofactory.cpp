@@ -263,7 +263,7 @@ protected:
 	int m_cint_natoms;
 	int m_cint_nbas;
 	
-	CINTIntegralFunction m_intfunc;
+	CINTIntegralFunction* m_intfunc;
 	
 	std::string m_intname;
 	ctr m_ctr = ctr::invalid;
@@ -556,55 +556,55 @@ public:
 		switch (combine(m_op, m_ctr)) {
 			
 			case combine(op::overlap, ctr::c_2c1e):
-				m_intfunc = cint1e_ovlp_sph;
+				m_intfunc = &int1e_ovlp_sph;
 				break;
 				
 			case combine(op::kinetic, ctr::c_2c1e):
-				m_intfunc = cint1e_kin_sph;
+				m_intfunc = &int1e_kin_sph;
 				break;
 				
 			case combine(op::nuclear, ctr::c_2c1e):
-				m_intfunc = cint1e_nuc_sph;
+				m_intfunc = &int1e_nuc_sph;
 				break;
 				
 			case combine(op::overlap, ctr::c_3c1e):
-				m_intfunc = cint3c1e_sph;
+				m_intfunc = &int3c1e_sph;
 				break;
 				
 			case combine(op::overlap, ctr::c_4c1e):
-				m_intfunc = cint4c1e_sph;
+				m_intfunc = &int4c1e_sph;
 				break;
 				
 			case combine(op::coulomb, ctr::c_2c2e):
-				m_intfunc = cint2c2e_sph;
+				m_intfunc = &int2c2e_sph;
 				break;
 				
 			case combine(op::coulomb, ctr::c_3c2e):
 				m_cint_env[PTR_RANGE_OMEGA] = 0.0d;
-				m_intfunc = cint3c2e_sph;
+				m_intfunc = &int3c2e_sph;
 				break;
 				
 			case combine(op::coulomb, ctr::c_4c2e):
-				m_intfunc = cint2e_sph;
+				m_intfunc = &int2e_sph;
 				break;
 				
 			case combine(op::erfc_coulomb, ctr::c_2c2e):
 				m_cint_env[PTR_RANGE_OMEGA] = - global::omega;
-				m_intfunc = cint2c2e_sph;
+				m_intfunc = &int2c2e_sph;
 				break;
 				
 			case combine(op::erfc_coulomb, ctr::c_3c2e):
 				m_cint_env[PTR_RANGE_OMEGA] = - global::omega;
-				m_intfunc = cint3c2e_sph;
+				m_intfunc = &int3c2e_sph;
 				break;
 				
 			case combine(op::erfc_coulomb, ctr::c_4c2e):
 				m_cint_env[PTR_RANGE_OMEGA] = - global::omega;
-				m_intfunc = cint2e_sph;
+				m_intfunc = &int2e_sph;
 				break;
 				
 			case combine(op::emultipole, ctr::c_2c1e):
-				m_intfunc = cint1e_r_sph;
+				m_intfunc = &int1e_r_sph;
 				break;
 				
 			default:

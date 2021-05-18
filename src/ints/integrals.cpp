@@ -15,7 +15,7 @@ namespace ints {
 // =====================================================================
 
 void calc_ints(dbcsr::matrix<double>& m_out, std::vector<std::vector<int>>& shell_offsets, 
-		std::vector<std::vector<int>>& nshells, CINTIntegralFunction& int_func,
+		std::vector<std::vector<int>>& nshells, CINTIntegralFunction* int_func,
 		int *atm, int natm, int* bas, int nbas, double* env, int max_l) 
 {
 	
@@ -81,8 +81,8 @@ void calc_ints(dbcsr::matrix<double>& m_out, std::vector<std::vector<int>>& shel
 					shls[1] = s1;
 					
 					//std::cout << "PROCESSING SHELL: " << s0 << " " << s1 << std::endl;
-					
-					int res = int_func(buf, shls, atm, natm, bas, nbas, env, nullptr);
+				
+					int res = int_func(buf, nullptr, shls, atm, natm, bas, nbas, env, nullptr, nullptr);
 											
 					if (res != 0) {
 						int idx = 0;
@@ -116,7 +116,7 @@ void calc_ints(dbcsr::matrix<double>& m_out, std::vector<std::vector<int>>& shel
 
 void calc_ints(dbcsr::matrix<double>& m_x, dbcsr::matrix<double>& m_y, dbcsr::matrix<double>& m_z, 
 		std::vector<std::vector<int>>& shell_offsets, 
-		std::vector<std::vector<int>>& shell_sizes, CINTIntegralFunction& int_func,
+		std::vector<std::vector<int>>& shell_sizes, CINTIntegralFunction* int_func,
 		int *atm, int natm, int* bas, int nbas, double* env, int max_l) 
 {
 	
@@ -189,7 +189,7 @@ void calc_ints(dbcsr::matrix<double>& m_x, dbcsr::matrix<double>& m_y, dbcsr::ma
 					
 					//std::cout << "PROCESSING SHELL: " << s0 << " " << s1 << std::endl;
 					
-					int res = int_func(buf, shls, atm, natm, bas, nbas, env, nullptr);
+					int res = int_func(buf, nullptr, shls, atm, natm, bas, nbas, env, nullptr, nullptr);
 											
 					if (res != 0) {
 						int idx = 0;
@@ -233,7 +233,7 @@ void calc_ints(dbcsr::matrix<double>& m_x, dbcsr::matrix<double>& m_y, dbcsr::ma
 }
 
 void calc_ints(dbcsr::tensor<3,double>& m_out, std::vector<std::vector<int>>& shell_offsets, 
-		std::vector<std::vector<int>>& nshells, CINTIntegralFunction& int_func,
+		std::vector<std::vector<int>>& nshells, CINTIntegralFunction* int_func,
 		int *atm, int natm, int* bas, int nbas, double* env, int max_l)
 {
 	
@@ -308,7 +308,7 @@ void calc_ints(dbcsr::tensor<3,double>& m_out, std::vector<std::vector<int>>& sh
 						int shellsize2 = CINTcgto_spheric(s2,bas);
 						shls[1] = s2;
 						
-						int res = int_func(buf, shls, atm, natm, bas, nbas, env, nullptr);
+						int res = int_func(buf, nullptr, shls, atm, natm, bas, nbas, env, nullptr, nullptr);
 												
 						if (res != 0) {
 							int iidx = 0;
@@ -350,7 +350,7 @@ void calc_ints(dbcsr::tensor<3,double>& m_out, std::vector<std::vector<int>>& sh
 }
 
 void calc_ints(dbcsr::tensor<4,double>& m_out, std::vector<std::vector<int>>& shell_offsets, 
-		std::vector<std::vector<int>>& nshells, CINTIntegralFunction& int_func,
+		std::vector<std::vector<int>>& nshells, CINTIntegralFunction* int_func,
 		int *atm, int natm, int* bas, int nbas, double* env, int max_l)
 {
 	const auto& nshells0 = nshells[0];
@@ -434,7 +434,7 @@ void calc_ints(dbcsr::tensor<4,double>& m_out, std::vector<std::vector<int>>& sh
 							const int shellsize3 = CINTcgto_spheric(s3,bas);
 							shls[3] = s3;
 					
-							int res = int_func(buf, shls, atm, natm, bas, nbas, env, nullptr);
+							int res = int_func(buf, nullptr, shls, atm, natm, bas, nbas, env, nullptr, nullptr);
 												
 							if (res != 0) {
 								int idx = 0;
@@ -485,7 +485,7 @@ void calc_ints(dbcsr::tensor<4,double>& m_out, std::vector<std::vector<int>>& sh
 }
 
 void calc_ints_schwarz_mn(dbcsr::matrix<double>& m_out, std::vector<std::vector<int>>& shell_offsets, 
-		std::vector<std::vector<int>>& nshells, CINTIntegralFunction& int_func,
+		std::vector<std::vector<int>>& nshells, CINTIntegralFunction* int_func,
 		int *atm, int natm, int* bas, int nbas, double* env, int max_l) 
 {
 		
@@ -551,7 +551,7 @@ void calc_ints_schwarz_mn(dbcsr::matrix<double>& m_out, std::vector<std::vector<
 					
 					//std::cout << "PROCESSING SHELL: " << s0 << " " << s1 << std::endl;
 					
-					int res = int_func(buf, shls, atm, natm, bas, nbas, env, nullptr);
+					int res = int_func(buf, nullptr, shls, atm, natm, bas, nbas, env, nullptr, nullptr);
 					
 					double n = 0.0;
 							
@@ -590,7 +590,7 @@ void calc_ints_schwarz_mn(dbcsr::matrix<double>& m_out, std::vector<std::vector<
 }
 
 void calc_ints_schwarz_x(dbcsr::matrix<double>& m_out, std::vector<std::vector<int>>& shell_offsets, 
-		std::vector<std::vector<int>>& nshells, CINTIntegralFunction& int_func,
+		std::vector<std::vector<int>>& nshells, CINTIntegralFunction* int_func,
 		int *atm, int natm, int* bas, int nbas, double* env, int max_l) 
 {
 		
@@ -631,7 +631,7 @@ void calc_ints_schwarz_x(dbcsr::matrix<double>& m_out, std::vector<std::vector<i
 					
 				//std::cout << "PROCESSING SHELL: " << s0 << std::endl;
 				
-				int res = int_func(buf, shls, atm, natm, bas, nbas, env, nullptr);
+				int res = int_func(buf, nullptr, shls, atm, natm, bas, nbas, env, nullptr, nullptr);
 				
 				double n = 0.0;
 						
