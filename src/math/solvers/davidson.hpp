@@ -721,7 +721,7 @@ public:
 		}*/
 			
 		
-		Eigen::MatrixXd bmat;
+		Eigen::MatrixXd bmat, smat;
 		std::vector<dbcsr::shared_matrix<double>> errvecs, trialvecs;
 		
 		for (int iiter = 0; iiter != m_diis_maxiter; ++iiter) {
@@ -745,7 +745,7 @@ public:
 				.build();
 				
 			r_ov->add(1.0, -current_omega, *b_ov);
-			//r_ov->scale(1.0/sqrt(b_ov->dot(*b_ov)));
+			r_ov->scale(1.0/sqrt(b_ov->dot(*b_ov)));
 			
 			double r_norm = r_ov->norm(dbcsr_norm_frobenius);
 			
@@ -780,16 +780,21 @@ public:
 			
 			// construct matrices
 			bmat.conservativeResize(iiter+1,iiter+1);
+			smat.conservativeResize(iiter+1,iiter+1);
 			
 			for (int ii = 0; ii <= iiter; ++ii) {
 				for (int jj = ii; jj <= iiter; ++jj) {
 					bmat(ii,jj) = bmat(jj,ii) = 
 						errvecs[ii]->dot(*errvecs[jj]);
+					smat(ii,jj) = smat(jj,ii) =
+						trialvecs[ii]->dot(*trialvecs[jj]);
 				}
 			}
 			
+			/*
 			// solve
 			Eigen::SelfAdjointEigenSolver<Eigen::MatrixXd> es;
+			//es.compute(smat.inverse() * bmat);
 			es.compute(bmat);
 			
 			Eigen::MatrixXd evecs = es.eigenvectors();
@@ -799,23 +804,51 @@ public:
 			
 			LOG.os<>("EVECS: ", evecs, '\n');
 			
+			std::cout << "SMAT: \n" << smat << std::endl;
+			es.compute(smat);
+			
+			std::cout << "EVALS SMAT:\n" << es.eigenvalues() << std::endl;*/
+			
+			// compute overlap eigenvalues
+			
+			Eigen::SelfAdjointEigenSolver<Eigen::MatrixXd> es;
+			es.compute(smat);
+			
+			Eigen::MatrixXd smat_evecs = es.eigenvectors();
+			Eigen::VectorXd smat_evals = es.eigenvalues();
+			
+			LOG.os<>("SMAT eigenvalues:\n", smat_evals, '\n');
+			
+			// correct small negative evals
+			for (int ii = 0; ii != iiter; ++ii) {
+				auto& val = smat_evals(ii);
+				val = fabs(val) < 1e-12 ? 1.0/sqrt(fabs(val)) : 1.0/sqrt(val);
+			}
+			
+			es.compute(smat_evals.asDiagonal() * bmat * smat_evals.asDiagonal());
+			
+			Eigen::VectorXd bmat_evals = es.eigenvalues();
+			Eigen::MatrixXd bmat_evecs = smat_evals.asDiagonal() * es.eigenvectors();
+			
+			LOG.os<>("BMAT eigenvalues:\n", bmat_evals, '\n');
+			
 			int pos = -1;
 			
 			// get first eigenvalue above given threshold
-			for (int ii = 0; ii != evals.size(); ++ii) {
-				if (evals(ii) > m_cdiis2_threshhold) {
+			for (int ii = 0; ii != bmat_evals.size(); ++ii) {
+				if (bmat_evals(ii) > m_cdiis2_threshhold) {
 					pos = ii;
 					break;
 				}
 			}
 			
-			LOG.os<>("ELE AT ", pos, " : ", evals(pos), '\n');
+			LOG.os<>("ELE AT ", pos, " : ", bmat_evals(pos), '\n');
 			
 			if (pos == -1) {
 				throw std::runtime_error("CDIIS2: linear dependency detected.");
 			}
 			
-			Eigen::VectorXd c = evecs.col(pos);
+			Eigen::VectorXd c = bmat_evecs.col(pos);
 			
 			// compute new trial vector
 			auto bnew = dbcsr::matrix<>::create_template(*b_ov)
@@ -828,8 +861,8 @@ public:
 			
 			// normalize
 			
-			double bnorm = 1.0/sqrt(bnew->dot(*bnew));
-			bnew->scale(bnorm);
+			//double bnorm = 1.0/sqrt(bnew->dot(*bnew));
+			//bnew->scale(bnorm);
 			
 			b_ov = bnew;
 		
