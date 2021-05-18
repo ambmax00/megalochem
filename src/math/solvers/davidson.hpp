@@ -826,6 +826,11 @@ public:
 				bnew->add(1.0, c(ii), *trialvecs[ii]);
 			}
 			
+			// normalize
+			
+			double bnorm = 1.0/sqrt(bnew->dot(*bnew));
+			bnew->scale(bnorm);
+			
 			b_ov = bnew;
 		
 		}
