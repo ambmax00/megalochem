@@ -220,7 +220,7 @@ public:
 				Eigen::VectorXd Svec_invsqrt = Svec;
 				
 				for (int i = 0; i != m_subspace; ++i) {
-					Svec_invsqrt(i) = 1.0/sqrt(Svec(i));
+					Svec_invsqrt(i) = 1.0/std::sqrt(Svec(i));
 				}
 				
 				Eigen::MatrixXd A_prime = Svec_invsqrt.asDiagonal() * Asub 
@@ -394,7 +394,7 @@ public:
 								
 				d_k->hadamard_product(*residuals[iroot], *D);
 				
-				double dnorm = sqrt(d_k->dot(*d_k));
+				double dnorm = std::sqrt(d_k->dot(*d_k));
 				
 				if (!m_balancing) d_k->scale(1.0/dnorm);
 				
@@ -431,7 +431,7 @@ public:
 				temp2->release();
 				
 				// normalize
-				double bnorm = sqrt(bnew->dot(*bnew));
+				double bnorm = std::sqrt(bnew->dot(*bnew));
 				
 				LOG.os<1>("Norm quotient: ", bnorm/dnorm, '\n');
 				
@@ -499,7 +499,7 @@ public:
 			}
 			
 			// normalize ?
-			double norm = sqrt(x_k->dot(*x_k));
+			double norm = std::sqrt(x_k->dot(*x_k));
 			if (m_balancing) x_k->scale(1.0/norm);
 			
 			new_vecs.push_back(x_k);
@@ -745,7 +745,7 @@ public:
 				.build();
 				
 			r_ov->add(1.0, -current_omega, *b_ov);
-			r_ov->scale(1.0/sqrt(b_ov->dot(*b_ov)));
+			r_ov->scale(1.0/std::sqrt(b_ov->dot(*b_ov)));
 			
 			double r_norm = r_ov->norm(dbcsr_norm_frobenius);
 			
@@ -822,7 +822,7 @@ public:
 			// correct small negative evals
 			for (int ii = 0; ii != iiter; ++ii) {
 				auto& val = smat_evals(ii);
-				val = fabs(val) < 1e-12 ? 1.0/sqrt(fabs(val)) : 1.0/sqrt(val);
+				val = std::fabs(val) < 1e-12 ? 1.0/std::sqrt(std::fabs(val)) : 1.0/std::sqrt(val);
 			}
 			
 			es.compute(smat_evals.asDiagonal() * bmat * smat_evals.asDiagonal());

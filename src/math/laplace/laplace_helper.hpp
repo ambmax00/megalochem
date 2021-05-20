@@ -4,7 +4,7 @@
 #include "megalochem.hpp"
 #include <dbcsr_matrix_ops.hpp>
 #include "utils/mpi_log.hpp"
-#include "math/laplace/laplace.hpp"
+#include "math/laplace/minimax.hpp"
 #include "math/linalg/piv_cd.hpp"
 
 namespace megalochem {
@@ -61,7 +61,7 @@ public:
 		
 		std::for_each(eps_scaled.begin(),eps_scaled.end(),
 			[xpt,wght,wfactor,xfactor](double& eps) {
-				eps = exp(wfactor * log(wght) + xfactor * eps * xpt);
+				eps = std::exp(wfactor * std::log(wght) + xfactor * eps * xpt);
 		});
 			
 		c_bm_scaled->scale(eps_scaled, "right");
@@ -158,15 +158,20 @@ public:
 		LOG.os<1>("eps_min/eps_homo/eps_lumo/eps_max ", emin, " ", ehomo, " ", elumo, " ", emax, '\n');
 		LOG.os<1>("ymin/ymax ", ymin, " ", ymax, '\n');
 		
-		math::laplace lp(m_world.comm(), LOG.global_plev());
+		math::minimax lp(LOG.global_plev());
 		
-		lp.compute(m_nlap, ymin, ymax);
+		if (m_world.rank() == 0) {
+			lp.compute(m_nlap, ymin, ymax);
+		}
 			
-		m_weights = lp.omega();
-		m_xpoints = lp.alpha();
+		m_weights = lp.weights();
+		m_xpoints = lp.exponents();
 		
-		//m_nlap = m_weights.size();
+		m_weights.resize(m_nlap);
 		
+		MPI_Bcast(m_weights.data(), m_nlap, MPI_DOUBLE, 0, m_world.comm());
+		MPI_Bcast(m_xpoints.data(), m_nlap, MPI_DOUBLE, 0, m_world.comm());
+				
 		m_p_occs.clear();
 		m_p_virs.clear();
 		m_l_occs.clear();

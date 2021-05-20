@@ -1,5 +1,4 @@
 #include "adc/adc_mvp.hpp"
-#include "math/laplace/laplace.hpp"
 #include "math/linalg/piv_cd.hpp"
 #include "math/linalg/LLT.hpp"
 #include "math/linalg/SVD.hpp"

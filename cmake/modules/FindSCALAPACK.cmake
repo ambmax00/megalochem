@@ -5,14 +5,12 @@ include(CheckLibraryExists)
 set(SCALAPACK_FOUND true)
 
 # check if we have Intel
-set(BLA_VENDOR Intel10_64lp)
-find_package(BLAS QUIET)
+set(MKLROOT $ENV{MKLROOT})
+set(MKL_ROOT $ENV{MKL_ROOT})
 
-if (BLAS_FOUND)
+if (NOT "${MKLROOT}" MATCHES "" OR NOT "${MKL_ROOT}" MATCHES "")
+	set(USE_MKL)
 	message(STATUS "MKL environment detected")
-else()
-	unset(BLA_VENDOR)
-	find_package(BLAS REQUIRED)
 endif()
 
 find_package(LAPACK REQUIRED)
@@ -20,15 +18,12 @@ find_package(MPI REQUIRED)
 
 message(STATUS "BLAS VENDOR: ${BLA_VENDOR}")
 
-if ("${BLA_VENDOR}" MATCHES "Intel.*") 
+if (USE_MKL) 
 
 	if (NOT MPI_VENDOR) 
 		message(FATAL_ERROR "Please specify MPI_VENDOR (openmpi/intelmpi)")
 	endif()	
 
-	set(MKLROOT $ENV{MKLROOT})
-	set(MKL_ROOT $ENV{MKL_ROOT})
-	
 	if ("${LAPACK_LIBRARIES}" MATCHES ".*intel64_lin.*") 
 		set(IDIR "intel64_lin")
 	else()

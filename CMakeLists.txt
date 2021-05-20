@@ -18,8 +18,6 @@ find_package(Eigen3 REQUIRED NO_MODULE)
 
 #get_target_property(dir Eigen3::Eigen INTERFACE_INCLUDE_DIRECTORIES)
 
-include_directories(${dir})
-
 find_package(OpenMP REQUIRED)
 find_package(MPI REQUIRED)
 find_package(DBCSR 2.1.0 CONFIG REQUIRED)

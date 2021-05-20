@@ -1,6 +1,6 @@
 #include "mp/mpmod.hpp"
 #include "mp/z_builder.hpp"
-#include "math/laplace/laplace.hpp"
+#include "math/laplace/minimax.hpp"
 #include "math/linalg/piv_cd.hpp"
 #include "math/linalg/LLT.hpp"
 #include "ints/aoloader.hpp"
@@ -76,14 +76,22 @@ desc::shared_wavefunction mpmod::compute() {
 	LOG.os<>("eps_min/eps_homo/eps_lumo/eps_max ", emin, " ", ehomo, " ", elumo, " ", emax, '\n');
 	LOG.os<>("ymin/ymax ", ymin, " ", ymax, '\n');
 	
-	math::laplace lp(m_world.comm(), LOG.global_plev());
+	math::minimax lp(LOG.global_plev());
 	
 	laptime.start();
-	lp.compute(m_nlap, ymin, ymax);
+	if (m_world.rank() == 0) {
+		lp.compute(m_nlap, ymin, ymax);
+	}
 	laptime.finish();
 	
-	auto lp_omega = lp.omega();
-	auto lp_alpha = lp.alpha();
+	auto lp_omega = lp.weights();
+	auto lp_alpha = lp.exponents();
+	
+	lp_omega.resize(m_nlap);
+	lp_alpha.resize(m_nlap);
+	
+	MPI_Bcast(lp_omega.data(), m_nlap, MPI_DOUBLE, 0, m_world.comm());
+	MPI_Bcast(lp_alpha.data(), m_nlap, MPI_DOUBLE, 0, m_world.comm());
 	
 	//==================================================================
 	//                        PGRIDS
