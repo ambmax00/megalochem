@@ -540,7 +540,7 @@ private:
 	int m_macro_maxiter = 30;
 	int m_diis_maxiter = 50;
 	double m_macro_conv = 1e-5;
-	double m_cdiis2_threshhold = 1e-16;
+	double m_cdiis2_threshhold = 1e-15;
 	
 	std::shared_ptr<MVFactory> m_fac;
 	smat m_diag;
@@ -596,8 +596,8 @@ public:
 		LOG.os<>("========== STARTING DIIS-DAVIDSON ================\n");
 		LOG.os<>("======== PERFORMING PSEUDO-DAVDISON ==============\n");
 		
-		m_macro_conv = 1e-3; //std::max(1e-3, m_macro_conv);
-		m_dav.conv(m_macro_conv);
+		double pseudo_dav_conv = std::max(1e-3, m_macro_conv);
+		m_dav.conv(pseudo_dav_conv);
 		
 		for (int ii = 0; ii != m_macro_maxiter; ++ii) {
 			
@@ -618,7 +618,7 @@ public:
 				err, "/ ", resnorms[nroot-1], '\n');
 			LOG.os<>("=== EIGENVALUE: ", current_omega, '\n');
 			
-			if (resnorms[nroot-1] < m_macro_conv && err < m_macro_conv) break;			
+			if (resnorms[nroot-1] < pseudo_dav_conv && err < pseudo_dav_conv) break;			
 						
 		}
 		
@@ -629,99 +629,7 @@ public:
 						
 		LOG.os<>("================= PERFORMING DIIS=================\n");
 		
-		diis_helper<2> dsolver(m_world, 10, 5, 12, true);
-		
-		current_omega = eigval;
-		dbcsr::shared_matrix<double> prev_u, prev_b;
-		
-		/*for (int ii = 0; ii != m_diis_maxiter; ++ii) {
-			
-			LOG.os<>("=== DIIS ITERATION: ", ii, '\n');
-			
-			double bdot = b_ov->dot(*b_ov);
-			
-			double old_omega = current_omega;
-			auto sig_ov = m_fac->compute(b_ov, current_omega);
-			
-			// compute new omega
-			// omega(i+1) = (sig(i) b(i))/||b(i)||^2
-			
-			current_omega = (sig_ov->dot(*b_ov))/bdot;
-			double omega_err = fabs(current_omega - old_omega);
-			
-			LOG.os<>("=== OMEGA: ", current_omega, " ERR ", omega_err, '\n');
-			
-			// compute residual
-			// r(i) = (sig(i) - omega(i+1) * u(i))/||u(i)||
-			auto r_ov = dbcsr::copy<double>(*sig_ov)
-				.name("r_ov")
-				.build();
-				
-			r_ov->add(1.0, -current_omega, *b_ov);
-			r_ov->scale(1.0/sqrt(bdot));
-			
-			double r_norm = r_ov->norm(dbcsr_norm_frobenius);
-			
-			LOG.os<>("==== RESIDUAL NORM: ", r_norm, '\n');
-			
-			if (r_norm < 1e-5) break;
-			
-			// compute update b = r/diag
-			auto dinv_ov = dbcsr::create_template<double>(*r_ov)
-				.name("dinv")
-				.build();
-			
-			dinv_ov->reserve_all();
-			//dinv_ov->set(current_omega);
-			dinv_ov->add(1.0, -1.0, *m_diag);
-			//dinv_ov->scale(-1.0);
-			dinv_ov->apply(dbcsr::func::inverse);
-			
-			auto u_ov = dbcsr::create_template<double>(*r_ov)
-				.name("Non-extrapolated update vector")
-				.build();
-				
-			auto uerr_ov = dbcsr::create_template<double>(*r_ov)
-				.name("Error update vector")
-				.build();
-			
-			u_ov->hadamard_product(*r_ov, *dinv_ov);
-			
-			dbcsr::print(*u_ov);
-			
-			if (ii == 0) {
-				
-				b_ov->add(1.0, 1.0, *u_ov);
-				b_ov->scale(1.0/sqrt(bdot));
-				
-				prev_u = u_ov;
-				prev_b = b_ov;
-				
-			} else {
-				
-				uerr_ov->add(0.0, 1.0, *u_ov);
-				uerr_ov->add(1.0, -1.0, *prev_u);
-				
-				prev_u = dbcsr::copy(*u_ov).build();
-						
-				dsolver.compute_extrapolation_parameters(prev_u, uerr_ov, ii);
-				
-				// get new update
-				auto new_u_ov = dbcsr::create_template<double>(*u_ov)
-					.name("Extrapolated update vector")
-					.build();
-			
-				dsolver.extrapolate(new_u_ov, ii);
-			
-				b_ov->add(1.0, 1.0, *new_u_ov);
-				b_ov->scale(1.0/sqrt(bdot));
-								
-			}
-			
-		}*/
-			
-		
-		Eigen::MatrixXd bmat, smat;
+		/*Eigen::MatrixXd bmat, smat;
 		std::vector<dbcsr::shared_matrix<double>> errvecs, trialvecs;
 		
 		for (int iiter = 0; iiter != m_diis_maxiter; ++iiter) {
@@ -745,7 +653,7 @@ public:
 				.build();
 				
 			r_ov->add(1.0, -current_omega, *b_ov);
-			r_ov->scale(1.0/sqrt(b_ov->dot(*b_ov)));
+			//r_ov->scale(1.0/sqrt(b_ov->dot(*b_ov)));
 			
 			double r_norm = r_ov->norm(dbcsr_norm_frobenius);
 			
@@ -763,7 +671,7 @@ public:
 				.build();
 			
 			div->reserve_all();
-			div->set(current_omega);
+			//div->set(current_omega);
 			div->add(1.0,-1.0,*m_diag);
 			
 			div->apply(dbcsr::func::inverse);
@@ -809,7 +717,7 @@ public:
 			
 			std::cout << "EVALS SMAT:\n" << es.eigenvalues() << std::endl;*/
 			
-			// compute overlap eigenvalues
+			/*/ compute overlap eigenvalues
 			
 			Eigen::SelfAdjointEigenSolver<Eigen::MatrixXd> es;
 			es.compute(smat);
@@ -866,7 +774,71 @@ public:
 			
 			b_ov = bnew;
 		
+		}*/
+		
+		math::diis_helper<2> diis(m_world, 0, 1, 8, true);
+		
+		for (int iiter = 0; iiter != m_diis_maxiter; ++iiter) {
+			
+			// compute new matrix vector product
+			auto sig_ov = m_fac->compute(b_ov,current_omega);
+			
+			// compute omega
+			double old_omega = current_omega;
+			current_omega = (b_ov->dot(*sig_ov))/(b_ov->dot(*b_ov));
+			
+			LOG.os<>("OMEGA: ", current_omega, " ", 
+				fabs(current_omega - old_omega), '\n'); 
+				
+			// compute residual
+			// r(i) = (sig(i) - omega(i+1) * u(i))/||u(i)||
+			auto r_ov = dbcsr::matrix<>::copy(*sig_ov)
+				.name("r_ov")
+				.build();
+				
+			r_ov->add(1.0, -current_omega, *b_ov);
+			r_ov->scale(1.0/sqrt(b_ov->dot(*b_ov)));
+			
+			double r_norm = r_ov->norm(dbcsr_norm_frobenius);
+			
+			LOG.os<>("==== RESIDUAL NORM: ", r_norm, '\n');
+			
+			if (r_norm < m_macro_conv) break;
+			
+			// compute update
+			auto u_ov = dbcsr::matrix<>::create_template(*sig_ov)
+				.name("update vector")
+				.build();
+			
+			auto div = dbcsr::matrix<>::create_template(*sig_ov)
+				.name("divisor")
+				.build();
+			
+			div->reserve_all();
+			div->set(current_omega);
+			div->add(1.0,-1.0,*m_diag);
+			
+			div->apply(dbcsr::func::inverse);
+			u_ov->hadamard_product(*r_ov, *div);
+			//u_ov->scale(1.0/sqrt(u_ov->dot(*u_ov)));
+			
+			// store vectors
+			auto trial = dbcsr::matrix<double>::copy(*b_ov)
+				.build();
+			
+			trial->add(1.0, 1.0, *u_ov);	
+			
+			diis.compute_extrapolation_parameters(trial, u_ov, iiter);
+			
+			diis.extrapolate(trial, iiter);
+			
+			//trial->scale(1.0/sqrt(trial->dot(*trial)));
+			
+			b_ov = trial;
+			
 		}
+			
+			
 		
 		LOG.os<>("DIIS CONVERGED!!\n");
 			
