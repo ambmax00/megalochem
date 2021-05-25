@@ -96,10 +96,11 @@ class contract_base {
 
 private:
 
+	T c_alpha;
     dbcsr::tensor<N1,T>& c_t1;
     dbcsr::tensor<N2,T>& c_t2;
+    T c_beta;
     dbcsr::tensor<N3,T>& c_t3;
-    T c_alpha, c_beta;
     
 public:
 
@@ -107,7 +108,7 @@ public:
     
     contract_base(T alpha, dbcsr::tensor<N1,T>& t1, dbcsr::tensor<N2,T>& t2, 
 		T beta, dbcsr::tensor<N3,T>& t3) 
-        : c_alpha(alpha), c_beta(beta), c_t1(t1), c_t2(t2), c_t3(t3) {}
+        : c_alpha(alpha), c_t1(t1), c_t2(t2), c_beta(beta), c_t3(t3) {}
     
     void perform() {
     
@@ -227,7 +228,7 @@ public:
         int i = 0;
 	
         // Parsing input
-        for (int ic = 0; ic != str.size(); ++ic) {
+        for (size_t ic = 0; ic != str.size(); ++ic) {
 		
             char c = str[ic];
             
@@ -273,14 +274,14 @@ public:
         
         std::string scon, sncon1, sncon2;
         
-        for (int i1 = 0; i1 != t1.size(); ++i1)  {
+        for (size_t i1 = 0; i1 != t1.size(); ++i1)  {
             auto c1 = t1[i1];
-            for (int i2 = 0; i2 != t2.size(); ++i2) {
+            for (size_t i2 = 0; i2 != t2.size(); ++i2) {
                 auto c2 = t2[i2];
                 if (c1 == c2) { 
                     scon.push_back(c1);
-                    con1.push_back(i1);
-                    con2.push_back(i2);
+                    con1.push_back((int)i1);
+                    con2.push_back((int)i2);
                 }
             }
         }
@@ -294,7 +295,7 @@ public:
         std::cout << std::endl;
         */
         
-        for (int i = 0; i != t1.size(); ++i) {
+        for (size_t i = 0; i != t1.size(); ++i) {
             auto found = std::find(scon.begin(), scon.end(), t1[i]);
             if (found == scon.end()) {
                 sncon1.push_back(t1[i]);
@@ -302,7 +303,7 @@ public:
             }
         }
         
-        for (int i = 0; i != t2.size(); ++i) {
+        for (size_t i = 0; i != t2.size(); ++i) {
             auto found = std::find(scon.begin(), scon.end(), t2[i]);
             if (found == scon.end()) {
                 sncon2.push_back(t2[i]);
@@ -322,14 +323,14 @@ public:
         
         if (ncon1.size() + ncon2.size() != t3.size()) throw std::runtime_error("Wrong tensor dimensions: "+str);
         
-        for (int i = 0; i != t3.size(); ++i) {
+        for (size_t i = 0; i != t3.size(); ++i) {
             auto found1 = std::find(sncon1.begin(),sncon1.end(),t3[i]);
             if (found1 != sncon1.end()) {
-                map1.push_back(i);
+                map1.push_back(int(i));
             }
             auto found2 = std::find(sncon2.begin(),sncon2.end(),t3[i]);
             if (found2 != sncon2.end()) {
-                map2.push_back(i);
+                map2.push_back(int(i));
             }
         }
 
@@ -1252,7 +1253,7 @@ void copy_local_to_global(tensor<N,T>& t_loc, tensor<N,T>& t_glob) {
 	
 	std::array<int,N> idxt, sizet;
 	
-	for (int iblk = 0; iblk != recv_blkidx[0].size(); ++iblk) {
+	for (size_t iblk = 0; iblk != recv_blkidx[0].size(); ++iblk) {
 		
 		for (int in = 0; in != N; ++in) {
 			idxt[in] = recv_blkidx[in][iblk];

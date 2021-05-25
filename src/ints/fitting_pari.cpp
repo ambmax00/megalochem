@@ -18,7 +18,6 @@ dbcsr::sbtensor<3,double> dfitting::compute_pari(dbcsr::shared_matrix<double> s_
 	aofac->ao_3c2e_setup(metric::coulomb);
 	
 	auto& time_setup = TIME.sub("Setting up preliminary data");
-	auto& time_form_cfit = TIME.sub("Forming cfit");
 	
 	TIME.start();
 	
@@ -62,12 +61,7 @@ dbcsr::sbtensor<3,double> dfitting::compute_pari(dbcsr::shared_matrix<double> s_
 	// === END ===
 	
 	// ==================== new atom centered dists ====================
-	
-	int nbf = m_mol->c_basis()->nbf();
-	int dfnbf = m_mol->c_dfbasis()->nbf();
-	
-	std::array<int,3> xbbsizes = {1,nbf,nbf};
-	
+			
 	auto spgrid2 = dbcsr::pgrid<2>::create(m_cart.comm()).build();
 	
 	auto spgrid3_xbb =dbcsr::pgrid<3>::create(m_cart.comm()).build();
@@ -129,23 +123,6 @@ dbcsr::sbtensor<3,double> dfitting::compute_pari(dbcsr::shared_matrix<double> s_
 	arrvec<int,3> blkidx = c_xbb_local->blks_local();
 	arrvec<int,3> blkoffsets = c_xbb_local->blk_offsets();
 	
-	auto& x_offsets = blkoffsets[0];
-	auto& b_offsets = blkoffsets[1];
-	
-	auto& loc_x_idx = blkidx[0];
-	auto& loc_m_idx = blkidx[1];
-	auto& loc_n_idx = blkidx[2];
-	
-	auto print = [](vec<int>& v) {
-		for (auto e : v) {
-			std::cout << e << " ";
-		} std::cout << std::endl;
-	};
-	
-	//print(loc_x_idx);
-	//print(loc_m_idx);
-	//print(loc_n_idx);	
-	
 	c_xbb_batched->compress_init({2}, vec<int>{0}, vec<int>{1,2});
 	
 	int nbatches = c_xbb_batched->nbatches(2); 
@@ -188,16 +165,16 @@ dbcsr::sbtensor<3,double> dfitting::compute_pari(dbcsr::shared_matrix<double> s_
 			// Get mu/nu indices centered on alpha/beta
 			vec<int> mA_idx, nB_idx, xAB_idx;
 			
-			for (int m = 0; m != b.size(); ++m) {
-				if (blkmap_b[m] == atomA) mA_idx.push_back(m);
-				if (blkmap_b[m] == atomB) nB_idx.push_back(m);
+			for (size_t m = 0; m != b.size(); ++m) {
+				if (blkmap_b[m] == atomA) mA_idx.push_back(int(m));
+				if (blkmap_b[m] == atomB) nB_idx.push_back(int(m));
 			}
 						
 			// get x indices centered on alpha or beta
 				
-			for (int i = 0; i != x.size(); ++i) {
+			for (size_t i = 0; i != x.size(); ++i) {
 				if (blkmap_x[i] == atomA || blkmap_x[i] == atomB) 
-					xAB_idx.push_back(i);
+					xAB_idx.push_back(int(i));
 			}
 			
 			#if 1
@@ -215,12 +192,7 @@ dbcsr::sbtensor<3,double> dfitting::compute_pari(dbcsr::shared_matrix<double> s_
 				std::cout << ix << " ";
 			} std::cout << std::endl;
 			#endif	
-			
-					
-			int mu_nblks = mA_idx.size();
-			int nu_nblks = nB_idx.size();		
-			int xAB_nblks = xAB_idx.size();
-			
+						
 			// compute 3c2e ints
 		
 			arrvec<int,3> blks = {xAB_idx, mA_idx, nB_idx};
@@ -243,12 +215,12 @@ dbcsr::sbtensor<3,double> dfitting::compute_pari(dbcsr::shared_matrix<double> s_
 			std::map<int,int> xAB_mapping;
 		
 			int off = 0;
-			for (int k = 0; k != xAB_idx.size(); ++k) {
+			for (size_t k = 0; k != xAB_idx.size(); ++k) {
 				int kAB = xAB_idx[k];
 				m += x[kAB];
 				xAB_sizes[k] = x[kAB];
 				xAB_offs[k] = off;
-				xAB_mapping[kAB] = k;
+				xAB_mapping[kAB] = int(k);
 				off += xAB_sizes[k];
 			}
 			
@@ -271,10 +243,7 @@ dbcsr::sbtensor<3,double> dfitting::compute_pari(dbcsr::shared_matrix<double> s_
 					bool found = false;
 					double* ptr = s_xx_desym->get_block_data(ix,iy,found);
 			
-					if (found) {
-						
-						std::array<int,2> sizes = {xsize,ysize};
-						
+					if (found) {						
 #if 0		
 						std::array<int,2> idx = {ix,iy};
 						met->put_block(idx, ptr, sizes);
@@ -399,7 +368,7 @@ dbcsr::sbtensor<3,double> dfitting::compute_pari(dbcsr::shared_matrix<double> s_
 				
 		}; // end worker function
 	
-		util::scheduler worker(m_cart.comm(), ntasks, workfunc);
+		util::basic_scheduler worker(m_cart.comm(), ntasks, workfunc);
 		worker.run();
 				
 		dbcsr::copy_local_to_global(*c_xbb_local, *c_xbb_global);

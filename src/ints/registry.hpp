@@ -45,18 +45,18 @@ public:
 	void insert_tensor(std::string name, dbcsr::stensor<N,T>& t) {
 		std::any in = std::any(t);
 		m_map[name] = in;
-	};
+	}
 	
 	template <int N, typename T>
 	void insert_btensor(std::string name, dbcsr::sbtensor<N,T>& t) {
 		std::any in = std::any(t);
 		m_map[name] = in;
-	}; 
+	}
 	
 	void insert_screener(std::string name, ints::shared_screener scr) {
 		std::any in = std::any(scr);
 		m_map[name] = in;
-	};
+	}
 	
 	template <typename T>
 	dbcsr::smatrix<T> get_matrix(std::string intname) {

@@ -64,8 +64,8 @@ inline std::ostream& operator<<(std::ostream& out, const Shell& s) {
 	out << "\t" << "O: [" << s.O[0] << ", " << s.O[1] << ", " << s.O[2] << "]\n";
 	out << "\t" << "l: " << s.l << "\n";
 	out << "\t" << "shell: {\n";
-	for (int i = 0; i != s.alpha.size(); ++i) {
-		out << "\t" << "\t" << s.alpha[i] << "\t" << s.coeff[i] << '\n';
+	for (size_t ii = 0; ii != s.alpha.size(); ++ii) {
+		out << "\t" << "\t" << s.alpha[ii] << "\t" << s.coeff[ii] << '\n';
 	} 
 	out << "\t" << "}\n";
 	out << "}";
@@ -100,7 +100,7 @@ inline size_t max_l(vshell bas) {
 }
 
 inline int atom_of(Shell& s, std::vector<Atom>& atoms) {
-	for (int i = 0; i != atoms.size(); ++i) {
+	for (int i = 0; i != (int)atoms.size(); ++i) {
 		double dist = sqrt(pow(s.O[0] - atoms[i].x,2.0)
 			+ pow(s.O[1] - atoms[i].y,2.0)
 			+ pow(s.O[2] - atoms[i].z,2.0));
@@ -148,11 +148,12 @@ public:
 	cluster_basis(const cluster_basis& cbasis) : 
 		m_clusters(cbasis.m_clusters),
 		m_cluster_sizes(cbasis.m_cluster_sizes),
+		m_cluster_diff(cbasis.m_cluster_diff),
+		m_cluster_types(cbasis.m_cluster_types), 
 		m_shell_offsets(cbasis.m_shell_offsets),
 		m_nsplit(cbasis.m_nsplit),
-		m_split_method(cbasis.m_split_method),
-		m_cluster_diff(cbasis.m_cluster_diff),
-		m_cluster_types(cbasis.m_cluster_types) {}
+		m_split_method(cbasis.m_split_method)
+	{}
 		
 	cluster_basis& operator =(const cluster_basis& cbasis) {
 		if (this != &cbasis) {

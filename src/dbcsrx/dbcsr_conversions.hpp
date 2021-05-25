@@ -99,7 +99,7 @@ MatrixX<T,StorageOrder> matrix_to_eigen(matrix<T>& mat_in) {
 		locmat->complete_redistribute(*mat_desym);
 		MatrixX<T,StorageOrder>* eigenmat;
 		
-		if (prow = w.myprow() && pcol == w.mypcol()) {
+		if ((prow == w.myprow()) && (pcol == w.mypcol())) {
 			
 			int nrows = mat_in.nfullrows_total();
 			int ncols = mat_in.nfullcols_total();

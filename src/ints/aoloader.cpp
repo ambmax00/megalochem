@@ -478,8 +478,8 @@ void aoloader::compute() {
 		auto m_xx = m_reg.get<smatd>(key::coul_xx);
 		auto s_xx_inv = m_reg.get<smatd>(key::ovlp_xx_inv);
 		
-		auto c_xbb_qr = dfit.compute_qr_new(s_bb, s_xx_inv, m_xx, spgrid3, nullptr, 
-			bdims, m_btype_intermeds, true);
+		auto c_xbb_qr = dfit.compute_qr_new(s_bb, s_xx_inv, m_xx, spgrid3, 
+			bdims, m_btype_intermeds);
 		m_reg.insert(key::qr_xbb, c_xbb_qr);
 		
 		auto mat = dfit.compute_idx(c_xbb_qr);
@@ -539,9 +539,9 @@ void aoloader::compute() {
 	TIME.finish();
 	LOG.os<>("Finished loading AO quantities.\n");
 	
-	for (int i = 0; i != m_to_compute.size(); ++i) {
+	for (size_t i = 0; i != m_to_compute.size(); ++i) {
 		
-		ints:key k = static_cast<ints::key>(i);
+		ints::key k = static_cast<ints::key>(i);
 		if (m_reg.present(k) && !m_to_keep[i]) {
 			m_reg.erase(k);
 		}

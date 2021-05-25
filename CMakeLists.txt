@@ -6,7 +6,7 @@ enable_language(Fortran CXX)
 set(CMAKE_BUILD_TYPE RelWithDebInfo)
 set(CMAKE_CXX_STANDARD 17)
 
-#set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -pedantic")
+add_compile_options(-Wall -Wextra -pedantic)
 
 message(STATUS "Compiling with CXX flags ${CMAKE_CXX_FLAGS}")
 

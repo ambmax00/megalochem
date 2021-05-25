@@ -30,7 +30,7 @@ inline btype get_btype(std::string str) {
 	if (str == "disk") return btype::disk;
 	if (str == "direct") return btype::direct;
 	throw std::runtime_error("Invalid btensor type.");
-};
+}
 
 inline vec<vec<int>> make_blk_bounds(std::vector<int> blksizes, 
 	int nbatches, std::optional<std::vector<int>> blkmap = std::nullopt) {
@@ -193,16 +193,16 @@ public:
 
 	btensor(create_pack&& p) :
 		m_comm(p.p_set_pgrid->comm()),
+		LOG(p.p_set_pgrid->comm(),(p.p_print) ? *p.p_print : 0),
+		m_mpirank(-1), m_mpisize(-1),
 		m_name(p.p_name),
 		m_spgrid_N(p.p_set_pgrid),
 		m_blk_sizes(p.p_blk_sizes),
 		m_blk_maps(p.p_blk_maps),
 		m_filename(),
-		m_mpirank(-1), m_mpisize(-1),
-		LOG(p.p_set_pgrid->comm(),(p.p_print) ? *p.p_print : 0),
+		m_type(p.p_btensor_type),
 		m_is_compress_initialized(false),
-		m_is_decompress_initialized(false),
-		m_type(p.p_btensor_type)
+		m_is_decompress_initialized(false)
 	{
 		
 		MPI_Comm_rank(m_comm, &m_mpirank);
@@ -242,7 +242,7 @@ public:
 			auto& iblkoffs = blkoffsets[i];
 			auto& iblksizes = m_blk_sizes[i];
 			
-			for (int x = 0; x != ibds.size(); ++x) {
+			for (size_t x = 0; x != ibds.size(); ++x) {
 				ibds[x][0] = iblkoffs[ibds[x][0]];
 				ibds[x][1] = iblkoffs[ibds[x][1]] + iblksizes[ibds[x][1]] - 1;
 			}
@@ -347,7 +347,7 @@ public:
 		
 		LOG.os<1>("Creating files for ", m_filename, '\n');
 		
-		int rc = MPI_File_open(m_comm,m_filename.c_str(),MPI_MODE_CREATE|MPI_MODE_WRONLY,
+		MPI_File_open(m_comm,m_filename.c_str(),MPI_MODE_CREATE|MPI_MODE_WRONLY,
 			MPI_INFO_NULL,&fh);
 		
 		MPI_File_close(&fh);
@@ -359,7 +359,7 @@ public:
 	void delete_file() {
 		
 		LOG.os<1>("Deleting files for ", m_filename, '\n');
-		int rc = MPI_File_delete(m_filename.c_str(),MPI_INFO_NULL);
+		MPI_File_delete(m_filename.c_str(),MPI_INFO_NULL);
 		
 	}
 	
@@ -408,15 +408,15 @@ public:
 	int flatten(vec<int>& idx, vec<int>& dims) {
 		
 		vec<int> bsizes(dims.size());
-		for (int i = 0; i != bsizes.size(); ++i) {
+		for (size_t i = 0; i != bsizes.size(); ++i) {
 			bsizes[i] = m_nbatches_dim[dims[i]];
 		}
 		
 		int flat_idx = 0;
 		
-		for (int i = 0; i != bsizes.size(); ++i) {
+		for (size_t i = 0; i != bsizes.size(); ++i) {
 			int off = 1;
-			for (int n = bsizes.size() - 1; n > i; --n) {
+			for (size_t n = bsizes.size() - 1; n > i; --n) {
 				off *= bsizes[i];
 			}
 			flat_idx += idx[i] * off;
@@ -429,7 +429,7 @@ public:
 	int get_nbatches(vec<int> dims) {
 		/* get total number of batches */
 		int nbatches = 1;
-		for (int i = 0; i != dims.size(); ++i) {
+		for (size_t i = 0; i != dims.size(); ++i) {
 			int idx = dims[i];
 			nbatches *= m_nbatches_dim[idx];
 		}
@@ -533,7 +533,7 @@ public:
 		
 		vec<vec<int>> b(N);
 		
-		for (int i = 0; i != idx.size(); ++i) {
+		for (size_t i = 0; i != idx.size(); ++i) {
 			b[dims[i]] = this->bounds(dims[i], idx[i]);
 		}
 		
@@ -552,7 +552,7 @@ public:
 		
 		vec<vec<int>> b(N);
 		
-		for (int i = 0; i != idx.size(); ++i) {
+		for (size_t i = 0; i != idx.size(); ++i) {
 			b[dims[i]] = this->blk_bounds(dims[i], idx[i]);
 		}
 		
@@ -613,7 +613,6 @@ public:
 		LOG.os<1>("Compressing into core memory...\n");
 		
 		auto b = get_bounds(idx, m_wrview.dims);
-		int ibatch = flatten(idx, m_wrview.dims);
     
 		LOG.os<1>("Copying\n");
 		
@@ -708,7 +707,6 @@ public:
 		blkidxbatch.fill(vec<int>(nblocks));
 		
 		MPI_Aint offset = 0;
-		int n = 0;
 		
 		int iblk = 0;
 		
@@ -810,7 +808,7 @@ public:
 		
 		if (LOG.global_plev() >= 10) {
 			std::cout << "LOC BLK IDX AND OFFSET." << std::endl;
-			for (int i = 0; i != blkidxbatch[0].size(); ++i) {
+			for (size_t i = 0; i != blkidxbatch[0].size(); ++i) {
 				for (int j = 0; j != N; ++j) {
 					std::cout << blkidxbatch[j][i] << " ";
 				}
@@ -840,7 +838,6 @@ public:
 		auto this_map1 = m_stensor->map1_2d();
 		auto this_map2 = m_stensor->map2_2d();
 		
-		/*
 		std::cout << "MAP1 vs MAP1 new" << std::endl;
 		auto prt = [](vec<int> m) {
 			for (auto i : m) {
@@ -988,7 +985,7 @@ public:
 		// start computing superindices
 		std::array<int,N> bsizes;
 		for (int i = 0; i != N; ++i) {
-			bsizes[i] = (dims.size() > i) ? m_nbatches_dim[dims[i]] : 1;
+			bsizes[i] = ((int)dims.size() > i) ? m_nbatches_dim[dims[i]] : 1;
 		}
 		int nbatches = std::accumulate(bsizes.begin(), bsizes.end(), 1, std::multiplies<int>());
 		
@@ -1002,15 +999,12 @@ public:
 		
 		for (int i = 0; i != N; ++i) {
 			int n = 0;
-			for (int iblk = 0; iblk != sizes[i].size(); ++iblk) {
+			for (size_t iblk = 0; iblk != sizes[i].size(); ++iblk) {
 				off[i][iblk] = n;
 				n += sizes[i][iblk];
 				full[i] += sizes[i][iblk];
 			}
 		}
-		
-		size_t nblks = std::accumulate(full.begin(),full.end(),
-			1, std::multiplies<size_t>());
 			
 		auto& nblksprocbatch = rview.nblksprocbatch;
 		auto& nzeprocbatch = rview.nzeprocbatch;
@@ -1101,7 +1095,7 @@ public:
 		
 		if (LOG.global_plev() >= 10 && m_mpirank == 0) {
 			std::cout << "BATCHSIZES:" << std::endl;
-			for (int i = 0; i != nblksprocbatch.size(); ++i) {
+			for (size_t i = 0; i != nblksprocbatch.size(); ++i) {
 				std::cout << "BATCH " << i << " " << nblksprocbatch[i][0] << std::endl;
 			}
 		}
@@ -1458,7 +1452,7 @@ public:
 			break;
 			case btype::direct : decompress_direct(idx);
 			break;
-			case btype::core : decompress_core(idx);
+			case btype::core : decompress_core();
 			break;
 		}
 		
@@ -1486,7 +1480,7 @@ public:
 		
 	}
 	
-	void decompress_core(vec<int> idx) {
+	void decompress_core() {
 		
 		LOG.os<1>("Decompressing from core.\n");
 		
@@ -1521,12 +1515,6 @@ public:
 		
 			int nze = nzeprocbatch[ibatch][m_mpirank];
 			int nblk = nblksprocbatch[ibatch][m_mpirank];
-			
-			int64_t nblktotbatch = std::accumulate(nblksprocbatch[ibatch].begin(),
-				nblksprocbatch[ibatch].end(),int64_t(0));
-		
-			int64_t nzetotbatch = std::accumulate(nzeprocbatch[ibatch].begin(),
-				nzeprocbatch[ibatch].end(),int64_t(0));
 			
 			// === Allocating blocks for tensor ===
 			//// offsets
@@ -1647,13 +1635,6 @@ public:
 			int nze = nzeprocbatch[ibatch][m_mpirank];
 			int nblk = nblksprocbatch[ibatch][m_mpirank];
 			
-			int64_t nblktotbatch = std::accumulate(nblksprocbatch[ibatch].begin(),
-				nblksprocbatch[ibatch].end(),int64_t(0));
-		
-			int64_t nzetotbatch = std::accumulate(nzeprocbatch[ibatch].begin(),
-				nzeprocbatch[ibatch].end(),int64_t(0));
-	
-			
 			// read idx and offset
 			int64_t blkoff = 0;
 			
@@ -1699,7 +1680,7 @@ public:
 				
 			vec<MPI_Aint> blkoffsets(nblk);
 			
-			for (size_t i = 0; i != nblk; ++i) {
+			for (int i = 0; i != nblk; ++i) {
 				blkoffsets[i] = newlocblkoff[i] * sizeof(T);
 			}
 			
@@ -1804,9 +1785,7 @@ public:
 			auto rmap1 = rdview.map1;
 			auto rmap2 = rdview.map2;
 			
-			std::array<int,N> idx, blksize;
-			std::array<int,2> blk2size;
-			
+			std::array<int,N> idx, blksize;			
 			/*std::cout << "MAP: " << std::endl;
 			for (auto m : map1) std::cout << m << " ";
 			for (auto m : map2) std::cout << m << " ";

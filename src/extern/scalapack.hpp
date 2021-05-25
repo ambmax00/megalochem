@@ -93,44 +93,52 @@ extern "C" {
 inline int c_sys2blacs_handle(MPI_Comm comm) {
 	MPI_Fint fcomm = MPI_Comm_c2f(comm);
 	return sys2blacs_handle_(&fcomm);
-};
+}
 
 inline void c_blacs_pinfo(int* mypnum, int* nprocs)
 {
 	blacs_pinfo_(mypnum, nprocs);
-};
+}
+
 inline void c_blacs_get(int icontxt, int what, int* val) 
 {
 	blacs_get_(&icontxt, &what, val);
-};
+}
+
 inline void c_blacs_gridinit(int* icontxt, char layout, int nprow, int npcol) 
 {
 	blacs_gridinit_(icontxt, &layout, &nprow, &npcol);
-};
+}
+
 inline int c_blacs_pnum(int icontxt, int prow, int pcol) 
 {
 	return blacs_pnum_(&icontxt,&prow,&pcol);
-};
+}
+
 inline void c_blacs_gridmap(int* icontxt, int* usermap, int ldumap, int nprow, int npcol)
 {
 	blacs_gridmap_(icontxt, usermap, &ldumap, &nprow, &npcol);
-};
+}
+
 inline void c_blacs_barrier(int icontxt, char scope) 
 {
 	blacs_barrier_(&icontxt, &scope);
-};
+}
+
 inline void c_blacs_gridinfo(int icontxt, int* nprow, int* npcol, int* myprow, int* mypcol)
 {
 	blacs_gridinfo_(&icontxt, nprow, npcol, myprow, mypcol);
-};
+}
+
 inline void c_blacs_gridexit(int ctxt) 
 {
 	blacs_gridexit_(&ctxt);
-};
+}
+
 inline void c_blacs_exit(int comt) 
 {
 	blacs_exit_(&comt);
-};
+}
 
 inline double c_pddot(int n, double* x, int ix, int jx, int* descx, 
 	int incx, double* y, int iy, int jy, int* descy, int incy) 
@@ -146,52 +154,57 @@ inline double c_pddot(int n, double* x, int ix, int jx, int* descx,
 	
 	return dot;
 	
-};
+}
 
 inline int c_indxl2g(int indxloc, int nb, int iproc, int isrcproc, int nprocs)
 {
 	int f_indxloc = indxloc + 1;
 	return indxl2g_(&f_indxloc, &nb, &iproc, &isrcproc, &nprocs) - 1;
-};
+}
+
 inline int c_indxg2l(int indxglob, int nb, int iproc, int isrcproc, int nprocs)
 {
 	int f_indxglob = indxglob + 1;
 	return indxg2l_(&f_indxglob, &nb, &iproc, &isrcproc, &nprocs) - 1;
-};
+}
+
 inline int c_indxg2p(int indxglob, int nb, int iproc, int isrcproc, int nprocs)
 {
 	int f_indxglob = indxglob + 1;
 	return indxg2p_(&f_indxglob, &nb, &iproc, &isrcproc, &nprocs);
-};
+}
 
 inline int c_numroc(int n, int nb, int iproc, int isrcproc, int nprocs)
 {
 	return numroc_(&n, &nb, &iproc, &isrcproc, &nprocs);
-};
+}
+
 inline void c_descinit(int* desc, int m, int n, int mb, int nb, int irsrc, int icsrc,
 		int ictxt, int lld, int* info)
 {
 	descinit_(desc, &m, &n, &mb, &nb, &irsrc, &icsrc, &ictxt, &lld, info);
-};
+}
 
 inline void c_pielset(int* A, int ia, int ja, int* desca, int alpha) 
 {
 	int f_ia = ia + 1;
 	int f_ja = ja + 1;
 	pielset_(A, &f_ia, &f_ja, desca, &alpha);
-};
+}
+
 inline void c_pdelset(double* A, int ia, int ja, int* desca, double alpha) 
 {
 	int f_ia = ia + 1;
 	int f_ja = ja + 1;
 	pdelset_(A, &f_ia, &f_ja, desca, &alpha);
-};
+}
+
 inline void c_pdelget(char scope, char top, double* alpha, double* A, int ia, int ja, int* desca)
 {
 	int f_ia = ia + 1;
 	int f_ja = ja + 1;
 	pdelget_(&scope, &top, alpha, A, &f_ia, &f_ja, desca);
-};
+}
 
 inline void c_pdsyev(char jobz, char uplo, int n, double* a, int ia, int ja,
 		int* desca, double* w, double* z, int iz, int jz, int* descz, 
@@ -202,7 +215,7 @@ inline void c_pdsyev(char jobz, char uplo, int n, double* a, int ia, int ja,
 	int f_iz = iz + 1;
 	int f_jz = jz + 1;
 	pdsyev_(&jobz,&uplo,&n,a,&f_ia,&f_ja,desca,w,z,&f_iz,&f_jz,descz,work,&lwork,info);
-};
+}
 
 inline double c_pdlange(char nrom, int m, int n, double* a, int ia, int ja, int* desca, double* work) 
 {
@@ -222,7 +235,7 @@ inline void c_pdlapiv(char direc, char rowcol, char pivroc, int m, int n,
 	int f_jp = jp + 1;
 	pdlapiv_(&direc, &rowcol, &pivroc, &m, &n, a, &f_ia, &f_ja, desca, ipiv, &f_ip, &f_jp,
 		descip, iwork);
-};
+}
 
 inline void c_pdpotrf(char uplo, int n, double* a, int ia, int ja, 
 	int* desca, int* info)
@@ -266,7 +279,7 @@ inline void c_pdgemm(char transa, char transb, int m, int n, int k, double alpha
 	pdgemm_(&transa,&transb,&m,&n,&k,&alpha,a,&f_ia,&f_ja,desca,b,&f_ib,&f_jb, 
 		descb,&beta,c,&f_ic,&f_jc,desc);
 
-};
+}
 
 // sub(B) = alpha * op(sub(A)) * B + B
 // sub(B) = alpha * B * op(sub(A)) + B 

@@ -30,9 +30,10 @@ class multiply_base {
 private:
 
     char m_transa, m_transb;
-    T m_alpha, m_beta;
+    T m_alpha;
     matrix<T>& m_A; 
-    matrix<T>& m_B; 
+    matrix<T>& m_B;
+    T m_beta; 
     matrix<T>& m_C;
     
 public:

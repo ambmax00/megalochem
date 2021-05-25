@@ -19,6 +19,7 @@ protected:
 	world m_world;
 	dbcsr::cart m_cart;
 	desc::shared_molecule m_mol;
+	std::string m_method;
 	
 	aofactory m_fac;
 	
@@ -28,7 +29,11 @@ protected:
 public:
 
 	screener(world w, desc::shared_molecule mol, std::string method) : 
-		m_world(w), m_cart(w.dbcsr_grid()), m_mol(mol), m_fac(mol, w) {}
+		m_world(w), 
+		m_cart(w.dbcsr_grid()), 
+		m_mol(mol), 
+		m_method(method),
+		m_fac(mol, w) {}
 		
 	virtual void compute() = 0;
 	
@@ -80,7 +85,10 @@ protected:
 public:
 
 	atomic_screener(world w, desc::shared_molecule mol, std::vector<int> alist) :
-		m_atom_list(alist), m_schwarz(w,mol), screener(w, mol, "atomic") {}
+		screener(w, mol, "atomic"), 
+		m_atom_list(alist), 
+		m_schwarz(w,mol) 
+	{}
 		
 	void compute() override;
 		

@@ -35,7 +35,7 @@ std::vector<block_info> get_block_info(desc::cluster_basis& cbas) {
 	auto radii = cbas.radii(radius_eps, radius_step, radius_max_step);
 	auto min_alphas = cbas.min_alpha();
 	
-	for (int ic = 0; ic != cbas.size(); ++ic) {
+	for (size_t ic = 0; ic != cbas.size(); ++ic) {
 		blkinfo[ic].pos = cbas[ic][0].O;
 		blkinfo[ic].radius = radii[ic];
 		blkinfo[ic].alpha = min_alphas[ic];
@@ -49,8 +49,7 @@ dbcsr::sbtensor<3,double> dfitting::compute_qr_new(
 	dbcsr::shared_matrix<double> s_bb, 
 	dbcsr::shared_matrix<double> s_xx_inv, 
 	dbcsr::shared_matrix<double> m_xx, dbcsr::shared_pgrid<3> spgrid3_xbb,
-	shared_screener scr_s, std::array<int,3> bdims, dbcsr::btype mytype,
-	bool atomic)
+	std::array<int,3> bdims, dbcsr::btype mytype)
 {
 	
 	TIME.start();
@@ -72,7 +71,7 @@ dbcsr::sbtensor<3,double> dfitting::compute_qr_new(
 	auto xoff = m_xx->row_blk_offsets();
 	auto boff = b;
 	int off = 0;
-	for (int i = 0; i != b.size(); ++i) {
+	for (size_t i = 0; i != b.size(); ++i) {
 		boff[i] = off;
 		off += b[i];
 	}
@@ -171,15 +170,12 @@ dbcsr::sbtensor<3,double> dfitting::compute_qr_new(
 	const int natoms = m_mol->atoms().size();
 	// make sure that each process has one atom block, but diffuse
 	// and tight blocks are separated
-	int offset = 0;
 	auto blkmap_frag = blkmap_b;
-	for (int i = 0; i != blkmap_b.size(); ++i) { 
+	for (size_t i = 0; i != blkmap_b.size(); ++i) { 
 		blkmap_frag[i] = (!is_diff[i]) ? blkmap_frag[i] 
 			: blkmap_frag[i] + natoms;
 	}
-	
-	int nblks = *(std::max_element(blkmap_frag.begin(), blkmap_frag.end())) + 1;
-	
+		
 	std::vector<std::vector<int>> frag_blocks;
 	std::vector<int> frag_blk_sizes;
 	
@@ -187,7 +183,7 @@ dbcsr::sbtensor<3,double> dfitting::compute_qr_new(
 	int sub_size = 0;
 	int prev_centre = 0;
 	
-	for (int i = 0; i != b.size(); ++i) {
+	for (size_t i = 0; i != b.size(); ++i) {
 		
 		int current_centre = blkmap_frag[i];
 		if (current_centre != prev_centre) {
@@ -208,7 +204,7 @@ dbcsr::sbtensor<3,double> dfitting::compute_qr_new(
 		prev_centre = current_centre;
 	}
 	
-	for (int ifrag = 0; ifrag != frag_blocks.size(); ++ifrag) {
+	for (size_t ifrag = 0; ifrag != frag_blocks.size(); ++ifrag) {
 		LOG.os<1>("Fragment ", ifrag, " (size: ", frag_blk_sizes[ifrag], ")\n");
 		for (auto ff : frag_blocks[ifrag]) {
 			LOG.os<1>(ff, " ");
@@ -225,7 +221,7 @@ dbcsr::sbtensor<3,double> dfitting::compute_qr_new(
 		
 		// we are guaranteed that each atom block is entirely in one
 		// batch, so we just check the first function
-		for (int i = 0; i != frag_blocks.size(); ++i) {
+		for (int i = 0; i != (int)frag_blocks.size(); ++i) {
 			if (frag_blocks[i][0] < nbds[0] || frag_blocks[i][0] > nbds[1]) continue;
 			blkbounds[0] = std::min(blkbounds[0], i);
 			blkbounds[1] = std::max(blkbounds[1], i);
@@ -299,7 +295,7 @@ dbcsr::sbtensor<3,double> dfitting::compute_qr_new(
 		
 		std::vector<std::pair<int,int>> chunk;
 				
-		for (int ifrag = 0; ifrag != frag_blocks.size(); ++ifrag) {
+		for (int ifrag = 0; ifrag != (int)frag_blocks.size(); ++ifrag) {
 			for (int jfrag = frag_blkbounds[0]; 
 				jfrag != frag_blkbounds[1]+1; ++jfrag) {
 					
@@ -360,18 +356,13 @@ dbcsr::sbtensor<3,double> dfitting::compute_qr_new(
 				for (auto imu : frag_blocks[ifrag]) {
 					for (auto inu : frag_blocks[jfrag]) {
 						
-						double ri = blkinfo_b[inu].radius;
-						double rj = blkinfo_b[imu].radius;
-						auto posi = blkinfo_b[inu].pos;
-						auto posj = blkinfo_b[imu].pos;
-						
 						bool is_same_type = (blktype_b[imu] == blktype_b[inu]);
 						
 						if (is_same_type && blknorms(imu,inu) < dbcsr::global::filter_eps) {
 							continue;
 						}
 						
-						for (int ix = 0; ix != x.size(); ++ix) {
+						for (size_t ix = 0; ix != x.size(); ++ix) {
 							
 							blkidx[0].push_back(ix);
 							blkidx[1].push_back(imu);
@@ -447,7 +438,7 @@ dbcsr::sbtensor<3,double> dfitting::compute_qr_new(
 				
 				for (auto imu : blk_mu) {
 				 for (auto inu : blk_nu) {
-				  for (int ix = 0; ix != x.size(); ++ix) {
+				  for (int ix = 0; ix != (int)x.size(); ++ix) {
 							
 				   idx3 = {ix,imu,inu};
 				   size3 = {x[ix],b[imu],b[inu]};
@@ -470,7 +461,7 @@ dbcsr::sbtensor<3,double> dfitting::compute_qr_new(
 			
 				vec<int> blk_P;
 				blk_P.reserve(x.size());
-				for (int ix = 0; ix != x.size(); ++ix) {
+				for (int ix = 0; ix != (int)x.size(); ++ix) {
 					if (blk_P_bool[ix]) blk_P.push_back(ix);
 				}
 				
@@ -518,13 +509,10 @@ dbcsr::sbtensor<3,double> dfitting::compute_qr_new(
 				
 				std::vector<int> blk_Q;
 				blk_Q.reserve(x.size());
-				for (int ix = 0; ix != x.size(); ++ix) {
+				for (int ix = 0; ix != (int)x.size(); ++ix) {
 					if (blk_Q_bool[ix]) blk_Q.push_back(ix);
 				}
-				
-				int nblkq = blk_Q.size();
-				//std::cout << "NEW SET: " << nblkq << "/" << x.size() << std::endl;
-				
+								
 				
 				// === Compute coulomb integrals
 				arrvec<int,3> coul_blk_idx;
@@ -880,8 +868,8 @@ std::shared_ptr<Eigen::MatrixXi> dfitting::compute_idx(
 		
 	int nblks = 0;
 		
-	for (int ix = 0; ix != x.size(); ++ix) {
-		for (int inu = 0; inu != b.size(); ++inu) {
+	for (int ix = 0; ix != (int)x.size(); ++ix) {
+		for (int inu = 0; inu != (int)b.size(); ++inu) {
 			if (idx_global(ix,inu)) ++nblks;
 		}
 	}

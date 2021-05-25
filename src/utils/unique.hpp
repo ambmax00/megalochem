@@ -16,7 +16,7 @@ inline std::string unique(std::string prefix, std::string suffix, MPI_Comm comm)
 	long long int id = 0;
 	
 	if (rank == 0) {
-		for (long long int ii = 0; ii <= std::numeric_limits<size_t>::max(); ++ii) {
+		for (size_t ii = 0; ii <= std::numeric_limits<size_t>::max(); ++ii) {
 			id = ii;
 			std::string fname = prefix + std::to_string(id) + suffix;
 			if (!std::filesystem::exists(fname)) break;

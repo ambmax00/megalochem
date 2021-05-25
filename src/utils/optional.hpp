@@ -96,13 +96,7 @@ public:
 			std::cout << "This is me: " << this << std::endl;
 		}
 		
-		_val = new noref_type(var);
-		
-		void* ptr = nullptr;
-		
-		if constexpr (util_debug) std::cout << "THIS IS A NULLPTR: " << ptr << std::endl;	
-		if constexpr (util_debug) std::cout << "MY PTR: " << &_val << " with " << _val << std::endl;
-		
+		_val = new noref_type(var);		
 		
 	}
 	
@@ -257,12 +251,12 @@ public:
 		return *this;
 	}
 		
-	optional(nullopt_t no_arg) : _val(nullptr) {
+	optional([[maybe_unused]] nullopt_t no_arg) : _val(nullptr) {
 		if constexpr (util_debug) std::cout << "13" << std::endl;
 		if constexpr (util_debug) std::cout << "This is me: " << this << std::endl;
 	}
 	
-	optional(std::nullopt_t no_arg) : _val(nullptr) {
+	optional([[maybe_unused]] std::nullopt_t no_arg) : _val(nullptr) {
 		if constexpr (util_debug) std::cout << "14" << std::endl;
 		if constexpr (util_debug) std::cout << "This is me: " << this << std::endl;
 	}

@@ -120,7 +120,7 @@ protected:
 			
 			m_bas_sizes = c.cluster_sizes();
 			
-			for (int i = 0; i != c.size(); ++i) {
+			for (size_t i = 0; i != c.size(); ++i) {
 				m_shell_sizes.push_back(c[i].size());
 			}
 			
@@ -131,7 +131,7 @@ protected:
 			m_dfbas_sizes = cdf.cluster_sizes();
 			
 			m_dfshell_sizes.clear();
-			for (int i = 0; i != cdf.size(); ++i) {
+			for (size_t i = 0; i != cdf.size(); ++i) {
 				m_dfshell_sizes.push_back(cdf[i].size());
 			}
 			
@@ -142,7 +142,7 @@ protected:
 			m_bas2_sizes = c2.cluster_sizes();
 			
 			m_shell2_sizes.clear();
-			for (int i = 0; i != c2.size(); ++i) {
+			for (size_t i = 0; i != c2.size(); ++i) {
 				m_shell2_sizes.push_back(c2[i].size());
 			}
 			

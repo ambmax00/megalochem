@@ -61,8 +61,8 @@ private:
 	
 	ints::key_registry<key> m_reg;
 
-	std::array<bool,static_cast<const int>(key::NUM_KEYS)> m_to_compute;
-	std::array<bool,static_cast<const int>(key::NUM_KEYS)> m_to_keep;
+	std::array<bool,static_cast<int>(key::NUM_KEYS)> m_to_compute;
+	std::array<bool,static_cast<int>(key::NUM_KEYS)> m_to_keep;
 
 	std::pair<dbcsr::shared_matrix<double>,dbcsr::shared_matrix<double>>
 		invert(dbcsr::shared_matrix<double> mat);
@@ -86,15 +86,16 @@ public:
 	MAKE_BUILDER_CLASS(aoloader, create, AOLOADER_CREATE_LIST, ())
 
 	aoloader(create_pack&& p) :
-		m_world(p.p_set_world), m_cart(p.p_set_world.dbcsr_grid()), 
+		m_world(p.p_set_world), 
+		m_cart(p.p_set_world.dbcsr_grid()), 
 		m_mol(p.p_set_molecule),
-		LOG(p.p_set_world.comm(), (p.p_print) ? *p.p_print : 0),
-		TIME(p.p_set_world.comm(), "AO-loader"),
 		m_btype_eris((p.p_btype_eris) ? *p.p_btype_eris : dbcsr::btype::core),
 		m_btype_intermeds((p.p_btype_intermeds) ? *p.p_btype_intermeds 
 			: dbcsr::btype::core),
 		m_nbatches_b((p.p_nbatches_b) ? *p.p_nbatches_b : 5),
-		m_nbatches_x((p.p_nbatches_x) ? *p.p_nbatches_x : 5)
+		m_nbatches_x((p.p_nbatches_x) ? *p.p_nbatches_x : 5),
+		LOG(p.p_set_world.comm(), (p.p_print) ? *p.p_print : 0),
+		TIME(p.p_set_world.comm(), "AO-loader")
 	{
 		for (auto& a : m_to_compute) a = false;		
 		for (auto& a : m_to_keep) a = false;

@@ -111,10 +111,13 @@ vvshell split_multi_shell(vshell& basis, int nsplit, bool strict, bool sp) {
 				//std::cout << "strict: " << l1 << " " << l2 << std::endl;
 				
 				if (sp) {
-					dont_split = (((l1 == 0) || (l1 == 1)) && ((l2 == 0) || (l2 == 1))
-						|| (l1 == l2));
+					bool is_s_or_p = ((l1 == 0) || (l1 == 1)) && 
+						((l2 == 0) || (l2 == 1));
+					dont_split = is_s_or_p || (l1 == l2);
+					
 				} else {
 					dont_split = (l1 == l2);
+					
 				}
 				
 			}
@@ -122,7 +125,7 @@ vvshell split_multi_shell(vshell& basis, int nsplit, bool strict, bool sp) {
 			//std::cout << ((dont_split) ? "TRUE" : "FALSE") << std::endl;
 			
 			if (it->O == fshell.O 
-				&& (nbf_cluster + nbf_shell <= nsplit || nbf_cluster == 0)
+				&& (int(nbf_cluster + nbf_shell) <= nsplit || nbf_cluster == 0)
 				&& (dont_split))
 			{
 				cluster.push_back(*it);
@@ -201,7 +204,7 @@ vshell make_basis(std::string basname, std::vector<desc::Atom>& atoms_in) {
 					std::vector<double> shell_alpha;
 					std::vector<double> shell_coeff;
 					
-					for (int i = 0; i != coeffs_full.size(); ++i) {
+					for (size_t i = 0; i != coeffs_full.size(); ++i) {
 						if (fabs(coeffs_full[i]) > std::numeric_limits<double>::epsilon()) {
 							shell_alpha.push_back(alpha[i]);
 							shell_coeff.push_back(coeffs_full[i]);
@@ -223,7 +226,7 @@ vshell make_basis(std::string basname, std::vector<desc::Atom>& atoms_in) {
 			
 			} else { 
 			
-				for (int i = 0; i != angmoms.size(); ++i) {
+				for (size_t i = 0; i != angmoms.size(); ++i) {
 					
 					std::vector<std::string> coeffs_str = coeff_arrays[i];						
 					
@@ -330,14 +333,11 @@ cluster_basis::cluster_basis(vshell basis,
 	std::optional<vshell> augbasis) : 
 	m_nsplit(opt_nsplit ? *opt_nsplit : DEFAULT_NSPLIT), 
 	m_split_method(opt_method ? *opt_method : DEFAULT_SPLIT_METHOD) {
-	
-	auto nbas = desc::nbf(basis);
-	auto vsize = basis.size();
-	
+		
 	//std::cout << "NBAS: " << nbas << std::endl;
 	//std::cout << "VSIZE: " << vsize << std::endl;
 	
-	auto get_cluster = [&](vshell t_basis, int t_nsplit) {
+	auto get_cluster = [&](vshell t_basis) {
 	
 		if (m_split_method == "atomic") {
 			
@@ -367,16 +367,16 @@ cluster_basis::cluster_basis(vshell basis,
 		
 	};
 	
-	auto clusters = get_cluster(basis, m_nsplit);
+	auto clusters = get_cluster(basis);
 	if (augbasis) {
 		
 		//std::cout << "PREPPING" << std::endl;
 		auto aug_extract = extract(basis, *augbasis);
 		
-		auto aug_clusters = get_cluster(aug_extract, m_nsplit);
+		auto aug_clusters = get_cluster(aug_extract);
 		decltype(clusters) new_clusters;
 		
-		for (int i = 0; i != clusters.size(); ++i) {
+		for (size_t i = 0; i < clusters.size(); ++i) {
 			
 			auto& this_shell = clusters[i].back();
 			auto& next_shell = (i == clusters.size() - 1) ? 
@@ -417,7 +417,7 @@ cluster_basis::cluster_basis(vshell basis,
 	int off = 0;
 	m_shell_offsets.resize(m_clusters.size());
 	
-	for (int i = 0; i != m_shell_offsets.size(); ++i) {
+	for (size_t i = 0; i != m_shell_offsets.size(); ++i) {
 		m_shell_offsets[i] = off;
 		off += m_clusters[i].size();
 	}
@@ -440,7 +440,7 @@ cluster_basis::cluster_basis(vshell basis,
 size_t cluster_basis::max_nprim() const {
 	
 	size_t n = 0;
-	for (int i = 0; i != m_clusters.size(); ++i) {
+	for (size_t i = 0; i != m_clusters.size(); ++i) {
 		n = std::max(desc::max_nprim(m_clusters[i]), n);
 	}
 	return n;	
@@ -449,7 +449,7 @@ size_t cluster_basis::max_nprim() const {
 size_t cluster_basis::nbf() const {
 	
 	size_t nbas = 0;
-	for (int i = 0; i != m_clusters.size(); ++i) {
+	for (size_t i = 0; i != m_clusters.size(); ++i) {
 		nbas += desc::nbf(m_clusters[i]);
 	}
 	return nbas;
@@ -458,7 +458,7 @@ size_t cluster_basis::nbf() const {
 size_t cluster_basis::max_l() const {
 	
 	size_t l = 0;
-		for (int i = 0; i != m_clusters.size(); ++i) {
+		for (size_t i = 0; i != m_clusters.size(); ++i) {
 		l = std::max(desc::max_l(m_clusters[i]), l);
 	}
 	return l;	
@@ -473,17 +473,17 @@ std::vector<int> cluster_basis::block_to_atom(std::vector<desc::Atom> atoms) con
 	std::vector<int> blk_to_atom(m_cluster_sizes.size());
 	
 	auto get_centre = [&atoms](Shell& s) {
-		for (int i = 0; i != atoms.size(); ++i) {
+		for (size_t i = 0; i != atoms.size(); ++i) {
 			auto& a = atoms[i];
 			double d = sqrt(pow(s.O[0] - a.x, 2)
 				+ pow(s.O[1] - a.y,2)
 				+ pow(s.O[2] - a.z,2));
-			if (d < 1e-12) return i;
+			if (d < 1e-12) return int(i);
 		}
 		return -1;
 	};
 	
-	for (int iv = 0; iv != m_clusters.size(); ++iv) {
+	for (size_t iv = 0; iv != m_clusters.size(); ++iv) {
 		auto s = m_clusters[iv][0];
 		blk_to_atom[iv] = get_centre(s);
 	}
@@ -508,7 +508,7 @@ std::vector<double> cluster_basis::radii(double cutoff, double step, int maxiter
 	for (auto& cluster : m_clusters) {
 		double max_radius = 0.0;
 		for (auto& shell : cluster) {
-			for (int i = 0; i != shell.nprim(); ++i) {
+			for (size_t i = 0; i != shell.nprim(); ++i) {
 				max_radius = std::max(max_radius,
 					exp_radius(shell.l, shell.alpha[i], 
 					cutoff, shell.coeff[i], step, maxiter));
@@ -532,7 +532,7 @@ void cluster_basis::print_info() const {
 	
 	auto cluster_radii = radii();
 	
-	for (int icluster = 0; icluster != m_clusters.size(); ++icluster) {
+	for (size_t icluster = 0; icluster != m_clusters.size(); ++icluster) {
 		std::cout << "Cluster: " << icluster << '\n'
 				<< "{" << '\n'
 				<< '\t' << "size: " << m_cluster_sizes[icluster] << '\n'

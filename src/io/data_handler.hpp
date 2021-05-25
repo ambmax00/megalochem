@@ -171,9 +171,11 @@ private:
 
 public:
 
-	data_handler(std::string filename, create_mode cmode, MPI_Comm comm) 
-		: _filename(filename), _abs_filename(fs::absolute(filename)), 
-		_is_open(false), _comm(comm) 
+	data_handler(std::string filename, create_mode cmode, MPI_Comm comm) : 
+		_filename(filename), 
+		_abs_filename(fs::absolute(filename)),
+		_comm(comm), 
+		_is_open(false) 
 	{
 
 		_plist_id = H5Pcreate(H5P_FILE_ACCESS);
@@ -248,7 +250,7 @@ public:
 			H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
 			
 		if (wrank == _rank) {
-			auto err = H5Dwrite(dset, memtype, H5S_ALL, H5S_ALL,
+			H5Dwrite(dset, memtype, H5S_ALL, H5S_ALL,
 				data_plist, data);
 		}
 		
@@ -265,7 +267,7 @@ public:
 	void write(std::string vname, T* data, std::vector<hsize_t> dims, int wrank = 0) {
 		
 		auto strtype = H5Tcopy(H5T_C_S1);
-		auto status = H5Tset_size(strtype, _max_strlength);
+		H5Tset_size(strtype, _max_strlength);
 		
 		auto space = H5Screate_simple(dims.size(),dims.data(),NULL);
 				
@@ -293,7 +295,7 @@ public:
 			H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
 			
 		if (wrank == _rank) {
-			auto err = H5Dwrite(dset, strtype, H5S_ALL, H5S_ALL,
+			H5Dwrite(dset, strtype, H5S_ALL, H5S_ALL,
 				data_plist, c_strings.data());
 		}
 		
@@ -333,7 +335,7 @@ public:
 	
 		auto memtype = CPPtoHDF5<T>::memtype();
 	
-		auto err = H5Dread(dataset, memtype, H5S_ALL, H5S_ALL, 
+		H5Dread(dataset, memtype, H5S_ALL, H5S_ALL, 
 			data_plist, buf.data());
 		
 		H5Dclose(dataset);
@@ -368,7 +370,7 @@ public:
 		auto strtype = H5Tcopy(H5T_C_S1);
 		status = H5Tset_size(strtype, _max_strlength);
 	
-		auto err = H5Dread(dataset, strtype, H5S_ALL, H5S_ALL, 
+		H5Dread(dataset, strtype, H5S_ALL, H5S_ALL, 
 			data_plist, readbuf.data());
 		
 		H5Dclose(dataset);

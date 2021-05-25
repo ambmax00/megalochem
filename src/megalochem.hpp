@@ -10,8 +10,7 @@
 namespace megalochem {
 
 // initilizes dbcsr, and sets logging in LOG class which is global	
-inline void init(MPI_Comm comm, std::string workdir, 
-	std::optional<std::string> log_filename = std::nullopt) {
+inline void init(MPI_Comm comm, std::string workdir) {
 	
 	if (!std::filesystem::exists(workdir))
 		throw std::runtime_error("Working directory does not exist.");

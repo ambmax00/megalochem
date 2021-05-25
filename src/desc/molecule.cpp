@@ -90,8 +90,8 @@ molecule::molecule(molecule::create_pack&& p) {
 		std::vector<double> occ_a(m_nocc_alpha, 1.0);
 		std::vector<double> occ_b(m_nocc_beta, 1.0);
 		
-		for (size_t i = ncore; i < m_nocc_alpha; ++i) occ_a[i] = nfraca;
-		for (size_t i = ncore; i < m_nocc_beta; ++i) occ_b[i] = nfracb;
+		for (int i = ncore; i < m_nocc_alpha; ++i) occ_a[i] = nfraca;
+		for (int i = ncore; i < m_nocc_beta; ++i) occ_b[i] = nfracb;
 		
 		m_frac_occ_alpha = occ_a;
 		m_frac_occ_beta = occ_b;
@@ -102,7 +102,7 @@ molecule::molecule(molecule::create_pack&& p) {
 	
 		// total number of electrons
 		m_nele = 0;
-		for (int i = 0; i != m_atoms.size(); ++i) {
+		for (size_t i = 0; i != m_atoms.size(); ++i) {
 			m_nele += m_atoms[i].atomic_number;
 		}
 		
@@ -209,7 +209,7 @@ std::shared_ptr<desc::molecule> molecule::fragment(int noa, int nob, int nva,
 		}
 		
 		std::vector<int> blklist;
-		for (int ishell = 0; ishell != is_included.size(); ++ishell) {
+		for (size_t ishell = 0; ishell != is_included.size(); ++ishell) {
 			if (is_included[ishell]) blklist.push_back(ishell);
 		}
 		
@@ -227,11 +227,11 @@ std::shared_ptr<desc::molecule> molecule::fragment(int noa, int nob, int nva,
 	
 	frag->m_blocks = block_sizes(*frag, m_mo_split);
 	
-	auto print = [](auto v) {
+	/*auto print = [](auto v) {
 		for (auto e : v) {
 			std::cout << e << " ";
 		} std::cout << std::endl;
-	};
+	};*/
 	
 	frag->m_atoms = m_atoms;
 	

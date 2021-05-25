@@ -555,9 +555,7 @@ void calc_ints_schwarz_mn(dbcsr::matrix<double>& m_out, std::vector<std::vector<
 					
 					double n = 0.0;
 							
-					if (res != 0) {
-						int idx = 0;
-					
+					if (res != 0) {					
 						for (int i = 0; i != shellsize0; ++i) {
 							for (int j = 0; j != shellsize1; ++j) {
 								n += fabs(buf[i + j * shellsize0 + i * shellsize0 * shellsize1
@@ -635,9 +633,7 @@ void calc_ints_schwarz_x(dbcsr::matrix<double>& m_out, std::vector<std::vector<i
 				
 				double n = 0.0;
 						
-				if (res != 0) {
-					int idx = 0;
-				
+				if (res != 0) {				
 					for (int i = 0; i != shellsize0; ++i) {
 							n += fabs(buf[i + i * shellsize0]);
 					} //std::cout << std::endl;

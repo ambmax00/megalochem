@@ -92,7 +92,7 @@ void atomic_screener::compute() {
 	m_blklist_b = get_check(cbas);
 	m_blklist_x = get_check(xbas);
 	
-	for (int ix = 0; ix != m_blklist_x.size(); ++ix) m_blklist_x[ix] = true;
+	for (size_t ix = 0; ix != m_blklist_x.size(); ++ix) m_blklist_x[ix] = true;
 	 
 }
 
@@ -117,13 +117,14 @@ bool atomic_screener::skip_block_bbbb(int i, int j, int k, int l) {
 	
 }
 
-bool atomic_screener::skip_xbb(int i, int j, int k) {
+bool atomic_screener::skip_xbb([[maybe_unused]] int i, [[maybe_unused]] int j, [[maybe_unused]] int k) {
 		
 	return false;
 	
 }
 
-bool atomic_screener::skip_bbbb(int i, int j, int k, int l) {
+bool atomic_screener::skip_bbbb([[maybe_unused]] int i, [[maybe_unused]] int j, 
+	[[maybe_unused]] int k, [[maybe_unused]] int l) {
 			
 	return false;
 	

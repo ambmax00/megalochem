@@ -245,11 +245,11 @@ inline auto cyclic_dist = [](int dist_size, int nbins) {
 
 inline void init(MPI_Comm comm = MPI_COMM_WORLD, int* io_unit = nullptr) {
 	c_dbcsr_init_lib(comm, io_unit);
-};
+}
 
 inline void finalize() {
 	c_dbcsr_finalize_lib();
-};
+}
 
 inline void print_statistics(const bool print_timers = false) {
 	c_dbcsr_print_statistics(&print_timers, nullptr);

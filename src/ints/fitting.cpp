@@ -52,12 +52,6 @@ dbcsr::sbtensor<3,double> dfitting::compute(dbcsr::sbtensor<3,double> eri_batche
 	
 	// ======== Compute inv_xx * i_xxb ==============
 	
-	auto print = [](auto v) {
-		for (auto e : v) {
-			std::cout << e << " ";
-		} std::cout << std::endl;
-	};
-	
 	auto c_xbb_0_12 = dbcsr::tensor<3>::create()
 		.name("c_xbb_0_12")
 		.set_pgrid(*spgrid3_xbb)
@@ -92,7 +86,6 @@ dbcsr::sbtensor<3,double> dfitting::compute(dbcsr::sbtensor<3,double> eri_batche
 	
 	auto& con = TIME.sub("Contraction");
 	auto& reo = TIME.sub("Reordering");
-	auto& write = TIME.sub("Writing");
 	auto& fetch = TIME.sub("Fetching ints");
 	
 	LOG.os<1>("Computing C_xbb.\n");

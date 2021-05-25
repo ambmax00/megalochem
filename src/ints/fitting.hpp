@@ -44,11 +44,9 @@ public:
 		dbcsr::shared_matrix<double> s_bb,
 		dbcsr::shared_matrix<double> s_xx_inv, 
 		dbcsr::shared_matrix<double> m_xx, 
-		dbcsr::shared_pgrid<3> spgrid3_xbb,
-		shared_screener scr_s, 
+		dbcsr::shared_pgrid<3> spgrid3_xbb, 
 		std::array<int,3> bdims,
-		dbcsr::btype mytype,
-		bool atomic);
+		dbcsr::btype mytype);
 		
 	std::shared_ptr<Eigen::MatrixXi> compute_idx(dbcsr::sbtensor<3,double> cfit_xbb);
 		

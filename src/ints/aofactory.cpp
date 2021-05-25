@@ -40,17 +40,15 @@ enum class ctr {
 };
 
 constexpr int combine(op e1, ctr e2) {
-	const int pos1 = static_cast<const int>(e1);
-	const int pos2 = static_cast<const int>(e2);
-	const int size1 = static_cast<const int>(op::_END);
+	const int pos1 = static_cast<int>(e1);
+	const int pos2 = static_cast<int>(e2);
+	const int size1 = static_cast<int>(op::_END);
 	return pos1 + pos2*size1;
 }
 
 class aofactory::impl {
 	
 private:
-
-	util::mpi_time TIME;
 
 	void reserve_3_partial(dbcsr::shared_tensor<3>& t_in, vec<vec<int>>& blkbounds,
 		shared_screener s_scr) {
@@ -81,17 +79,17 @@ private:
 		
 		for (auto& r : res) r.reserve(maxblks);
 
-		for (int i0 = 0; i0 != blk_idx_loc[dim0].size(); ++i0) {
+		for (int i0 = 0; i0 != int(blk_idx_loc[dim0].size()); ++i0) {
 			
 			iblk[dim0] = blk_idx_loc[dim0][i0];
 			if (iblk[dim0] < blkbounds[dim0][0] || iblk[dim0] > blkbounds[dim0][1]) continue;
 			 
-			for (int i1 = 0; i1 != blk_idx_loc[dim1].size(); ++i1) {
+			for (int i1 = 0; i1 != int(blk_idx_loc[dim1].size()); ++i1) {
 				
 				iblk[dim1] = blk_idx_loc[dim1][i1];
 				if (iblk[dim1] < blkbounds[dim1][0] || iblk[dim1] > blkbounds[dim1][1]) continue;
 				
-				for (int i2 = 0; i2 != blk_idx_loc[dim2].size(); ++i2) {
+				for (int i2 = 0; i2 != int(blk_idx_loc[dim2].size()); ++i2) {
 					iblk[dim2] = blk_idx_loc[dim2][i2];
 					
 					if (iblk[dim2] < blkbounds[dim2][0] || iblk[dim2] > blkbounds[dim2][1]) continue;
@@ -168,9 +166,7 @@ private:
 		auto scr = s_scr.get();
 		
 		auto blksizes = t_in->blk_sizes(); 
-			
-		size_t totblk = 0;
-		
+					
 		auto blk_idx_loc = t_in->blks_local();
 		
 		auto idx_speed = t_in->idx_speed();
@@ -193,22 +189,22 @@ private:
 		
 		for (auto& r : res) r.reserve(maxblks);
 
-		for (int i0 = 0; i0 != blk_idx_loc[dim0].size(); ++i0) {
+		for (int i0 = 0; i0 != (int)blk_idx_loc[dim0].size(); ++i0) {
 			
 			iblk[dim0] = blk_idx_loc[dim0][i0];
 			if (iblk[dim0] < blkbounds[dim0][0] || iblk[dim0] > blkbounds[dim0][1]) continue;
 			 
-			for (int i1 = 0; i1 != blk_idx_loc[dim1].size(); ++i1) {
+			for (int i1 = 0; i1 != (int)blk_idx_loc[dim1].size(); ++i1) {
 				
 				iblk[dim1] = blk_idx_loc[dim1][i1];
 				if (iblk[dim1] < blkbounds[dim1][0] || iblk[dim1] > blkbounds[dim1][1]) continue;
 				
-				for (int i2 = 0; i2 != blk_idx_loc[dim2].size(); ++i2) {
+				for (int i2 = 0; i2 != (int)blk_idx_loc[dim2].size(); ++i2) {
 					iblk[dim2] = blk_idx_loc[dim2][i2];
 					
 					if (iblk[dim2] < blkbounds[dim2][0] || iblk[dim2] > blkbounds[dim2][1]) continue;
 					
-					for (int i3 = 0; i3 != blk_idx_loc[dim3].size(); ++i3) {
+					for (int i3 = 0; i3 != (int)blk_idx_loc[dim3].size(); ++i3) {
 						iblk[dim3] = blk_idx_loc[dim3][i3];
 						
 						if (iblk[dim3] < blkbounds[dim3][0] || iblk[dim3] > blkbounds[dim3][1]) continue;
@@ -328,8 +324,7 @@ public:
 		m_cbas2(mol->c_basis2()),
 		m_cint_natoms(0),
 		m_cint_nbas(0),
-		m_max_l(0),
-		TIME(w.comm(), "integrals")
+		m_max_l(0)
 	{ init(); }
 	
 	impl(world w, desc::shared_cluster_basis cbas,
@@ -342,8 +337,7 @@ public:
 		m_cbas2(cbas2),
 		m_cint_natoms(0),
 		m_cint_nbas(0),
-		m_max_l(0),
-		TIME(w.comm(), "integrals")
+		m_max_l(0)
 	{
 		
 		for (auto& cluster : *cbas) {
@@ -435,7 +429,7 @@ public:
 					bas_i[NCTR_OF] = 1;
 					bas_i[PTR_EXP] = off;
 										
-					for (int i = 0; i != shell.alpha.size(); ++i) {
+					for (size_t i = 0; i != shell.alpha.size(); ++i) {
 						m_cint_env.push_back(shell.alpha[i]);
 						++off;
 					}
@@ -444,7 +438,7 @@ public:
 								
 					auto coeff = gto_normalize(shell.l, shell.alpha, shell.coeff);
 					
-					for (int i = 0; i != coeff.size(); ++i) {
+					for (size_t i = 0; i != coeff.size(); ++i) {
 						m_cint_env.push_back(coeff[i]);
 						++off;
 					}
@@ -465,11 +459,11 @@ public:
 		
 		//std::cout << "MAX_L: " << m_max_l << std::endl;
 		
-		auto print = [](auto& v) {
+		/*auto print = [](auto& v) {
 			for (auto e : v) {
 				std::cout << e << " ";
 			} std::cout << std::endl;
-		};
+		};*/
 		
 		//print(m_atm);
 		//print(m_bas);
@@ -484,7 +478,7 @@ public:
 			
 			std::vector<int> shell_offsets = nshells;
 			
-			for (int i = 0; i != nshells.size(); ++i) {
+			for (size_t i = 0; i != nshells.size(); ++i) {
 				shell_offsets[i] = off;
 				off += nshells[i];
 			}
@@ -549,7 +543,7 @@ public:
 		m_intname = istr;
 	}
 	
-	void setup_calc(bool dummy = false) {
+	void setup_calc() {
 		
 		m_cint_env[PTR_RANGE_OMEGA] = 0.0;
 		
@@ -580,7 +574,7 @@ public:
 				break;
 				
 			case combine(op::coulomb, ctr::c_3c2e):
-				m_cint_env[PTR_RANGE_OMEGA] = 0.0d;
+				m_cint_env[PTR_RANGE_OMEGA] = 0.0;
 				m_intfunc = &int3c2e_sph;
 				break;
 				
@@ -939,7 +933,7 @@ dbcsr::shared_matrix<double> aofactory::ao_schwarz() {
 	pimpl->set_dim("bb");
 	pimpl->set_center(ctr::c_4c2e);
 	pimpl->set_operator(op::coulomb);
-	pimpl->setup_calc(true);
+	pimpl->setup_calc();
 	return pimpl->compute_screen("schwarz", "bbbb");
 }
 	
@@ -948,7 +942,7 @@ dbcsr::shared_matrix<double> aofactory::ao_3cschwarz() {
 	pimpl->set_dim("xx");
 	pimpl->set_center(ctr::c_2c2e);
 	pimpl->set_operator(op::coulomb);
-	pimpl->setup_calc(true);
+	pimpl->setup_calc();
 	return pimpl->compute_screen("schwarz", "xx");
 }
 
@@ -957,7 +951,7 @@ dbcsr::shared_matrix<double> aofactory::ao_schwarz_ovlp() {
 	pimpl->set_dim("bb");
 	pimpl->set_center(ctr::c_4c1e);
 	pimpl->set_operator(op::overlap);
-	pimpl->setup_calc(true);
+	pimpl->setup_calc();
 	return pimpl->compute_screen("schwarz", "bbbb");
 }
 	
@@ -966,7 +960,7 @@ dbcsr::shared_matrix<double> aofactory::ao_3cschwarz_ovlp() {
 	pimpl->set_dim("xx");
 	pimpl->set_center(ctr::c_2c1e);
 	pimpl->set_operator(op::overlap);
-	pimpl->setup_calc(true);
+	pimpl->setup_calc();
 	return pimpl->compute_screen("schwarz", "xx");
 }
 
@@ -1014,7 +1008,7 @@ desc::shared_cluster_basis remove_lindep(world wrd,
 			shell_s2b.push_back(off);
 			off += shell.size();
 			
-			for (int ii = 0; ii != shell.size(); ++ii) {
+			for (size_t ii = 0; ii != shell.size(); ++ii) {
 				shell_b2s.push_back(ishell);
 			}
 			
@@ -1042,7 +1036,7 @@ desc::shared_cluster_basis remove_lindep(world wrd,
 	
 	std::vector<desc::Shell> newvshell;
 	
-	for (int ishell = 0; ishell != vshell.size(); ++ishell) {
+	for (size_t ishell = 0; ishell != vshell.size(); ++ishell) {
 		if (keep_shell[ishell]) {
 			 newvshell.push_back(vshell[ishell]);
 		} else {
