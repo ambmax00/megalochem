@@ -36,7 +36,7 @@ eigenpair adcmod::guess() {
 		auto eigen_ia = dbcsr::matrix_to_eigen(*d_ia);
 		
 		std::vector<int> index(eigen_ia.size(), 0);
-		for (int i = 0; i!= index.size(); ++i) {
+		for (size_t i = 0; i!= index.size(); ++i) {
 			index[i] = i;
 		}
 		
@@ -440,7 +440,6 @@ std::vector<bool> adcmod::get_significant_blocks(dbcsr::shared_matrix<double> u_
 		
 	//return std::make_tuple(retmol,retvec);
 	
-	auto dims = m_cart.dims();
     auto dist = dbcsr::default_dist(b.size(), m_cart.size(), b);
     
     double norm = u_bb_a->norm(dbcsr_norm_frobenius);
@@ -460,7 +459,7 @@ std::vector<bool> adcmod::get_significant_blocks(dbcsr::shared_matrix<double> u_
     auto blkmap = m_wfn->mol->c_basis()->block_to_atom(atoms);
     
     // loop over blocks rows/cols
-    for (int iblk = 0; iblk != b.size(); ++iblk) {
+    for (int iblk = 0; iblk != (int)b.size(); ++iblk) {
 		
 		if (dist[iblk] == m_cart.rank()) {
 			
@@ -469,7 +468,7 @@ std::vector<bool> adcmod::get_significant_blocks(dbcsr::shared_matrix<double> u_
 			std::vector<double> blknorms_r(blksize_i,0.0);
 			std::vector<double> blknorms_c(blksize_i,0.0);
 			
-			for (int jblk = 0; jblk != b.size(); ++jblk) {
+			for (int jblk = 0; jblk != (int)b.size(); ++jblk) {
 				
 				bool foundr = false;
 				bool foundc = false;
@@ -798,7 +797,6 @@ adcmod::canon_lmo adcmod::get_canon_pao(dbcsr::shared_matrix<double> u_ia) {
 	
 	LOG.os<>("Extracting norms form transformed guess vector\n");
 	
-	int nbas = c_bo->nfullrows_total();
 	int noccs = c_bo->nfullcols_total();
 	int nvirs = c_bv->nfullcols_total();
 	int n_pao_occs = u_mn->nfullrows_total();
@@ -890,8 +888,7 @@ adcmod::canon_lmo adcmod::get_canon_pao(dbcsr::shared_matrix<double> u_ia) {
 	std::vector<int> func_to_atom_occ;
 	std::vector<int> func_to_atom_vir;
 	
-	int ibas = 0;
-	for (int iblk = 0; iblk != cbas->size(); ++iblk) {
+	for (size_t iblk = 0; iblk != cbas->size(); ++iblk) {
 		int iatom = blkmap[iblk];
 		int nbf = desc::nbf(cbas->at(iblk));
 		
@@ -913,7 +910,7 @@ adcmod::canon_lmo adcmod::get_canon_pao(dbcsr::shared_matrix<double> u_ia) {
 	}
 	
 	LOG.os<1>("Atoms used:\n");
-	for (int ii = 0; ii != use_atom.size(); ++ii) {
+	for (size_t ii = 0; ii != use_atom.size(); ++ii) {
 		if (use_atom[ii]) LOG.os<1>(ii, " ");
 	} LOG.os<1>('\n');
 	
@@ -927,7 +924,7 @@ adcmod::canon_lmo adcmod::get_canon_pao(dbcsr::shared_matrix<double> u_ia) {
 	
 	std::vector<desc::Shell> vshell_sub;
 	
-	for (int ii = 0; ii != cbas->size(); ++ii) {
+	for (size_t ii = 0; ii != cbas->size(); ++ii) {
 		int iatom = blkmap[ii];
 		if (use_atom[iatom]) {
 			vshell_sub.insert(vshell_sub.end(), cbas->at(ii).begin(), cbas->at(ii).end());
@@ -1234,9 +1231,6 @@ std::vector<bool> adcmod::get_significant_atoms(dbcsr::shared_matrix<double> u_i
 	
 	LOG.os<>("Extracting norms form transformed guess vector\n");
 	
-	int nbas = c_bo->nfullrows_total();
-	int noccs = c_bo->nfullcols_total();
-	int nvirs = c_bv->nfullcols_total();
 	int n_pao_occs = u_mn->nfullrows_total();
 	int n_pao_virs = u_mn->nfullcols_total();
 	
@@ -1326,8 +1320,7 @@ std::vector<bool> adcmod::get_significant_atoms(dbcsr::shared_matrix<double> u_i
 	std::vector<int> func_to_atom_occ;
 	std::vector<int> func_to_atom_vir;
 	
-	int ibas = 0;
-	for (int iblk = 0; iblk != cbas->size(); ++iblk) {
+	for (size_t iblk = 0; iblk != cbas->size(); ++iblk) {
 		int iatom = blkmap[iblk];
 		int nbf = desc::nbf(cbas->at(iblk));
 		
@@ -1349,7 +1342,7 @@ std::vector<bool> adcmod::get_significant_atoms(dbcsr::shared_matrix<double> u_i
 	}
 	
 	LOG.os<1>("Atoms used:\n");
-	for (int ii = 0; ii != use_atom.size(); ++ii) {
+	for (size_t ii = 0; ii != use_atom.size(); ++ii) {
 		if (use_atom[ii]) LOG.os<1>(ii, " ");
 	} LOG.os<1>('\n');
 	
@@ -1476,7 +1469,6 @@ adcmod::canon_lmo_mol adcmod::get_restricted_cmos2(dbcsr::shared_matrix<double> 
 		
 	LOG.os<>("Reduced active basis set from ", cbas->nbf(), " to ", cbas_sub->nbf(), '\n');
 	
-	/*
 	// =================================================================	
 	// ==========   STEP 6 : PERFORM AN SVD    =========================
 	// =================================================================

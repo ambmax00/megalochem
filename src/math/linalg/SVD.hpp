@@ -30,8 +30,10 @@ public:
 
 	SVD(world w, dbcsr::shared_matrix<double>& mat, char jobu, char jobvt, 
 		int print) : 
-		m_world(w), m_mat_in(mat), LOG(m_mat_in->get_cart().comm(),print),
-		m_jobu(jobu), m_jobvt(jobvt) {}
+		m_world(w), m_mat_in(mat),
+		m_jobu(jobu), m_jobvt(jobvt),
+		LOG(m_mat_in->get_cart().comm(),print) 
+	{}
 	~SVD() {}
 	
 	void compute(double eps = 1e-10);

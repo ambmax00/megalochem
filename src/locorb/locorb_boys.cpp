@@ -267,11 +267,11 @@ private:
 
 	const int EMPTY = -1;
 
-	util::mpi_log LOG;
-
 	MPI_Comm m_comm;
 	int m_rank = -1;
 	int m_mpisize = 0;
+	
+	util::mpi_log LOG;
 
 	int m_ncols;
 	int m_totnrows;
@@ -698,19 +698,11 @@ void form_type() {
 double jacobi_sweep_mpi(smat& c_dist, smat& x_dist, smat& y_dist, smat& z_dist) {
 	
 	auto w = c_dist->get_cart();
-	int mpi_rank = w.rank();
-	int mpi_size = w.size();
 	
 	if (w.size() < 2) {
 		throw std::runtime_error(
 			"Jacobi sweep (MPI) needs nproc >= 2");
 	}
-	
-	auto printvec = [](auto vec) {
-		for (auto a : vec) {
-			std::cout << a << " ";
-		} std::cout << std::endl;
-	};
 	
 	util::mpi_log LOG(w.comm(), 0);
 	
@@ -726,12 +718,8 @@ double jacobi_sweep_mpi(smat& c_dist, smat& x_dist, smat& y_dist, smat& z_dist) 
 	auto z = dbcsr::matrix_to_eigen(*z_dist);
 	
 	double t12 = 1e-12;
-	double t8 = 1e-8;
 	double max_diff = 0.0;
-	
-	// how many sweeps?
-	int nsweeps = norb;
-	
+		
 	// caterpillar ordering
 	/* Number represents column
 	 * One box with pairs is one process 
@@ -753,7 +741,7 @@ double jacobi_sweep_mpi(smat& c_dist, smat& x_dist, smat& y_dist, smat& z_dist) 
 	*/
 	
 	ring<4> ring_data(w.comm(), std::array<decltype(x),4>{x,y,z,c});
-	double pi = 2 * acos(0.0d);
+	double pi = 2 * acos(0.0);
 	
 	int npairs = ring_data.npairs();
 	int npairs_tot = ring_data.npairs_tot();

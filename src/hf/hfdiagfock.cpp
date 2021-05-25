@@ -100,7 +100,7 @@ void hfmod::diag_fock() {
 		
 	};
 	
-	auto localize = [&] (dbcsr::shared_matrix<double>& p_bb, 
+	/*auto localize = [&] (dbcsr::shared_matrix<double>& p_bb, 
 		dbcsr::shared_matrix<double>& c_bm, std::string x) {
 		
 		LOG.os<1>("Localizing occupied ", x, " MO orbitals.\n");
@@ -119,8 +119,8 @@ void hfmod::diag_fock() {
 		
 		// move cvir into L
 		#pragma omp parallel for
-		for (int im = o.size(); im != m.size(); ++im) {
-			for (int ib = 0; ib != b.size(); ++ib) {
+		for (int im = o.size(); im != (int)m.size(); ++im) {
+			for (int ib = 0; ib != (int)b.size(); ++ib) {
 			
 				bool found = false;
 				auto blk_c = c_bm->get_block_p(ib,im,found);
@@ -134,7 +134,7 @@ void hfmod::diag_fock() {
 				
 		LOG.os<1>("Done with localization.\n");
 		
-	};
+	};*/
 	
 	diagonalize(m_f_bb_A, m_c_bm_A, *m_eps_A, "A");
 	if (m_f_bb_B) {
@@ -217,7 +217,7 @@ void hfmod::compute_virtual_density() {
 	auto form_density = [&] (dbcsr::shared_matrix<double>& pv_bb, 
 		dbcsr::shared_matrix<double>& c_bm, std::string x) {
 		
-		int lobound, upbound;
+		int lobound(0), upbound(0);
 		
 		pv_bb = dbcsr::matrix<>::create_template(*m_p_bb_A)
 			.name("pv_bb_"+x).build();

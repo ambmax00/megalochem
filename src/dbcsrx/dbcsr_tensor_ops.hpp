@@ -476,7 +476,6 @@ void copy_matrix_to_3Dtensor_new(matrix<T>& m, tensor<3,T>& t, bool sym = false)
 	
 	auto w = m.get_cart();
 	
-	int mpirank = w.rank();
 	int mpisize = w.size();
 	auto comm = w.comm();
 	
@@ -627,7 +626,7 @@ void copy_matrix_to_3Dtensor_new(matrix<T>& m, tensor<3,T>& t, bool sym = false)
 	
 	idx3 sizes = {1,1,1};
 	
-	for (int iblk = 0; iblk != recv_blkidx[0].size(); ++iblk) {
+	for (int iblk = 0; iblk != int(recv_blkidx[0].size()); ++iblk) {
 		
 		idxt[0] = recv_blkidx[0][iblk];
 		idxt[1] = recv_blkidx[1][iblk];
@@ -661,8 +660,6 @@ template <typename T>
 void copy_3Dtensor_to_matrix_new(tensor<3,T>& t, matrix<T>& m) {
 	
 	auto w = m.get_cart();
-	
-	int mpirank = w.rank();
 	int mpisize = w.size();
 	auto comm = w.comm();
 	
@@ -929,7 +926,7 @@ void copy_3Dtensor_to_matrix_new(tensor<3,T>& t, matrix<T>& m) {
 		rowres.reserve(recv_blkidx[0].size());
 		colres.reserve(recv_blkidx[1].size());
 		
-		for (int i = 0; i != recv_blkidx[0].size(); ++i) {
+		for (size_t i = 0; i != recv_blkidx[0].size(); ++i) {
 			int ix = recv_blkidx[0][i];
 			int jx = recv_blkidx[1][i];
 			
@@ -958,7 +955,7 @@ void copy_3Dtensor_to_matrix_new(tensor<3,T>& t, matrix<T>& m) {
 	auto rowblksizes = m.row_blk_sizes();
 	auto colblksizes = m.col_blk_sizes();
 	
-	for (int iblk = 0; iblk != recv_blkidx[0].size(); ++iblk) {
+	for (size_t iblk = 0; iblk != recv_blkidx[0].size(); ++iblk) {
 		
 		int ix = recv_blkidx[0][iblk];
 		int jx = recv_blkidx[1][iblk];

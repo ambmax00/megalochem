@@ -30,7 +30,6 @@ struct global {
 };
 
 enum class metric {
-	invalid,
 	coulomb,
 	erfc_coulomb,
 	qr_fit,
@@ -42,7 +41,7 @@ inline metric str_to_metric(std::string m) {
 	if (m == "erfc_coulomb") return metric::erfc_coulomb;
 	if (m == "qr_fit") return metric::qr_fit;
 	if (m == "pari") return metric::pari;
-	return metric::invalid;
+	throw std::runtime_error("Invalid metric");
 }
 	
 class screener;

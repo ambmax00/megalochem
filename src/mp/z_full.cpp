@@ -254,7 +254,7 @@ void LLMP_FULL_Z::compute() {
 				auto xblkbounds = m_eri3c2e_batched->blk_bounds(0,ix);
 				auto bblkbounds = m_eri3c2e_batched->blk_bounds(2,inu);
 
-				for (int mublk = 0; mublk != b.size(); ++mublk) {
+				for (int mublk = 0; mublk != (int)b.size(); ++mublk) {
 					for (int nublk = bblkbounds[0]; nublk != bblkbounds[1]+1; ++nublk) {
 						
 						if (!shellmat(mublk,nublk)) continue;
@@ -435,7 +435,6 @@ void LL_FULL_Z::compute() {
 	auto& time_reo_int1 = TIME.sub("Reordering integrals 0|12 -> 1|02");
 	auto& time_reo1 = TIME.sub("Reordering intermed tensor (1)");
 	auto& time_reo2 = TIME.sub("Reordering intermed tensor (2)");
-	auto& time_reo3 = TIME.sub("Reordering intermed tensor (3)");
 	auto& time_tran1 = TIME.sub("First transformation");
 	auto& time_tran2 = TIME.sub("Second transformation");
 	auto& time_write = TIME.sub("Writing tensor");
@@ -443,7 +442,6 @@ void LL_FULL_Z::compute() {
 	auto& time_formz = TIME.sub("Forming Z");
 	auto& time_setview = TIME.sub("Setting view");
 	auto& time_fetchints1 = TIME.sub("Fetching ints (1)");
-	auto& time_fetchints2 = TIME.sub("Fetching ints (2)");
 	
 	auto b = m_locc->row_blk_sizes();
 	auto o = m_locc->col_blk_sizes();

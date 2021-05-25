@@ -323,7 +323,7 @@ public:
 		int rank = H5Sget_simple_extent_ndims(space);
 		
 		std::vector<hsize_t> dims(rank);
-		auto status = H5Sget_simple_extent_dims(space, dims.data(), NULL);
+		H5Sget_simple_extent_dims(space, dims.data(), NULL);
 		
 		hid_t data_plist = H5Pcreate(H5P_DATASET_XFER);
 		H5Pset_dxpl_mpio(data_plist, H5FD_MPIO_COLLECTIVE);

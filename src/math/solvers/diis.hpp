@@ -40,8 +40,15 @@ private:
 public:
 
 	diis_helper(world w, int start, int min, int max, bool print = false) :
-		m_min(min), m_max(max), m_print(print), m_start(start), m_B(0,0), m_coeffs(0,0),
-		m_world(w), LOG(w.comm(), m_print == false ? 0 : 999) {};
+		m_world(w),
+		m_B(0,0), 
+		m_coeffs(0,0),
+		m_max(max), 
+		m_min(min), 
+		m_start(start),
+		m_print(print),
+		LOG(w.comm(), m_print ? 0 : 999)
+	{};
 	
 	
 	void compute_extrapolation_parameters(smat_d& T, smat_d& err, int iter) {
@@ -54,7 +61,7 @@ public:
 			//std::cout << "Size of delta: " << m_delta.size() << std::endl;
 			
 			bool reduce = false;
-			if (m_delta.size() >= m_max) reduce = true;
+			if ((int)m_delta.size() >= m_max) reduce = true;
 			
 			auto err_copy = dbcsr::matrix<>::copy(*err).build();
 			
@@ -199,9 +206,9 @@ public:
 		
 		static bool first = true;
 		
-		if (coeffs.size() != m_trialvecs.size()) throw std::runtime_error("DIIS: Wrong dimensions.");
+		if (coeffs.size() != (int)m_trialvecs.size()) throw std::runtime_error("DIIS: Wrong dimensions.");
 		
-		if (iter >= m_start && m_trialvecs.size() >= m_min) { 
+		if (iter >= m_start && (int)m_trialvecs.size() >= m_min) { 
 			
 			if (first) {
 				LOG.os<>("Starting DIIS...\n");

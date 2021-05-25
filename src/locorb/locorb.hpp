@@ -29,8 +29,8 @@ public:
 	mo_localizer(world w, desc::shared_molecule mol) :
 		m_world(w),
 		m_mol(mol),
-		LOG(w.comm(), 0),
-		m_aofac(std::make_shared<ints::aofactory>(mol,w))
+		m_aofac(std::make_shared<ints::aofactory>(mol,w)),
+		LOG(w.comm(), 0)
 	{}
 	
 	std::tuple<smat_d,smat_d> compute_cholesky(smat_d c_bm, smat_d s_bb);

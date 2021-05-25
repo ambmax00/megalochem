@@ -33,8 +33,6 @@ private:
 	
 	std::vector<int> m_perm;
 	
-	void reorder_and_reduce(scalapack::distmat<double>& L);
-
 public:
 
 	pivinc_cd(world w, dbcsr::shared_matrix<double> mat_in, int print) : 

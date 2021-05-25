@@ -41,6 +41,7 @@ std::tuple<smat_d, smat_d, std::vector<double>>
 	 * s : truncated canonical o/v
 	 * 
 	 */
+	(void)u_km;
 	 
 	LOG.os<>("PAO 1\n");
 	
@@ -86,10 +87,7 @@ std::tuple<smat_d, smat_d, std::vector<double>>
 	
 	auto s_nosym = s_bb->desymmetrize();
 	s_nosym->replicate_all();
-	
-	int np = std::accumulate(p.begin(), p.end(), 0);
-	int nb = std::accumulate(b.begin(), b.end(), 0);
-	
+		
 	LOG.os<>("PAO 2\n");
 	
 	dbcsr::iterator iterpp(*s_pp);

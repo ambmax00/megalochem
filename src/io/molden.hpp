@@ -31,7 +31,7 @@ inline void write_molden(
 		
 		auto atoms = mol.atoms();
 		
-		for (int ii = 0; ii != atoms.size(); ++ii) {
+		for (size_t ii = 0; ii != atoms.size(); ++ii) {
 			file << util::int_to_ele[atoms[ii].atomic_number] << " ";
 			file << ii+1 << " " << atoms[ii].atomic_number << " ";
 			file << atoms[ii].x 
@@ -47,14 +47,14 @@ inline void write_molden(
 		
 		std::vector<char> labels = {'s', 'p', 'd', 'f', 'g'};
 		
-		for (int ii = 0; ii != cbas->size(); ++ii) {
+		for (size_t ii = 0; ii != cbas->size(); ++ii) {
 			int iatom = blkmap[ii];
 			for (auto s : cbas->at(ii)) {
 				
 				file << iatom+1 << " " << 0 << '\n';
 				file << labels[s.l] << " " << s.ncontr() << " " << 1.0 << '\n';
 				
-				for (int jj = 0; jj != s.ncontr(); ++jj) {
+				for (size_t jj = 0; jj != s.ncontr(); ++jj) {
 					file << s.alpha[jj] << " " << s.coeff[jj] << '\n';
 				}
 				file << '\n';
@@ -72,7 +72,6 @@ inline void write_molden(
 		std::vector<int> gmap = {4,5,3,6,2,7,1,8,0};
 		
 		auto write_coeff = [&](auto cmat, auto eps, bool occ) {
-			int nbas = cmat.rows();
 			int norb = cmat.cols();
 			
 			std::string occup = (occ) ? "1" : "0";
@@ -85,10 +84,10 @@ inline void write_molden(
 				
 				int noff = 0;
 				
-				for (int icluster = 0; icluster != cbas->size(); ++icluster) {
+				for (size_t icluster = 0; icluster != cbas->size(); ++icluster) {
 					auto& c = cbas->at(icluster);
 					
-					for (int ishell = 0; ishell != c.size(); ++ishell) {
+					for (size_t ishell = 0; ishell != c.size(); ++ishell) {
 							
 							auto s = c[ishell];
 							int size = s.size();

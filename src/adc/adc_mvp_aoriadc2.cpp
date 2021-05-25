@@ -412,6 +412,10 @@ void MVP_AORISOSADC2::compute_intermeds() {
 					.build();
 				break;
 			}
+			default:
+			{
+				throw std::runtime_error("Invalid method in ADC2 module");
+			}
 		}
 			
 		k_inter->set_sym(true);
@@ -927,7 +931,7 @@ std::tuple<dbcsr::sbtensor<3,double>,dbcsr::sbtensor<3,double>>
 			.move_data(true)
 			.perform();
 		
-		dbcsr:contract(1.0, *eri_02_1, *up_ob_01, 0.0, *HT_xob_02_1)
+		dbcsr::contract(1.0, *eri_02_1, *up_ob_01, 0.0, *HT_xob_02_1)
 			.bounds2(xn_bounds)
 			.filter(dbcsr::global::filter_eps)
 			.perform("Xmn, im -> Xin");
@@ -1067,7 +1071,7 @@ std::tuple<dbcsr::shared_tensor<2,double>,dbcsr::shared_tensor<2,double>>
 			auto xblkbounds = m_eri3c2e_batched->blk_bounds(0,ix);
 			auto bblkbounds = m_eri3c2e_batched->blk_bounds(2,ib);
 
-			for (int mublk = 0; mublk != m_b.size(); ++mublk) {
+			for (int mublk = 0; mublk != (int)m_b.size(); ++mublk) {
 				for (int nublk = bblkbounds[0]; nublk != bblkbounds[1]+1; ++nublk) {
 					
 					if (!shellmat(mublk,nublk)) continue;
@@ -1273,7 +1277,7 @@ dbcsr::sbtensor<3,double> MVP_AORISOSADC2::compute_I_OB(dbcsr::sbtensor<3,double
 }
 
 std::tuple<smat,smat> MVP_AORISOSADC2::compute_sigma_2e_ilap_OB(
-	dbcsr::sbtensor<3,double>& I_xob_batched, smat& L_bo, double omega)
+	dbcsr::sbtensor<3,double>& I_xob_batched, smat& L_bo, [[maybe_unused]] double omega)
 {
 	
 	/*
@@ -1307,19 +1311,12 @@ std::tuple<smat,smat> MVP_AORISOSADC2::compute_sigma_2e_ilap_OB(
 	
 	dbcsr::copy_matrix_to_tensor(*L_bo, *L_bo_01);
 	
-	int nxbas = m_mol->c_dfbasis()->nbf();
-	int nbas = m_mol->c_basis()->nbf();
-	int no_chol = L_bo->nfullcols_total();
-	
 	auto spgrid2 = dbcsr::pgrid<2>::create(m_cart.comm())
 		.build();
-	
-	std::array<int,3> dims_xob_chol = {nxbas,no_chol,nbas};
-	
+		
 	auto spgrid_xob_chol = I_xob_batched->spgrid();
 	
 	int nxbatches = I_xob_batched->nbatches(0);
-	int nobatches = I_xob_batched->nbatches(1);
 	int nbbatches = I_xob_batched->nbatches(2);
 	
 	auto sig_pre_E1_bb_01 = dbcsr::tensor<2>::create()
@@ -1863,7 +1860,7 @@ std::tuple<dbcsr::sbtensor<3,double>,dbcsr::sbtensor<3,double>>
 			.move_data(true)
 			.perform();
 		
-		dbcsr:contract(1.0, *eri_02_1, *up_ob_01, 0.0, *HT_xob_02_1)
+		dbcsr::contract(1.0, *eri_02_1, *up_ob_01, 0.0, *HT_xob_02_1)
 			.bounds2(xn_bounds)
 			.filter(dbcsr::global::filter_eps)
 			.perform("Xmn, im -> Xin");
@@ -2087,7 +2084,7 @@ dbcsr::sbtensor<3,double> MVP_AORISOSADC2::compute_I_OV(dbcsr::sbtensor<3,double
 
 std::tuple<smat,smat> MVP_AORISOSADC2::compute_sigma_2e_ilap_OV(
 	dbcsr::sbtensor<3,double>& I_xov_batched, smat& L_bo, smat& L_bv,
-	double omega)
+	[[maybe_unused]] double omega)
 {
 	
 	/*

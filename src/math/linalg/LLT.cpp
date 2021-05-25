@@ -12,8 +12,6 @@ void LLT::compute() {
 	
 	int n = m_mat_in->nfullrows_total();
 	int nb = scalapack::global::block_size;
-	int nprow = dgrid.dims()[0];
-	int npcol = dgrid.dims()[1];
 	
 	LOG.os<>("Running SCALAPACK pdpotrf calculation\n");
 	
@@ -33,7 +31,6 @@ void LLT::compute() {
 		
 	m_L = std::make_shared<scalapack::distmat<double>>(
 		dbcsr::matrix_to_scalapack(m_mat_in, sgrid, 
-		m_mat_in->name() + "_scalapack", 
 		nb, nb, ori_coord[0], ori_coord[1])
 	);
 		

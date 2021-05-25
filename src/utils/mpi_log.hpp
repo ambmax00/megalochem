@@ -140,15 +140,8 @@ public:
 	  std::stringstream ss(str);
 	  std::string to;
 	  std::vector<std::string> message;
-
-	  if (&m != NULL)
-	  {
-		while(std::getline(ss,to,'\n')){
-		  message.push_back(to);
-		}
-	  }
 	  
-	  for (int i = 0; i != message.size(); ++i) {
+	  for (size_t i = 0; i != message.size(); ++i) {
 		  if ((int)message[i].size() > totl-2) {
 			  totl = message[i].size() + 2;
 		  }
@@ -157,7 +150,7 @@ public:
 	  std::string top(totl, del);
 	  std::cout << "\n" << top << std::endl;
 	  
-	  for (int i = 0; i != message.size(); ++i) {
+	  for (size_t i = 0; i != message.size(); ++i) {
 		  
 		int nstr = message[i].size();
 		int padl, padr;

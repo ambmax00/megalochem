@@ -85,6 +85,8 @@ void DFROBUST_K::compute_K() {
 	[&] (dbcsr::shared_matrix<double>& p_bb, 
 		dbcsr::shared_matrix<double>& k_bb, std::string x) {
 		
+		LOG.os<1>("Computing K " + x, '\n');
+		
 		// c_bar(X,n,l) = c_fit(X,n,s) * P(s,l)
 		auto k_1 = dbcsr::tensor<2>::create_template(*m_K_01)
 			.name("k_1")

@@ -39,8 +39,8 @@ private:
 	
 	MAKE_MEMBER_VARS(MPMOD_OPTLIST)
 	
-	util::mpi_time TIME;
 	util::mpi_log LOG;
+	util::mpi_time TIME;
 		
 	void init();
 	
@@ -53,9 +53,9 @@ public:
 		m_world(p.p_set_world),
 		m_wfn(p.p_set_wfn),
 		m_df_basis(p.p_df_basis ? *p.p_df_basis : nullptr),
+		MAKE_INIT_LIST_OPT(MPMOD_OPTLIST),
 		LOG(m_world.comm(), m_print),
-		TIME(m_world.comm(), "mpmod", m_print),
-		MAKE_INIT_LIST_OPT(MPMOD_OPTLIST)
+		TIME(m_world.comm(), "mpmod", m_print)
 	{ init(); }
 	
 	~mpmod() {}

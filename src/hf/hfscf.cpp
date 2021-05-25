@@ -113,8 +113,8 @@ void hfmod::compute_nucrep() {
 	
 	auto atoms = m_mol->atoms();
 	
-	for (int i = 0; i != atoms.size(); ++i) {
-		for (int j = i+1; j < atoms.size(); ++j) {
+	for (size_t i = 0; i != atoms.size(); ++i) {
+		for (size_t j = i+1; j < atoms.size(); ++j) {
 			
 			int Zi = atoms[i].atomic_number;
 			int Zj = atoms[j].atomic_number;
@@ -237,6 +237,8 @@ void hfmod::form_fock(bool SAD_iter, int rank) {
 	LOG.os<>("Forming Fock matrix...\n");
 	auto& TIME_2e = TIME.sub("Computing Fock matrix");
 	
+	TIME_2e.start();
+	
 	auto pA_copy = dbcsr::matrix<>::copy(*m_p_bb_A).build();
 	pA_copy->filter(dbcsr::global::filter_eps);
 	
@@ -274,6 +276,8 @@ void hfmod::form_fock(bool SAD_iter, int rank) {
 		m_f_bb_B->add(1.0, 1.0, *j_bb);
 		m_f_bb_B->add(1.0, 1.0, *k_bb_B);
 	}
+	
+	TIME_2e.finish();
 	
 	LOG.os<>("Done with forming Fock matrix.\n");
 	
@@ -347,7 +351,6 @@ desc::shared_wavefunction hfmod::compute() {
 	
 	// Now enter loop
 	int iter = 0;
-	bool converged = false;
 	
 	math::diis_helper<2> diis_A(m_cart.comm(),m_diis_start, 
 		m_diis_min_vecs, m_diis_max_vecs, (LOG.global_plev() >= 2) ? true : false );
@@ -450,7 +453,7 @@ desc::shared_wavefunction hfmod::compute() {
 	e_A->release();
 	if (e_B) e_B->release();
 	
-	if (iter > m_max_iter) throw std::runtime_error("HF did not converge.");
+	if (iter >= m_max_iter) throw std::runtime_error("HF did not converge.");
 	
 	LOG.os<>("Done with SCF cycle. Took ", iter, " iterations.\n");
 	LOG.scientific();
@@ -474,7 +477,6 @@ desc::shared_wavefunction hfmod::compute() {
 	{
 			
 			vec<int> o, v, b;
-			int noblks, nvblks;
 			int nocc, nvir;
 			
 			if (x == "A") { 

@@ -113,9 +113,9 @@ public:
 		bool blocked,
 		std::vector<double> dav_eigvals,
 		std::vector<dbcsr::shared_matrix<double>> dav_eigvecs) :
-		m_blocked(blocked),
 		m_dav_eigvals(dav_eigvals),
-		m_dav_eigvecs(dav_eigvecs)
+		m_dav_eigvecs(dav_eigvecs),
+		m_blocked(blocked)
 	{}
 	
 	bool blocked() { return m_blocked; }
@@ -191,7 +191,7 @@ inline dbcsr::shared_matrix<double> read_mat(
 	
 	auto darray = dh.read<double>(name);
 	
-	if (nrows != darray.dims[0] || ncols != darray.dims[1]) {
+	if (nrows != (int)darray.dims[0] || ncols != (int)darray.dims[1]) {
 		throw std::runtime_error("Read hfwfn: incompatible matrix dimensions.");
 	}
 	

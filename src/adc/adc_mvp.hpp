@@ -42,11 +42,11 @@ class MVP {
 protected:
 
 	megalochem::world m_world;
+	dbcsr::cart m_cart;
 	desc::shared_molecule m_mol;
 	
 	util::mpi_log LOG;
 	util::mpi_time TIME;
-	dbcsr::cart m_cart;
 	
 	smat compute_sigma_0(smat& u_ia, vec<double> epso, vec<double> epsv);
 
@@ -67,23 +67,23 @@ public:
 class MVP_AORIADC1 : public MVP {
 private:
 	
-	fock::jmethod m_jmethod;
-	fock::kmethod m_kmethod;
+	smat m_c_bo;
+	smat m_c_bv;
+	smat m_v_xx;
 	
 	sbtensor3 m_eri3c2e_batched;
 	sbtensor3 m_fitting_batched;
-	smat m_v_xx;
-	
-	std::shared_ptr<fock::J> m_jbuilder;
-	std::shared_ptr<fock::K> m_kbuilder;
 	
 	std::vector<double> m_eps_occ;
 	std::vector<double> m_eps_vir;
-
-	smat m_c_bo;
-	smat m_c_bv;
 	
 	int m_nbatches_occ;
+	
+	fock::jmethod m_jmethod;
+	fock::kmethod m_kmethod;
+	
+	std::shared_ptr<fock::J> m_jbuilder;
+	std::shared_ptr<fock::K> m_kbuilder;
 
 public:
 
@@ -106,14 +106,19 @@ public:
 	MAKE_BUILDER_CLASS(MVP_AORIADC1, create, AORIADC1_LIST, ())
 	
 	MVP_AORIADC1(create_pack&& p) :
-		m_c_bo(p.p_c_bo), m_c_bv(p.p_c_bv), m_v_xx(p.p_metric_inv),
-		m_eps_occ(p.p_eps_occ), m_eps_vir(p.p_eps_vir), 
+		MVP(p.p_set_world, p.p_set_molecule, (p.p_print) ? *p.p_print : 0,
+			"MVP_AORIADC1"),
+		m_c_bo(p.p_c_bo), 
+		m_c_bv(p.p_c_bv), 
+		m_v_xx(p.p_metric_inv),
 		m_eri3c2e_batched(p.p_eri3c2e_batched),
 		m_fitting_batched(p.p_fitting_batched),
-		m_kmethod(p.p_kmethod), m_jmethod(p.p_jmethod),
+		m_eps_occ(p.p_eps_occ), 
+		m_eps_vir(p.p_eps_vir), 
 		m_nbatches_occ(p.p_nbatches_occ ? *p.p_nbatches_occ : 5),
-		MVP(p.p_set_world, p.p_set_molecule, (p.p_print) ? *p.p_print : 0,
-			"MVP_AORIADC1") {}
+		m_jmethod(p.p_jmethod),
+		m_kmethod(p.p_kmethod)
+	{}
 		
 	void init() override;
 	
@@ -136,9 +141,6 @@ class MVP_AORISOSADC2 : public MVP {
 private:
 	
 	// input:
-	std::vector<double> m_eps_occ;
-	std::vector<double> m_eps_vir;
-
 	smat m_s_bb;
 	smat m_c_bo;
 	smat m_c_bv;
@@ -147,9 +149,14 @@ private:
 	sbtensor3 m_eri3c2e_batched;
 	sbtensor3 m_fitting_batched;
 	
+	std::vector<double> m_eps_occ;
+	std::vector<double> m_eps_vir;
+	
 	fock::jmethod m_jmethod;
 	fock::kmethod m_kmethod;
 	mp::zmethod m_zmethod;
+	
+	dbcsr::btype m_btype;
 	
 	int m_nlap;
 	double m_c_os;
@@ -157,8 +164,6 @@ private:
 	int m_nbatches_occ;
 	
 	std::vector<int> m_o, m_v, m_b, m_x;
-	
-	dbcsr::btype m_btype;
 	
 	// created with init()
 	
@@ -263,11 +268,19 @@ public:
 	MAKE_BUILDER_CLASS(MVP_AORISOSADC2, create, AORIADC2_LIST, ())
 
 	MVP_AORISOSADC2(create_pack&& p) :
-		m_c_bo(p.p_c_bo), m_c_bv(p.p_c_bv), m_v_xx(p.p_metric_inv),
-		m_s_bb(p.p_s_bb), m_eps_occ(p.p_eps_occ), m_eps_vir(p.p_eps_vir), 
+		MVP(p.p_set_world, p.p_set_molecule, (p.p_print) ? *p.p_print : 0, 
+			"MVP_AORISOSADC2"),
+		m_s_bb(p.p_s_bb),
+		m_c_bo(p.p_c_bo), 
+		m_c_bv(p.p_c_bv), 
+		m_v_xx(p.p_metric_inv), 
 		m_eri3c2e_batched(p.p_eri3c2e_batched),
 		m_fitting_batched(p.p_fitting_batched),
-		m_kmethod(p.p_kmethod), m_jmethod(p.p_jmethod), m_zmethod(p.p_zmethod),
+		m_eps_occ(p.p_eps_occ), 
+		m_eps_vir(p.p_eps_vir), 
+		m_jmethod(p.p_jmethod), 
+		m_kmethod(p.p_kmethod), 
+		m_zmethod(p.p_zmethod),
 		m_btype(p.p_btype), 
 		m_nlap((p.p_nlap)),
 		m_c_os((p.p_c_os)),
@@ -276,9 +289,8 @@ public:
 		m_o(p.p_c_bo->col_blk_sizes()),
 		m_v(p.p_c_bv->col_blk_sizes()),
 		m_b(p.p_c_bo->row_blk_sizes()),
-		m_x(p.p_metric_inv->row_blk_sizes()),
-		MVP(p.p_set_world, p.p_set_molecule, (p.p_print) ? *p.p_print : 0, 
-			"MVP_AORISOSADC2") {}
+		m_x(p.p_metric_inv->row_blk_sizes())
+	{}
 		
 	void init() override;
 	

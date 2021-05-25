@@ -8,7 +8,7 @@ namespace megalochem {
 namespace fock {
 	
 JK_common::JK_common(world w, desc::shared_molecule mol, int print, std::string name) :
-	m_world(w), m_cart(w.dbcsr_grid()), m_mol(mol),
+	m_mol(mol), m_world(w), m_cart(w.dbcsr_grid()), 
 	LOG(m_cart.comm(),print),
 	TIME(m_cart.comm(), name, print) {}
 	

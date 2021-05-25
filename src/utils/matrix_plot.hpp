@@ -24,7 +24,7 @@ inline void plot(dbcsr::shared_matrix<double> mat_in, double thresh,
 	
 	float zeroval = std::log10(fabs(thresh));
 	
-	for (size_t idx = 0; idx != nrows * ncols; ++idx) {
+	for (int idx = 0; idx != nrows * ncols; ++idx) {
 		float& val = ptr[idx];
 		val = (fabs(val) < thresh) ? zeroval : std::log10(fabs(val));
 	}

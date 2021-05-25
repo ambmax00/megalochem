@@ -39,7 +39,7 @@ inline megatype str_to_type(std::string str) {
 	} else {
 		throw std::runtime_error("Unknown type");
 	}
-};  	
+} 	
 
 struct megajob {
 	megatype mtype;

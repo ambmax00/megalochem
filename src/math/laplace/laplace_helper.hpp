@@ -15,13 +15,12 @@ class laplace_helper {
 private:
 
 	world m_world;
-	
 	util::mpi_log LOG;
+	
+	const int m_nlap;
 	
 	dbcsr::shared_matrix<double> m_c_bo, m_c_bv, m_s_sqrt, m_s_invsqrt;
 	std::vector<double> m_eps_occ, m_eps_vir;
-	
-	const int m_nlap;
 	
 	std::vector<double> m_weights, m_xpoints;
 	std::vector<dbcsr::shared_matrix<double>> m_p_occs,
@@ -39,9 +38,9 @@ public:
 		std::vector<double> eps_occ, 
 		std::vector<double> eps_vir,
 		int nprint) :
-	m_nlap(nlap), m_c_bo(c_bo), m_c_bv(c_bv), m_s_sqrt(s_sqrt), m_s_invsqrt(s_invsqrt),
-		m_eps_occ(eps_occ), m_eps_vir(eps_vir),
-		LOG(c_bo->get_cart().comm(), nprint), m_world(w)
+		m_world(w), LOG(c_bo->get_cart().comm(), nprint), m_nlap(nlap), 
+		m_c_bo(c_bo), m_c_bv(c_bv), m_s_sqrt(s_sqrt), m_s_invsqrt(s_invsqrt),
+		m_eps_occ(eps_occ), m_eps_vir(eps_vir)
 	{}
 	
 	laplace_helper(const laplace_helper& in) = default;

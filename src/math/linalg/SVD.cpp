@@ -15,8 +15,6 @@ void SVD::compute(double eps) {
 	int m = m_mat_in->nfullrows_total();
 	int n = m_mat_in->nfullcols_total();
 	int nb = scalapack::global::block_size;
-	int nprow = dcart.dims()[0];
-	int npcol = dcart.dims()[1];
 	int size = std::min(m,n);
 	
 	LOG.os<1>("Running SCALAPACK pdgesvd calculation\n");
@@ -38,7 +36,6 @@ void SVD::compute(double eps) {
 		
 	auto sca_mat_in = std::make_shared<scalapack::distmat<double>>(
 		dbcsr::matrix_to_scalapack(m_mat_in, sgrid, 
-		m_mat_in->name() + "_scalapack", 
 		nb, nb, ori_coord[0], ori_coord[1])
 	);
 	

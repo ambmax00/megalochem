@@ -249,12 +249,12 @@ void DFMO_K::compute_K() {
 		vec<int> o_offsets(o.size());
 		int off = 0;	
 	
-		for (int i = 0; i != o.size(); ++i) {
+		for (size_t i = 0; i != o.size(); ++i) {
 			o_offsets[i] = off;
 			off += o[i];
 		}
 			
-		for (int i = 0; i != o_bounds.size(); ++i) { 
+		for (size_t i = 0; i != o_bounds.size(); ++i) { 
 			o_bounds[i][0] = o_offsets[o_bounds[i][0]];
 			o_bounds[i][1] = o_offsets[o_bounds[i][1]]
 				+ o[o_bounds[i][1]] - 1;
@@ -306,7 +306,7 @@ void DFMO_K::compute_K() {
 		auto full = m_HT1_xmb_02_1->nfull_total();
 		int64_t nze_HTI_tot = (int64_t)full[0] * (int64_t)full[1] * (int64_t)full[2];
 		
-		for (int iocc = 0; iocc != o_bounds.size(); ++iocc) {
+		for (int iocc = 0; iocc != (int)o_bounds.size(); ++iocc) {
 			
 			LOG.os<1>("IOCC = ", iocc, " ", o_bounds[iocc][0],
 				" -> ", o_bounds[iocc][1], '\n');
@@ -379,7 +379,7 @@ void DFMO_K::compute_K() {
 				dbcsr::tensor<3>::create_template(*m_HT2_xmb_01_2)
 				.name("HT2_xmb_01_2_copy").build();
 				
-			dbcsr:copy(*m_HT2_xmb_01_2, *HT2_xmb_01_2_copy).perform();
+			dbcsr::copy(*m_HT2_xmb_01_2, *HT2_xmb_01_2_copy).perform();
 			
 			//dbcsr::print(*m_HT2_xmb_01_2);
 			//dbcsr::print(*HT2_xmb_01_2_copy);
@@ -732,7 +732,6 @@ void DFMEM_K::compute_K() {
 		reo_int.finish();
 		
 		int nxbatches = m_eri3c2e_batched->nbatches(0);
-		int nnbatches = m_eri3c2e_batched->nbatches(2);
 		
 		for (int ix = 0; ix != nxbatches; ++ix) {
 			
@@ -811,7 +810,7 @@ void DFMEM_K::compute_K() {
 				reo_2.finish();
 				
 				reo_3.start();
-				dbcsr:copy(*c_xbb_0_12, *m_c_xbb_02_1)
+				dbcsr::copy(*c_xbb_0_12, *m_c_xbb_02_1)
 					.bounds(cpybds)
 					.perform();
 				reo_3.finish();
@@ -904,7 +903,6 @@ void DFLMO_K::compute_K() {
 		
 		LOG.os<1>("Computing exchange part (", X, ")\n");
 		
-		auto& time_chol = TIME.sub("Pivoted Cholesky decomposition");
 		auto& time_reo1 = TIME.sub("First reordering");
 		auto& time_reo2 = TIME.sub("Second reordering");
 		auto& time_reo3 = TIME.sub("Third reordering");
@@ -929,18 +927,17 @@ void DFLMO_K::compute_K() {
 		vec<int> o_offsets(o.size());
 		int off = 0;	
 	
-		for (int i = 0; i != o.size(); ++i) {
+		for (size_t i = 0; i != o.size(); ++i) {
 			o_offsets[i] = off;
 			off += o[i];
 		}
 					
-		for (int i = 0; i != o_bounds.size(); ++i) { 
+		for (size_t i = 0; i != o_bounds.size(); ++i) { 
 			o_bounds[i][0] = o_offsets[o_bounds[i][0]];
 			o_bounds[i][1] = o_offsets[o_bounds[i][1]]
 				+ o[o_bounds[i][1]] - 1;
 		}
 				
-		std::array<int,2> dims2 = {nbas, nocc};
 		std::array<int,3> dims3 = {nxbas, nbas, nocc};
 				
 		arrvec<int,3> xbm = {x,b,o};
@@ -1131,14 +1128,12 @@ void DFLMO_K::compute_K() {
 	[&] (dbcsr::shared_matrix<double>& u_bm, dbcsr::shared_matrix<double>& v_mb,
 		dbcsr::shared_matrix<double>& k_bb, std::string X) {
 		
-		auto& time_svd = TIME.sub("Singular value decomposition");
 		auto& time_reo1 = TIME.sub("First reordering");
 		auto& time_reo2 = TIME.sub("Second reordering");
 		auto& time_reo3 = TIME.sub("Third reordering");
 		auto& time_htuint = TIME.sub("Forming half-transformed u integrals");
 		auto& time_htvint = TIME.sub("Forming half-transformed v integrals");
 		auto& time_htvfit = TIME.sub("Contracting with v_xx");
-		auto& time_formk = TIME.sub("Final contraction");
 		auto& time_ints = TIME.sub("Fetching ints");
 		
 		LOG.os<1>("Computing exchange part (", X, "), NON SYMMETRIC\n");
@@ -1162,19 +1157,17 @@ void DFLMO_K::compute_K() {
 		vec<int> o_offsets(o.size());
 		int off = 0;	
 	
-		for (int i = 0; i != o.size(); ++i) {
+		for (size_t i = 0; i != o.size(); ++i) {
 			o_offsets[i] = off;
 			off += o[i];
 		}
 			
-		for (int i = 0; i != o_bounds.size(); ++i) { 
+		for (size_t i = 0; i != o_bounds.size(); ++i) { 
 			o_bounds[i][0] = o_offsets[o_bounds[i][0]];
 			o_bounds[i][1] = o_offsets[o_bounds[i][1]]
 				+ o[o_bounds[i][1]] - 1;
 		}
 		
-		std::array<int,2> dims2 = {nbas, nocc};
-		std::array<int,2> dims2t = {nocc, nbas};
 		std::array<int,3> dims3 = {nxbas, nbas, nocc};
 		
 		arrvec<int,3> xbm = {x,b,o};

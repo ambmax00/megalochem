@@ -170,7 +170,7 @@ std::optional<T> json_optional(nlohmann::json& j, std::string key) {
 		out = std::make_optional<T>(j[key]);
 	}
 	return out;
-};
+}
 
 void validate(std::string section, const nlohmann::json& j_in, const nlohmann::json& j_ref) {
 			
@@ -308,7 +308,7 @@ void driver::parse_atoms(nlohmann::json& jdata) {
 			throw std::runtime_error("Missing coordinates.");
 		}
 		
-		for (int i = 0; i != geometry.size()/3; ++i) {
+		for (size_t i = 0; i != geometry.size()/3; ++i) {
 			desc::Atom a;
 			a.x = geometry.at(3*i);
 			a.y = geometry.at(3*i+1);
@@ -337,7 +337,6 @@ void driver::parse_atoms(nlohmann::json& jdata) {
 		
 		std::string ele_name;
 		int nline = 0;
-		double x, y, z;
 		
 		while(std::getline(in,line)) {
 			

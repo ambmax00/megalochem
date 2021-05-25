@@ -47,7 +47,7 @@ void hermitian_eigen_solver::compute() {
 	MPI_Bcast(&ori_coord[0],2,MPI_INT,ori_proc,m_world.comm());
 		
 	scalapack::distmat<double> sca_mat_in = dbcsr::matrix_to_scalapack(m_mat_in, 
-		sgrid, m_mat_in->name() + "_scalapack", nb, nb, ori_coord[0], ori_coord[1]);
+		sgrid, nb, nb, ori_coord[0], ori_coord[1]);
 	
 	std::optional<scalapack::distmat<double>> sca_eigvec_opt;
 	

@@ -84,7 +84,8 @@ protected:
 		
 public:
 	
-	JK_common(megalochem::world w, desc::shared_molecule smol, int print, std::string name);
+	JK_common(megalochem::world w, desc::shared_molecule smol, int print, 
+		std::string name);
 	
 	void set_density_alpha(dbcsr::shared_matrix<double>& ipA) { m_p_A = ipA; }
 	
@@ -192,8 +193,8 @@ public:
 	MAKE_BUILDER_CLASS(EXACT_J, create, CONCAT(BASE_LIST, EXACT_J_LIST), ())
 
 	EXACT_J(create_pack&& p) : 
-		m_eri4c2e_batched(p.p_eri4c2e_batched),
-		BASE_INIT(J, EXACT_J)
+		BASE_INIT(J, EXACT_J),
+		m_eri4c2e_batched(p.p_eri4c2e_batched)
 	{}
 	void compute_J() override;
 	void init() override;
@@ -218,8 +219,8 @@ public:
 	MAKE_BUILDER_CLASS(EXACT_K, create, CONCAT(BASE_LIST, EXACT_J_LIST), ())
 
 	EXACT_K(create_pack&& p) :
-		m_eri4c2e_batched(p.p_eri4c2e_batched),
-		BASE_INIT(K, EXACT_K)
+		BASE_INIT(K, EXACT_K),
+		m_eri4c2e_batched(p.p_eri4c2e_batched)
 	{}
 	void compute_K() override;
 	void init() override;
@@ -251,9 +252,9 @@ public:
 	MAKE_BUILDER_CLASS(DF_J, create, CONCAT(BASE_LIST, DF_J_LIST), ())
 	
 	DF_J(create_pack&& p) : 
+		BASE_INIT(J, DF_J),
 		m_eri3c2e_batched(p.p_eri3c2e_batched),
-		m_v_inv(p.p_metric_inv),
-		BASE_INIT(J, DF_J)
+		m_v_inv(p.p_metric_inv)
 	{}
 	void compute_J() override;
 	void init() override;
@@ -291,10 +292,10 @@ public:
 	MAKE_BUILDER_CLASS(DFMO_K, create, CONCAT(BASE_LIST, DFMO_K_LIST), ())
 
 	DFMO_K(create_pack&& p) : 
+		BASE_INIT(K, DFMO_K),
 		m_eri3c2e_batched(p.p_eri3c2e_batched),
 		m_v_invsqrt(p.p_metric_invsqrt),
-		m_occ_nbatches((p.p_occ_nbatches) ? *p.p_occ_nbatches : 5),
-		BASE_INIT(K, DFMO_K)
+		m_occ_nbatches((p.p_occ_nbatches) ? *p.p_occ_nbatches : 5)
 	{}
 	void compute_K() override;
 	void init() override;
@@ -329,9 +330,9 @@ public:
 	MAKE_BUILDER_CLASS(DFAO_K, create, CONCAT(BASE_LIST, DFAO_K_LIST), ())
 
 	DFAO_K(create_pack&& p) : 
+		BASE_INIT(K, DFAO_K),
 		m_eri3c2e_batched(p.p_eri3c2e_batched),
-		m_fitting_batched(p.p_fitting_batched),
-		BASE_INIT(K, DFAO_K)
+		m_fitting_batched(p.p_fitting_batched)
 	{}
 	
 	void compute_K() override;
@@ -372,10 +373,10 @@ public:
 	MAKE_BUILDER_CLASS(DFROBUST_K, create, CONCAT(BASE_LIST, DFROBUST_K_LIST), ())
 
 	DFROBUST_K(create_pack&& p) : 
+		BASE_INIT(K, DFROBUST_K),
 		m_eri3c2e_batched(p.p_eri3c2e_batched),
 		m_fitting_batched(p.p_fitting_batched),
-		m_v_xx(p.p_metric),
-		BASE_INIT(K, DFROBUST_K)
+		m_v_xx(p.p_metric)
 	{}
 	
 	void compute_K() override;
@@ -417,9 +418,9 @@ public:
 	MAKE_BUILDER_CLASS(DFMEM_K, create, CONCAT(BASE_LIST, DFMEM_K_LIST), ())
 
 	DFMEM_K(create_pack&& p) : 
+		BASE_INIT(K, DFMEM_K),
 		m_eri3c2e_batched(p.p_eri3c2e_batched),
-		m_v_xx(p.p_metric_inv),
-		BASE_INIT(K, DFMEM_K)
+		m_v_xx(p.p_metric_inv)
 	{}
 	
 	void compute_K() override;
@@ -454,10 +455,10 @@ public:
 	MAKE_BUILDER_CLASS(DFLMO_K, create, CONCAT(BASE_LIST, DFLMO_K_LIST), ())
 
 	DFLMO_K(create_pack&& p) : 
+		BASE_INIT(K, DFLMO_K),
 		m_eri3c2e_batched(p.p_eri3c2e_batched),
 		m_v_xx(p.p_metric_inv),
-		m_occ_nbatches((p.p_occ_nbatches) ? *p.p_occ_nbatches : 5),
-		BASE_INIT(K, DFLMO_K)
+		m_occ_nbatches((p.p_occ_nbatches) ? *p.p_occ_nbatches : 5)
 	{}
 	
 	void compute_K() override;

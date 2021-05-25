@@ -59,13 +59,12 @@ private:
 	
 	// descriptors
 	world m_world;
+	dbcsr::cart m_cart;
 	desc::shared_molecule m_mol;
 	
 	desc::shared_cluster_basis m_df_basis, m_df_basis2;
 	
 	MAKE_MEMBER_VARS(HFMOD_LIST_OPT)
-	
-	dbcsr::cart m_cart;
 	
 	util::mpi_log LOG;
 	util::mpi_time TIME;
@@ -125,8 +124,8 @@ public:
 	
 	hfmod(create_pack&& p) : 
 		m_world(p.p_set_world),
-		m_mol(p.p_set_molecule),
 		m_cart(p.p_set_world.dbcsr_grid()),
+		m_mol(p.p_set_molecule),
 		m_df_basis(p.p_df_basis ? *p.p_df_basis : nullptr),
 		m_df_basis2(p.p_df_basis2 ? *p.p_df_basis2 : nullptr),
 		MAKE_INIT_LIST_OPT(HFMOD_LIST_OPT),

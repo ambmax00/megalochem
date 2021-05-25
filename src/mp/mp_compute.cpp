@@ -30,10 +30,6 @@ desc::shared_wavefunction mpmod::compute() {
 	LOG.banner<>("Batched CD-LT-SOS-RI-MP2", 50, '*');
 	
 	auto& laptime = TIME.sub("Computing laplace points");
-	auto& scrtime = TIME.sub("Computing screener");
-	auto& calcints = TIME.sub("Computing integrals");
-	auto& spinfotime = TIME.sub("Shellpair info");
-	auto& invtime = TIME.sub("Inverting metric");
 	auto& pseudotime = TIME.sub("Forming pseudo densities");
 	auto& pcholtime = TIME.sub("Pivoted cholesky decomposition");
 	auto& formZtilde = TIME.sub("Forming Z tilde");
@@ -162,6 +158,9 @@ desc::shared_wavefunction mpmod::compute() {
 			metric_matrix = aoreg.get<dbcsr::shared_matrix<double>>(
 				ints::key::coul_xx);
 			break;
+			
+		case ints::metric::pari:
+			throw std::runtime_error("Invalid metric for z kernel.");
 			
 	}
 	

@@ -82,7 +82,7 @@ void MVP_AORIADC1::init() {
 	
 }
 
-smat MVP_AORIADC1::compute(smat u_ia, double omega) {
+smat MVP_AORIADC1::compute(smat u_ia, [[maybe_unused]] double omega) {
 	
 	TIME.start();
 	

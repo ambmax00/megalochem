@@ -784,7 +784,6 @@ void pivinc_cd::compute(std::optional<int> force_rank,
 	auto dcart = m_world.dbcsr_grid();
 	
 	int nrows = m_mat_in->nfullrows_total();
-	int ncols = m_mat_in->nfullcols_total();
 	int N = nrows;
 	int nb = 4;
 	
@@ -814,9 +813,7 @@ void pivinc_cd::compute(std::optional<int> force_rank,
 	LOG.os<1>("-- Occupation of U: ", U->occupation(), '\n');
 	
 	//dbcsr::print(*U);
-	
-	int nblks = U->nblkrows_total();
-	
+		
 	double thresh = (eps) ? *eps : filter_100;
 	LOG.os<1>("-- Threshold: ", thresh, '\n');
 			
@@ -1020,15 +1017,13 @@ void pivinc_cd::compute(std::optional<int> force_rank,
 				
 				if (icol > m_rank-1) continue;
 				
-				double prevval = startpos[icol].d;
 				int prevrow = startpos[icol].i;
 				
 				if (val > T && irow <= prevrow) {
 					startpos[icol].d = val;
 					startpos[icol].i = irow;
 				}
-				
-				prevval = stoppos[icol].d;
+								
 				prevrow = stoppos[icol].i;
 				
 				if (val > T && irow >= prevrow) {
@@ -1094,7 +1089,7 @@ void pivinc_cd::compute(std::optional<int> force_rank,
 			});
 			
 		LOG.os<1>("-- Reordered LMO indices: \n");
-		for (int i = 0; i != lmo_perm.size(); ++i) {
+		for (size_t i = 0; i != lmo_perm.size(); ++i) {
 			LOG.os<1>(lmo_perm[i], " ", lmo_pos[lmo_perm[i]], "\n");
 		} LOG.os<1>('\n');
 		
@@ -1194,8 +1189,6 @@ dbcsr::shared_matrix<double> pivinc_cd::L(std::vector<int> rowblksizes, std::vec
 	return Lredist;
 	
 }
-
-void reorder_and_reduce(scalapack::distmat<double>& L) {}
 
 #endif
 	

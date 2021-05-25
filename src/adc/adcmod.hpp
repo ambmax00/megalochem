@@ -89,18 +89,17 @@ private:
 		std::vector<double> eps_occ, eps_vir;
 	};
 
-	desc::shared_wavefunction m_wfn;
 	megalochem::world m_world;
-	desc::shared_cluster_basis m_df_basis;
-	
+	desc::shared_wavefunction m_wfn;
 	dbcsr::cart m_cart;
+	desc::shared_cluster_basis m_df_basis;
 	
 	MAKE_MEMBER_VARS(ADCMOD_OPTLIST)
 	
 	adcmethod m_adcmethod;
 	
-	util::mpi_time TIME;
 	util::mpi_log LOG;
+	util::mpi_time TIME;
 	
 	std::shared_ptr<ints::aoloader> m_aoloader;
 		

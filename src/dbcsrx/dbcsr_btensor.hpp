@@ -296,17 +296,17 @@ public:
 
 	btensor(create_template_pack&& p) :
 		m_comm(p.p_t_in.m_comm),
+		LOG(p.p_t_in.m_comm,(p.p_print) ? *p.p_print : 0),
+		m_mpirank(p.p_t_in.m_mpirank),
+		m_mpisize(p.p_t_in.m_mpisize),
 		m_name(p.p_name),
 		m_spgrid_N(p.p_t_in.m_spgrid_N),
 		m_blk_sizes(p.p_t_in.m_blk_sizes),
 		m_blk_maps(p.p_t_in.m_blk_maps),
 		m_filename(),
-		m_mpirank(p.p_t_in.m_mpirank),
-		m_mpisize(p.p_t_in.m_mpisize),
-		LOG(p.p_t_in.m_comm,(p.p_print) ? *p.p_print : 0),
+		m_type(p.p_btensor_type),
 		m_is_compress_initialized(false),
-		m_is_decompress_initialized(false),
-		m_type(p.p_btensor_type)
+		m_is_decompress_initialized(false)
 	{
 		LOG.os<1>("Setting up batch tensor information for ", m_name, + ".\n");
 		

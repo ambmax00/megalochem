@@ -450,9 +450,13 @@ public:
 
 	distmat(grid igrid, int nrows, int ncols, int rowblksize, 
 		int colblksize, int irsrc, int icsrc) :
-		m_grid(igrid), m_nrowstot(nrows), m_ncolstot(ncols), 
-		m_rowblk_size(rowblksize), m_colblk_size(colblksize),
-		m_rsrc(irsrc), m_csrc(icsrc)
+		m_data(nullptr),
+		m_grid(igrid), 
+		m_nrowstot(nrows), 
+		m_ncolstot(ncols), 
+		m_rsrc(irsrc), m_csrc(icsrc),
+		m_rowblk_size(rowblksize), 
+		m_colblk_size(colblksize)
 	{
 		
 		//if (global_grid.mypnum() == 0) {
@@ -555,11 +559,13 @@ public:
 	distmat(const distmat& d) = delete;
 	
 	distmat(distmat&& d) :
-		m_grid(d.m_grid), m_data(d.m_data), m_nrowstot(d.m_nrowstot), 
+		m_data(d.m_data), m_grid(d.m_grid), m_nrowstot(d.m_nrowstot), 
 		m_ncolstot(d.m_ncolstot), m_nrowsloc(d.m_nrowsloc),
-		m_ncolsloc(d.m_ncolsloc), m_rowblk_size(d.m_rowblk_size),
-		m_colblk_size(d.m_colblk_size), m_desc(d.m_desc),
-		m_rsrc(d.m_rsrc), m_csrc(d.m_csrc)
+		m_ncolsloc(d.m_ncolsloc), 
+		m_rsrc(d.m_rsrc), m_csrc(d.m_csrc),
+		m_rowblk_size(d.m_rowblk_size),
+		m_colblk_size(d.m_colblk_size),
+		m_desc(d.m_desc)
 	{
 		d.m_data = nullptr;
 	}

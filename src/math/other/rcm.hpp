@@ -26,7 +26,7 @@ private:
 	const std::vector<Point> m_points;
 	const func m_distfunc;
 	const double m_cutoff;
-	const size_t m_dim;
+	const int m_dim;
 	
 	std::vector<int> m_index;
 	Eigen::MatrixXd m_distmat;
@@ -132,11 +132,15 @@ private:
 	
 public:
 
-	rcm(std::vector<Point> t_points, double t_cutoff, 
-		func t_distfunc) : m_points(t_points), m_distfunc(t_distfunc), 
-		m_cutoff(t_cutoff), m_index(t_points.size()), m_dim(t_points.size()),
+	rcm(std::vector<Point> t_points, double t_cutoff, func t_distfunc) : 
+		m_points(t_points), 
+		m_distfunc(t_distfunc), 
+		m_cutoff(t_cutoff), 
+		m_dim((int)t_points.size()),
+		m_index(t_points.size()), 
 		m_distmat(Eigen::MatrixXd::Zero(m_dim,m_dim)), 
-		m_conmat(Eigen::MatrixXi::Zero(m_dim,m_dim)) {};
+		m_conmat(Eigen::MatrixXi::Zero(m_dim,m_dim))
+	{}
 
 	~rcm() {};
 	
@@ -152,7 +156,7 @@ public:
 		std::deque<int> Q;
 		std::vector<int> R;
 		
-		while (R.size() != m_dim) {
+		while ((int)R.size() != m_dim) {
 			
 			// find object with minimum degree which is not yet in R
 			int P = min_degree(R);
@@ -200,7 +204,7 @@ public:
 				
 			}
 			
-			if (R.size() == m_dim) {
+			if ((int)R.size() == m_dim) {
 				break;
 			}
 				
@@ -241,7 +245,7 @@ public:
 	void reorder(T& p_in) {
 		
 		T p_out = p_in;
-		for (int i = 0; i != m_points.size(); ++i) {
+		for (size_t i = 0; i != m_points.size(); ++i) {
 			p_out[i] = p_in[m_index[i]];
 		}
 		p_in = p_out;

@@ -138,9 +138,9 @@ public:
 	MAKE_BUILDER_CLASS(LLMP_FULL_Z, create, CONCAT(Z_INIT_LIST, LLMP_FULL_Z_LIST), ())
 
 	LLMP_FULL_Z(create_pack&& p) : 
+		Z_INIT_CON(LLMP_FULL_Z),
 		m_eri3c2e_batched(p.p_eri3c2e_batched),
-		m_intermeds(p.p_intermeds),
-		Z_INIT_CON(LLMP_FULL_Z)
+		m_intermeds(p.p_intermeds)
 	{}
 
 	void init() override;
@@ -172,9 +172,9 @@ public:
 	MAKE_BUILDER_CLASS(LL_FULL_Z, create, CONCAT(Z_INIT_LIST, LL_FULL_Z_LIST), ())
 
 	LL_FULL_Z(create_pack&& p) : 
+		Z_INIT_CON(LL_FULL_Z),
 		m_eri3c2e_batched(p.p_eri3c2e_batched),
-		m_intermeds(p.p_intermeds),
-		Z_INIT_CON(LL_FULL_Z)
+		m_intermeds(p.p_intermeds)
 	{}
 
 	void init() override;
@@ -240,8 +240,8 @@ public:
 	MAKE_BUILDER_CLASS(LLMP_MEM_Z, create, CONCAT(Z_INIT_LIST, LLMP_MEM_Z_LIST), ())
 
 	LLMP_MEM_Z(create_pack&& p) : 
-		m_eri3c2e_batched(p.p_eri3c2e_batched),
-		Z_INIT_CON(LLMP_MEM_Z)
+		Z_INIT_CON(LLMP_MEM_Z),
+		m_eri3c2e_batched(p.p_eri3c2e_batched)
 	{}
 
 	void init() override;
@@ -287,7 +287,7 @@ ${_MAKE_BUILDER_CLASS('LLMP_ASYM_Z', 'create', list, True)}$
 	
 };*/
 
-inline void load_zints(zmethod zmet, ints::metric metr, ints::aoloader& ao) {
+inline void load_zints([[maybe_unused]] zmethod zmet, ints::metric metr, ints::aoloader& ao) {
 	
 	// set J
 	ao.request(ints::key::scr_xbb,true);
@@ -343,9 +343,7 @@ public:
 		CHECK_REQUIRED(CONCAT(Z_INIT_LIST, ZBUILDER_LIST))
 
 		auto aoreg = c_aoloader->get_registry();
-		
-		int nprint = (c_print) ? *c_print : 0;
-	
+			
 		dbcsr::sbtensor<3,double> eri3c2e_batched;
 		
 		switch (*c_metric) {

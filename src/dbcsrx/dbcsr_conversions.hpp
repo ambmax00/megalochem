@@ -259,7 +259,7 @@ shared_matrix<typename Derived::Scalar> eigen_to_matrix(
 
 template <typename T = double>
 scalapack::distmat<T> matrix_to_scalapack(shared_matrix<T> mat_in, 
-	scalapack::grid sgrid, std::string nameint, 
+	scalapack::grid sgrid, 
 	int nsplitrow, int nsplitcol, int ori_row, int ori_col) {
 	
 	cart mcart = mat_in->get_cart();	

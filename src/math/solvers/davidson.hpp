@@ -87,12 +87,16 @@ public:
 	davidson(world w, int nprint) : 
 		m_world(w),
 		LOG(w.comm(), nprint),
-		m_converged(false),
+		m_diag(nullptr),
+		m_fac(nullptr),
+		m_nroots(1),
+		m_subspace(0),
 		m_pseudo(false),
-		m_conv(1e-5),
-		m_maxiter(100),
+		m_converged(false),
 		m_block(true),
 		m_balancing(true),
+		m_conv(1e-5),
+		m_maxiter(100),
 		m_maxsubspace(30)
 	{}
 
@@ -106,7 +110,7 @@ public:
 		if (!omega && m_pseudo) 
 			throw std::runtime_error("Davidson solver initialized as pseudo-eigenvalue problem, but no omega given.");
 		
-		double prev_omega, current_omega, init_omega;
+		double prev_omega(0.0), current_omega(0.0), init_omega(0.0);
 		if (omega) {
 			prev_omega = *omega;
 			init_omega = *omega;
@@ -129,7 +133,7 @@ public:
 		
 		LOG.os<1>("Max subspace: ", nvecs_max, '\n');
 		
-		if (m_nroots > m_vecs.size()) {
+		if (m_nroots > (int)m_vecs.size()) {
 			std::string msg = std::to_string(m_nroots) + " roots requested, but only "
 				+ std::to_string(m_vecs.size()) + " guesses given.\n";
 			throw std::runtime_error(msg);
@@ -313,8 +317,8 @@ public:
 				// because we are probably dealing with an approximation to
 				// the real diagonal of the matrix, we are checking both the 
 				// residual and the eigenvectors of the subspace matrix
-				double alpha_ki = (ITER == 0) ? std::numeric_limits<double>::max() 
-						: fabs(evecs(m_subspace-1,iroot));
+				//double alpha_ki = (ITER == 0) ? std::numeric_limits<double>::max() 
+				//		: fabs(evecs(m_subspace-1,iroot));
 				
 				m_errs[iroot] = //std::min(
 					r_k->norm(dbcsr_norm_frobenius);//,
@@ -415,7 +419,7 @@ public:
 				bnew->copy_in(*d_k);
 				
 				LOG.os<1>("Computing new guess vector.\n");
-				for (int i = 0; i != m_vecs.size(); ++i) {
+				for (size_t i = 0; i != m_vecs.size(); ++i) {
 									
 					//dbcsr::copy(*m_vecs[i], temp2).perform();
 					temp2->copy_in(*m_vecs[i]);
@@ -445,12 +449,12 @@ public:
 				
 			}
 			
-			if (m_vecs.size() == nvecs_prev) {
+			if ((int)m_vecs.size() == nvecs_prev) {
 				throw std::runtime_error(
 					"Davidson: linear dependence in trial vector space");
 			}
 			
-			if (m_vecs.size() > nvecs_max) {
+			if ((int)m_vecs.size() > nvecs_max) {
 				LOG.os<1>("Subspace too large. \n");
 				collapse(evecs);
 			}

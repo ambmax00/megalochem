@@ -108,8 +108,8 @@ adcmod::test_fitting(std::vector<bool> atom_idx) {
 	
 	metric_out->reserve_sym();
 	
-	for (int ir = 0; ir != r.size(); ++ir) {
-		for (int jr = 0; jr != r.size(); ++jr) {
+	for (int ir = 0; ir != (int)r.size(); ++ir) {
+		for (int jr = 0; jr != (int)r.size(); ++jr) {
 			
 			auto ix = rx[ir];
 			auto jx = rx[jr];
@@ -134,7 +134,7 @@ adcmod::test_fitting(std::vector<bool> atom_idx) {
 	LOG.os<>("5\n");
 	
 	auto mscala_XR = dbcsr::matrix_to_scalapack(metric_XR, sgrid, 
-		"mscala_XR", 16, 16, 0, 0);
+		16, 16, 0, 0);
 
 	//metric_XY->release();
 	metric_XR->release();
@@ -177,7 +177,6 @@ adcmod::test_fitting(std::vector<bool> atom_idx) {
 	*/
 	scalapack::distmat<double> tau_dist(sgrid, 1, nr, 16, 16, 0, 0);
 	
-	double* tau = new double[nx]();
 	double* work = nullptr;
 	double work_query = 0;
 	int lwork = 0;
@@ -341,7 +340,7 @@ adcmod::test_fitting(std::vector<bool> atom_idx) {
 			
 			std::cout << "TASK " << itask << " MU/NU: " << imu << " " << inu << '\n';
 			
-			for (int ix = 0; ix != x.size(); ++ix) {
+			for (int ix = 0; ix != (int)x.size(); ++ix) {
 				res[0].push_back(ix);
 				res[1].push_back(imu);
 				res[2].push_back(inu);
@@ -358,7 +357,7 @@ adcmod::test_fitting(std::vector<bool> atom_idx) {
 			
 			int qoff = 0;
 			
-			for (int ix = 0; ix != x.size(); ++ix) {
+			for (int ix = 0; ix != (int)x.size(); ++ix) {
 				
 				std::array<int,3> idx = {ix,imu,inu};
 				std::array<int,3> size = {x[ix], b[imu], b[inu]};
@@ -414,7 +413,7 @@ adcmod::test_fitting(std::vector<bool> atom_idx) {
 			
 			cfit_xbb_task->reserve(res);
 			
-			for (int ir = 0; ir != r.size(); ++ir) {
+			for (int ir = 0; ir != (int)r.size(); ++ir) {
 					
 				int ix = rx[ir];
 					
@@ -513,7 +512,6 @@ void adcmod::init_ao_tensors() {
 		{
 			auto jmet_adc2 = fock::str_to_jmethod(m_build_J);
 			auto kmet_adc2 = fock::str_to_kmethod(m_build_K);
-			auto zmet_adc2 = mp::str_to_zmethod(m_build_Z);
 			auto metr_adc2 = ints::str_to_metric(m_df_metric);
 		
 			fock::load_jints(jmet_adc2, metr_adc2, *m_aoloader);

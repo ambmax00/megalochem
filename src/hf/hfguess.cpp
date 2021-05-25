@@ -179,7 +179,7 @@ void hfmod::compute_guess() {
 		// divide it up
 		std::vector<desc::Atom> my_atypes;
 		
-		for (int I = 0; I != atypes.size(); ++I) {
+		for (size_t I = 0; I != atypes.size(); ++I) {
 			//if (m_cart.rank() == I % m_cart.size()) my_atypes.push_back(atypes[I]);
 			// All om rank 1 for now
 			if (m_cart.rank() == 0) my_atypes.push_back(atypes[I]);
@@ -201,7 +201,7 @@ void hfmod::compute_guess() {
 		// set up new grid
 		world wself(MPI_COMM_SELF);
 		
-		for (int I = 0; I != my_atypes.size(); ++I) {
+		for (size_t I = 0; I != my_atypes.size(); ++I) {
 			
 			auto atom = my_atypes[I];
 			int Z = atom.atomic_number;
@@ -406,9 +406,8 @@ void hfmod::compute_guess() {
 		Eigen::MatrixXd ptot_eigen = Eigen::MatrixXd::Zero(nbas,nbas);
 		auto csizes = m_mol->dims().b();
 		int off = 0;
-		int size = 0;
 		
-		for (int i = 0; i != m_mol->atoms().size(); ++i) {
+		for (size_t i = 0; i != m_mol->atoms().size(); ++i) {
 			
 			int Z = m_mol->atoms()[i].atomic_number;
 			auto& at_density = densitymap[Z];
@@ -515,9 +514,7 @@ void hfmod::compute_guess() {
 			.mult(m_mol->mult())
 			.mo_split(m_mol->mo_split())
 			.build();
-					
-		int print = LOG.global_plev(); // - 1;
-		
+							
 		auto subhf = hfmod::create()
 			.set_world(m_world)
 			.set_molecule(mol_sub)
