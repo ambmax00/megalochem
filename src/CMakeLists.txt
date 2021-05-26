@@ -4,6 +4,28 @@ include_directories(
 	${CMAKE_CURRENT_BINARY_DIR}
 )
 
+# clang - format
+
+file(GLOB_RECURSE SRC_FILES
+     "test.cpp"
+)
+
+find_program(CLANG_FORMAT_EXE clang-format)
+if (CLANG_FORMAT_EXE)
+	message(STATUS "Found clang-format. Enabling target format.")
+else()
+        message(STATUS "Target format disabled")
+
+endif()
+
+if (CLANG_FORMAT_EXE)
+	add_custom_target(
+		clang_format
+		COMMAND clang-format -i --style=file ${SRC_FILES}
+		COMMENT "Formatting files"
+	)
+endif()
+
 add_subdirectory(dbcsrx)
 add_subdirectory(math)
 add_subdirectory(io)
