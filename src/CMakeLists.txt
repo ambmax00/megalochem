@@ -7,8 +7,11 @@ include_directories(
 # clang - format
 
 file(GLOB_RECURSE SRC_FILES
-     "test.cpp"
+     *cpp
+     *hpp
 )
+
+list(FILTER SRC_FILES EXCLUDE REGEX ".*json.hpp")
 
 find_program(CLANG_FORMAT_EXE clang-format)
 if (CLANG_FORMAT_EXE)
@@ -20,9 +23,9 @@ endif()
 
 if (CLANG_FORMAT_EXE)
 	add_custom_target(
-		clang_format
+		clang-format
 		COMMAND clang-format -i --style=file ${SRC_FILES}
-		COMMENT "Formatting files"
+		COMMENT "Formatting files ${SRC_FILES}"
 	)
 endif()
 

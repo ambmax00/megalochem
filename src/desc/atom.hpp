@@ -6,12 +6,12 @@ namespace megalochem {
 namespace desc {
 
 struct Atom {
-	double x, y, z;
-	int atomic_number;
+  double x, y, z;
+  int atomic_number;
 };
 
-}
+}  // namespace desc
 
-}
+}  // namespace megalochem
 
 #endif
