@@ -864,7 +864,7 @@ adcmod::canon_lmo adcmod::get_canon_pao(dbcsr::shared_matrix<double> u_ia)
 
   for (size_t iblk = 0; iblk != cbas->size(); ++iblk) {
     int iatom = blkmap[iblk];
-    int nbf = desc::nbf(cbas->at(iblk));
+    int nbf = desc::nbf(cbas->at(iblk).shells);
 
     std::vector<int> map(nbf, iatom);
     func_to_atom_occ.insert(func_to_atom_occ.end(), map.begin(), map.end());
@@ -902,12 +902,12 @@ adcmod::canon_lmo adcmod::get_canon_pao(dbcsr::shared_matrix<double> u_ia)
     int iatom = blkmap[ii];
     if (use_atom[iatom]) {
       vshell_sub.insert(
-          vshell_sub.end(), cbas->at(ii).begin(), cbas->at(ii).end());
+          vshell_sub.end(), cbas->at(ii).shells.begin(), cbas->at(ii).shells.end());
     }
   }
 
   auto cbas_sub = std::make_shared<desc::cluster_basis>(
-      vshell_sub, cbas->split_method(), cbas->nsplit());
+      vshell_sub, "atomic", 8);
 
   auto p = cbas_sub->cluster_sizes();
 
@@ -1295,7 +1295,7 @@ std::vector<bool> adcmod::get_significant_atoms(
 
   for (size_t iblk = 0; iblk != cbas->size(); ++iblk) {
     int iatom = blkmap[iblk];
-    int nbf = desc::nbf(cbas->at(iblk));
+    int nbf = desc::nbf(cbas->at(iblk).shells);
 
     std::vector<int> map(nbf, iatom);
     func_to_atom_occ.insert(func_to_atom_occ.end(), map.begin(), map.end());

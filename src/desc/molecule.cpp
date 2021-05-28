@@ -166,6 +166,7 @@ void molecule::print_info(int level)
 std::shared_ptr<desc::molecule> molecule::fragment(
     int noa, int nob, int nva, int nvb, std::vector<int> atom_list)
 {
+  throw std::runtime_error("NYI.");
   auto frag = std::make_shared<desc::molecule>();
 
   // basic members
@@ -196,8 +197,8 @@ std::shared_ptr<desc::molecule> molecule::fragment(
     std::vector<bool> is_included(cbas.size(), false);
 
     int off = 0;
-    for (auto& cluster : cbas) {
-      if (atom_of(cluster[0], frag->m_atoms) != -1) {
+    for (auto& c : cbas) {
+      if (atom_of(c, frag->m_atoms) != -1) {
         is_included[off] = true;
       }
       ++off;
@@ -213,11 +214,11 @@ std::shared_ptr<desc::molecule> molecule::fragment(
   };
 
   auto blklist_b = get_block(*m_cluster_basis);
-  frag->m_cluster_basis = m_cluster_basis->fragment(blklist_b);
+  //frag->m_cluster_basis = m_cluster_basis->fragment(blklist_b);
 
   if (m_cluster_dfbasis) {
     auto blklist_x = get_block(*m_cluster_dfbasis);
-    frag->m_cluster_dfbasis = m_cluster_dfbasis->fragment(blklist_x);
+    //frag->m_cluster_dfbasis = m_cluster_dfbasis->fragment(blklist_x);
   }
 
   frag->m_blocks = block_sizes(*frag, m_mo_split);

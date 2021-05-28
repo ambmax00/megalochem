@@ -155,30 +155,19 @@ class molecule {
     void set_b(cluster_basis& c)
     {
       m_bas_sizes = c.cluster_sizes();
-
-      for (size_t i = 0; i != c.size(); ++i) {
-        m_shell_sizes.push_back(c[i].size());
-      }
+      m_shell_sizes = c.nshells();
     }
 
     void set_x(cluster_basis& cdf)
     {
       m_dfbas_sizes = cdf.cluster_sizes();
-
-      m_dfshell_sizes.clear();
-      for (size_t i = 0; i != cdf.size(); ++i) {
-        m_dfshell_sizes.push_back(cdf[i].size());
-      }
+      m_dfshell_sizes = cdf.nshells();
     }
 
     void set_b2(cluster_basis& c2)
     {
       m_bas2_sizes = c2.cluster_sizes();
-
-      m_shell2_sizes.clear();
-      for (size_t i = 0; i != c2.size(); ++i) {
-        m_shell2_sizes.push_back(c2[i].size());
-      }
+      m_shell2_sizes = c2.nshells();
     }
 
     ~block_sizes()

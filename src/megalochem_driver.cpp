@@ -396,7 +396,8 @@ void driver::parse_basis(nlohmann::json& jdata)
       jdata["name"], atoms, ao_split_method, ao_split, augmentation);
 
   if (jdata.find("cutoff") != jdata.end()) {
-    cbas = ints::remove_lindep(m_world, cbas, (double)jdata["cutoff"]);
+    cbas = ints::remove_lindep(m_world, cbas, (double)jdata["cutoff"],
+		ao_split_method, ao_split);
   }
 
   m_stack[jdata["tag"]] = std::any(cbas);
@@ -431,7 +432,7 @@ void driver::parse_molecule(nlohmann::json& jdata)
     mol->set_cluster_basis2(cbas2);
   }
 
-  mol->print_info();
+  mol->print_info(1);
 
   m_stack[jdata["tag"]] = std::any(mol);
 

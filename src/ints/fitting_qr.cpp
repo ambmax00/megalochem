@@ -36,7 +36,7 @@ std::vector<block_info> get_block_info(desc::cluster_basis& cbas)
   auto min_alphas = cbas.min_alpha();
 
   for (size_t ic = 0; ic != cbas.size(); ++ic) {
-    blkinfo[ic].pos = cbas[ic][0].O;
+    blkinfo[ic].pos = cbas[ic].O;
     blkinfo[ic].radius = radii[ic];
     blkinfo[ic].alpha = min_alphas[ic];
   }
@@ -83,7 +83,7 @@ dbcsr::sbtensor<3, double> dfitting::compute_qr_new(
 
   auto blkmap_b = m_mol->c_basis()->block_to_atom(m_mol->atoms());
   auto blkmap_x = m_mol->c_dfbasis()->block_to_atom(m_mol->atoms());
-  auto blktype_b = m_mol->c_basis()->types();
+  auto blktype_b = m_mol->c_basis()->shell_types();
 
   auto spgrid2_local = dbcsr::pgrid<2>::create(MPI_COMM_SELF).build();
   auto spgrid3_local = dbcsr::pgrid<3>::create(MPI_COMM_SELF).build();

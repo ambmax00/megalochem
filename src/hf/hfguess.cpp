@@ -209,18 +209,18 @@ void hfmod::compute_guess()
 
       std::vector<desc::Atom> atvec = {atom};
 
-      std::vector<desc::Shell> at_libint_basis;
+      std::vector<desc::Shell> at_vshell;
 
       // find basis functions
       for (auto& c : *m_mol->c_basis()) {
-        for (auto& s : c) {
+        for (auto& s : c.shells) {
           if (are_oncentre(atom, s))
-            at_libint_basis.push_back(s);
+            at_vshell.push_back(s);
         }
       }
 
       desc::shared_cluster_basis at_basis =
-          std::make_shared<desc::cluster_basis>(at_libint_basis, "atomic", 1);
+          std::make_shared<desc::cluster_basis>(at_vshell, "atomic", 1);
 
       desc::shared_cluster_basis at_dfbasis = nullptr;
 

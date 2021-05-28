@@ -331,8 +331,8 @@ class aofactory::impl {
       m_cart(w.dbcsr_grid()), m_cbas(cbas), m_cdfbas(cdfbas), m_cbas2(cbas2),
       m_cint_natoms(0), m_cint_nbas(0), m_max_l(0)
   {
-    for (auto& cluster : *cbas) {
-      for (auto shell : cluster) {
+    for (auto& cltr : *cbas) {
+      for (auto shell : cltr.shells) {
         // std::cout << "CLUSTER" << std::endl;
 
         // check if coordinates inside
@@ -348,12 +348,6 @@ class aofactory::impl {
         }
       }
     }
-
-    /*std::cout << "ATOMS: " << std::endl;
-    for (auto a : m_atoms) {
-            std::cout << a.atomic_number << " " << a.x << " " << a.y <<
-                    " " << a.z << std::endl;
-    }*/
 
     init();
   }
@@ -397,10 +391,10 @@ class aofactory::impl {
     m_cint_env.push_back(two_sqrt_pi);
 
     auto add_basis = [this, &off](desc::cluster_basis& cbas) {
-      for (auto& cluster : cbas) {
+      for (auto& cltr : cbas) {
         // std::cout << "CLUSTER" << std::endl;
 
-        for (auto& shell : cluster) {
+        for (auto& shell : cltr.shells) {
           // std::cout << shell << std::endl;
 
           m_max_l = std::max((size_t)m_max_l, shell.l);
@@ -981,7 +975,9 @@ aofactory::get_generator(shared_screener s_scr)
 }
 
 desc::shared_cluster_basis remove_lindep(
-    world wrd, desc::shared_cluster_basis cbas, double cutoff)
+    world wrd, desc::shared_cluster_basis cbas, 
+    double cutoff, std::optional<std::string> opt_split,
+    std::optional<int> opt_nsplit)
 {
   util::mpi_log LOG(wrd.comm(), 0);
 
@@ -1009,8 +1005,8 @@ desc::shared_cluster_basis remove_lindep(
   int off = 0;
   int ishell = 0;
 
-  for (auto& cluster : *cbas) {
-    for (auto& shell : cluster) {
+  for (auto& cltr : *cbas) {
+    for (auto& shell : cltr.shells) {
       vshell.push_back(shell);
       shell_s2b.push_back(off);
       off += shell.size();
@@ -1057,7 +1053,7 @@ desc::shared_cluster_basis remove_lindep(
       " shells.\n");
 
   auto newcbas = std::make_shared<desc::cluster_basis>(
-      newvshell, cbas->split_method(), cbas->nsplit());
+      newvshell, opt_split, opt_nsplit);
 
   return newcbas;
 }

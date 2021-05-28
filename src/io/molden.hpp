@@ -49,7 +49,7 @@ inline void write_molden(
 
     for (size_t ii = 0; ii != cbas->size(); ++ii) {
       int iatom = blkmap[ii];
-      for (auto s : cbas->at(ii)) {
+      for (auto s : cbas->at(ii).shells) {
         file << iatom + 1 << " " << 0 << '\n';
         file << labels[s.l] << " " << s.ncontr() << " " << 1.0 << '\n';
 
@@ -87,8 +87,8 @@ inline void write_molden(
         for (size_t icluster = 0; icluster != cbas->size(); ++icluster) {
           auto& c = cbas->at(icluster);
 
-          for (size_t ishell = 0; ishell != c.size(); ++ishell) {
-            auto s = c[ishell];
+          for (size_t ishell = 0; ishell != c.shells.size(); ++ishell) {
+            auto s = c.shells[ishell];
             int size = s.size();
 
             std::vector<int> map;

@@ -150,16 +150,30 @@ inline int atom_of(Shell& s, std::vector<Atom>& atoms)
 inline static const int DEFAULT_NSPLIT = 8;
 inline static const std::string DEFAULT_SPLIT_METHOD = "multi_shell_strict_sp";
 
+struct cluster {
+ vshell shells;
+ std::array<double,3> O;
+ bool diffuse;
+};
+
+inline int atom_of(cluster& c, std::vector<Atom>& atoms)
+{
+  for (int i = 0; i != (int)atoms.size(); ++i) {
+    double dist = sqrt(
+        pow(c.O[0] - atoms[i].x, 2.0) + pow(c.O[1] - atoms[i].y, 2.0) +
+        pow(c.O[2] - atoms[i].z, 2.0));
+    if (dist < std::numeric_limits<double>::epsilon()) {
+      return i;
+    }
+  }
+  return -1;
+}
+
 class cluster_basis {
  private:
-  std::vector<vshell> m_clusters;
-  std::vector<int> m_cluster_sizes;
-  std::vector<bool> m_cluster_diff;  // false: not diffuse | true : diffuse
-  std::vector<std::string> m_cluster_types;  // s, p, d, ... sp, spdf, ...
-  std::vector<int> m_shell_offsets;
-  int m_nsplit;
-  std::string m_split_method;
-
+ 
+  std::vector<cluster> m_clusters;
+  
  public:
   struct global {
     static inline double cutoff = 1e-8;
@@ -185,11 +199,7 @@ class cluster_basis {
       std::optional<vshell> augbasis = std::nullopt);
 
   cluster_basis(const cluster_basis& cbasis) :
-      m_clusters(cbasis.m_clusters), m_cluster_sizes(cbasis.m_cluster_sizes),
-      m_cluster_diff(cbasis.m_cluster_diff),
-      m_cluster_types(cbasis.m_cluster_types),
-      m_shell_offsets(cbasis.m_shell_offsets), m_nsplit(cbasis.m_nsplit),
-      m_split_method(cbasis.m_split_method)
+      m_clusters(cbasis.m_clusters)
   {
   }
 
@@ -197,59 +207,43 @@ class cluster_basis {
   {
     if (this != &cbasis) {
       m_clusters = cbasis.m_clusters;
-      m_cluster_sizes = cbasis.m_cluster_sizes;
-      m_shell_offsets = cbasis.m_shell_offsets;
-      m_nsplit = cbasis.m_nsplit;
-      m_split_method = cbasis.m_split_method;
-      m_cluster_diff = cbasis.m_cluster_diff;
-      m_cluster_types = cbasis.m_cluster_types;
     }
 
     return *this;
   }
 
-  vvshell::iterator begin()
+  std::vector<cluster>::iterator begin()
   {
     return m_clusters.begin();
   }
 
-  vvshell::iterator end()
+  std::vector<cluster>::iterator end()
   {
     return m_clusters.end();
   }
+  
+  void add(const cluster& c) {
+	  m_clusters.push_back(c);
+  }
 
-  vshell& operator[](int i)
+  cluster& operator[](int i)
   {
     return m_clusters[i];
   }
 
-  vshell& at(int i)
+  cluster& at(int i)
   {
     return m_clusters[i];
   }
+  
+  std::vector<int> shell_offsets() const;
 
-  const vshell& operator[](int i) const
+  const cluster& operator[](int i) const
   {
     return m_clusters[i];
   }
 
   std::vector<int> cluster_sizes() const;
-
-  int shell_offset(int i) const
-  {
-    return m_shell_offsets[i];
-  }
-
-  std::vector<int> block_to_atom(std::vector<desc::Atom> atoms) const;
-
-  int nsplit()
-  {
-    return m_nsplit;
-  }
-  std::string split_method()
-  {
-    return m_split_method;
-  }
 
   std::vector<double> min_alpha() const;
 
@@ -257,37 +251,28 @@ class cluster_basis {
       double cutoff = 1e-8, double step = 0.2, int maxiter = 1000) const;
 
   std::vector<bool> diffuse() const;
+  
+  std::vector<std::string> shell_types() const;
 
-  std::vector<std::string> types() const;
+  int max_nprim() const;
 
-  size_t max_nprim() const;
+  int nbf() const;
 
-  size_t nbf() const;
-
-  size_t max_l() const;
+  int max_l() const;
 
   size_t size() const
   {
     return m_clusters.size();
   }
 
-  std::vector<int> nshells()
-  {
-    std::vector<int> out;
-    for (auto& cluster : m_clusters) { out.push_back(cluster.size()); }
-    return out;
-  }
+  std::vector<int> block_to_atom(std::vector<desc::Atom> atoms) const;
 
-  size_t nshells_tot()
-  {
-    size_t n = 0;
-    for (auto& c : m_clusters) { n += c.size(); }
-    return n;
-  }
+  std::vector<int> nshells() const;
+
+  int nshells_tot() const;
 
   void print_info() const;
 
-  std::shared_ptr<cluster_basis> fragment(std::vector<int> block_list);
 };
 
 using shared_cluster_basis = std::shared_ptr<cluster_basis>;
