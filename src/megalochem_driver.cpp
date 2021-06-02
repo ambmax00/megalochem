@@ -140,6 +140,7 @@ static const nlohmann::json valid_adcwfn = {
     {"cutoff", 1e-6},
     {"ortho_eps", 1e-12},
     {"test_mvp", true},
+    {"use_doubles_ob", false},
     {"_required", {"tag", "type", "wfn", "nroots", "df_basis"}}};
 
 template <typename T>
@@ -589,6 +590,10 @@ void driver::run_adcmod(megajob& job)
 
   if (job.jdata.find("test_mvp") != job.jdata.end()) {
     adc::MVP_AORISOSADC2::TEST_MVP = job.jdata["test_mvp"];
+  }
+  
+  if (job.jdata.find("use_doubles_ob") != job.jdata.end()) {
+    adc::MVP_AORISOSADC2::USE_DOUBLES_OB = job.jdata["use_doubles_ob"];
   }
 
   auto myadcmod = adc::adcmod::create()

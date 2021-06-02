@@ -132,8 +132,6 @@ class MVP_AORIADC1 : public MVP {
   }
 };
 
-inline constexpr bool _use_doubles_ob = false;
-
 class MVP_AORISOSADC2 : public MVP {
  private:
   // input:
@@ -242,6 +240,8 @@ class MVP_AORISOSADC2 : public MVP {
 
  public:
   static inline bool TEST_MVP = false;
+  static inline bool USE_DOUBLES_OB = false;
+
 
 #define AORIADC2_LIST \
   (((megalochem::world), set_world), ((desc::shared_molecule), set_molecule), \

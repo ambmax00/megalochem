@@ -2345,7 +2345,7 @@ smat MVP_AORISOSADC2::compute(smat u_ia, double omega)
   auto sigma_2d = compute_sigma_2d(u_ia);
 
   decltype(sigma_2d) sigma_2e;
-  if constexpr (_use_doubles_ob) {
+  if (USE_DOUBLES_OB) {
     sigma_2e = compute_sigma_2e_OB(u_ao, omega);
   }
   else {
