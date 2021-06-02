@@ -399,6 +399,11 @@ void driver::parse_basis(nlohmann::json& jdata)
     cbas = ints::remove_lindep(m_world, cbas, (double)jdata["cutoff"],
 		ao_split_method, ao_split);
   }
+  
+  LOG.os<>("Basis set: ", std::string(jdata["name"]), " with block sizes:\n");
+  for (auto ele : cbas->cluster_sizes()) {
+	  LOG.os<>(ele, " ");
+  } LOG.os<>('\n');
 
   m_stack[jdata["tag"]] = std::any(cbas);
 }
