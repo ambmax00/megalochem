@@ -83,6 +83,7 @@ void LLMP_MEM_Z::compute()
 
   // copy over
   dbcsr::copy_matrix_to_tensor(*m_locc, *m_locc_01);
+  m_locc_01->filter(dbcsr::global::filter_eps);
 
   // ============= TAKE CARE OF TENSOR STUFF =============
 
@@ -189,6 +190,7 @@ void LLMP_MEM_Z::compute()
 
     // copy over vir density
     dbcsr::copy_matrix_to_tensor(*m_pvir, *m_pvir_01);
+    m_pvir_01->filter(dbcsr::global::filter_eps);
 
     // new loop over nu
     for (int inu = 0; inu != nnbatches; ++inu) {

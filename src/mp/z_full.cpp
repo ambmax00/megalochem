@@ -120,6 +120,7 @@ void LLMP_FULL_Z::compute()
 
   // copy over
   dbcsr::copy_matrix_to_tensor(*m_locc, *m_locc_01);
+  m_locc_01->filter(dbcsr::global::filter_eps);
 
   // ============= TAKE CARE OF TENSOR STUFF =============
 
@@ -214,6 +215,7 @@ void LLMP_FULL_Z::compute()
 
     // copy over vir density
     dbcsr::copy_matrix_to_tensor(*m_pvir, *m_pvir_01);
+    m_pvir_01->filter(dbcsr::global::filter_eps);
 
     // new loop over nu
     for (int inu = 0; inu != m_eri3c2e_batched->nbatches(2); ++inu) {
@@ -480,6 +482,9 @@ void LL_FULL_Z::compute()
   dbcsr::copy_matrix_to_tensor(*m_locc, *m_locc_01);
   dbcsr::copy_matrix_to_tensor(*m_lvir, *m_lvir_01);
 
+  m_locc_01->filter(dbcsr::global::filter_eps);
+  m_lvir_01->filter(dbcsr::global::filter_eps);
+
   // ============= TAKE CARE OF TENSOR STUFF =============
 
   auto spgrid3_xob =
@@ -588,6 +593,7 @@ void LL_FULL_Z::compute()
 
     // copy over vir density
     dbcsr::copy_matrix_to_tensor(*m_lvir, *m_lvir_01);
+    m_lvir_01->filter(dbcsr::global::filter_eps);
 
     // new loop over nu
     for (int iv = 0; iv != b_xov_batched->nbatches(2); ++iv) {
