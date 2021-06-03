@@ -4,18 +4,18 @@
 #include <string>
 
 namespace fock {
-	
-	inline const int FOCK_PRINT_LEVEL = 0;
-	inline const int FOCK_NBATCHES_X = 5;
-	inline const int FOCK_NBATCHES_B = 5;
-	inline const int FOCK_NOCCBATCHES = 1;
-	
-	inline const std::string FOCK_BUILD_J = "exact";
-	inline const std::string FOCK_BUILD_K = "exact";
-	inline const std::string FOCK_METRIC = "coulomb";
-	inline const std::string FOCK_ERIS = "core";
-	inline const std::string FOCK_INTERMEDS = "core";
-	
-} // end namespace
+
+inline const int FOCK_PRINT_LEVEL = 0;
+inline const int FOCK_NBATCHES_X = 5;
+inline const int FOCK_NBATCHES_B = 5;
+inline const int FOCK_NOCCBATCHES = 1;
+
+inline const std::string FOCK_BUILD_J = "exact";
+inline const std::string FOCK_BUILD_K = "exact";
+inline const std::string FOCK_METRIC = "coulomb";
+inline const std::string FOCK_ERIS = "core";
+inline const std::string FOCK_INTERMEDS = "core";
+
+}  // namespace fock
 
 #endif

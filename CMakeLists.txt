@@ -6,7 +6,7 @@ enable_language(Fortran CXX)
 set(CMAKE_BUILD_TYPE RelWithDebInfo)
 set(CMAKE_CXX_STANDARD 17)
 
-#set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -pedantic")
+add_compile_options(-Wall -Wextra -pedantic)
 
 message(STATUS "Compiling with CXX flags ${CMAKE_CXX_FLAGS}")
 
@@ -17,8 +17,6 @@ include(cpp_sources)
 find_package(Eigen3 REQUIRED NO_MODULE)
 
 #get_target_property(dir Eigen3::Eigen INTERFACE_INCLUDE_DIRECTORIES)
-
-include_directories(${dir})
 
 find_package(OpenMP REQUIRED)
 find_package(MPI REQUIRED)

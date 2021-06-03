@@ -1,37 +1,37 @@
 #ifndef MATH_ORTHOGONALIZER_H
 #define MATH_ORTHOGONALIZER_H
 
+#include <Eigen/Core>
 #include <dbcsr_matrix.hpp>
 #include <string>
-#include <Eigen/Core>
 #include "megalochem.hpp"
 
 namespace megalochem {
 
 namespace math {
-	
+
 class orthogonalizer {
-private:
+ private:
+  world m_world;
 
-	world m_world;
+  dbcsr::shared_matrix<double> m_mat_in;
+  dbcsr::shared_matrix<double> m_mat_out;
+  bool m_print;
 
-	dbcsr::shared_matrix<double> m_mat_in;
-	dbcsr::shared_matrix<double> m_mat_out;
-	bool m_print;
+ public:
+  orthogonalizer(world w, dbcsr::shared_matrix<double>& m, bool print = false) :
+      m_world(w), m_mat_in(m), m_print(print){};
 
-public:
+  void compute();
 
-	orthogonalizer(world w, dbcsr::shared_matrix<double>& m, bool print = false) 
-		: m_world(w), m_mat_in(m), m_print(print) {};
-	
-	void compute();
-
-	dbcsr::smatrix<double> result() { return m_mat_out; }
-	
+  dbcsr::smatrix<double> result()
+  {
+    return m_mat_out;
+  }
 };
 
-} // end namespace
+}  // namespace math
 
-} // end mega
+}  // namespace megalochem
 
 #endif
