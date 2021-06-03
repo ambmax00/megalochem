@@ -975,8 +975,10 @@ aofactory::get_generator(shared_screener s_scr)
 }
 
 desc::shared_cluster_basis remove_lindep(
-    world wrd, desc::shared_cluster_basis cbas, 
-    double cutoff, std::optional<std::string> opt_split,
+    world wrd,
+    desc::shared_cluster_basis cbas,
+    double cutoff,
+    std::optional<std::string> opt_split,
     std::optional<int> opt_nsplit)
 {
   util::mpi_log LOG(wrd.comm(), 0);
@@ -1052,8 +1054,8 @@ desc::shared_cluster_basis remove_lindep(
       "Removed ", vshell.size() - newvshell.size(), " of ", vshell.size(),
       " shells.\n");
 
-  auto newcbas = std::make_shared<desc::cluster_basis>(
-      newvshell, opt_split, opt_nsplit);
+  auto newcbas =
+      std::make_shared<desc::cluster_basis>(newvshell, opt_split, opt_nsplit);
 
   return newcbas;
 }

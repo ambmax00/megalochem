@@ -114,7 +114,9 @@ class aofactory {
 };  // end class aofactory
 
 desc::shared_cluster_basis remove_lindep(
-    world w, desc::shared_cluster_basis cbas, double cutoff,
+    world w,
+    desc::shared_cluster_basis cbas,
+    double cutoff,
     std::optional<std::string> opt_split,
     std::optional<int> opt_nsplit);
 

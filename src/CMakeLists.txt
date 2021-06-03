@@ -25,7 +25,7 @@ if (CLANG_FORMAT_EXE)
 	add_custom_target(
 		clang-format
 		COMMAND clang-format -i --style=file ${SRC_FILES}
-		COMMENT "Formatting files ${SRC_FILES}"
+		COMMENT "Formatting files"
 	)
 endif()
 

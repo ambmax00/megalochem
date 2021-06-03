@@ -397,14 +397,13 @@ void driver::parse_basis(nlohmann::json& jdata)
       jdata["name"], atoms, ao_split_method, ao_split, augmentation);
 
   if (jdata.find("cutoff") != jdata.end()) {
-    cbas = ints::remove_lindep(m_world, cbas, (double)jdata["cutoff"],
-		ao_split_method, ao_split);
+    cbas = ints::remove_lindep(
+        m_world, cbas, (double)jdata["cutoff"], ao_split_method, ao_split);
   }
-  
+
   LOG.os<>("Basis set: ", std::string(jdata["name"]), " with block sizes:\n");
-  for (auto ele : cbas->cluster_sizes()) {
-	  LOG.os<>(ele, " ");
-  } LOG.os<>('\n');
+  for (auto ele : cbas->cluster_sizes()) { LOG.os<>(ele, " "); }
+  LOG.os<>('\n');
 
   m_stack[jdata["tag"]] = std::any(cbas);
 }
@@ -591,7 +590,7 @@ void driver::run_adcmod(megajob& job)
   if (job.jdata.find("test_mvp") != job.jdata.end()) {
     adc::MVP_AORISOSADC2::TEST_MVP = job.jdata["test_mvp"];
   }
-  
+
   if (job.jdata.find("use_doubles_ob") != job.jdata.end()) {
     adc::MVP_AORISOSADC2::USE_DOUBLES_OB = job.jdata["use_doubles_ob"];
   }

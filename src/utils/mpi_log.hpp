@@ -149,14 +149,12 @@ class mpi_log {
       stream << m;
 
       std::string str = stream.str();
-      
+
       std::stringstream ss(str);
       std::string to;
       std::vector<std::string> message;
 
-		while(std::getline(ss,to,'\n')){
-		  message.push_back(to);
-		}
+      while (std::getline(ss, to, '\n')) { message.push_back(to); }
 
       for (size_t i = 0; i != message.size(); ++i) {
         if ((int)message[i].size() > totl - 2) {
@@ -188,9 +186,9 @@ class mpi_log {
       }
       std::cout << top << std::endl;
       std::cout << std::endl;
-     }
-     MPI_Barrier(m_comm);
-   }
+    }
+    MPI_Barrier(m_comm);
+  }
 
 };  // end class
 

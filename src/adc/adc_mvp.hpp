@@ -242,7 +242,6 @@ class MVP_AORISOSADC2 : public MVP {
   static inline bool TEST_MVP = false;
   static inline bool USE_DOUBLES_OB = false;
 
-
 #define AORIADC2_LIST \
   (((megalochem::world), set_world), ((desc::shared_molecule), set_molecule), \
    ((util::optional<int>), print), ((dbcsr::shared_matrix<double>), c_bo), \

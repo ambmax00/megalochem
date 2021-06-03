@@ -902,12 +902,13 @@ adcmod::canon_lmo adcmod::get_canon_pao(dbcsr::shared_matrix<double> u_ia)
     int iatom = blkmap[ii];
     if (use_atom[iatom]) {
       vshell_sub.insert(
-          vshell_sub.end(), cbas->at(ii).shells.begin(), cbas->at(ii).shells.end());
+          vshell_sub.end(), cbas->at(ii).shells.begin(),
+          cbas->at(ii).shells.end());
     }
   }
 
-  auto cbas_sub = std::make_shared<desc::cluster_basis>(
-      vshell_sub, "atomic", 8);
+  auto cbas_sub =
+      std::make_shared<desc::cluster_basis>(vshell_sub, "atomic", 8);
 
   auto p = cbas_sub->cluster_sizes();
 

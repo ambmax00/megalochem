@@ -71,7 +71,7 @@ std::vector<cluster> cluster_atomic(vshell& basis)
       }
     }
 
-	cltr.O = cltr.shells[0].O;
+    cltr.O = cltr.shells[0].O;
 
     c_out.push_back(cltr);
     cltr.shells.clear();
@@ -103,8 +103,8 @@ std::vector<cluster> cluster_shell(vshell& basis)
       }
     }
 
-	cltr.O = cltr.shells[0].O;
-	
+    cltr.O = cltr.shells[0].O;
+
     c_out.push_back(cltr);
     cltr.shells.clear();
   }
@@ -112,7 +112,8 @@ std::vector<cluster> cluster_shell(vshell& basis)
   return c_out;
 }
 
-std::vector<cluster> cluster_multi_shell(vshell& basis, int nsplit, bool strict, bool sp)
+std::vector<cluster> cluster_multi_shell(
+    vshell& basis, int nsplit, bool strict, bool sp)
 {
   std::vector<cluster> c_out;
   cluster cltr;
@@ -159,7 +160,7 @@ std::vector<cluster> cluster_multi_shell(vshell& basis, int nsplit, bool strict,
       }
     }
 
-	cltr.O = cltr.shells[0].O;
+    cltr.O = cltr.shells[0].O;
 
     c_out.push_back(cltr);
     cltr.shells.clear();
@@ -312,13 +313,12 @@ cluster_basis::cluster_basis(
     std::optional<int> opt_nsplit,
     std::optional<vshell> augbasis)
 {
-
   auto get_cluster = [&](vshell t_basis) {
-	std::vector<cluster> out;  
-	  
-	auto method = (opt_method) ? *opt_method : DEFAULT_SPLIT_METHOD;
-	auto nsplit = (opt_nsplit) ? *opt_nsplit : DEFAULT_NSPLIT;
-	  
+    std::vector<cluster> out;
+
+    auto method = (opt_method) ? *opt_method : DEFAULT_SPLIT_METHOD;
+    auto nsplit = (opt_nsplit) ? *opt_nsplit : DEFAULT_NSPLIT;
+
     if (method == "atomic") {
       out = cluster_atomic(t_basis);
     }
@@ -341,17 +341,17 @@ cluster_basis::cluster_basis(
   };
 
   auto clusters = get_cluster(basis);
-  
+
   if (augbasis) {
     auto aug_extract = extract_augbasis(basis, *augbasis);
 
     auto aug_clusters = get_cluster(aug_extract);
     std::vector<cluster> new_clusters;
-    
+
     for (size_t i = 0; i < clusters.size(); ++i) {
       auto& this_cluster = clusters[i];
-      auto& next_cluster = (i == clusters.size() - 1) ? clusters[0] :
-                                                      clusters[i + 1];
+      auto& next_cluster =
+          (i == clusters.size() - 1) ? clusters[0] : clusters[i + 1];
 
       new_clusters.push_back(clusters[i]);
       new_clusters.back().diffuse = false;
@@ -376,7 +376,6 @@ cluster_basis::cluster_basis(
   else {
     m_clusters = clusters;
   }
-
 }
 
 int cluster_basis::max_nprim() const
@@ -391,27 +390,21 @@ int cluster_basis::max_nprim() const
 int cluster_basis::nbf() const
 {
   int nbas = 0;
-  for (auto& c : m_clusters) {
-    nbas += (int)desc::nbf(c.shells);
-  }
+  for (auto& c : m_clusters) { nbas += (int)desc::nbf(c.shells); }
   return nbas;
 }
 
 int cluster_basis::max_l() const
 {
   int l = 0;
-  for (auto& c : m_clusters) {
-    l = std::max((int)desc::max_l(c.shells), l);
-  }
+  for (auto& c : m_clusters) { l = std::max((int)desc::max_l(c.shells), l); }
   return l;
 }
 
 std::vector<int> cluster_basis::cluster_sizes() const
 {
   std::vector<int> out;
-  for (auto& c : m_clusters) {
-	  out.push_back(desc::nbf(c.shells));
-  }
+  for (auto& c : m_clusters) { out.push_back(desc::nbf(c.shells)); }
   return out;
 }
 
@@ -472,43 +465,41 @@ std::vector<double> cluster_basis::radii(
 std::vector<bool> cluster_basis::diffuse() const
 {
   std::vector<bool> out;
-  for (auto& c : m_clusters) {
-	  out.push_back(c.diffuse);
-  }
+  for (auto& c : m_clusters) { out.push_back(c.diffuse); }
   return out;
 }
 
 std::vector<int> cluster_basis::shell_offsets() const
 {
-	std::vector<int> out;
-	int off = 0;
-	
-	for (auto& c : m_clusters) {
-		out.push_back(off);
-		off += (int)c.shells.size();
-	}
+  std::vector<int> out;
+  int off = 0;
 
-    return out;
+  for (auto& c : m_clusters) {
+    out.push_back(off);
+    off += (int)c.shells.size();
+  }
+
+  return out;
 }
- 
+
 std::vector<int> cluster_basis::nshells() const
 {
-    std::vector<int> out;
-    for (auto& c : m_clusters) { out.push_back(c.shells.size()); }
-    return out;
+  std::vector<int> out;
+  for (auto& c : m_clusters) { out.push_back(c.shells.size()); }
+  return out;
 }
-  
+
 int cluster_basis::nshells_tot() const
 {
-	int n = 0;
-	for (auto& c : m_clusters) { n += c.shells.size(); }
-	return n;
+  int n = 0;
+  for (auto& c : m_clusters) { n += c.shells.size(); }
+  return n;
 }
 
 std::vector<std::string> cluster_basis::shell_types() const
 {
-   std::vector<std::string> ctypes;
-   for (auto& cltr : m_clusters) {
+  std::vector<std::string> ctypes;
+  for (auto& cltr : m_clusters) {
     std::vector<bool> stypes(MAX_L + 1);
     for (auto& shell : cltr.shells) { stypes[shell.l] = true; }
     std::string id = "";

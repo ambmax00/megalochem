@@ -214,11 +214,11 @@ std::shared_ptr<desc::molecule> molecule::fragment(
   };
 
   auto blklist_b = get_block(*m_cluster_basis);
-  //frag->m_cluster_basis = m_cluster_basis->fragment(blklist_b);
+  // frag->m_cluster_basis = m_cluster_basis->fragment(blklist_b);
 
   if (m_cluster_dfbasis) {
     auto blklist_x = get_block(*m_cluster_dfbasis);
-    //frag->m_cluster_dfbasis = m_cluster_dfbasis->fragment(blklist_x);
+    // frag->m_cluster_dfbasis = m_cluster_dfbasis->fragment(blklist_x);
   }
 
   frag->m_blocks = block_sizes(*frag, m_mo_split);

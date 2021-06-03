@@ -1,9 +1,9 @@
 #ifndef DESC_WFN_H
 #define DESC_WFN_H
 
-#include "megalochem.hpp"
 #include "desc/molecule.hpp"
 #include "io/data_handler.hpp"
+#include "megalochem.hpp"
 
 #include <mpi.h>
 #include <dbcsr_conversions.hpp>

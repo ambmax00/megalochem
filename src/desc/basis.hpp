@@ -151,9 +151,9 @@ inline static const int DEFAULT_NSPLIT = 8;
 inline static const std::string DEFAULT_SPLIT_METHOD = "multi_shell_strict_sp";
 
 struct cluster {
- vshell shells;
- std::array<double,3> O;
- bool diffuse;
+  vshell shells;
+  std::array<double, 3> O;
+  bool diffuse;
 };
 
 inline int atom_of(cluster& c, std::vector<Atom>& atoms)
@@ -171,9 +171,8 @@ inline int atom_of(cluster& c, std::vector<Atom>& atoms)
 
 class cluster_basis {
  private:
- 
   std::vector<cluster> m_clusters;
-  
+
  public:
   struct global {
     static inline double cutoff = 1e-8;
@@ -198,8 +197,7 @@ class cluster_basis {
       std::optional<int> nsplit = std::nullopt,
       std::optional<vshell> augbasis = std::nullopt);
 
-  cluster_basis(const cluster_basis& cbasis) :
-      m_clusters(cbasis.m_clusters)
+  cluster_basis(const cluster_basis& cbasis) : m_clusters(cbasis.m_clusters)
   {
   }
 
@@ -221,9 +219,10 @@ class cluster_basis {
   {
     return m_clusters.end();
   }
-  
-  void add(const cluster& c) {
-	  m_clusters.push_back(c);
+
+  void add(const cluster& c)
+  {
+    m_clusters.push_back(c);
   }
 
   cluster& operator[](int i)
@@ -235,7 +234,7 @@ class cluster_basis {
   {
     return m_clusters[i];
   }
-  
+
   std::vector<int> shell_offsets() const;
 
   const cluster& operator[](int i) const
@@ -251,7 +250,7 @@ class cluster_basis {
       double cutoff = 1e-8, double step = 0.2, int maxiter = 1000) const;
 
   std::vector<bool> diffuse() const;
-  
+
   std::vector<std::string> shell_types() const;
 
   int max_nprim() const;
@@ -272,7 +271,6 @@ class cluster_basis {
   int nshells_tot() const;
 
   void print_info() const;
-
 };
 
 using shared_cluster_basis = std::shared_ptr<cluster_basis>;
