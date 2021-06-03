@@ -180,7 +180,7 @@ class davidson {
           dbcsr::print(*Av_i);
         }
 
-        double vnorm = sqrt(m_vecs[i]->dot(*m_vecs[i]));
+        double vnorm = std::sqrt(m_vecs[i]->dot(*m_vecs[i]));
         m_vnorms.push_back(vnorm);
       }
 
@@ -246,7 +246,7 @@ class davidson {
         // get min and max coeff
         double minc = evecs.col(i).minCoeff();
         double maxc = evecs.col(i).maxCoeff();
-        double maxabs = (fabs(maxc) > fabs(minc)) ? maxc : minc;
+        double maxabs = (std::fabs(maxc) > std::fabs(minc)) ? maxc : minc;
 
         if (maxabs < 0)
           evecs.col(i) *= -1;
@@ -345,12 +345,12 @@ class davidson {
         current_omega = evals(m_nroots - 1);
         LOG.os<1>(
             "EVALS: ", *omega, " ", evals(m_nroots - 1),
-            " Err: ", fabs(current_omega - prev_omega), '\n');
+            " Err: ", std::fabs(current_omega - prev_omega), '\n');
       }
 
       m_converged = (m_pseudo) ?
           ((m_errs[m_nroots - 1] < m_conv) ||
-           m_errs[m_nroots - 1] < fabs(init_omega - current_omega)) :
+           m_errs[m_nroots - 1] < std::fabs(init_omega - current_omega)) :
           (max_err < m_conv);
 
       prev_omega = current_omega;
@@ -610,7 +610,7 @@ class diis_davidson {
 
       auto resnorms = m_dav.residual_norms();
 
-      double err = fabs(current_omega - old_omega);
+      double err = std::fabs(current_omega - old_omega);
 
       LOG.os<>(
           "=== MACRO ITERATION ERROR EIGENVALUE/RESIDUAL: ", err, "/ ",
@@ -621,7 +621,6 @@ class diis_davidson {
         break;
     }
 
-    double eigval = m_dav.eigvals()[nroot - 1];
     auto b_ov = m_dav.ritz_vectors()[nroot - 1];
 
     LOG.os<>("============ PSEUDO-DAVIDSON CONVERGED ===========\n");
@@ -638,14 +637,14 @@ class diis_davidson {
       current_omega = (b_ov->dot(*sig_ov)) / (b_ov->dot(*b_ov));
 
       LOG.os<>(
-          "OMEGA: ", current_omega, " ", fabs(current_omega - old_omega), '\n');
+          "OMEGA: ", current_omega, " ", std::fabs(current_omega - old_omega), '\n');
 
       // compute residual
       // r(i) = (sig(i) - omega(i+1) * u(i))/||u(i)||
       auto r_ov = dbcsr::matrix<>::copy(*sig_ov).name("r_ov").build();
 
       r_ov->add(1.0, -current_omega, *b_ov);
-      r_ov->scale(1.0 / sqrt(b_ov->dot(*b_ov)));
+      r_ov->scale(1.0 / std::sqrt(b_ov->dot(*b_ov)));
 
       double r_norm = r_ov->norm(dbcsr_norm_frobenius);
 
