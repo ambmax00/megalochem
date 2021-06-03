@@ -1,4 +1,4 @@
-# MEGALOCHEM
+<img src="docs/MEGALOCHEM.png" width="600">
 
 WORK IN PROGRESS!
 A quantum chemistry software package that is being designed for computing excitation energies of large molecules using ADC, using sparse matrix algebra. 
@@ -16,7 +16,6 @@ libcint >= 4.0.7
 ScaLAPACK (>= 2.0 for reference ScaLAPACK)
 HDF5 (with parallel libraries enabled)
 DBCSR (fork from ambmax00)
-fypp (Fortran preprocessor)
 python >= 3.6
 ```
 
