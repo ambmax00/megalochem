@@ -157,12 +157,12 @@ class laplace_helper {
 
     if (m_world.rank() == 0) {
       lp.compute(m_nlap, ymin, ymax);
+      m_weights = lp.weights();
+      m_xpoints = lp.exponents(); 
+    } else {
+      m_weights.resize(m_nlap);
+      m_xpoints.resize(m_nlap);
     }
-
-    m_weights = lp.weights();
-    m_xpoints = lp.exponents();
-
-    m_weights.resize(m_nlap);
 
     MPI_Bcast(m_weights.data(), m_nlap, MPI_DOUBLE, 0, m_world.comm());
     MPI_Bcast(m_xpoints.data(), m_nlap, MPI_DOUBLE, 0, m_world.comm());

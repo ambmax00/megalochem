@@ -318,16 +318,18 @@ class optional {
     return *this;
   }
 
-  optional([[maybe_unused]] nullopt_t no_arg) : _val(nullptr)
+  optional(nullopt_t no_arg) : _val(nullptr)
   {
+    (void)no_arg;
     if constexpr (util_debug)
       std::cout << "13" << std::endl;
     if constexpr (util_debug)
       std::cout << "This is me: " << this << std::endl;
   }
 
-  optional([[maybe_unused]] std::nullopt_t no_arg) : _val(nullptr)
+  optional(std::nullopt_t no_arg) : _val(nullptr)
   {
+    (void)no_arg;
     if constexpr (util_debug)
       std::cout << "14" << std::endl;
     if constexpr (util_debug)

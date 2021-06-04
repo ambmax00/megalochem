@@ -4,13 +4,16 @@ include(CheckLibraryExists)
 
 set(SCALAPACK_FOUND true)
 
+
 # check if we have Intel
 set(MKLROOT $ENV{MKLROOT})
 set(MKL_ROOT $ENV{MKL_ROOT})
 
-if (NOT "${MKLROOT}" MATCHES "" OR NOT "${MKL_ROOT}" MATCHES "")
-	set(USE_MKL)
+if (NOT "${MKLROOT}" STREQUAL "" OR NOT "${MKL_ROOT}" STREQUAL "")
+	set(USE_MKL true)
 	message(STATUS "MKL environment detected")
+else()
+	message(STATUS "No MKL environment detected")
 endif()
 
 find_package(LAPACK REQUIRED)
@@ -19,6 +22,8 @@ find_package(MPI REQUIRED)
 message(STATUS "BLAS VENDOR: ${BLA_VENDOR}")
 
 if (USE_MKL) 
+
+	message(STATUS "Using Intel MKL")
 
 	if (NOT MPI_VENDOR) 
 		message(FATAL_ERROR "Please specify MPI_VENDOR (openmpi/intelmpi)")
@@ -63,6 +68,8 @@ if (USE_MKL)
 		"${SCALAPACK_LIBRARIES};${BLACS_LIBRARIES};${LAPACK_LIBRARIES};${MPI_Fortran_LIBRARIES}"
         )
 else()
+
+	message(STATUS "Using reference SCALAPACK")
 
 	find_library(
 		SCALAPACK_LIBRARIES
