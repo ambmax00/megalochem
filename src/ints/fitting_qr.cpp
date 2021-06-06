@@ -182,6 +182,10 @@ dbcsr::sbtensor<3, double> dfitting::compute_qr_new(
     blkmap_frag[i] = (!is_diff[i]) ? blkmap_frag[i] : blkmap_frag[i] + natoms;
   }
 
+  for (auto ele : blkmap_frag) {
+	  LOG.os<>(ele, " ");
+  } LOG.os<>('\n');
+
   std::vector<std::vector<int>> frag_blocks;
   std::vector<int> frag_blk_sizes;
 

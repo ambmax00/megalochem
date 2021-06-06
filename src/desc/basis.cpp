@@ -374,6 +374,9 @@ cluster_basis::cluster_basis(
     m_clusters = new_clusters;
   }
   else {
+	for (auto& c : clusters) {
+	  c.diffuse = false;
+	}
     m_clusters = clusters;
   }
 }
