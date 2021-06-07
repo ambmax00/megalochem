@@ -637,7 +637,8 @@ class diis_davidson {
       current_omega = (b_ov->dot(*sig_ov)) / (b_ov->dot(*b_ov));
 
       LOG.os<>(
-          "OMEGA: ", current_omega, " ", std::fabs(current_omega - old_omega), '\n');
+          "OMEGA: ", current_omega, " ", std::fabs(current_omega - old_omega),
+          '\n');
 
       // compute residual
       // r(i) = (sig(i) - omega(i+1) * u(i))/||u(i)||

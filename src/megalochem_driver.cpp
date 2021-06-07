@@ -397,30 +397,31 @@ void driver::parse_basis(nlohmann::json& jdata)
   auto symbols = json_optional<std::vector<std::string>>(jdata, "symbols");
   auto names = json_optional<std::vector<std::string>>(jdata, "names");
   auto augmentations = json_optional<std::vector<bool>>(jdata, "augmentations");
-  
+
   auto& atoms = get<std::vector<desc::Atom>>(jdata["atoms"]);
-  
+
   if (!name && !names) {
-	  throw std::runtime_error("Please specify name or names in basis set!");
+    throw std::runtime_error("Please specify name or names in basis set!");
   }
-  
+
   if (name && names) {
-	  throw std::runtime_error("Please specify either name or names in basis set!");
+    throw std::runtime_error(
+        "Please specify either name or names in basis set!");
   }
-  
+
   if (names && !symbols) {
-	  throw std::runtime_error("Please specify symbols for basis set"); 
+    throw std::runtime_error("Please specify symbols for basis set");
   }
-  
+
   desc::shared_cluster_basis cbas;
-  
+
   if (name) {
-	cbas = std::make_shared<desc::cluster_basis>(
-      jdata["name"], atoms, ao_split_method, ao_split, augmentation);
-  } else {
-	  cbas = std::make_shared<desc::cluster_basis>(
-	    atoms, *symbols, *names, augmentations, 
-		ao_split_method, ao_split);
+    cbas = std::make_shared<desc::cluster_basis>(
+        jdata["name"], atoms, ao_split_method, ao_split, augmentation);
+  }
+  else {
+    cbas = std::make_shared<desc::cluster_basis>(
+        atoms, *symbols, *names, augmentations, ao_split_method, ao_split);
   }
 
   if (jdata.find("cutoff") != jdata.end()) {
@@ -431,7 +432,7 @@ void driver::parse_basis(nlohmann::json& jdata)
   LOG.os<>("Basis set: ", std::string(jdata["tag"]), " with block sizes:\n");
   for (auto ele : cbas->cluster_sizes()) { LOG.os<>(ele, " "); }
   LOG.os<>('\n');
-  
+
   auto blkmap = cbas->block_to_atom(atoms);
   LOG.os<>("Atom mapping:\n");
   for (auto ele : blkmap) { LOG.os<>(ele, " "); }

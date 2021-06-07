@@ -178,14 +178,13 @@ dbcsr::sbtensor<3, double> dfitting::compute_qr_new(
   // and tight blocks are separated
   auto blkmap_frag = blkmap_b;
   int natoms = (int)m_mol->atoms().size();
-  
+
   for (size_t i = 0; i != blkmap_b.size(); ++i) {
     blkmap_frag[i] = (!is_diff[i]) ? blkmap_frag[i] : blkmap_frag[i] + natoms;
   }
 
-  for (auto ele : blkmap_frag) {
-	  LOG.os<>(ele, " ");
-  } LOG.os<>('\n');
+  for (auto ele : blkmap_frag) { LOG.os<>(ele, " "); }
+  LOG.os<>('\n');
 
   std::vector<std::vector<int>> frag_blocks;
   std::vector<int> frag_blk_sizes;
@@ -240,9 +239,7 @@ dbcsr::sbtensor<3, double> dfitting::compute_qr_new(
   }
 
   LOG.os<1>("FRAG BLOCK BOUNDS: \n");
-  for (auto bds : frag_bounds) {
-    LOG.os<1>(bds[0],  " ", bds[1], '\n');
-  }
+  for (auto bds : frag_bounds) { LOG.os<1>(bds[0], " ", bds[1], '\n'); }
 
   // ============== CREATE BLOCK INFO ================================
 

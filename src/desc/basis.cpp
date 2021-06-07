@@ -4,8 +4,8 @@
 #include <fstream>
 #include <iostream>
 #include <list>
-#include "utils/json.hpp"
 #include "utils/ele_to_int.hpp"
+#include "utils/json.hpp"
 
 #cmakedefine BASIS_ROOT "@BASIS_ROOT@"
 
@@ -170,11 +170,10 @@ std::vector<cluster> cluster_multi_shell(
   return c_out;
 }
 
-std::map<std::string,vshell> read_atom_basis(
-   std::string basname,
-   std::vector<std::string> symbols)
+std::map<std::string, vshell> read_atom_basis(
+    std::string basname, std::vector<std::string> symbols)
 {
-   // check if file exists
+  // check if file exists
   std::string basis_root_dir(BASIS_ROOT);
   std::string filename_1 = basis_root_dir + "/" + basname + ".json";
   std::string filename_2 = basname + ".json";
@@ -205,16 +204,14 @@ std::map<std::string,vshell> read_atom_basis(
     for (auto s : str_vec) { out.push_back(std::stod(s)); }
     return out;
   };
-  
+
   for (auto& s : symbols) {
-	  	  
-	vshell atom_basis;  
-	 
-	int Z = util::ele_to_int[s];
+    vshell atom_basis;
+
+    int Z = util::ele_to_int[s];
     auto& Z_basis = elements[std::to_string(Z)]["electron_shells"];
 
     for (auto& Z_shell : Z_basis) {
-		
       std::array<double, 3> pos = {0.0, 0.0, 0.0};
 
       std::vector<std::string> alpha_str = Z_shell["exponents"];
@@ -267,17 +264,16 @@ std::map<std::string,vshell> read_atom_basis(
         }
       }
     }
-    
-    //for (auto s : atom_basis) {
-	//	std::cout << s << std::endl;
-	//}
-    
+
+    // for (auto s : atom_basis) {
+    //	std::cout << s << std::endl;
+    //}
+
     symbol_basis[s] = atom_basis;
   }
 
   return symbol_basis;
 }
-  
 
 vshell read_basis(std::string basname, std::vector<desc::Atom>& atoms_in)
 {
@@ -375,16 +371,17 @@ vshell read_basis(std::string basname, std::vector<desc::Atom>& atoms_in)
   return basis;
 }
 
-std::vector<std::string> get_unique(std::vector<desc::Atom>& atoms) {
-	std::vector<std::string> out;
-	for (auto a : atoms) {
-		auto a_name = util::int_to_ele[a.atomic_number];
-		auto it = std::find(out.begin(), out.end(), a_name);
-		if (it == out.end()) {
-			out.push_back(a_name);
-		}
-	}
-	return out;
+std::vector<std::string> get_unique(std::vector<desc::Atom>& atoms)
+{
+  std::vector<std::string> out;
+  for (auto a : atoms) {
+    auto a_name = util::int_to_ele[a.atomic_number];
+    auto it = std::find(out.begin(), out.end(), a_name);
+    if (it == out.end()) {
+      out.push_back(a_name);
+    }
+  }
+  return out;
 }
 
 vshell extract_augbasis(vshell& basis, vshell& augbasis)
@@ -411,196 +408,189 @@ vshell extract_augbasis(vshell& basis, vshell& augbasis)
 }
 
 std::vector<cluster> get_cluster(
-   vshell t_basis,
-   std::optional<std::string> opt_method = std::nullopt,
-   std::optional<int> opt_nsplit = std::nullopt) 
+    vshell t_basis,
+    std::optional<std::string> opt_method = std::nullopt,
+    std::optional<int> opt_nsplit = std::nullopt)
 {
-    std::vector<cluster> out;
+  std::vector<cluster> out;
 
-    auto method = (opt_method) ? *opt_method : DEFAULT_SPLIT_METHOD;
-    auto nsplit = (opt_nsplit) ? *opt_nsplit : DEFAULT_NSPLIT;
+  auto method = (opt_method) ? *opt_method : DEFAULT_SPLIT_METHOD;
+  auto nsplit = (opt_nsplit) ? *opt_nsplit : DEFAULT_NSPLIT;
 
-    if (method == "atomic") {
-      out = cluster_atomic(t_basis);
-    }
-    else if (method == "shell") {
-      out = cluster_shell(t_basis);
-    }
-    else if (method == "multi_shell") {
-      out = cluster_multi_shell(t_basis, nsplit, false, false);
-    }
-    else if (method == "multi_shell_strict") {
-      out = cluster_multi_shell(t_basis, nsplit, true, false);
-    }
-    else if (method == "multi_shell_strict_sp") {
-      out = cluster_multi_shell(t_basis, nsplit, true, true);
-    }
-    else {
-      throw std::runtime_error("Unknown splitting method: " + method);
-    }
-    
-    return out;
+  if (method == "atomic") {
+    out = cluster_atomic(t_basis);
+  }
+  else if (method == "shell") {
+    out = cluster_shell(t_basis);
+  }
+  else if (method == "multi_shell") {
+    out = cluster_multi_shell(t_basis, nsplit, false, false);
+  }
+  else if (method == "multi_shell_strict") {
+    out = cluster_multi_shell(t_basis, nsplit, true, false);
+  }
+  else if (method == "multi_shell_strict_sp") {
+    out = cluster_multi_shell(t_basis, nsplit, true, true);
+  }
+  else {
+    throw std::runtime_error("Unknown splitting method: " + method);
+  }
+
+  return out;
 }
 
 cluster_basis::cluster_basis(
-      std::vector<desc::Atom>& atoms,
-      std::vector<std::string> symbols,
-      std::vector<std::string> basis_names,
-      std::optional<std::vector<bool>> augmentations,
-      std::optional<std::string> method,
-      std::optional<int> nsplit)
+    std::vector<desc::Atom>& atoms,
+    std::vector<std::string> symbols,
+    std::vector<std::string> basis_names,
+    std::optional<std::vector<bool>> augmentations,
+    std::optional<std::string> method,
+    std::optional<int> nsplit)
 {
-	
-	// first, check if vectors have appropriate sizes
-	bool do_throw = false;
-	if (!(augmentations) && !(symbols.size() == basis_names.size())) {
-		//std::cout <<  symbols.size() << " " << basis_names.size() << std::endl;
-		do_throw = true;
-	} else if ((augmentations) && (!(augmentations->size() == basis_names.size()) || 
-		!(symbols.size() == basis_names.size())) 
-	) {
-		//std::cout << augmentations->size() << " " << symbols.size() << " " << basis_names.size() << std::endl;
-		do_throw = true;
-	}
-	
-	if (do_throw) {
-		throw std::runtime_error("Basis set constructor: wrong vector sizes");
-	}
-	
-	// then check wether all atoms are in symbols
-	auto unique_names = get_unique(atoms);
-	
-	for (auto uname : unique_names) {
-		auto it = std::find(symbols.begin(), symbols.end(), uname);
-		if (it == symbols.end()) {
-			throw std::runtime_error("Could not find " + uname + 
-				" in basis set symbols");
-		}
-	}
-	
-	// get unique basis sets
-	std::map<std::string,std::vector<std::string>> unique_basis;
-	std::map<std::string,std::vector<std::string>> unique_aug_basis;
-	// {basis_set_name, {vector of symbols which use that basis set}}
-	
-	auto add_basis = [&](auto elename, auto& basname, auto& basis) {
-		if (basis.find(basname) == basis.end()) {
-			basis[basname] = {};
-		}
-		basis[basname].push_back(elename);
-	};
-	
-	for (int iele = 0; iele != (int)symbols.size(); ++iele) {
-		
-		auto iname = basis_names[iele];
-		add_basis(symbols[iele], iname, unique_basis);
-		
-		if (augmentations->at(iele)) {
-			add_basis(symbols[iele], iname, unique_aug_basis);
-		}
-				
-	}
-	
-	/*for (auto& [basis_name,basis_symbols] : unique_basis) {
-		std::cout << basis_name << std::endl;
-		for (auto e : basis_symbols) {
-			std::cout << e << " ";
-		} std::cout << std::endl;
-	}*/
-	
-	// now read each individual basis set
-	std::map<std::string,vshell> unique_shells;
-	std::map<std::string,vshell> unique_aug_shells;
-	
-	auto add_shells = [&](auto& ubasis, auto& ushells, bool diffuse) {
-		for (auto& [basis_name, basis_symbols] : ubasis) {
-		   std::string suffix = (diffuse) ? "aug-" : "";
-		   auto vec_shells = read_atom_basis(suffix + basis_name, basis_symbols);
-		   for (auto& [ele_name, shells] : vec_shells) {
-			   ushells[ele_name] = shells;
-		   }
-		}
-	};
-		
-	add_shells(unique_basis, unique_shells, false);
-	if (augmentations) add_shells(unique_aug_basis, unique_aug_shells, true);
-	
-	/*std::cout << "BASIS" << std::endl;
-	for (auto& [elename, shells] : unique_shells) {
-		std::cout << elename << " : " << std::endl;
-		for (auto& c : shells) {
-			std::cout << c << std::endl;
-		}
-		std::cout << std::endl;
-	}
-	
-	std::cout << "AUGBASIS" << std::endl;
-	for (auto& [elename, shells] : unique_aug_shells) {
-		std::cout << elename << " : " << std::endl;
-		for (auto& c : shells) {
-			std::cout << c << std::endl;
-		}
-		std::cout << std::endl;
-	}*/
-	
-	// form clusters
-	std::map<std::string,std::vector<cluster>> unique_clusters;
-	
-	for (auto& [ele_name, shells] : unique_shells) {
-		auto cltr = get_cluster(shells, method, nsplit);
-		for (auto& c : cltr) {
-			c.diffuse = false;
-		}
-		
-		if (unique_aug_shells.find(ele_name) != unique_aug_shells.end()) {
-			auto diff_shells = extract_augbasis(shells, unique_aug_shells[ele_name]);
-			auto aug_cltr = get_cluster(diff_shells, method, nsplit);
-			for (auto& c : aug_cltr) {
-				c.diffuse = true;
-			}
-			cltr.insert(cltr.end(), aug_cltr.begin(), aug_cltr.end());
-		}
-		
-		unique_clusters[ele_name] = cltr;
-	}
-	
-	/*std::cout << "CLUSTERS" << std::endl;
-	for (auto [elename, clstrs] : unique_clusters) {
-		std::cout << elename << " : " << std::endl;
-		for (auto c : clstrs) {
-			std::cout << "c" << std::endl;
-			for (auto s : c.shells) {
-				std::cout << s << '\n';
-			}
-		}
-		std::cout << std::endl;
-	}*/
-	
-	// assign cluster vector to each atom
-	
-	for (auto a : atoms) {
-		std::array<double,3> pos = {a.x, a.y, a.z};
-		auto str = util::int_to_ele[a.atomic_number];
-		auto cltr = unique_clusters[str];
-		for (auto& c : cltr) {
-			c.O = pos;
-			for (auto& s : c.shells) {
-				s.O = pos;
-			}
-		}
-		m_clusters.insert(m_clusters.end(), cltr.begin(), cltr.end());
-	}
-	
-	/*std::cout << "END" << std::endl;
-	for (auto& cltr : m_clusters) {
-		std::cout << "=== cluster ===" << std::endl;
-		for (auto& s : cltr.shells) {
-			std::cout << s << std::endl;
-		}
-	}*/
-		
-}
+  // first, check if vectors have appropriate sizes
+  bool do_throw = false;
+  if (!(augmentations) && !(symbols.size() == basis_names.size())) {
+    // std::cout <<  symbols.size() << " " << basis_names.size() << std::endl;
+    do_throw = true;
+  }
+  else if (
+      (augmentations) &&
+      (!(augmentations->size() == basis_names.size()) ||
+       !(symbols.size() == basis_names.size()))) {
+    // std::cout << augmentations->size() << " " << symbols.size() << " " <<
+    // basis_names.size() << std::endl;
+    do_throw = true;
+  }
 
+  if (do_throw) {
+    throw std::runtime_error("Basis set constructor: wrong vector sizes");
+  }
+
+  // then check wether all atoms are in symbols
+  auto unique_names = get_unique(atoms);
+
+  for (auto uname : unique_names) {
+    auto it = std::find(symbols.begin(), symbols.end(), uname);
+    if (it == symbols.end()) {
+      throw std::runtime_error(
+          "Could not find " + uname + " in basis set symbols");
+    }
+  }
+
+  // get unique basis sets
+  std::map<std::string, std::vector<std::string>> unique_basis;
+  std::map<std::string, std::vector<std::string>> unique_aug_basis;
+  // {basis_set_name, {vector of symbols which use that basis set}}
+
+  auto add_basis = [&](auto elename, auto& basname, auto& basis) {
+    if (basis.find(basname) == basis.end()) {
+      basis[basname] = {};
+    }
+    basis[basname].push_back(elename);
+  };
+
+  for (int iele = 0; iele != (int)symbols.size(); ++iele) {
+    auto iname = basis_names[iele];
+    add_basis(symbols[iele], iname, unique_basis);
+
+    if (augmentations->at(iele)) {
+      add_basis(symbols[iele], iname, unique_aug_basis);
+    }
+  }
+
+  /*for (auto& [basis_name,basis_symbols] : unique_basis) {
+          std::cout << basis_name << std::endl;
+          for (auto e : basis_symbols) {
+                  std::cout << e << " ";
+          } std::cout << std::endl;
+  }*/
+
+  // now read each individual basis set
+  std::map<std::string, vshell> unique_shells;
+  std::map<std::string, vshell> unique_aug_shells;
+
+  auto add_shells = [&](auto& ubasis, auto& ushells, bool diffuse) {
+    for (auto& [basis_name, basis_symbols] : ubasis) {
+      std::string suffix = (diffuse) ? "aug-" : "";
+      auto vec_shells = read_atom_basis(suffix + basis_name, basis_symbols);
+      for (auto& [ele_name, shells] : vec_shells) {
+        ushells[ele_name] = shells;
+      }
+    }
+  };
+
+  add_shells(unique_basis, unique_shells, false);
+  if (augmentations)
+    add_shells(unique_aug_basis, unique_aug_shells, true);
+
+  /*std::cout << "BASIS" << std::endl;
+  for (auto& [elename, shells] : unique_shells) {
+          std::cout << elename << " : " << std::endl;
+          for (auto& c : shells) {
+                  std::cout << c << std::endl;
+          }
+          std::cout << std::endl;
+  }
+
+  std::cout << "AUGBASIS" << std::endl;
+  for (auto& [elename, shells] : unique_aug_shells) {
+          std::cout << elename << " : " << std::endl;
+          for (auto& c : shells) {
+                  std::cout << c << std::endl;
+          }
+          std::cout << std::endl;
+  }*/
+
+  // form clusters
+  std::map<std::string, std::vector<cluster>> unique_clusters;
+
+  for (auto& [ele_name, shells] : unique_shells) {
+    auto cltr = get_cluster(shells, method, nsplit);
+    for (auto& c : cltr) { c.diffuse = false; }
+
+    if (unique_aug_shells.find(ele_name) != unique_aug_shells.end()) {
+      auto diff_shells = extract_augbasis(shells, unique_aug_shells[ele_name]);
+      auto aug_cltr = get_cluster(diff_shells, method, nsplit);
+      for (auto& c : aug_cltr) { c.diffuse = true; }
+      cltr.insert(cltr.end(), aug_cltr.begin(), aug_cltr.end());
+    }
+
+    unique_clusters[ele_name] = cltr;
+  }
+
+  /*std::cout << "CLUSTERS" << std::endl;
+  for (auto [elename, clstrs] : unique_clusters) {
+          std::cout << elename << " : " << std::endl;
+          for (auto c : clstrs) {
+                  std::cout << "c" << std::endl;
+                  for (auto s : c.shells) {
+                          std::cout << s << '\n';
+                  }
+          }
+          std::cout << std::endl;
+  }*/
+
+  // assign cluster vector to each atom
+
+  for (auto a : atoms) {
+    std::array<double, 3> pos = {a.x, a.y, a.z};
+    auto str = util::int_to_ele[a.atomic_number];
+    auto cltr = unique_clusters[str];
+    for (auto& c : cltr) {
+      c.O = pos;
+      for (auto& s : c.shells) { s.O = pos; }
+    }
+    m_clusters.insert(m_clusters.end(), cltr.begin(), cltr.end());
+  }
+
+  /*std::cout << "END" << std::endl;
+  for (auto& cltr : m_clusters) {
+          std::cout << "=== cluster ===" << std::endl;
+          for (auto& s : cltr.shells) {
+                  std::cout << s << std::endl;
+          }
+  }*/
+}
 
 cluster_basis::cluster_basis(
     std::string basname,
@@ -688,9 +678,7 @@ cluster_basis::cluster_basis(
     m_clusters = new_clusters;
   }
   else {
-	for (auto& c : clusters) {
-	  c.diffuse = false;
-	}
+    for (auto& c : clusters) { c.diffuse = false; }
     m_clusters = clusters;
   }
 }
