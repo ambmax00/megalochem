@@ -42,7 +42,10 @@ static const nlohmann::json valid_basis = {
     {"cutoff", 1e-16},
     {"ao_split_method", "atomic"},
     {"ao_split", 10u},
-    {"_required", {"tag", "type", "name", "atoms"}}};
+    {"symbols", {"H", "He", "..."}},
+    {"names", {"cc-pvdz", "cc-pvdz", "..."}},
+    {"augmentations", {false, true, true}},
+    {"_required", {"tag", "type", "atoms"}}};
 
 static const nlohmann::json valid_atoms = {
     {"tag", "string"},
@@ -390,19 +393,48 @@ void driver::parse_basis(nlohmann::json& jdata)
   auto augmentation = json_optional<bool>(jdata, "augmentation");
   auto ao_split_method = json_optional<std::string>(jdata, "ao_split_method");
   auto ao_split = json_optional<int>(jdata, "ao_split");
-
+  auto name = json_optional<std::string>(jdata, "name");
+  auto symbols = json_optional<std::vector<std::string>>(jdata, "symbols");
+  auto names = json_optional<std::vector<std::string>>(jdata, "names");
+  auto augmentations = json_optional<std::vector<bool>>(jdata, "augmentations");
+  
   auto& atoms = get<std::vector<desc::Atom>>(jdata["atoms"]);
-
-  auto cbas = std::make_shared<desc::cluster_basis>(
+  
+  if (!name && !names) {
+	  throw std::runtime_error("Please specify name or names in basis set!");
+  }
+  
+  if (name && names) {
+	  throw std::runtime_error("Please specify either name or names in basis set!");
+  }
+  
+  if (names && !symbols) {
+	  throw std::runtime_error("Please specify symbols for basis set"); 
+  }
+  
+  desc::shared_cluster_basis cbas;
+  
+  if (name) {
+	cbas = std::make_shared<desc::cluster_basis>(
       jdata["name"], atoms, ao_split_method, ao_split, augmentation);
+  } else {
+	  cbas = std::make_shared<desc::cluster_basis>(
+	    atoms, *symbols, *names, augmentations, 
+		ao_split_method, ao_split);
+  }
 
   if (jdata.find("cutoff") != jdata.end()) {
     cbas = ints::remove_lindep(
         m_world, cbas, (double)jdata["cutoff"], ao_split_method, ao_split);
   }
 
-  LOG.os<>("Basis set: ", std::string(jdata["name"]), " with block sizes:\n");
+  LOG.os<>("Basis set: ", std::string(jdata["tag"]), " with block sizes:\n");
   for (auto ele : cbas->cluster_sizes()) { LOG.os<>(ele, " "); }
+  LOG.os<>('\n');
+  
+  auto blkmap = cbas->block_to_atom(atoms);
+  LOG.os<>("Atom mapping:\n");
+  for (auto ele : blkmap) { LOG.os<>(ele, " "); }
   LOG.os<>('\n');
 
   m_stack[jdata["tag"]] = std::any(cbas);

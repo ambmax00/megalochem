@@ -174,10 +174,11 @@ dbcsr::sbtensor<3, double> dfitting::compute_qr_new(
 
   auto is_diff = m_mol->c_basis()->diffuse();
 
-  const int natoms = m_mol->atoms().size();
   // make sure that each process has one atom block, but diffuse
   // and tight blocks are separated
   auto blkmap_frag = blkmap_b;
+  int natoms = (int)m_mol->atoms().size();
+  
   for (size_t i = 0; i != blkmap_b.size(); ++i) {
     blkmap_frag[i] = (!is_diff[i]) ? blkmap_frag[i] : blkmap_frag[i] + natoms;
   }
@@ -191,11 +192,11 @@ dbcsr::sbtensor<3, double> dfitting::compute_qr_new(
 
   std::vector<int> sub_block;
   int sub_size = 0;
-  int prev_centre = 0;
+  int prev_centre = -1;
 
   for (size_t i = 0; i != b.size(); ++i) {
     int current_centre = blkmap_frag[i];
-    if (current_centre != prev_centre) {
+    if (prev_centre != -1 && current_centre != prev_centre) {
       frag_blocks.push_back(sub_block);
       frag_blk_sizes.push_back(sub_size);
       sub_block.clear();
@@ -240,7 +241,7 @@ dbcsr::sbtensor<3, double> dfitting::compute_qr_new(
 
   LOG.os<1>("FRAG BLOCK BOUNDS: \n");
   for (auto bds : frag_bounds) {
-    std::cout << bds[0] << " " << bds[1] << std::endl;
+    LOG.os<1>(bds[0],  " ", bds[1], '\n');
   }
 
   // ============== CREATE BLOCK INFO ================================

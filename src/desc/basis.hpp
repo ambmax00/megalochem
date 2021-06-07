@@ -197,6 +197,14 @@ class cluster_basis {
       std::optional<int> nsplit = std::nullopt,
       std::optional<vshell> augbasis = std::nullopt);
 
+   cluster_basis(
+      std::vector<desc::Atom>& atoms,
+      std::vector<std::string> symbols,
+      std::vector<std::string> basis_names,
+      std::optional<std::vector<bool>> augmentations,
+      std::optional<std::string> method = std::nullopt,
+      std::optional<int> nsplit = std::nullopt);
+
   cluster_basis(const cluster_basis& cbasis) : m_clusters(cbasis.m_clusters)
   {
   }
