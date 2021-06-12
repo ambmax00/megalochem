@@ -60,8 +60,6 @@ inline void write_molden(
 
     file << "[Atoms] (AU)\n";
 
-    
-
     for (size_t ii = 0; ii != atoms.size(); ++ii) {
       file << util::int_to_ele[atoms[ii].atomic_number] << " ";
       file << ii + 1 << " " << atoms[ii].atomic_number << " ";
@@ -95,13 +93,19 @@ inline void write_molden(
     auto write_coeff = [&](auto cmat, auto eps, bool occ, std::string spin) {
       
       auto cmat_eigen = dbcsr::matrix_to_eigen(*cmat);
-	  int norb = cmat_eigen.cols();
 	  
 	  if (w.rank() == 0) {
 
-		  std::string occup = (occ) ? "2" : "0";
+		  std::string occup = (occ) ? "1" : "0";
+		  
+		  std::vector<int> perm_orb(eps.size());
+		  std::iota(perm_orb.begin(), perm_orb.end(), 0);
+		  std::sort(perm_orb.begin(), perm_orb.end(), 
+			[&] (const int i, const int j) {
+				return eps[i] < eps[j];
+			});
 
-		  for (int iorb = 0; iorb != norb; ++iorb) {
+		  for (auto iorb : perm_orb) {
 			file << "Sym= C1\n";
 			file << "Ene= " << eps[iorb] << '\n';
 			file << "Spin= "
@@ -153,9 +157,16 @@ inline void write_molden(
 
     write_coeff(c_bo_A, eps_occ_A, true, "Alpha");
     write_coeff(c_bv_A, eps_vir_A, false, "Alpha");
-    if (c_bo_B) write_coeff(c_bo_B, *eps_occ_B, true, "Beta");
-    if (c_bv_B) write_coeff(c_bv_B, *eps_vir_B, false, "Beta");
-
+    if (c_bo_B) {
+		write_coeff(c_bo_B, *eps_occ_B, true, "Beta");
+    } else {
+		write_coeff(c_bo_A, eps_occ_A, true, "Beta");
+	}
+    if (c_bv_B) {
+		write_coeff(c_bv_B, *eps_vir_B, false, "Beta");
+	} else {
+		write_coeff(c_bv_A, eps_vir_A, false, "Beta");
+	}
     if (w.rank() == 0) file.close();
 
   MPI_Barrier(w.comm());
