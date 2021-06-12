@@ -741,18 +741,17 @@
 #define MAKE_MEMBER_VARS(list) ITERATE_LIST(CAT_M, (;), (;), list)
 
 #define ENUM_STRINGS_IF(val) \
-	if (str == #val) return enumtype::val;
+  if (str == #val) \
+    return enumtype::val;
 
 #define ENUM_STRINGS(name, list) \
-enum class name { \
-	ITERATE_LIST(ECHO, (,), (), list) \
-}; \
-inline name CAT(str2, name) (std::string str) { \
-	using enumtype = name; \
-	ITERATE_LIST(ENUM_STRINGS_IF, (), (), list) \
-	throw std::runtime_error("Invalid string for " #name); \
-} 
-	
+  enum class name { ITERATE_LIST(ECHO, (, ), (), list) }; \
+  inline name CAT(str2, name)(std::string str) \
+  { \
+    using enumtype = name; \
+    ITERATE_LIST(ENUM_STRINGS_IF, (), (), list) \
+    throw std::runtime_error("Invalid string for " #name); \
+  }
 
 /***********************************************************************
  *                          CPP FUNCTIONS

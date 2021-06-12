@@ -12,7 +12,8 @@
 
 namespace megalochem {
 
-ENUM_STRINGS(megatype, (globals, atoms, molecule, basis, hfwfn, mpwfn, adcwfn, moprint))
+ENUM_STRINGS(
+    megatype, (globals, atoms, molecule, basis, hfwfn, mpwfn, adcwfn, moprint))
 
 struct megajob {
   megatype mtype;
@@ -62,7 +63,7 @@ class driver {
   void parse_mpwfn(nlohmann::json& jdata);
 
   void parse_adcwfn(nlohmann::json& jdata);
-  
+
   void parse_moprint(nlohmann::json& jdata);
 
   void run();
