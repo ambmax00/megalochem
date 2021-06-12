@@ -5,6 +5,7 @@
 #include "ints/aofactory.hpp"
 #include "math/other/rcm.hpp"
 #include "mp/mpmod.hpp"
+#include "locorb/moprintmod.hpp"
 #include "utils/constants.hpp"
 #include "utils/ele_to_int.hpp"
 #include "utils/ppdirs.hpp"
@@ -145,6 +146,17 @@ static const nlohmann::json valid_adcwfn = {
     {"test_mvp", true},
     {"use_doubles_ob", false},
     {"_required", {"tag", "type", "wfn", "nroots", "df_basis"}}};
+    
+static const nlohmann::json valid_moprint = {
+	{"tag", "string"},
+	{"type", "string"},
+	{"wfn", "string"},
+	{"job_type", "string"},
+	{"lmo_occ", "string"},
+	{"lmo_vir", "string"},
+	{"file", "string"},
+	{"_required", {"tag", "wfn", "type", "job_type", "file"}}
+};
 
 template <typename T>
 std::optional<T> json_optional(nlohmann::json& j, std::string key)
@@ -220,7 +232,7 @@ void driver::parse_json_section(nlohmann::json& jdata)
 {
   std::string strtype = jdata["type"];
 
-  megatype mtype = str_to_type(strtype);
+  megatype mtype = str2megatype(strtype);
 
   switch (mtype) {
     case megatype::globals: {
@@ -250,6 +262,10 @@ void driver::parse_json_section(nlohmann::json& jdata)
     case megatype::mpwfn: {
       parse_mpwfn(jdata);
       break;
+    }
+    case megatype::moprint: {
+	  parse_moprint(jdata);
+	  break;
     }
     default: {
       throw std::runtime_error("Unknown type in json string.");
@@ -537,6 +553,13 @@ void driver::parse_adcwfn(nlohmann::json& jdata)
   }
 }
 
+void driver::parse_moprint(nlohmann::json& jdata)
+{
+	validate("moprint", jdata, valid_moprint);
+	megajob j = {megatype::moprint, jdata};
+    m_jobs.push_back(std::move(j));
+}
+
 void driver::run()
 {
   for (auto& j : m_jobs) {
@@ -553,6 +576,10 @@ void driver::run()
         run_adcmod(j);
         break;
       }
+      case megatype::moprint: {
+		 run_moprintmod(j);
+		 break;
+	  }
       default:
         throw std::runtime_error("Unknown driver method.");
     }
@@ -639,6 +666,33 @@ void driver::run_adcmod(megajob& job)
   m_stack[job.jdata["tag"]] = std::any(newwfn);
 
   write_adcwfn(job.jdata["tag"], *newwfn->adc_wfn, *m_fh.output_fh);
+}
+
+void driver::run_moprintmod(megajob& job) 
+{
+	auto wfn = get<desc::shared_wavefunction>(job.jdata["wfn"]);
+	
+	std::optional<locorb::lmo_type> opt_olmo, opt_vlmo;
+	
+	if (job.jdata.find("lmo_occ") != job.jdata.end()) {
+		opt_olmo = locorb::str2lmo_type(job.jdata["lmo_occ"]);
+	}
+	
+	if (job.jdata.find("lmo_vir") != job.jdata.end()) {
+		opt_vlmo = locorb::str2lmo_type(job.jdata["lmo_vir"]);
+	}
+	
+	auto mymoprintmod = locorb::moprintmod::create()
+		.set_world(m_world)
+		.set_wfn(wfn)
+		.filename(job.jdata["file"])
+		.job_name(locorb::str2job_type(job.jdata["job_type"]))
+		.lmo_occ(opt_olmo)
+		.lmo_vir(opt_vlmo)
+		.build();
+		
+	mymoprintmod->compute();
+
 }
 
 }  // namespace megalochem
