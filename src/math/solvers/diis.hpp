@@ -31,14 +31,14 @@ class diis_helper {
   const int m_max;
   const int m_min;
   const int m_start;
-  const bool m_print;
+  const int m_print;
 
   util::mpi_log LOG;
 
  public:
-  diis_helper(world w, int start, int min, int max, bool print = false) :
+  diis_helper(world w, int start, int min, int max, int print = 0) :
       m_world(w), m_B(0, 0), m_coeffs(0, 0), m_max(max), m_min(min),
-      m_start(start), m_print(print), LOG(w.comm(), m_print ? 0 : 999){};
+      m_start(start), m_print(print), LOG(w.comm(), m_print){};
 
   void compute_extrapolation_parameters(smat_d& T, smat_d& err, int iter)
   {

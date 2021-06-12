@@ -227,7 +227,7 @@ void hfmod::two_electron()
 
 void hfmod::form_fock(bool SAD_iter, int rank)
 {
-  LOG.os<>("Forming Fock matrix...\n");
+  LOG.os<1>("Forming Fock matrix...\n");
   auto& TIME_2e = TIME.sub("Computing Fock matrix");
 
   TIME_2e.start();
@@ -272,7 +272,7 @@ void hfmod::form_fock(bool SAD_iter, int rank)
 
   TIME_2e.finish();
 
-  LOG.os<>("Done with forming Fock matrix.\n");
+  LOG.os<1>("Done with forming Fock matrix.\n");
 }
 
 void hfmod::compute_scf_energy()
@@ -346,10 +346,10 @@ desc::shared_wavefunction hfmod::compute()
 
   math::diis_helper<2> diis_A(
       m_cart.comm(), m_diis_start, m_diis_min_vecs, m_diis_max_vecs,
-      (LOG.global_plev() >= 2) ? true : false);
+      LOG.global_plev());
   math::diis_helper<2> diis_B(
       m_cart.comm(), m_diis_start, m_diis_min_vecs, m_diis_max_vecs,
-      (LOG.global_plev() >= 2) ? true : false);
+      LOG.global_plev());
 
   // ERROR MATRICES
   dbcsr::shared_matrix<double> e_A;

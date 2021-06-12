@@ -626,7 +626,7 @@ class diis_davidson {
     LOG.os<>("============ PSEUDO-DAVIDSON CONVERGED ===========\n");
 
     LOG.os<>("================= PERFORMING DIIS=================\n");
-    math::diis_helper<2> diis(m_world, 0, 1, 8, true);
+    math::diis_helper<2> diis(m_world, 0, 1, 8, LOG.global_plev());
 
     for (int iiter = 0; iiter != m_diis_maxiter; ++iiter) {
       // compute new matrix vector product
