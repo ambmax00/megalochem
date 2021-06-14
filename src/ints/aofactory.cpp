@@ -995,6 +995,8 @@ desc::shared_cluster_basis remove_lindep(
 
   int prank = pivcd.rank();
   auto perm = pivcd.perm();
+  
+  LOG.os<>("Rank of overlap matrix: ", prank, '\n');
 
   // get all Shells in a single vector
 
@@ -1021,15 +1023,15 @@ desc::shared_cluster_basis remove_lindep(
     }
   }
 
-  /*
+/*
   for (auto i : shell_s2b) {
           std::cout << i << " ";
   } std::cout << std::endl;
 
   for (auto i : shell_b2s) {
           std::cout << i << " ";
-  } std::cout << std::endl;*/
-
+  } std::cout << std::endl;
+*/
   // check which shells we are keeping
 
   std::vector<bool> keep_shell(vshell.size(), false);

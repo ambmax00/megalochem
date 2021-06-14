@@ -8,7 +8,7 @@
 #include "megalochem.hpp"
 #include "utils/mpi_log.hpp"
 
-#define _USE_SPARSE_COMPUTE
+//#define _USE_SPARSE_COMPUTE
 
 namespace megalochem {
 
@@ -24,6 +24,7 @@ class pivinc_cd {
   dbcsr::shared_matrix<double> m_L;
 #else
   std::shared_ptr<scalapack::distmat<double> > m_L;
+  void reorder_and_reduce(scalapack::distmat<double>& L);
 #endif
 
   util::mpi_log LOG;

@@ -12,84 +12,117 @@
 namespace megalochem {
 
 namespace math {
+  
+struct alignas(alignof(double)) double_int {
+  double d;
+  int i;
+};
+
+struct alignas(alignof(int)) int_int {
+  int i0;
+  int i1;
+};
 
 #ifndef _USE_SPARSE_COMPUTE
 
 void pivinc_cd::reorder_and_reduce(scalapack::distmat<double>& L)
 {
-  // REORDER COLUMNS ACCORDING TO SORT METHOD
-
+  
+  auto sgrid = m_world.scalapack_grid();
   int N = L.nrowstot();
-  int nb = L.rowblk_size();
+  
+  std::vector<double_int> startpos(
+      m_rank, {std::numeric_limits<double>::max(), N - 1});
+      
+  std::vector<double_int> stoppos(m_rank, {0.0, 0});
+  double eps = 1e-6;
+  
+  // loop over matrix elements to find start and end positions for my process
+  for (int icol = 0; icol != m_rank; ++icol) {
+	  if (sgrid.mypcol() != L.jproc(icol)) continue;
+	  for (int irow = 0; irow != m_rank; ++irow) {
+		  if (sgrid.myprow() != L.iproc(irow)) continue;
+		  
+      double val = L.global_access(irow,icol);
+		  int prevrow = startpos[icol].i;
+      
 
-  std::vector<int> new_col_perms(m_rank);
-  std::iota(new_col_perms.begin(), new_col_perms.end(), 0);
+		  if (val > eps && irow <= prevrow) {
+			  startpos[icol].d = val;
+			  startpos[icol].i = irow;
+		  }
 
-  LOG.os<1>("-- Reordering cholesky orbitals according to method: old", "\n");
+			prevrow = stoppos[icol].i;
 
-  double reorder_thresh = 1e-4;
-
-  // reorder it according to matrix values
-  std::vector<double> lmo_pos(m_rank, 0);
-
-  for (int j = 0; j != m_rank; ++j) {
-    int first_mu = -1;
-    int last_mu = N - 1;
-
-    for (int i = 0; i != N; ++i) {
-      double L_ij = L.get('A', ' ', i, j);
-
-      if (fabs(L_ij) > reorder_thresh && first_mu == -1) {
-        first_mu = i;
-        last_mu = i;
+      if (val > eps && irow >= prevrow) {
+        stoppos[icol].d = val;
+        stoppos[icol].i = irow;
       }
-      else if (fabs(L_ij) > reorder_thresh && first_mu != -1) {
-        last_mu = i;
+      
+    } // end for irow
+  } // end for icol
+
+  // Prepare to reduce over the communicator
+  std::vector<int> startpos_comm(m_rank), stoppos_comm(m_rank),
+      startpos_red(m_rank), stoppos_red(m_rank);
+  for (int i = 0; i != m_rank; ++i) {
+    startpos_comm[i] = startpos[i].i;
+    stoppos_comm[i] = stoppos[i].i;
+  }
+
+  MPI_Reduce(
+      startpos_comm.data(), startpos_red.data(), m_rank, MPI_INT, MPI_MIN, 0,
+      m_world.comm());
+
+  MPI_Reduce(
+      stoppos_comm.data(), stoppos_red.data(), m_rank, MPI_INT, MPI_MAX, 0,
+      m_world.comm());
+
+  // reorder on rank 0
+  std::vector<int> lmo_perm(m_rank, 0);
+
+  if (m_world.rank() == 0) {
+    std::iota(lmo_perm.begin(), lmo_perm.end(), 0);
+    std::vector<double> lmo_pos(m_rank);
+
+    for (int i = 0; i != m_rank; ++i) {
+      if (startpos_red[i] == N - 1 && stoppos_red[i] == 0) {
+        lmo_pos[i] = N - 1;
+      }
+      else {
+        lmo_pos[i] = (double)(startpos_red[i] + stoppos_red[i]) / 2.0;
       }
     }
 
-    if (first_mu == -1)
-      throw std::runtime_error("Piv. Cholesky decomposition: Reorder failed.");
+    std::stable_sort(
+        lmo_perm.begin(), lmo_perm.end(), [&lmo_pos](int i1, int i2) {
+          return lmo_pos[i1] < lmo_pos[i2];
+        });
 
-    lmo_pos[j] = (double)(first_mu + last_mu) / 2;
-
-    /*ORTHOGONALIZATION DO IT BETTER
-    1. MAKE REORDERING INDEPENDENT
-    2. MAKE MODULES USE LOC FUNCTIONS
-    3. USE ORTHOGONALIZATION (CHOLESKY)*/
+    LOG.os<1>("-- Reordered LMO indices: \n");
+    for (size_t i = 0; i != lmo_perm.size(); ++i) {
+      LOG.os<1>(lmo_perm[i], " ", lmo_pos[lmo_perm[i]], "\n");
+    }
+    LOG.os<1>('\n');
   }
 
-  if (LOG.global_plev() >= 2) {
-    LOG.os<2>("-- Orbital weights: \n");
-    for (auto x : lmo_pos) { LOG.os<2>(x, " "); }
-    LOG.os<2>('\n');
+  // broadcast permutation
+  MPI_Bcast(lmo_perm.data(), m_rank, MPI_INT, 0, m_world.comm());
+
+  // create a new L matrix 
+  auto L_reo = scalapack::distmat<double>(sgrid, N, m_rank, L.rowblk_size(),
+    L.colblk_size(), 0, 0);
+    
+  for (int icol = 0; icol != m_rank; ++icol) {
+    c_pdgeadd('N', N, 1, 1.0, L.data(), 0, icol, L.desc().data(), 
+      0.0, L_reo.data(), 0, lmo_perm[icol], L_reo.desc().data());
   }
+  
+  L = std::move(L_reo);
 
-  std::stable_sort(
-      new_col_perms.begin(), new_col_perms.end(), [&lmo_pos](int i1, int i2) {
-        return lmo_pos[i1] < lmo_pos[i2];
-      });
-
-  if (LOG.global_plev() >= 2) {
-    LOG.os<2>("-- Reordered indices: \n");
-    for (auto x : new_col_perms) { LOG.os<2>(x, " "); }
-    LOG.os<2>("\n");
-  }
-
-  LOG.os<1>("-- Finished reordering.\n");
-
-  m_L = std::make_shared<scalapack::distmat<double>>(N, m_rank, nb, nb, 0, 0);
-
-  LOG.os<1>("-- Reducing and reordering L.\n");
-
-  for (int i = 0; i != m_rank; ++i) {
-    c_pdgeadd(
-        'N', N, 1, 1.0, L.data(), 0, new_col_perms[i], L.desc().data(), 0.0,
-        m_L->data(), 0, i, m_L->desc().data());
-  }
 }
 
-void pivinc_cd::compute()
+void pivinc_cd::compute(std::optional<int> force_rank, std::optional<double> eps)
 {
   // convert input mat to scalapack format
 
@@ -97,20 +130,21 @@ void pivinc_cd::compute()
 
   LOG.os<1>("-- Setting up scalapack environment and matrices.\n");
 
+  util::mpi_time TIME(m_world.comm(), "CHOLESKY");
+  //auto& time_reo = TIME.sub("REO");
+  //auto& time_calc = TIME.sub("CALC");
+  //auto& time_reol = TIME.sub("reol");
+  
+  //TIME.start();
+
   int N = m_mat_in->nfullrows_total();
-  int iter = 0;
   int* iwork = new int[N];
-  char scopeR = 'R';
-  char scopeC = 'C';
-  char top = ' ';
-  int nb = scalapack::global::block_size;
+  int nb = 16;
 
   auto sgrid = m_world.scalapack_grid();
 
   MPI_Comm comm = m_world.comm();
   int myrank = m_world.rank();
-  int myprow = sgrid.myprow();
-  int mypcol = sgrid.mypcol();
 
   int ori_proc = m_mat_in->proc(0, 0);
   int ori_coord[2];
@@ -125,7 +159,7 @@ void pivinc_cd::compute()
   // util::plot(m_mat_in, 1e-4);
 
   scalapack::distmat<double> U = dbcsr::matrix_to_scalapack(
-      m_mat_in, sgrid, m_mat_in->name() + "_scalapack", nb, nb, ori_coord[0],
+      m_mat_in, sgrid, nb, nb, ori_coord[0],
       ori_coord[1]);
 
   scalapack::distmat<double> Ucopy(sgrid, N, N, nb, nb, 0, 0);
@@ -133,13 +167,6 @@ void pivinc_cd::compute()
   c_pdgeadd(
       'N', N, N, 1.0, U.data(), 0, 0, U.desc().data(), 0.0, Ucopy.data(), 0, 0,
       Ucopy.desc().data());
-
-  // if (LOG.global_plev() >= 3) {
-  //	LOG.os<3>("-- Input matrix: \n");
-  //	U.print();
-  //}
-
-  // permutation vector
 
   int LOCr = c_numroc(N, nb, sgrid.myprow(), 0, sgrid.nprow());
   int LOCc = c_numroc(N, nb, sgrid.mypcol(), 0, sgrid.npcol());
@@ -161,39 +188,62 @@ void pivinc_cd::compute()
       &desc_c[0], 1, N + nb * sgrid.npcol(), nb, nb, 0, 0, sgrid.ctx(), 1,
       &info);
 
-  // vector to keep track of permutations
+  // vector to keep track of permutations (scalapack)
   std::vector<int> perms(N);
   std::iota(perms.begin(), perms.end(), 1);
+  
+  // m_perms
+  m_perm.resize(N);
+  std::iota(m_perm.begin(), m_perm.end(), 0);
 
   // chol mat
   scalapack::distmat<double> L(sgrid, N, N, nb, nb, 0, 0);
 
-  auto printp = [&sgrid](int* p, int n) {
-    for (int ir = 0; ir != sgrid.nprow(); ++ir) {
-      for (int ic = 0; ic != sgrid.npcol(); ++ic) {
-        if (ir == sgrid.myprow() && ic == sgrid.mypcol()) {
-          std::cout << ir << " " << ic << std::endl;
-          for (int i = 0; i != n; ++i) { std::cout << p[i] << " "; }
-          std::cout << std::endl;
+  // get max diag element
+  auto get_max_diag = [&](int I) {
+    
+    double local_max = 0.0;
+    int local_idx = 0;
+    
+    for (int ii = I; ii != N; ++ii) {
+      if (sgrid.myprow() == U.iproc(ii) && sgrid.mypcol() == U.jproc(ii)) {
+        double val = U.global_access(ii,ii);
+        if (fabs(val) > fabs(local_max)) {
+           local_max = val;
+           local_idx = ii;
         }
       }
     }
+    
+    double_int di_loc;
+    double_int di_glob;
+    
+    di_loc.i = m_world.rank();
+    di_loc.d = local_max;
+    
+    MPI_Allreduce(&di_loc, &di_glob, 1, MPI_DOUBLE_INT, MPI_MAXLOC,
+      m_world.comm());
+    
+    int maxrank = di_glob.i;
+    di_glob.i = local_idx;
+    
+    MPI_Bcast(&di_glob, 1, MPI_DOUBLE_INT, maxrank, m_world.comm());
+    
+    return std::tie(di_glob.d, di_glob.i);
   };
-
-  // get max diag element
-  double max_U_diag_global = 0.0;
+     
+  /*double max_U_diag_global = 0.0;
   for (int ix = 0; ix != N; ++ix) {
     max_U_diag_global =
         std::max(fabs(max_U_diag_global), fabs(U.get('A', ' ', ix, ix)));
-  }
+  }*/
+  auto [max_val_global, max_idx_global] = get_max_diag(0); 
 
   LOG.os<1>("-- Problem size: ", N, '\n');
   LOG.os<1>(
-      "-- Maximum diagonal element of input matrix: ", max_U_diag_global, '\n');
+      "-- Maximum diagonal element of input matrix: ", max_val_global, '\n');
 
-  m_thresh = N * std::numeric_limits<double>::epsilon() * max_U_diag_global;
-  double thresh = m_thresh; /*N * std::numeric_limits<double>::epsilon() *
-                               max_U_diag_global;*/
+  double thresh = (eps) ? *eps : N * std::numeric_limits<double>::epsilon() * max_val_global;
 
   LOG.os<1>("-- Threshold: ", thresh, '\n');
 
@@ -202,6 +252,16 @@ void pivinc_cd::compute()
     // STEP 1: If Dimension of U is one, then set L and return
 
     LOG.os<1>("---- Level ", I, '\n');
+    
+    auto [max_U_diag, max_U_idx] = get_max_diag(I);
+
+    /*for (int ix = I; ix != N; ++ix) {
+      double ele = U.get('A', ' ', ix, ix);
+      if (ele > max_U_diag) {
+        max_U_diag = ele;
+        max_U_idx = ix;
+      }
+    }*/
 
     if (I == N - 1) {
       double U_II = U.get('A', ' ', I, I);
@@ -212,24 +272,11 @@ void pivinc_cd::compute()
 
     // STEP 2.0: Permutation
 
-    // a) find maximum diagonal element
-
-    double max_U_diag = U.get('A', ' ', I, I);
-    int max_U_idx = I;
-
-    for (int ix = I; ix != N; ++ix) {
-      double ele = U.get('A', ' ', ix, ix);
-      if (ele > max_U_diag) {
-        max_U_diag = ele;
-        max_U_idx = ix;
-      }
-    }
-
     LOG.os<1>("---- MAX ", max_U_diag, " @ ", max_U_idx, '\n');
 
     // b) permute rows/cols
     // U := P * U * P^t
-
+    //time_reo.start();
     LOG.os<1>("---- Permuting U.\n");
     /*
     for (int ix = I; ix != N; ++ix) {
@@ -242,24 +289,12 @@ void pivinc_cd::compute()
     // Pcol.set(I,0,max_U_idx + 1);
     // Prow.set(0,I,max_U_idx + 1);
 
-    if (_grid.myprow() == U.iproc(I)) {
+    if (sgrid.myprow() == U.iproc(I)) {
       ipiv_r[U.iloc(I)] = max_U_idx + 1;
     }
-    if (_grid.mypcol() == U.jproc(I)) {
+    if (sgrid.mypcol() == U.jproc(I)) {
       ipiv_c[U.jloc(I)] = max_U_idx + 1;
     }
-
-    // LOG.os<>("P\n");
-
-    // c_blacs_barrier(_grid.ctx(),'A');
-
-    // printp(ipiv_r,LOCr);
-
-    // c_blacs_barrier(_grid.ctx(),'A');
-
-    // printp(ipiv_c,LOCc);
-
-    // U.print();
 
     c_pdlapiv(
         'F', 'R', 'C', N - I, N - I, U.data(), I, I, U.desc().data(), ipiv_r, I,
@@ -267,8 +302,10 @@ void pivinc_cd::compute()
     c_pdlapiv(
         'F', 'C', 'R', N - I, N - I, U.data(), I, I, U.desc().data(), ipiv_c, 0,
         I, desc_c, iwork);
-
-    U.print();
+        
+    std::swap(m_perm[I], m_perm[max_U_idx]);
+    //time_reo.finish();
+    //U.print();
 
     // STEP 3.0: Convergence criterion
 
@@ -282,8 +319,13 @@ void pivinc_cd::compute()
     }
 
     if (fabs(U_II) < thresh) {
+      LOG.os<1>("Pivot element below threshold.\n");
       perms[I] = max_U_idx + 1;
-
+      m_rank = I;
+      return;
+    } else if (force_rank && *force_rank == I) {
+      LOG.os<1>("Max rank reached.\n");
+      perms[I] = max_U_idx + 1;
       m_rank = I;
       return;
     }
@@ -292,17 +334,22 @@ void pivinc_cd::compute()
 
     // a) get u
     // u_i
+    //time_calc.start();
     scalapack::distmat<double> u_i(sgrid, N, 1, nb, nb, 0, 0);
     c_pdgeadd(
         'N', N - I - 1, 1, 1.0, U.data(), I + 1, I, U.desc().data(), 0.0,
         u_i.data(), I + 1, 0, u_i.desc().data());
 
     // b) form Utilde
-    c_pdgemm(
+    /*c_pdgemm(
         'N', 'T', N - I - 1, N - I - 1, 1, -1 / U_II, u_i.data(), I + 1, 0,
         u_i.desc().data(), u_i.data(), I + 1, 0, u_i.desc().data(), 1.0,
-        U.data(), I + 1, I + 1, U.desc().data());
-
+        U.data(), I + 1, I + 1, U.desc().data());*/
+    
+    c_pdger(N - I - 1, N - I - 1, -1.0/U_II, u_i.data(), I+1, 0, u_i.desc().data(),
+      1, u_i.data(), I+1, 0, u_i.desc().data(), 1, U.data(), I+1, I+1, U.desc().data());
+        
+    //time_calc.finish();
     // STEP 3.2: Solve P * Utilde * Pt = L * Lt
 
     LOG.os<1>(
@@ -323,14 +370,14 @@ void pivinc_cd::compute()
 
     // printp(ipiv_r,LOCr);
 
-    LOG.os<>("LITTLE U\n");
-    u_i.print();
+    //LOG.os<>("LITTLE U\n");
+    //u_i.print();
 
     c_pdlapiv(
         'F', 'R', 'C', N - I - 1, 1, u_i.data(), I + 1, 0, u_i.desc().data(),
         ipiv_r, I + 1, 0, desc_r, iwork);
 
-    u_i.print();
+    //u_i.print();
 
     // (c) add u_i to L
 
@@ -349,7 +396,8 @@ void pivinc_cd::compute()
 
   LOG.os<1>("-- Starting recursive decomposition.\n");
   cd_step(0);
-
+  
+  //time_reol.start();
   LOG.os<1>("-- Rank of L: ", m_rank, '\n');
 
   for (int ir = 0; ir != LOCr; ++ir) { ipiv_r[ir] = perms[U.iglob(ir)]; }
@@ -358,26 +406,20 @@ void pivinc_cd::compute()
 
   LOG.os<1>("-- Permuting L.\n");
 
-  L.print();
+  //L.print();
 
-  exit(0);
-
+  // permute rows of L back to original order
   c_pdlapiv(
       'B', 'R', 'C', N, N, L.data(), 0, 0, L.desc().data(), ipiv_r, 0, 0,
       desc_r, iwork);
 
-  // L.print();
-
-  // c_pdlapiv('B', 'C', 'C', N, N, Uc.data(), 0, 0, Uc.desc().data(),
-  // Pcol.data(), 0, 0, Pcol.desc().data(), iwork); c_pdlapiv('B', 'R', 'R', N,
-  // N, Uc.data(), 0, 0, Uc.desc().data(), Prow.data(), 0, 0,
-  // Prow.desc().data(), iwork);
-
-  // c_pdgeadd('N', N, N, 1.0, Ucopy.data(), 0, 0, Ucopy.desc().data(), -1.0,
-  // Uc.data(), 0, 0, Uc.desc().data());
-
-  reorder_and_reduce(L);
-
+  //reorder_and_reduce(L);
+  m_L = std::make_shared<decltype(L)>(std::move(L));
+  //time_reol.finish();
+  
+  //TIME.finish();
+  //TIME.print_info();
+     
   c_pdgemm(
       'N', 'T', N, N, m_rank, 1.0, m_L->data(), 0, 0, m_L->desc().data(),
       m_L->data(), 0, 0, m_L->desc().data(), -1.0, Ucopy.data(), 0, 0,
@@ -385,7 +427,7 @@ void pivinc_cd::compute()
 
   double err =
       c_pdlange('F', N, N, Ucopy.data(), 0, 0, Ucopy.desc().data(), nullptr);
-
+      
   LOG.os<1>("-- CD error: ", err, '\n');
 
   LOG.os<1>("Finished decomposition.\n");
@@ -393,18 +435,15 @@ void pivinc_cd::compute()
   delete[] iwork;
   delete[] ipiv_r;
   delete[] ipiv_c;
+    
 }
 
 dbcsr::shared_matrix<double> pivinc_cd::L(
     std::vector<int> rowblksizes, std::vector<int> colblksizes)
 {
   auto out = dbcsr::scalapack_to_matrix(
-      *m_L, "Inc. Chol. Decom. of " + m_mat_in->name(), m_world.dbcsr_grid(),
+      *m_L, m_world.dbcsr_grid(), "Inc. Chol. Decom. of " + m_mat_in->name(),
       rowblksizes, colblksizes);
-
-  m_L->release();
-
-  // util::plot(out, 1e-4);
 
   return out;
 }
@@ -743,16 +782,6 @@ void permute_cols(
   temp0.clear();
   temp1.clear();
 }
-
-struct alignas(alignof(double)) double_int {
-  double d;
-  int i;
-};
-
-struct alignas(alignof(int)) int_int {
-  int i0;
-  int i1;
-};
 
 std::tuple<double, int> get_max_diag(dbcsr::matrix<double>& mat, int istart = 0)
 {
@@ -1163,8 +1192,6 @@ void pivinc_cd::compute(
 dbcsr::shared_matrix<double> pivinc_cd::L(
     std::vector<int> rowblksizes, std::vector<int> colblksizes)
 {
-  static int i = 0;
-  i++;
 
   auto Lredist = dbcsr::matrix<>::create()
                      .set_cart(m_world.dbcsr_grid())

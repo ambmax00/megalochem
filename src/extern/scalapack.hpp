@@ -50,13 +50,13 @@ int indxg2p_(int* indxglob, int* nb, int* iproc, int* isrcproc, int* nprocs);
 void pielset_(int* A, int* ia, int* ja, int* desca, int* alpha);
 void pdelset_(double* A, int* ia, int* ja, int* desca, double* alpha);
 void pdelget_(
-    char* scope,
-    char* top,
+    const char* scope,
+    const char* top,
     double* alpha,
     double* A,
     int* ia,
     int* ja,
-    int* desca);
+    const int* desca);
 
 double pdlange_(
     char* nrom,
@@ -96,6 +96,10 @@ void pdgeadd_(
     int* ic,
     int* jc,
     int* desc);
+    
+void pdger_(int* m, int* n, double* alpha, double* x, int* ix, int* jx, int* descx, 
+  int* incx, double* y, int* iy, int* jy, int* descy, int* incy, double* a, 
+  int* ia, int* ja, int* desca);
 
 void pdgemm_(
     char* transa,
@@ -409,7 +413,7 @@ inline void c_pdelset(double* A, int ia, int ja, int* desca, double alpha)
 }
 
 inline void c_pdelget(
-    char scope, char top, double* alpha, double* A, int ia, int ja, int* desca)
+    const char scope, const char top, double* alpha, double* A, int ia, int ja, const int* desca)
 {
   int f_ia = ia + 1;
   int f_ja = ja + 1;
@@ -722,6 +726,22 @@ inline void c_pdgemr2d(
   pdgemr2d_(&m, &n, a, &fia, &fja, desca, b, &fib, &fjb, descb, &ictxt);
 }
 
+inline void c_pdger(int m, int n, double alpha, double* x, int ix, int jx, int* descx, 
+  int incx, double* y, int iy, int jy, int* descy, int incy, double* a, 
+  int ia, int ja, int* desca)
+{
+  int f_ix = ix+1;
+  int f_jx = jx+1;
+  int f_iy = iy+1;
+  int f_jy = jy+1;
+  int f_ia = ia+1;
+  int f_ja = ja+1;
+  
+  pdger_(&m,&n,&alpha,x,&f_ix,&f_jx,descx,&incx,y,&f_iy,&f_jy,descy,&incy,a,
+    &f_ia, &f_ja, desca);
+    
+}
+
 namespace scalapack {
 
 struct global {
@@ -770,6 +790,10 @@ class grid {
   grid(const grid& g_in) = default;
 
   grid(grid&& g_in) = default;
+  
+  grid& operator=(const grid& g_in) = default;
+  
+  grid& operator=(grid&& g_in) = default;
 
   ~grid()
   {
@@ -953,7 +977,7 @@ class distmat {
       typename D = T,
       typename =
           typename std::enable_if<std::is_same<D, double>::value, int>::type>
-  double get(char scope, char top, int i, int j) const
+  double get(const char scope, const char top, int i, int j) const
   {
     double out;
     c_pdelget(scope, top, &out, m_data, i, j, &m_desc[0]);
@@ -961,6 +985,27 @@ class distmat {
   }
 
   distmat(const distmat& d) = delete;
+  
+  distmat& operator=(const distmat& d) = delete;
+  
+  distmat& operator=(distmat&& d) {
+    if (this == &d) return *this;
+    
+    m_data = d.m_data;
+    m_grid = d.m_grid;
+    m_nrowstot = d.m_nrowstot;
+    m_ncolstot = d.m_ncolstot;
+    m_nrowsloc = d.m_nrowsloc;
+    m_ncolsloc = d.m_ncolsloc; 
+    m_rsrc = d.m_rsrc; 
+    m_csrc = d.m_csrc;
+    m_rowblk_size = d.m_rowblk_size; 
+    m_colblk_size = d.m_colblk_size;
+    m_desc = d.m_desc;
+    
+    d.m_data = nullptr;
+    return *this;
+  }
 
   distmat(distmat&& d) :
       m_data(d.m_data), m_grid(d.m_grid), m_nrowstot(d.m_nrowstot),
@@ -1058,6 +1103,11 @@ class distmat {
   {
     return m_csrc;
   }
+  
+  grid& get_grid() {
+    return m_grid;
+  }
+  
 };
 
 }  // namespace scalapack
