@@ -35,12 +35,12 @@ void pivinc_cd::reorder_and_reduce(scalapack::distmat<double>& L)
       m_rank, {std::numeric_limits<double>::max(), N - 1});
       
   std::vector<double_int> stoppos(m_rank, {0.0, 0});
-  double eps = 1e-6;
+  double eps = dbcsr::global::filter_eps;
   
   // loop over matrix elements to find start and end positions for my process
   for (int icol = 0; icol != m_rank; ++icol) {
 	  if (sgrid.mypcol() != L.jproc(icol)) continue;
-	  for (int irow = 0; irow != m_rank; ++irow) {
+	  for (int irow = 0; irow != N; ++irow) {
 		  if (sgrid.myprow() != L.iproc(irow)) continue;
 		  
       double val = L.global_access(irow,icol);
@@ -114,8 +114,8 @@ void pivinc_cd::reorder_and_reduce(scalapack::distmat<double>& L)
     L.colblk_size(), 0, 0);
     
   for (int icol = 0; icol != m_rank; ++icol) {
-    c_pdgeadd('N', N, 1, 1.0, L.data(), 0, icol, L.desc().data(), 
-      0.0, L_reo.data(), 0, lmo_perm[icol], L_reo.desc().data());
+    c_pdgeadd('N', N, 1, 1.0, L.data(), 0, lmo_perm[icol], L.desc().data(), 
+      0.0, L_reo.data(), 0, icol, L_reo.desc().data());
   }
   
   L = std::move(L_reo);
@@ -413,7 +413,7 @@ void pivinc_cd::compute(std::optional<int> force_rank, std::optional<double> eps
       'B', 'R', 'C', N, N, L.data(), 0, 0, L.desc().data(), ipiv_r, 0, 0,
       desc_r, iwork);
 
-  //reorder_and_reduce(L);
+  reorder_and_reduce(L);
   m_L = std::make_shared<decltype(L)>(std::move(L));
   //time_reol.finish();
   
