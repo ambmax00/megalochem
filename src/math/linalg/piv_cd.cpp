@@ -198,9 +198,43 @@ void pivinc_cd::compute(std::optional<int> force_rank, std::optional<double> eps
 
   // chol mat
   scalapack::distmat<double> L(sgrid, N, N, nb, nb, 0, 0);
+  
+  // create a shared memeory window on each node
+  LOG.os<1>("-- Setup shared memory.\n");
+  
+  MPI_Comm local_comm;
+  int local_size(-1), local_rank(-1);
+  
+  MPI_Comm_split_type(
+        m_world.comm(), MPI_COMM_TYPE_SHARED, m_world.rank(), MPI_INFO_NULL,
+        &local_comm);
+
+  MPI_Comm_size(local_comm, &local_size);
+  MPI_Comm_rank(local_comm, &local_rank);
+
+  MPI_Win local_window;
+  double_int* local_data;
+  
+  MPI_Win_allocate_shared(
+      sizeof(double_int), sizeof(double_int), MPI_INFO_NULL, local_comm, 
+      &local_data, &local_window);
+      
+  // communicator which groups all first processes on each node
+  MPI_Comm master_comm = MPI_COMM_NULL;
+  int color = (local_rank == 0) ? 0 : MPI_UNDEFINED;
+  int key = m_world.rank();
+    
+  MPI_Comm_split(m_world.comm(), color, key, &master_comm);
+
+  util::mpi_time TIME0(m_world.comm(), "COMM");
+  auto& time1 = TIME0.sub("1");
+  auto& time2 = TIME0.sub("2");
+  auto& time3 = TIME0.sub("3");
 
   // get max diag element
   auto get_max_diag = [&](int I) {
+    
+    time1.start();
     
     double local_max = 0.0;
     int local_idx = 0;
@@ -215,21 +249,38 @@ void pivinc_cd::compute(std::optional<int> force_rank, std::optional<double> eps
       }
     }
     
-    double_int di_loc;
-    double_int di_glob;
+    local_data->i = local_idx;
+    local_data->d = local_max;
     
-    di_loc.i = m_world.rank();
-    di_loc.d = local_max;
+    time1.finish();
     
-    MPI_Allreduce(&di_loc, &di_glob, 1, MPI_DOUBLE_INT, MPI_MAXLOC,
-      m_world.comm());
+    time2.start();
     
-    int maxrank = di_glob.i;
-    di_glob.i = local_idx;
+    if (local_rank == 0) {
+      auto it = std::max_element(local_data, local_data + local_size, 
+        [](const double_int& v1, const double_int& v2) {
+          return v1.d < v2.d;
+      });
+      
+      MPI_Allreduce(it, local_data, 1, MPI_DOUBLE_INT, MPI_MAXLOC, master_comm);    
+      
+    }
     
-    MPI_Bcast(&di_glob, 1, MPI_DOUBLE_INT, maxrank, m_world.comm());
+    MPI_Barrier(local_comm);
     
-    return std::tie(di_glob.d, di_glob.i);
+    time2.finish();
+    
+    double_int* di_glob;
+    MPI_Aint size = 0;
+    int disp = 0;
+    MPI_Win_shared_query(local_window, 0, &size, &disp, &di_glob);
+    
+    time3.start();
+    double_int di_glob2;
+    MPI_Allreduce(local_data, &di_glob2, 1, MPI_DOUBLE_INT, MPI_MAXLOC, m_world.comm());  
+    time3.finish();
+    
+    return std::tie(di_glob->d, di_glob->i);
   };
      
   /*double max_U_diag_global = 0.0;
@@ -237,6 +288,9 @@ void pivinc_cd::compute(std::optional<int> force_rank, std::optional<double> eps
     max_U_diag_global =
         std::max(fabs(max_U_diag_global), fabs(U.get('A', ' ', ix, ix)));
   }*/
+  
+  LOG.os<1>("-- Getting maximum element.\n");
+  
   auto [max_val_global, max_idx_global] = get_max_diag(0); 
 
   LOG.os<1>("-- Problem size: ", N, '\n');
@@ -396,6 +450,8 @@ void pivinc_cd::compute(std::optional<int> force_rank, std::optional<double> eps
 
   LOG.os<1>("-- Starting recursive decomposition.\n");
   cd_step(0);
+  
+  TIME0.print_info();
   
   //time_reol.start();
   LOG.os<1>("-- Rank of L: ", m_rank, '\n');
