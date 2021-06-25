@@ -135,7 +135,7 @@ void pivinc_cd::compute(std::optional<int> force_rank, std::optional<double> eps
   //auto& time_calc = TIME.sub("CALC");
   //auto& time_reol = TIME.sub("reol");
   
-  //TIME.start();
+  TIME.start();
 
   int N = m_mat_in->nfullrows_total();
   int* iwork = new int[N];
@@ -199,8 +199,11 @@ void pivinc_cd::compute(std::optional<int> force_rank, std::optional<double> eps
   // chol mat
   scalapack::distmat<double> L(sgrid, N, N, nb, nb, 0, 0);
   
+  // subvectors
+  scalapack::distmat<double> u_i(sgrid, N, N, nb, nb, 0, 0);
+  
   // create a shared memeory window on each node
-  LOG.os<1>("-- Setup shared memory.\n");
+ /* LOG.os<1>("-- Setup shared memory.\n");
   
   MPI_Comm local_comm;
   int local_size(-1), local_rank(-1);
@@ -229,58 +232,30 @@ void pivinc_cd::compute(std::optional<int> force_rank, std::optional<double> eps
   util::mpi_time TIME0(m_world.comm(), "COMM");
   auto& time1 = TIME0.sub("1");
   auto& time2 = TIME0.sub("2");
-  auto& time3 = TIME0.sub("3");
+  auto& time3 = TIME0.sub("3");*/
 
   // get max diag element
   auto get_max_diag = [&](int I) {
     
-    time1.start();
+    //time1.start();
     
-    double local_max = 0.0;
-    int local_idx = 0;
+    double_int local, global;
+    local.d = 0.0;
+    local.i = 0;
     
     for (int ii = I; ii != N; ++ii) {
       if (sgrid.myprow() == U.iproc(ii) && sgrid.mypcol() == U.jproc(ii)) {
         double val = U.global_access(ii,ii);
-        if (fabs(val) > fabs(local_max)) {
-           local_max = val;
-           local_idx = ii;
+        if (fabs(val) > fabs(local.d)) {
+           local.d = val;
+           local.i = ii;
         }
       }
     }
     
-    local_data->i = local_idx;
-    local_data->d = local_max;
+    MPI_Allreduce(&local, &global, 1, MPI_DOUBLE_INT, MPI_MAXLOC, m_world.comm());  
     
-    time1.finish();
-    
-    time2.start();
-    
-    if (local_rank == 0) {
-      auto it = std::max_element(local_data, local_data + local_size, 
-        [](const double_int& v1, const double_int& v2) {
-          return v1.d < v2.d;
-      });
-      
-      MPI_Allreduce(it, local_data, 1, MPI_DOUBLE_INT, MPI_MAXLOC, master_comm);    
-      
-    }
-    
-    MPI_Barrier(local_comm);
-    
-    time2.finish();
-    
-    double_int* di_glob;
-    MPI_Aint size = 0;
-    int disp = 0;
-    MPI_Win_shared_query(local_window, 0, &size, &disp, &di_glob);
-    
-    time3.start();
-    double_int di_glob2;
-    MPI_Allreduce(local_data, &di_glob2, 1, MPI_DOUBLE_INT, MPI_MAXLOC, m_world.comm());  
-    time3.finish();
-    
-    return std::tie(di_glob->d, di_glob->i);
+    return global;
   };
      
   /*double max_U_diag_global = 0.0;
@@ -291,7 +266,8 @@ void pivinc_cd::compute(std::optional<int> force_rank, std::optional<double> eps
   
   LOG.os<1>("-- Getting maximum element.\n");
   
-  auto [max_val_global, max_idx_global] = get_max_diag(0); 
+  auto max_diag = get_max_diag(0); 
+  double max_val_global = max_diag.d;
 
   LOG.os<1>("-- Problem size: ", N, '\n');
   LOG.os<1>(
@@ -307,7 +283,9 @@ void pivinc_cd::compute(std::optional<int> force_rank, std::optional<double> eps
 
     LOG.os<1>("---- Level ", I, '\n');
     
-    auto [max_U_diag, max_U_idx] = get_max_diag(I);
+    auto max_U = get_max_diag(I);
+    double max_U_diag = max_U.d;
+    int max_U_idx = max_U.i;
 
     /*for (int ix = I; ix != N; ++ix) {
       double ele = U.get('A', ' ', ix, ix);
@@ -389,10 +367,10 @@ void pivinc_cd::compute(std::optional<int> force_rank, std::optional<double> eps
     // a) get u
     // u_i
     //time_calc.start();
-    scalapack::distmat<double> u_i(sgrid, N, 1, nb, nb, 0, 0);
+    //scalapack::distmat<double> u_i(sgrid, N, 1, nb, nb, 0, 0);
     c_pdgeadd(
         'N', N - I - 1, 1, 1.0, U.data(), I + 1, I, U.desc().data(), 0.0,
-        u_i.data(), I + 1, 0, u_i.desc().data());
+        u_i.data(), I + 1, I, u_i.desc().data());
 
     // b) form Utilde
     /*c_pdgemm(
@@ -400,8 +378,8 @@ void pivinc_cd::compute(std::optional<int> force_rank, std::optional<double> eps
         u_i.desc().data(), u_i.data(), I + 1, 0, u_i.desc().data(), 1.0,
         U.data(), I + 1, I + 1, U.desc().data());*/
     
-    c_pdger(N - I - 1, N - I - 1, -1.0/U_II, u_i.data(), I+1, 0, u_i.desc().data(),
-      1, u_i.data(), I+1, 0, u_i.desc().data(), 1, U.data(), I+1, I+1, U.desc().data());
+    c_pdger(N - I - 1, N - I - 1, -1.0/U_II, u_i.data(), I+1, I, u_i.desc().data(),
+      1, u_i.data(), I+1, I, u_i.desc().data(), 1, U.data(), I+1, I+1, U.desc().data());
         
     //time_calc.finish();
     // STEP 3.2: Solve P * Utilde * Pt = L * Lt
@@ -428,7 +406,7 @@ void pivinc_cd::compute(std::optional<int> force_rank, std::optional<double> eps
     //u_i.print();
 
     c_pdlapiv(
-        'F', 'R', 'C', N - I - 1, 1, u_i.data(), I + 1, 0, u_i.desc().data(),
+        'F', 'R', 'C', N - I - 1, 1, u_i.data(), I + 1, I, u_i.desc().data(),
         ipiv_r, I + 1, 0, desc_r, iwork);
 
     //u_i.print();
@@ -438,7 +416,7 @@ void pivinc_cd::compute(std::optional<int> force_rank, std::optional<double> eps
     // L.print();
 
     c_pdgeadd(
-        'N', N - I - 1, 1, 1.0 / sqrt(U_II), u_i.data(), I + 1, 0,
+        'N', N - I - 1, 1, 1.0 / sqrt(U_II), u_i.data(), I + 1, I,
         u_i.desc().data(), 0.0, L.data(), I + 1, I, L.desc().data());
 
     // L.print();
@@ -451,7 +429,10 @@ void pivinc_cd::compute(std::optional<int> force_rank, std::optional<double> eps
   LOG.os<1>("-- Starting recursive decomposition.\n");
   cd_step(0);
   
-  TIME0.print_info();
+  TIME.finish();
+  TIME.print_info();
+  
+  //TIME0.print_info();
   
   //time_reol.start();
   LOG.os<1>("-- Rank of L: ", m_rank, '\n');
