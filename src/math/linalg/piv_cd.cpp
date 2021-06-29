@@ -139,7 +139,7 @@ void pivinc_cd::compute(std::optional<int> force_rank, std::optional<double> eps
 
   int N = m_mat_in->nfullrows_total();
   int* iwork = new int[N];
-  int nb = 16;
+  int nb = 64;
 
   auto sgrid = m_world.scalapack_grid();
 
