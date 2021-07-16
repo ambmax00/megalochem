@@ -240,17 +240,23 @@ void pivinc_cd::compute(std::optional<int> force_rank, std::optional<double> eps
     //time1.start();
     
     double_int local, global;
-    local.d = 0.0;
+    local.d = 0;
     local.i = 0;
+    bool is_set = false;
     
     for (int ii = I; ii != N; ++ii) {
       if (sgrid.myprow() == U.iproc(ii) && sgrid.mypcol() == U.jproc(ii)) {
         double val = U.global_access(ii,ii);
-        if (fabs(val) > fabs(local.d)) {
+        if (!is_set || fabs(val) > fabs(local.d)) {
            local.d = val;
            local.i = ii;
+           is_set = true;
         }
       }
+    }
+    
+    if (!is_set) {
+      local.d = -std::numeric_limits<double>::max();
     }
     
     MPI_Allreduce(&local, &global, 1, MPI_DOUBLE_INT, MPI_MAXLOC, m_world.comm());  
