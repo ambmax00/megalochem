@@ -1,104 +1,103 @@
 #ifndef MATH_MINIMAX_HPP
 #define MATH_MINIMAX_HPP
 
-#include <functional>
-#include <tuple>
 #include <vector>
-#include "math/laplace/quadmath.hpp"
+#include <optional>
+
+extern "C" {
+  void c_laplace_minimax(double* errmax, double* xpnts, double* wghts, int* nlap,
+    double ymin, double ymax, int* mxiter, int* iprint, double* stepmx,
+    double* tolrng, double* tolpar, double* tolerr, double* delta, double* afact,
+    bool* do_rmsd, bool* do_init, bool* do_nlap);
+}
 
 namespace megalochem {
 
 namespace math {
-
+	
 class minimax {
- private:
-  // ==== member variables ====
-  int _print_level;
+private:
+		
+	int m_nlap, m_print;
+	double m_err;
+	std::vector<double> m_omega;
+	std::vector<double> m_alpha;
+	
+/*	mxiter               (optional) maximum number of iterations. Used for each
+                           of the iterative prodecures (Remez + Newton(-Maehly))
+   stepmx               (optional) maximum step length used for each of the 
+                           Newton type procedures
+   tolrng               (optional) tolerance threshold for the Newton-Maehly
+                           procedure that determines the extremum points
+   tolpar               (optional) tolerance threshold for the Newton procedure
+                           that computes the Laplace parameters at each extremum
+                           point
+   tolerr               (optional) tolerance threshold for the maximum quadrature
+                           error obtained by the minimax algorithm
+   delta                (optional) shift parameter for initializating the next
+                           extremum point to be determined by Newton-Maehly
+   afact                (optional) factor for the line search algorithm used
+                           in combination with the Newton algorithm to determine
+                           the Laplace parameters
+   do_rmsd              (optional) compute an RMS error after the optimization
+                           of the Laplace parameters
+*/	
+	
+#define set_var(type, name) \
+	std::optional<type> m_##name = std::nullopt; \
+	minimax& set_##name(type name) { \
+		m_##name = name; \
+		return *this; \
+	} 
+	
+	set_var(int, mxiter)
+	set_var(double,stepmx)
+	set_var(double,tolrng)
+	set_var(double,tolpar)
+	set_var(double,tolerr)
+	set_var(double,delta)
+	set_var(double,afact)
+	set_var(bool,do_rmsd)
 
-  float128 _delta = 0.0001;
-  float128 _itol_newton = 1e-16;
-  float128 _itol_remez = 1e-16;
+public:
 
-  int _max_iter_newton = 50;
-  int _max_iter_remez = 50;
-
-  std::vector<double> _weights;
-  std::vector<double> _exponents;
-
-  // ==== other ====
-
-  using newton_function = std::function<float128(float128)>;
-
-  // ==== main functions ======
-
-  std::tuple<Eigen::VectorXq, Eigen::VectorXq> read_guess(double R, int k);
-
-  float128 eta(float128 x, Eigen::VectorXq& omegas, Eigen::VectorXq& alphas);
-
-  float128 dEta(float128 x, Eigen::VectorXq& omegas, Eigen::VectorXq& alphas);
-
-  float128 ddEta(float128 x, Eigen::VectorXq& omegas, Eigen::VectorXq& alphas);
-
-  Eigen::VectorXq newton_maehly(
-      double R, int k, Eigen::VectorXq& omega, Eigen::VectorXq& alpha);
-
-  float128 newton(float128 x0, newton_function& update);
-
-  float128 kahan_summation(Eigen::VectorXq& array);
-
-  std::tuple<Eigen::VectorXq, Eigen::VectorXq> para_opt(
-      Eigen::VectorXq& expts, Eigen::VectorXq omegas, Eigen::VectorXq alphas);
-
-  /*float128 newton_maehly_step(Eigen::VectorXq expts,
-          Eigen::VectorXq omegas, Eigen::VectorXq alphas, int i);
-
-  float128 eta(float128 x, Eigen::VectorXq omegas,
-          Eigen::VectorXq alphas);
-
-  float128 deta(float128 x, Eigen::VectorXq omegas,
-          Eigen::VectorXq alphas);
-
-  float128 d2eta(float128 x, Eigen::VectorXq omegas,
-          Eigen::VectorXq alphas);*/
-
-  // ==== utility functions ======
-
-  void print_()
-  {
-    std::cout << std::flush;
-  }
-
-  template <typename T, typename... Args>
-  void print_(T in, Args... args)
-  {
-    std::cout << in;
-    print_(args...);
-  }
-
-  template <int nprint = 0, typename T, typename... Args>
-  void os(T in, Args... args)
-  {
-    if (nprint <= _print_level) {
-      print_(in, args...);
-    }
-  }
-
- public:
-  minimax(int print_level = 0) : _print_level(print_level)
-  {
-  }
-
-  void compute(int k, double ymin, double ymax);
-
-  std::vector<double> weights()
-  {
-    return _weights;
-  }
-
-  std::vector<double> exponents()
-  {
-    return _exponents;
-  }
+	minimax(int print = 0) :  
+		m_nlap(0), m_print(print), m_err(0.0) {}
+		
+	void compute(int nlap, double ymin, double ymax) {
+		
+		m_omega.clear();
+		m_alpha.clear();
+		
+		m_omega.resize(nlap);
+		m_alpha.resize(nlap);
+    
+    c_laplace_minimax(&m_err, m_alpha.data(), m_omega.data(), 
+      &nlap, ymin, ymax, 
+      (m_mxiter) ? &*m_mxiter : nullptr , 
+      &m_print, 
+      (m_stepmx) ? &*m_stepmx : nullptr, 
+      (m_tolrng) ? &*m_tolrng : nullptr, 
+      (m_tolpar) ? &*m_tolpar : nullptr, 
+      (m_tolerr) ? &*m_tolerr : nullptr, 
+      (m_delta) ? &*m_delta : nullptr,
+      (m_afact) ? &*m_afact : nullptr,
+      (m_do_rmsd) ? &*m_do_rmsd : nullptr,
+      nullptr, nullptr);
+			
+	}
+			
+	
+	std::vector<double> weights() const {
+		return m_omega;
+	}
+	
+	std::vector<double> exponents() const {
+		return m_alpha;
+	}
+	
+	~minimax() {}
+	
 };
 
 }  // namespace math
