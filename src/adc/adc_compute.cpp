@@ -300,6 +300,9 @@ eigenpair adcmod::run_adc2_local(eigenpair& epairs)
 
     adc2_epair.eigvals[iroot] = mdav.eigval()[iroot];
     adc2_epair.eigvecs[iroot] = evec_cmo;
+    
+     adc2_mvp->print_info();
+    
   }
 
   LOG.os<>("==== Finished ADC(2) Computation ====\n\n");
@@ -373,6 +376,8 @@ eigenpair adcmod::run_adc2(eigenpair& epairs)
     LOG.os<>(
         "Excitation nr. ", iroot + 1, " : ", adc2_epair.eigvals[iroot], '\n');
   }
+  
+  adc2_mvp->print_info();
 
   return adc2_epair;
 }

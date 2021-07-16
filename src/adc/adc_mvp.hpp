@@ -282,6 +282,8 @@ class MVP_AORISOSADC2 : public MVP {
 
   void print_info() override
   {
+    LOG.os<>("Timings for AO-ADC(2): \n");
+    TIME.print_info();
   }
 
   ~MVP_AORISOSADC2() override
