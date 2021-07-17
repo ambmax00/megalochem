@@ -1,6 +1,8 @@
 set (sources
 	orthogonalizer.hpp
 	orthogonalizer.cpp
+	newton_schulz.hpp
+	newton_schulz.cpp
 	piv_cd.hpp
 	piv_cd.cpp
 	LLT.hpp

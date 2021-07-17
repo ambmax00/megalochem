@@ -1,6 +1,7 @@
 #include "hf/hfmod.hpp"
 #include "math/linalg/orthogonalizer.hpp"
 #include "math/linalg/piv_cd.hpp"
+#include "math/linalg/newton_schulz.hpp"
 #include "math/solvers/diis.hpp"
 
 namespace megalochem {
@@ -139,6 +140,11 @@ void hfmod::one_electron()
 
   // overlap
   m_s_bb = int_engine.ao_overlap();
+  
+  math::newton_schulz newt(m_world, m_s_bb, 1);
+  newt.compute();
+  
+  exit(0);
 
   // kinetic
   m_t_bb = int_engine.ao_kinetic();
