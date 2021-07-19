@@ -140,11 +140,6 @@ void hfmod::one_electron()
 
   // overlap
   m_s_bb = int_engine.ao_overlap();
-  
-  math::newton_schulz newt(m_world, m_s_bb, 1);
-  newt.compute();
-  
-  exit(0);
 
   // kinetic
   m_t_bb = int_engine.ao_kinetic();
