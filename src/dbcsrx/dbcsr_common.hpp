@@ -583,12 +583,27 @@ class block {
     }
   }
 
-  T norm() const
+  T norm(norm norm_type = norm::frobenius) const
   {
     T out = 0;
-    for (int i = 0; i != m_nfull; ++i) { out += pow(m_data[i], 2); }
-
-    return sqrt(out);
+    
+    switch (norm_type) {
+      case norm::frobenius:
+      {
+        for (int i = 0; i != m_nfull; ++i) { out += pow(m_data[i], 2); }
+        out = std::sqrt(out);
+        break;
+      }
+      case norm::maxabsnorm:
+      {
+        for (int i = 0; i != m_nfull; ++i) { out = std::max(out, std::fabs(m_data[i])); }
+        break;
+      }
+      default:
+        throw std::runtime_error("Norm type not yet implemented");
+    }
+    
+    return out;
   }
 
   T max_abs() const

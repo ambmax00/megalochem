@@ -2,6 +2,7 @@
 #define DBCSR_CONVERSIONS_HPP
 
 #include <Eigen/Core>
+#include <Eigen/SparseCore>
 
 #include <dbcsr_matrix.hpp>
 #include <dbcsr_tensor.hpp>
@@ -562,7 +563,7 @@ void copy_matrix_to_tensor(
 }
 
 template <typename T>
-Eigen::MatrixXd block_norms(matrix<T>& m_in)
+Eigen::MatrixXd block_norms(matrix<T>& m_in, norm norm_type = norm::frobenius)
 {
   // returns an eigen matrix with block norms
   int nrows = m_in.nblkrows_total();
@@ -587,7 +588,10 @@ Eigen::MatrixXd block_norms(matrix<T>& m_in)
     int iblk = iter.row();
     int jblk = iter.col();
 
-    eigen_out(iblk, jblk) = iter.norm();
+    bool found = true;
+    auto blk2 = m_in.get_block_p(iblk, jblk, found);
+
+    eigen_out(iblk, jblk) = blk2.norm(norm_type);
     if (mtype == type::symmetric)
       eigen_out(jblk, iblk) = eigen_out(iblk, jblk);
   }
@@ -600,6 +604,102 @@ Eigen::MatrixXd block_norms(matrix<T>& m_in)
   return eigen_out;
 }
 
+template <typename T>
+Eigen::SparseMatrix<double> sparse_block_norms(dbcsr::matrix<T>& m_in, 
+  double eps, dbcsr::norm norm_type = dbcsr::norm::frobenius) 
+{
+  
+  typedef Eigen::Triplet<double> triplet;
+  
+  auto dcart = m_in.get_cart();
+  std::vector<triplet> sdata;
+  //sdata.reserve(nblks);
+  
+  //auto eigen = dbcsr::matrix_to_eigen(m_in);
+  
+  /*if (dcart.rank() == 0) {
+    std::cout << eigen << std::endl;
+  }*/
+  
+  auto print = [&](auto v) {
+    for (int ip = 0; ip != dcart.size(); ++ip) {
+      if (ip == dcart.rank()) {
+        std::cout << "RANK: " << ip << std::endl;
+        for (auto e : v) {
+          std::cout << e.row() << " " << e.col() << " : " << e.value() << std::endl;
+        } std::cout << std::endl;
+      }
+      MPI_Barrier(dcart.comm());
+    }
+  };
+  
+  int nblks = 0;
+  
+  dbcsr::iterator iter(m_in);
+  iter.start();
+    
+  while (iter.blocks_left()) {
+    
+    iter.next_block();
+    int irow = iter.row();
+    int icol = iter.col();
+    
+    bool found = true;
+    auto blk2 = m_in.get_block_p(irow, icol, found);
+    
+    double val = blk2.norm(norm_type);
+    
+    if (val > eps) {
+      sdata.push_back(triplet(irow, icol, val));
+      ++nblks;
+    }
+  }
+  
+  iter.stop();
+  
+  //print(sdata);
+  
+  int tripletsize = sizeof(triplet);
+  
+  int blklengths[1] = {tripletsize};
+  MPI_Aint disps[1] = {0};
+  MPI_Datatype types[1] = {MPI_BYTE};
+  MPI_Datatype MPI_TRIPLET;
+  
+  MPI_Type_create_struct(1, blklengths, disps, types, &MPI_TRIPLET);
+  MPI_Type_commit(&MPI_TRIPLET);
+  
+  // we now send all triplets to everyone
+  
+  int nblk_send = nblks;
+  std::vector<int> nblk_recv(dcart.size(), 0);
+  std::vector<int> nblk_recv_offset(dcart.size(), 0);
+  
+  MPI_Allgather(&nblks, 1, MPI_INT, nblk_recv.data(), 1, MPI_INT, dcart.comm());
+  
+  int nblkstot = std::accumulate(nblk_recv.begin(), nblk_recv.end(), 0);
+  int offset = 0;
+  for (int ii = 0; ii != nblk_recv.size(); ++ii) {
+    nblk_recv_offset[ii] = offset;
+    offset += nblk_recv[ii];
+  }
+  
+  std::vector<triplet> rdata(nblkstot);
+  
+  MPI_Allgatherv(sdata.data(), nblk_send, MPI_TRIPLET,
+    rdata.data(), nblk_recv.data(), nblk_recv_offset.data(), 
+    MPI_TRIPLET, dcart.comm());
+  
+  sdata.clear();
+  //print(rdata);
+  
+  Eigen::SparseMatrix<double> smat(m_in.nblkrows_total(), m_in.nblkcols_total());
+  smat.setFromTriplets(rdata.begin(), rdata.end());
+  
+  return smat;
+  
+}
+  
 }  // namespace dbcsr
-
+  
 #endif
