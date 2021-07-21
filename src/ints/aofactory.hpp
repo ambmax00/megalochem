@@ -83,11 +83,15 @@ class aofactory {
   std::array<dbcsr::shared_matrix<double>, 3> ao_emultipole(
       std::array<int, 3> O = {0, 0, 0});
 
+  void ao_2c2e_setup(metric m);
+
   void ao_3c1e_ovlp_setup();
 
   void ao_3c2e_setup(metric m);
 
   void ao_eri_setup(metric m);
+  
+  void ao_2c_fill(dbcsr::shared_matrix<double>& m_in);
 
   void ao_3c_fill(dbcsr::shared_tensor<3, double>& t_in);
 

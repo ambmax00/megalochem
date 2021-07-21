@@ -115,6 +115,7 @@ class basic_scheduler {
   int _local_size;
 
   int64_t _global_counter;
+  int _request_factor = 2;
 
   // local mutex
   std::shared_ptr<util::mutex> _local_mtx;
@@ -187,7 +188,7 @@ class basic_scheduler {
 
       _DPRINT("Filling queue")
 
-      int64_t nrequests = _local_size;
+      int64_t nrequests = _request_factor * _local_size;
 
       _DPRINT("Requesting " + std::to_string(nrequests))
 

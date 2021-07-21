@@ -625,6 +625,14 @@ class aofactory::impl {
 
     return m_ints;
   }
+  
+  void compute_2_reserved(dbcsr::shared_matrix<double>& m_ints) 
+  {
+    calc_ints(
+        *m_ints, m_shell_offsets, m_nshells, m_intfunc, m_cint_atm.data(),
+        m_cint_natoms, m_cint_bas.data(), m_cint_nbas, m_cint_env.data(),
+        m_max_l);
+  }
 
   std::array<dbcsr::shared_matrix<double>, 3> compute_xyz(std::array<int, 3> O)
   {
@@ -675,7 +683,7 @@ class aofactory::impl {
         m_max_l);
   }
 
-  void compute_3_all(dbcsr::shared_tensor<3>& t_in)
+  void compute_3_reserved(dbcsr::shared_tensor<3>& t_in)
   {
     calc_ints(
         *t_in, m_shell_offsets, m_nshells, m_intfunc, m_cint_atm.data(),
@@ -863,6 +871,20 @@ std::array<dbcsr::shared_matrix<double>, 3> aofactory::ao_emultipole(
   return pimpl->compute_xyz(O);
 }
 
+void aofactory::ao_2c2e_setup(metric m) 
+{
+  op iop = op::invalid;
+  if (m == metric::coulomb)
+    iop = op::coulomb;
+  if (m == metric::erfc_coulomb)
+    iop = op::erfc_coulomb;
+
+  pimpl->set_center(ctr::c_2c2e);
+  pimpl->set_dim("xx");
+  pimpl->set_operator(iop);
+  pimpl->setup_calc();
+}
+
 void aofactory::ao_3c2e_setup(metric m)
 {
   op iop = op::invalid;
@@ -899,9 +921,14 @@ void aofactory::ao_eri_setup(metric m)
   pimpl->setup_calc();
 }
 
+void aofactory::ao_2c_fill(dbcsr::shared_matrix<double>& m_in)
+{
+  pimpl->compute_2_reserved(m_in);
+}
+
 void aofactory::ao_3c_fill(dbcsr::shared_tensor<3, double>& t_in)
 {
-  pimpl->compute_3_all(t_in);
+  pimpl->compute_3_reserved(t_in);
 }
 
 void aofactory::ao_3c_fill(

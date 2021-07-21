@@ -1,8 +1,8 @@
 #include <Eigen/Core>
 #include <Eigen/Dense>
-#include <Eigen/SVD>
-#include <Eigen/SparseCore>
 #include <bitset>
+
+#include <dbcsr_conversions.hpp>
 #include "extern/lapack.hpp"
 #include "ints/fitting.hpp"
 #include "math/solvers/hermitian_eigen_solver.hpp"
@@ -85,16 +85,18 @@ dbcsr::sbtensor<3, double> dfitting::compute_qr_new(
   auto blkmap_x = m_mol->c_dfbasis()->block_to_atom(m_mol->atoms());
   auto blktype_b = m_mol->c_basis()->shell_types();
 
+  dbcsr::cart dcart_self(MPI_COMM_SELF);
+  
+  auto m_xx_local = dbcsr::matrix<double>::create()
+    .set_cart(dcart_self)
+    .name("m_xx_local")
+    .row_blk_sizes(x)
+    .col_blk_sizes(x)
+    .matrix_type(dbcsr::type::no_symmetry)
+    .build();
+
   auto spgrid2_local = dbcsr::pgrid<2>::create(MPI_COMM_SELF).build();
   auto spgrid3_local = dbcsr::pgrid<3>::create(MPI_COMM_SELF).build();
-
-  auto prs_xbb_local = dbcsr::tensor<3>::create()
-                           .name("prs_xbb_local")
-                           .set_pgrid(*spgrid3_local)
-                           .blk_sizes(xbb)
-                           .map1({0})
-                           .map2({1, 2})
-                           .build();
 
   auto c_xbb_local = dbcsr::tensor<3>::create()
                          .name("c_xbb_local")
@@ -128,14 +130,6 @@ dbcsr::sbtensor<3, double> dfitting::compute_qr_new(
                        .map2({1, 2})
                        .build();
 
-  auto s_xx_inv_local = dbcsr::tensor<2>::create()
-                            .name("s_xx_inv_local")
-                            .set_pgrid(*spgrid2_local)
-                            .blk_sizes(xx)
-                            .map1({0})
-                            .map2({1})
-                            .build();
-
   auto c_xbb_global = dbcsr::tensor<3>::create()
                           .name("c_xbb_global_1bb")
                           .set_pgrid(*spgrid3_xbb)
@@ -158,17 +152,12 @@ dbcsr::sbtensor<3, double> dfitting::compute_qr_new(
 
   dbcsr::cart single_world(MPI_COMM_SELF);
 
-  auto s_xx_inv_eigen = dbcsr::matrix_to_eigen(*s_xx_inv);
-  auto s_xx_local_mat = dbcsr::eigen_to_matrix(
-      s_xx_inv_eigen, single_world, "temp", x, x, dbcsr::type::symmetric);
-  dbcsr::copy_matrix_to_tensor(*s_xx_local_mat, *s_xx_inv_local);
-  s_xx_inv_local->filter(dbcsr::global::filter_eps);
-
-  s_xx_inv_eigen.resize(0, 0);
-  s_xx_local_mat->release();
-
-  /* NOT FILTERED BECAUSE IT IS USED IN QR */
-  auto m_xx_eigen = dbcsr::matrix_to_eigen(*m_xx);
+  auto s_xx_inv_norms = dbcsr::sparse_block_norms(
+    *s_xx_inv, dbcsr::global::filter_eps, dbcsr::norm::frobenius);
+    
+  //LOG.os<>("SXX: ", s_xx_inv_norms, '\n');
+  
+  //Eigen::MatrixXd m_xx_eigen = dbcsr::matrix_to_eigen(*m_xx);
 
   // =============== CREATE FRAGMENT BLOCKS ==========================
 
@@ -280,6 +269,9 @@ dbcsr::sbtensor<3, double> dfitting::compute_qr_new(
 
   std::vector<int> blkprev;
   int ncounter = 0;
+  
+  int64_t ntasks_tot = nfrags*nfrags;
+  int64_t ntasks_off = 0;
 
   for (int ibatch_nu = 0; ibatch_nu != c_xbb_batched->nbatches(2);
        ++ibatch_nu) {
@@ -297,16 +289,40 @@ dbcsr::sbtensor<3, double> dfitting::compute_qr_new(
     std::deque<std::vector<int>> blkbuffer;
 
     std::function<void(int64_t)> task_func = [&](int64_t itask) {
-      // std::cout << "PROC: " << m_cart.rank() << " -> TASK ID: " << itask <<
-      // std::endl;
       
-      int ifrag = itask % int64_t(nfrags);
+      std::cout << "PROC: " << m_cart.rank() << " -> TASK ID: " 
+        << itask << std::endl;
+      
+      itask += ntasks_off;
+      
+      /*int ifrag = itask % int64_t(nfrags);
       int jfrag = itask / int64_t(nfrags);
+      if (ifrag < jfrag) return;*/
       
-      if (ifrag < jfrag) return;
+      // The same is achieved with this
+      //int ifrag = std::ceil(std::sqrt(2*(itask+1)+0.25) - 0.5) - 1;
+     // int jfrag = itask - ((ifrag+1)*ifrag)/2;
+      
+      int jfrag = std::floor((double(2*nfrags+1) 
+        - std::sqrt((2*nfrags+1)*(2*nfrags+1) - 8*itask))/2.0);
+      int ifrag = itask - nfrags*jfrag + ((jfrag-1)*jfrag)/2 + jfrag;
+      
+      std::cout << "PROC: " << m_cart.rank() << " " << ifrag << " "
+        << jfrag << std::endl;
+      
+      auto blk_mu = frag2blk[ifrag];
+      auto blk_nu = frag2blk[jfrag];
+      
+      int nblk_xtot = int(x.size());
+      int nblk_mu = int(frag2blk[ifrag].size());
+      int nblk_nu = int(frag2blk[jfrag].size());
+      int nblk_mu_off = *std::min_element(blk_mu.begin(), blk_mu.end());
+      int nblk_nu_off = *std::min_element(blk_nu.begin(), blk_nu.end());
 
       // === COMPUTE 3c1e overlap integrals
       // 1. allocate blocks
+      
+      std::cout << "PROC: " << m_cart.rank() << "2" << std::endl;
 
       auto& ovlp_time = work_time.sub("Computing ovlp integrals");
       auto& coul_time = work_time.sub("Computing coul integrals");
@@ -317,6 +333,8 @@ dbcsr::sbtensor<3, double> dfitting::compute_qr_new(
       work_time.start();
 
       arrvec<int, 3> blkidx, blkidx_full;
+      
+      std::cout << "PROC: " << m_cart.rank() << "3" << std::endl;
 
       // make reserve block list for 3c1e overlap integrals 
       for (auto imu : frag2blk[ifrag]) {
@@ -336,6 +354,8 @@ dbcsr::sbtensor<3, double> dfitting::compute_qr_new(
         }
       }
       
+      std::cout << "PROC: " << m_cart.rank() << "4" << std::endl;
+      
       // 2. Compute
 
       ovlp_time.start();
@@ -346,9 +366,6 @@ dbcsr::sbtensor<3, double> dfitting::compute_qr_new(
       aofac->ao_3c_fill(ovlp_xbb_local);
       ovlp_xbb_local->filter(dbcsr::global::filter_eps);
 
-      vec<vec<int>> mn_bounds = {
-          c_xbb_batched->full_bounds(1), c_xbb_batched->bounds(2, ibatch_nu)};
-
       // 3. Contract
 
       if (ovlp_xbb_local->num_blocks() == 0) {
@@ -358,16 +375,58 @@ dbcsr::sbtensor<3, double> dfitting::compute_qr_new(
         work_time.finish();
         return;
       }
-
-      dbcsr::contract(
-          1.0, *s_xx_inv_local, *ovlp_xbb_local, 0.0, *prs_xbb_local)
-          .filter(qr_theta)
-          .bounds3(mn_bounds)
-          .perform("XY, Ymn -> Xmn");
-
+      
+      std::cout << "PROC: " << m_cart.rank() << "5" << std::endl;
+            
+      typedef Eigen::Triplet<double> triplet;
+      
+      std::vector<triplet> trip_vec_ovlp3c1e;
+      trip_vec_ovlp3c1e.reserve(ovlp_xbb_local->num_blocks());
+      
+      dbcsr::iterator_t<3> iter_ovlp3c1e(*ovlp_xbb_local);
+      iter_ovlp3c1e.start();
+      while (iter_ovlp3c1e.blocks_left()) {
+        iter_ovlp3c1e.next();
+        auto& indices = iter_ovlp3c1e.idx();
+        auto& sizes = iter_ovlp3c1e.size();
+        bool found = false;
+        auto blk3 = ovlp_xbb_local->get_block(indices, sizes, found);
+       
+        int ii = indices[0];
+        int jj = (indices[1] - nblk_mu_off) + nblk_mu*(indices[2] - nblk_nu_off);
+        double nval = blk3.norm(dbcsr::norm::frobenius);
+        
+        if (nval > dbcsr::global::filter_eps) {
+          trip_vec_ovlp3c1e.push_back(triplet(ii,jj,nval));
+          //std::cout << ii << " " << jj << " " << nval << std::endl;
+        }
+      }
+      
+      std::cout << "PROC: " << m_cart.rank() << "6" << std::endl;
+      //std::cout << nblk_mu << " " << nblk_nu << " " << trip_vec_ovlp3c1e.size()
+      //  << std::endl;
+      
       ovlp_xbb_local->clear();
-
-      if (prs_xbb_local->num_blocks() == 0) {
+      
+      Eigen::SparseMatrix<double> 
+        ovlp_xbb_norms(nblk_xtot, nblk_mu*nblk_nu), 
+        fit_xbb_norms(nblk_xtot, nblk_mu*nblk_nu);
+        
+      std::cout << "PROC: " << m_cart.rank() << "7" << std::endl;  
+      
+      ovlp_xbb_norms.setFromTriplets(trip_vec_ovlp3c1e.begin(),
+        trip_vec_ovlp3c1e.end());
+      trip_vec_ovlp3c1e.clear();
+        
+      fit_xbb_norms = s_xx_inv_norms * ovlp_xbb_norms;
+      
+      ovlp_xbb_norms.resize(0,0);
+      
+      //std::cout << fit_xbb_norms << std::endl;
+      
+      std::cout << "PROC: " << m_cart.rank() << "8" << std::endl;
+      
+      if (fit_xbb_norms.nonZeros() == 0) {
         std::cout << "RANK: " << m_cart.rank() << "COMPLETE SCREEN"
                   << std::endl;
         ovlp_time.finish();
@@ -381,41 +440,21 @@ dbcsr::sbtensor<3, double> dfitting::compute_qr_new(
 
       std::cout << "CHUNK: " << ifrag << " " << jfrag << std::endl;
 
-      auto blk_mu = frag2blk[ifrag];
-      auto blk_nu = frag2blk[jfrag];
-
       // std::cout << "SIZE: " << blk_mu.size() << " " << blk_nu.size()
       //	<< std::endl;
 
       vec<bool> blk_P_bool(x.size(), false);
 
-      std::array<int, 3> idx3 = {0, 0, 0};
-      std::array<int, 3> size3 = {0, 0, 0};
-
-      for (auto imu : blk_mu) {
-        for (auto inu : blk_nu) {
-          for (int ix = 0; ix != (int)x.size(); ++ix) {
-            idx3 = {ix, imu, inu};
-            size3 = {x[ix], b[imu], b[inu]};
-            bool found = true;
-
-            auto blk3 = prs_xbb_local->get_block(idx3, size3, found);
-            if (!found)
-              continue;
-
-            auto max_iter = std::max_element(
-                blk3.data(), blk3.data() + blk3.ntot(),
-                [](double a, double b) {
-                  return fabs(a) < fabs(b);
-                });
-
-            if (fabs(*max_iter) > qr_theta)
-              blk_P_bool[ix] = true;
-          }
+      for (int k = 0; k < fit_xbb_norms.outerSize(); ++k) {
+        for(Eigen::SparseMatrix<double>::InnerIterator it(fit_xbb_norms,k);
+          it; ++it)
+        {
+          if (it.value() < qr_theta) continue;
+          blk_P_bool[it.row()] = true;
         }
       }
-
-      // prs_xbb_local->clear();
+      
+      fit_xbb_norms.resize(0,0);
 
       vec<int> blk_P;
       blk_P.reserve(x.size());
@@ -442,6 +481,7 @@ dbcsr::sbtensor<3, double> dfitting::compute_qr_new(
 
       if (nblkp == 0) {
         setup_time.finish();
+        work_time.finish();
         std::cout << "RANK: " << m_cart.rank() << "QRRHO SCREEN" << std::endl;
         return;
       }
@@ -477,13 +517,12 @@ dbcsr::sbtensor<3, double> dfitting::compute_qr_new(
       coul_blk_idx[0] = blk_Q;
       coul_blk_idx[1] = blk_mu;
       coul_blk_idx[2] = blk_nu;
-
+      
       int nb = 0;  // number of total nb functions
       int mstride = 0;
       int nstride = 0;
 
       for (auto imu : blk_mu) { mstride += b[imu]; }
-
       for (auto inu : blk_nu) { nstride += b[inu]; }
 
       nb = nstride * mstride;
@@ -495,6 +534,22 @@ dbcsr::sbtensor<3, double> dfitting::compute_qr_new(
       // generate integrals
       aofac->ao_3c2e_setup(metric::coulomb);
       aofac->ao_3c_fill_idx(eri_local, coul_blk_idx, nullptr);
+      
+      std::vector<int> resrow, rescol;
+      for (auto q : blk_Q) {
+        for (auto p : blk_P) {
+          //if (p > q) continue;
+          resrow.push_back(q);
+          rescol.push_back(p);
+        }
+      }
+      m_xx_local->reserve_blocks(resrow, rescol);
+      resrow.clear();
+      rescol.clear();
+      
+      aofac->ao_2c2e_setup(metric::coulomb);
+      aofac->ao_2c_fill(m_xx_local);
+      
       /* NOT FILTERED BECAUSE IT IS USED IN QR */
 
       coul_time.finish();
@@ -506,7 +561,6 @@ dbcsr::sbtensor<3, double> dfitting::compute_qr_new(
       int np = 0;
 
       for (auto iq : blk_Q) { nq += x[iq]; }
-
       for (auto ip : blk_P) { np += x[ip]; }
 
       std::cout << "RANK: " << m_cart.rank() << " NP,NQ,NB: " << np << "/"
@@ -557,7 +611,34 @@ dbcsr::sbtensor<3, double> dfitting::compute_qr_new(
         qoff += x[iq];
       }
 
+      eri_local->clear();
+
+      poff = 0;
+      qoff = 0;
+
       // copy metric to eigen
+      for (auto ip : blk_P) {
+        for (auto iq : blk_Q) {
+          
+          bool found = true;
+          auto blk2 = m_xx_local->get_block_p(iq,ip,found);
+          
+          for (int jj = 0; jj < x[ip]; ++jj) {
+            for (int ii = 0; ii < x[iq]; ++ii) {
+               m_qp_eigen(qoff + ii, poff + jj)  = blk2(ii,jj);
+            }
+          }
+          
+          qoff += x[iq];
+        }
+        qoff = 0;
+        poff += x[ip];
+      }
+
+      m_xx_local->clear();
+      
+       // copy metric to eigen
+      /*Eigen::MatrixXd m_xx_eigen = dbcsr::matrix_to_eigen(*m_xx_local);
       for (auto ip : blk_P) {
         int sizep = x[ip];
         int poff_m = xoff[ip];
@@ -579,8 +660,7 @@ dbcsr::sbtensor<3, double> dfitting::compute_qr_new(
         }
         poff += sizep;
       }
-
-      eri_local->clear();
+      m_xx_local->clear();*/
 
       // ===== Compute QR decomposition ====
 
@@ -675,14 +755,20 @@ delete[] work;
 
       move_time.finish();
 
-      prs_xbb_local->clear();
-
       work_time.finish();
     };  // end task function
-
-    util::basic_scheduler tasks(m_cart.comm(), nfrags*nfrags, task_func);
+    
+    int lb = frag_blkbounds[0];
+    int ub = frag_blkbounds[1];
+    
+    //int ntasks = (ub - lb + 1)*nfrags;
+    int ntasks = (ub - lb + 1)*(2*nfrags - ub - lb)/2;
+    
+    util::basic_scheduler tasks(m_cart.comm(), ntasks, task_func);
 
     tasks.run();
+
+    ntasks_off += ntasks;
 
     comp_time.start();
 
@@ -750,7 +836,7 @@ delete[] work;
     throw std::runtime_error("Fitting coefficients occupation more than 100%");
 
   TIME.finish();
-  TIME.print_info();
+  TIME.print_info(1);
 
   return c_xbb_batched_full;
 }
