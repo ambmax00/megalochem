@@ -101,6 +101,53 @@ class mutex {
   mutex& operator=(const mutex& in) = delete;
 };
 
+template <typename T>
+class mpi_atomic {
+ private:
+ 
+  MPI_Comm _comm;
+  int _rank, _size;
+  
+  MPI_Win _atomic_win;
+  volatile std::atomic<T>* _atomic_data;
+  volatile std::atomic<T>* _atomic_ptr;
+ 
+ public:
+  
+  mpi_atomic(MPI_Comm comm, T val) : _comm(comm) {
+    
+    MPI_Comm_rank(comm,&_rank);
+    MPI_Comm_size(comm,&_size);
+    
+    int atomic_size = sizeof(std::atomic<T>);
+    int nele = (_rank == 0) ? 1 : 0;
+    
+    MPI_Win_allocate_shared(
+      nele * atomic_size, atomic_size, MPI_INFO_NULL, _comm, &_atomic_data,
+      &_atomic_win);
+        
+    int asize;
+    MPI_Aint disp;
+
+    MPI_Win_shared_query(_atomic_win, 0, &disp, &asize, &_atomic_ptr);
+    if (_rank == 0) {
+      _atomic_ptr->store(val);
+    }
+    MPI_Barrier(_comm);
+    
+  }
+  
+  volatile std::atomic<T>* ptr() {
+    return _atomic_ptr;
+  }
+    
+  ~mpi_atomic()
+  {
+    MPI_Win_free(&_atomic_win);
+  }
+  
+};
+
 class basic_scheduler {
  private:
   const int64_t NO_TASK = -1;
@@ -133,9 +180,8 @@ class basic_scheduler {
 
   int64_t _ntasks_completed;
 
-#define _DPRINT(str) \
-  std::cout << "RANK: " << _global_rank << "/" << _local_rank << " : " << str \
-            << std::endl;
+#define _DPRINT(str) 
+  //std::cout << "RANK: " << _global_rank << "/" << _local_rank << " : " << str << std::endl;
 
   bool local_queue_empty()
   {
@@ -368,6 +414,270 @@ class basic_scheduler {
 };
 
 #undef _DPRINT
+
+#if 0
+#define _DPRINT(str) \
+  std::cout << _global_rank << "/" << _shared_rank << " " << str << std::endl;
+
+class advanced_scheduler {
+ private:
+  
+  MPI_Comm _global_comm, _shared_comm, _main_comm;
+  int _global_rank, _global_size, _shared_rank, _shared_size,
+    _main_rank, _main_size;
+  int _num_nodes;
+    
+  int64_t _ntasks;
+  
+  int64_t _REQUEST_NONE = -1;
+  
+  int64_t _TASK_NOANSWER = -1;
+  int64_t _TASK_NONE = -2;
+  
+  int64_t _TOKEN_WHITE = 1;
+  int64_t _TOKEN_BLACK = 0;
+  int64_t _TOKEN_RED = -1;
+  int64_t _TOKEN_NONE = -2;
+  
+  mpi_atomic<int64_t>* _terminate_flag;
+  mpi_atomic<int64_t>* _local_counter;
+  mpi_atomic<int64_t>* _local_ubound;
+  volatile std::atomic<int64_t>* _terminate_flag_ptr;
+  volatile std::atomic<int64_t>* _local_counter_ptr;
+  volatile std::atomic<int64_t>* _local_ubound_ptr;
+  
+  mutex* _mtx_token;
+  MPI_Win _win_token_shared, _win_token_global;
+  int64_t* _token;
+  
+  mutex* _mtx_request;
+  MPI_Win _win_request_shared, _win_request_global;
+  int64_t* _request_array;
+  
+  mutex* _mtx_task;
+  MPI_Win _win_task_shared, _win_task_global;
+  int64_t* _task_array;
+  
+  std::function<void(int64_t)> _executer;
+  
+  bool queue_is_empty() {
+    return *_local_ubound_ptr <= _local_counter_ptr;
+  }
+  
+  void communicate_token() {
+    
+    // LOCK
+    // check if you have the token
+    /* if you have the token:
+      if token == TOKEN_WHITE || TOKEN_RED
+      * no change
+      if token == TOKEN_BLACK
+      * if no tasks on this node, no change
+      * if tasks on this node, change to WHITE
+    pass token to next node.
+    UNLOCK*/
+    
+    // flush
+    
+    if (_mtx_token->try_lock()) {
+      
+      int64_t mytoken = _TOKEN_NONE;
+      std::swap(*_token, mytoken);
+      
+      if (mytoken == _TOKEN_BLACK && !queue_is_empty()) {
+        mytoken = _TOKEN_WHITE;
+      }
+      
+      if (mytoken == _TOKEN_RED) {
+        _terminate_flag_ptr->set(true);
+      }
+      
+      if (mytoken != _TOKEN_NONE) {
+        int dest = 
+    
+    
+  }
+  
+  void communicate_task() {
+    
+    /* LOCK
+     * check if you have a request
+     * if yes:
+     *    get_task(s), put onto requester
+     * if no:
+     *    put NO_TASK on requester
+     * UNLOCK
+     */
+     
+     // flush
+     
+     
+     
+     
+  }
+    
+  int64_t get_task() {
+    
+    /* LOCK
+     * if no tasks
+     *    put a random request out
+     *    wait until request fulfilled
+     *    put tasks on this node
+     * else
+     *    do nothing
+     *UNLOCK*/
+     
+    /* LOCK 
+     * get_task
+     */
+     
+    // flush
+    
+    // return task
+    
+  }
+  
+  void communicate() {
+    communicate_token();
+    communicate_task();
+  }
+    
+ public:
+ 
+  advanced_scheduler(
+      MPI_Comm comm, int64_t ntasks, std::function<void(int64_t)>& executer) :
+      _global_comm(comm), _executer(executer), _ntasks(ntasks)
+  {
+    MPI_Comm_rank(_global_comm, &_global_rank);
+    MPI_Comm_size(_global_comm, &_global_size);
+    
+    // split comm
+    int icolor = _global_rank % 2;
+    MPI_Comm_split(_global_comm, icolor, _global_rank, &_shared_comm);
+    
+    //MPI_Comm_split_type(_global_comm, MPI_COMM_TYPE_SHARED, 0, 
+    //  MPI_INFO_NULL, &_shared_comm);
+    
+    MPI_Comm_rank(_shared_comm, &_shared_rank);
+    MPI_Comm_size(_shared_comm, &_shared_size);
+    
+    // make comm which combines rank 0 of every node
+    int color = (_shared_rank == 0) ? 0 : MPI_UNDEFINED;
+    MPI_Comm_split(_global_comm, color, _global_rank, &_main_comm);
+    
+    // get number of nodes
+    if (_shared_rank == 0) {
+      int i_send = 1;
+      MPI_Reduce(&i_send, &_num_nodes, 1, MPI_INT, MPI_SUM, 0, _main_comm);
+    }
+    MPI_Bcast(&_num_nodes, 1, MPI_INT, 0, _global_comm);
+    
+    // allocate space for token on node
+    int nele = (_shared_rank == 0) ? 1 : 0;
+    int64_t* token_ptr;    
+    MPI_Win_allocate_shared(
+        nele * sizeof(int64_t), sizeof(int64_t), MPI_INFO_NULL, _shared_comm,
+        &token_ptr, &_win_token_shared);
+        
+    MPI_Aint disp = 0;
+    int asize = 0;
+    MPI_Win_shared_query(_win_token_shared, 0, &disp, &asize, &_token);
+    
+    // attach window to token
+    MPI_Win_create_dynamic(MPI_INFO_NULL, _global_comm, &_win_token_global);
+    MPI_Win_attach(_win_token_global, _token, sizeof(int64_t));
+    
+    // allocate request and task windows
+    int64_t* req_ptr, task_ptr;
+    MPI_Win_allocate_shared(
+        nele * _num_nodes * sizeof(int64_t), sizeof(int64_t), MPI_INFO_NULL, _shared_comm,
+        &req_ptr, &_win_request_shared);
+    MPI_Win_allocate_shared(
+        nele * _num_nodes * sizeof(int64_t), sizeof(int64_t), MPI_INFO_NULL, _shared_comm,
+        &task_ptr, &_win_task_shared);   
+        
+    MPI_Win_shared_query(_win_request_shared, 0, &disp, &asize, &_request_array);
+    MPI_Win_shared_query(_win_task_shared, 0, &disp, &asize, &_task_array);
+    
+    // attach windows
+    MPI_Win_create_dynamic(MPI_INFO_NULL, _global_comm, &_win_request_global);
+    MPI_Win_attach(_win_request_global, _request_array, _num_nodes * sizeof(int64_t));
+    
+    MPI_Win_create_dynamic(MPI_INFO_NULL, _global_comm, &_win_task_global);
+    MPI_Win_attach(_win_task_global, _task_array, _num_nodes * sizeof(int64_t));
+    
+    // set mutex
+    _mtx_token = new mutex(_shared_comm);
+    _mtx_task = new mutex(_shared_comm);
+    _mtx_request = new mutex(_shared_comm);
+    
+    // set atomics
+    _terminate_flag = new mpi_atomic<int64_t>(_shared_comm, 0);
+    _local_counter = new mpi_atomic<int64_t>(_shared_comm, 0);
+    
+    _terminate_flag_ptr = _terminate_flag->ptr();
+    _local_counter_ptr = _local_counter->ptr();
+    
+    // set token
+    if (_global_rank == 0) {
+      *_token = _TOKEN_WHITE;
+    } else if (_shared_rank == 0) {
+      *_token = _TOKEN_NONE;
+    }
+    
+    // set request & task
+    if (_shared_rank == 0) {
+      std::fill(_request_array, _request_array + _num_nodes, _REQUEST_NONE);
+      std::fill(_task_array, _task_array + _num_nodes, _TASK_NONE);
+    }
+    
+    if (_global_rank == 0) {
+      std::cout<< "SCHEDULER INFO: " << std::endl;
+      std::cout << "Number of nodes: " << _num_nodes << std::endl;
+    }
+    _DPRINT("My token: " + std::to_string(*_token));
+    _DPRINT("My queue: " + std::to_string(*_local_counter_ptr));
+    
+    MPI_Barrier(_global_comm);
+    
+    
+  }
+  
+  ~advanced_scheduler() 
+  {
+    MPI_Win_free(&_win_token_shared);
+    MPI_Win_free(&_win_request_shared);
+    MPI_Win_free(&_win_task_shared);
+    MPI_Win_free(&_win_token_global);
+    MPI_Win_free(&_win_request_global);
+    MPI_Win_free(&_win_task_global);
+    MPI_Comm_free(&_shared_comm);
+    MPI_Comm_free(&_main_comm);
+    delete _terminate_flag;
+    delete _local_counter;
+    delete _mtx_token;
+    delete _mtx_task;
+    delete _mtx_request;
+  }
+  
+  void run() {
+    
+    /*while (!terminate) {
+      
+      communicate();
+      int64_t itask = get_task();
+      if (itask > 0) _executer(itask);
+      
+    }
+    
+    while (ibarrier) {
+      communicate();
+    }*/
+    
+  }
+  
+};
+#endif
 
 }  // namespace util
 

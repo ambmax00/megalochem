@@ -174,8 +174,8 @@ dbcsr::sbtensor<3, double> dfitting::compute_qr_new(
     blk2frag[i] = (!is_diff[i]) ? blk2frag[i] : blk2frag[i] + nfrags_nodiff;
   }
 
-  for (auto ele : blk2frag) { LOG.os<>(ele, " "); }
-  LOG.os<>('\n');
+  for (auto ele : blk2frag) { LOG.os<1>(ele, " "); }
+  LOG.os<1>('\n');
 
   std::vector<std::vector<int>> frag2blk;
 
@@ -276,8 +276,8 @@ dbcsr::sbtensor<3, double> dfitting::compute_qr_new(
   for (int ibatch_nu = 0; ibatch_nu != c_xbb_batched->nbatches(2);
        ++ibatch_nu) {
          
-    LOG.os<>("BATCH: ", ibatch_nu, '\n');
-    LOG.os<>("Creating tasks\n");
+    LOG.os<1>("BATCH: ", ibatch_nu, '\n');
+    LOG.os<1>("Creating tasks\n");
 
     auto nu_blkbounds = c_xbb_batched->blk_bounds(2, ibatch_nu);
     auto frag_blkbounds = frag_bounds[ibatch_nu];
@@ -287,10 +287,11 @@ dbcsr::sbtensor<3, double> dfitting::compute_qr_new(
      * ============================================================*/
 
     std::deque<std::vector<int>> blkbuffer;
+    int nprint = LOG.global_plev();
 
     std::function<void(int64_t)> task_func = [&](int64_t itask) {
       
-      std::cout << "PROC: " << m_cart.rank() << " -> TASK ID: " 
+      if (nprint > 2) std::cout << "PROC: " << m_cart.rank() << " -> TASK ID: " 
         << itask << std::endl;
       
       itask += ntasks_off;
@@ -307,7 +308,7 @@ dbcsr::sbtensor<3, double> dfitting::compute_qr_new(
         - std::sqrt((2*nfrags+1)*(2*nfrags+1) - 8*itask))/2.0);
       int ifrag = itask - nfrags*jfrag + ((jfrag-1)*jfrag)/2 + jfrag;
       
-      std::cout << "PROC: " << m_cart.rank() << " " << ifrag << " "
+      if (nprint > 2) std::cout << "PROC: " << m_cart.rank() << " " << ifrag << " "
         << jfrag << std::endl;
       
       auto blk_mu = frag2blk[ifrag];
@@ -322,7 +323,7 @@ dbcsr::sbtensor<3, double> dfitting::compute_qr_new(
       // === COMPUTE 3c1e overlap integrals
       // 1. allocate blocks
       
-      std::cout << "PROC: " << m_cart.rank() << "2" << std::endl;
+      if (nprint > 2) std::cout << "PROC: " << m_cart.rank() << "2" << std::endl;
 
       auto& ovlp_time = work_time.sub("Computing ovlp integrals");
       auto& coul_time = work_time.sub("Computing coul integrals");
@@ -334,7 +335,7 @@ dbcsr::sbtensor<3, double> dfitting::compute_qr_new(
 
       arrvec<int, 3> blkidx, blkidx_full;
       
-      std::cout << "PROC: " << m_cart.rank() << "3" << std::endl;
+      if (nprint > 2) std::cout << "PROC: " << m_cart.rank() << "3" << std::endl;
 
       // make reserve block list for 3c1e overlap integrals 
       for (auto imu : frag2blk[ifrag]) {
@@ -354,7 +355,7 @@ dbcsr::sbtensor<3, double> dfitting::compute_qr_new(
         }
       }
       
-      std::cout << "PROC: " << m_cart.rank() << "4" << std::endl;
+      if (nprint > 2) std::cout << "PROC: " << m_cart.rank() << "4" << std::endl;
       
       // 2. Compute
 
@@ -369,14 +370,14 @@ dbcsr::sbtensor<3, double> dfitting::compute_qr_new(
       // 3. Contract
 
       if (ovlp_xbb_local->num_blocks() == 0) {
-        std::cout << "RANK: " << m_cart.rank() << "COMPLETE SCREEN"
+        if (nprint > 2) std::cout << "RANK: " << m_cart.rank() << "COMPLETE SCREEN"
                   << std::endl;
         ovlp_time.finish();
         work_time.finish();
         return;
       }
       
-      std::cout << "PROC: " << m_cart.rank() << "5" << std::endl;
+      if (nprint > 2) std::cout << "PROC: " << m_cart.rank() << "5" << std::endl;
             
       typedef Eigen::Triplet<double> triplet;
       
@@ -402,9 +403,9 @@ dbcsr::sbtensor<3, double> dfitting::compute_qr_new(
         }
       }
       
-      std::cout << "PROC: " << m_cart.rank() << "6" << std::endl;
-      //std::cout << nblk_mu << " " << nblk_nu << " " << trip_vec_ovlp3c1e.size()
-      //  << std::endl;
+      if (nprint > 2) std::cout << "PROC: " << m_cart.rank() << "6" << std::endl;
+      if (nprint > 2) std::cout << nblk_mu << " " << nblk_nu << " " << trip_vec_ovlp3c1e.size()
+        << std::endl;
       
       ovlp_xbb_local->clear();
       
@@ -412,7 +413,7 @@ dbcsr::sbtensor<3, double> dfitting::compute_qr_new(
         ovlp_xbb_norms(nblk_xtot, nblk_mu*nblk_nu), 
         fit_xbb_norms(nblk_xtot, nblk_mu*nblk_nu);
         
-      std::cout << "PROC: " << m_cart.rank() << "7" << std::endl;  
+      if (nprint > 2) std::cout << "PROC: " << m_cart.rank() << "7" << std::endl;  
       
       ovlp_xbb_norms.setFromTriplets(trip_vec_ovlp3c1e.begin(),
         trip_vec_ovlp3c1e.end());
@@ -422,12 +423,12 @@ dbcsr::sbtensor<3, double> dfitting::compute_qr_new(
       
       ovlp_xbb_norms.resize(0,0);
       
-      //std::cout << fit_xbb_norms << std::endl;
+      if (nprint > 2) std::cout << fit_xbb_norms << std::endl;
       
-      std::cout << "PROC: " << m_cart.rank() << "8" << std::endl;
+      if (nprint > 2) std::cout << "PROC: " << m_cart.rank() << "8" << std::endl;
       
       if (fit_xbb_norms.nonZeros() == 0) {
-        std::cout << "RANK: " << m_cart.rank() << "COMPLETE SCREEN"
+        if (nprint > 2) std::cout << "RANK: " << m_cart.rank() << "COMPLETE SCREEN"
                   << std::endl;
         ovlp_time.finish();
         work_time.finish();
@@ -438,7 +439,7 @@ dbcsr::sbtensor<3, double> dfitting::compute_qr_new(
 
       setup_time.start();
 
-      std::cout << "CHUNK: " << ifrag << " " << jfrag << std::endl;
+      if (nprint > 2) std::cout << "CHUNK: " << ifrag << " " << jfrag << std::endl;
 
       // std::cout << "SIZE: " << blk_mu.size() << " " << blk_nu.size()
       //	<< std::endl;
@@ -449,7 +450,15 @@ dbcsr::sbtensor<3, double> dfitting::compute_qr_new(
         for(Eigen::SparseMatrix<double>::InnerIterator it(fit_xbb_norms,k);
           it; ++it)
         {
-          if (it.value() < qr_theta) continue;
+          int ix = it.row();
+          int imu = it.col() % nblk_mu + nblk_mu_off;
+          int inu = it.col() / nblk_mu + nblk_nu_off;
+          
+          int nele = x[ix] * b[imu] * b[inu];
+          // mean absolute value of elements in block
+          double nval = std::sqrt(std::pow(it.value(),2)/double(nele));
+          
+          if (nval < qr_theta) continue;
           blk_P_bool[it.row()] = true;
         }
       }
@@ -482,7 +491,7 @@ dbcsr::sbtensor<3, double> dfitting::compute_qr_new(
       if (nblkp == 0) {
         setup_time.finish();
         work_time.finish();
-        std::cout << "RANK: " << m_cart.rank() << "QRRHO SCREEN" << std::endl;
+        if (nprint > 2) std::cout << "RANK: " << m_cart.rank() << "QRRHO SCREEN" << std::endl;
         return;
       }
 
@@ -563,7 +572,7 @@ dbcsr::sbtensor<3, double> dfitting::compute_qr_new(
       for (auto iq : blk_Q) { nq += x[iq]; }
       for (auto ip : blk_P) { np += x[ip]; }
 
-      std::cout << "RANK: " << m_cart.rank() << " NP,NQ,NB: " << np << "/"
+      if (nprint > 2) std::cout << "RANK: " << m_cart.rank() << " NP,NQ,NB: " << np << "/"
                 << nq << "/" << nb << std::endl;
 
       // ==== Prepare matrices for QR decomposition ====
@@ -636,32 +645,7 @@ dbcsr::sbtensor<3, double> dfitting::compute_qr_new(
       }
 
       m_xx_local->clear();
-      
-       // copy metric to eigen
-      /*Eigen::MatrixXd m_xx_eigen = dbcsr::matrix_to_eigen(*m_xx_local);
-      for (auto ip : blk_P) {
-        int sizep = x[ip];
-        int poff_m = xoff[ip];
-
-        qoff = 0;
-
-        for (auto iq : blk_Q) {
-          int sizeq = x[iq];
-          int qoff_m = xoff[iq];
-
-          for (int qq = 0; qq != sizeq; ++qq) {
-            for (int pp = 0; pp != sizep; ++pp) {
-              m_qp_eigen(qq + qoff, pp + poff) =
-                  m_xx_eigen(qq + qoff_m, pp + poff_m);
-            }
-          }
-
-          qoff += sizeq;
-        }
-        poff += sizep;
-      }
-      m_xx_local->clear();*/
-
+    
       // ===== Compute QR decomposition ====
 
       move_time.finish();
@@ -902,7 +886,7 @@ std::shared_ptr<Eigen::MatrixXi> dfitting::compute_idx(
     }
   }
 
-  LOG.os<>("BLOCKS: ", nblks, "/", x.size() * b.size(), '\n');
+  LOG.os<1>("BLOCKS: ", nblks, "/", x.size() * b.size(), '\n');
 
   auto out_ptr = std::make_shared<Eigen::MatrixXi>(std::move(idx_global));
   return out_ptr;
