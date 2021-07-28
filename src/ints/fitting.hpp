@@ -50,7 +50,8 @@ class dfitting {
       dbcsr::shared_matrix<double> m_xx,
       dbcsr::shared_pgrid<3> spgrid3_xbb,
       std::array<int, 3> bdims,
-      dbcsr::btype mytype);
+      dbcsr::btype mytype,
+      ints::shared_screener scr);
 
   std::shared_ptr<Eigen::MatrixXi> compute_idx(
       dbcsr::sbtensor<3, double> cfit_xbb);

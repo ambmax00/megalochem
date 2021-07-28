@@ -266,7 +266,7 @@ void aoloader::compute()
     LOG.os<>("Done computing 2e integrals.\n\n");
   }
 
-  if (comp(key::scr_xbb)) {
+  if (comp(key::qr_xbb) || comp(key::scr_xbb)) {
     LOG.os<>("Computing screener\n");
 
     auto& time = TIME.sub("Screener for 3c2e integrals");
@@ -458,6 +458,8 @@ void aoloader::compute()
 
     auto& time = TIME.sub("Density fitting coefficients (QR)");
     time.start();
+    
+    auto scr = m_reg.get<ints::shared_screener>(key::scr_xbb);
 
     std::array<int, 3> bdims = {m_nbatches_x, m_nbatches_b, m_nbatches_b};
 
@@ -467,7 +469,7 @@ void aoloader::compute()
     auto s_xx_inv = m_reg.get<smatd>(key::ovlp_xx_inv);
 
     auto c_xbb_qr = dfit.compute_qr_new(
-        s_bb, s_xx_inv, m_xx, spgrid3, bdims, m_btype_intermeds);
+        s_bb, s_xx_inv, m_xx, spgrid3, bdims, m_btype_intermeds, scr);
     m_reg.insert(key::qr_xbb, c_xbb_qr);
 
     auto mat = dfit.compute_idx(c_xbb_qr);

@@ -50,7 +50,8 @@ dbcsr::sbtensor<3, double> dfitting::compute_qr_new(
     dbcsr::shared_matrix<double> m_xx,
     dbcsr::shared_pgrid<3> spgrid3_xbb,
     std::array<int, 3> bdims,
-    dbcsr::btype mytype)
+    dbcsr::btype mytype,
+    ints::shared_screener scr)
 {
   TIME.start();
 
@@ -277,10 +278,41 @@ dbcsr::sbtensor<3, double> dfitting::compute_qr_new(
        ++ibatch_nu) {
          
     LOG.os<1>("BATCH: ", ibatch_nu, '\n');
-    LOG.os<1>("Creating tasks\n");
 
     auto nu_blkbounds = c_xbb_batched->blk_bounds(2, ibatch_nu);
     auto frag_blkbounds = frag_bounds[ibatch_nu];
+    
+    LOG.os<1>("Creating tasks\n");
+    std::vector<int64_t> task_vector;
+    
+    for (int jfrag = frag_blkbounds[0]; jfrag <= frag_blkbounds[1]; ++jfrag) {
+      for (int ifrag = jfrag; ifrag < nfrags; ++ifrag) {
+        bool skip = true;
+        for (auto imu : frag2blk[ifrag]) {
+          for (auto inu : frag2blk[jfrag]) {
+            bool is_same_type = (blktype_b[imu] == blktype_b[inu]);
+
+            if (is_same_type &&
+                blknorms(imu, inu) < dbcsr::global::filter_eps) {
+                std::cout << "OVLP" << std::endl;
+                continue;
+            } else if (!is_same_type && scr->skip_block_bb(imu,inu)) {
+              std::cout << "COUL" << std::endl;
+              continue;
+            }
+            
+            skip = false;
+            goto OUTSIDE; // ooooh, a GOTO? HOW DARE YOU!!!!!!!
+          }
+        }
+        
+OUTSIDE:
+        if (!skip) task_vector.push_back(ifrag + nfrags*jfrag);
+        
+      }
+    }
+    
+    LOG.os<1>("NTASKS: ", task_vector.size(), '\n');
 
     /* =============================================================
      *            TASK FUNCTION FOR SCHEDULER
@@ -294,7 +326,7 @@ dbcsr::sbtensor<3, double> dfitting::compute_qr_new(
       if (nprint > 2) std::cout << "PROC: " << m_cart.rank() << " -> TASK ID: " 
         << itask << std::endl;
       
-      itask += ntasks_off;
+      //itask += ntasks_off;
       
       /*int ifrag = itask % int64_t(nfrags);
       int jfrag = itask / int64_t(nfrags);
@@ -304,9 +336,12 @@ dbcsr::sbtensor<3, double> dfitting::compute_qr_new(
       //int ifrag = std::ceil(std::sqrt(2*(itask+1)+0.25) - 0.5) - 1;
      // int jfrag = itask - ((ifrag+1)*ifrag)/2;
       
-      int jfrag = std::floor((double(2*nfrags+1) 
-        - std::sqrt((2*nfrags+1)*(2*nfrags+1) - 8*itask))/2.0);
-      int ifrag = itask - nfrags*jfrag + ((jfrag-1)*jfrag)/2 + jfrag;
+      //int jfrag = std::floor((double(2*nfrags+1) 
+      //  - std::sqrt((2*nfrags+1)*(2*nfrags+1) - 8*itask))/2.0);
+      //int ifrag = itask - nfrags*jfrag + ((jfrag-1)*jfrag)/2 + jfrag;
+      
+      int64_t ifrag = task_vector[itask] % (int64_t)nfrags;
+      int64_t jfrag = task_vector[itask] / (int64_t)nfrags;
       
       if (nprint > 2) std::cout << "PROC: " << m_cart.rank() << " " << ifrag << " "
         << jfrag << std::endl;
@@ -340,14 +375,8 @@ dbcsr::sbtensor<3, double> dfitting::compute_qr_new(
       // make reserve block list for 3c1e overlap integrals 
       for (auto imu : frag2blk[ifrag]) {
         for (auto inu : frag2blk[jfrag]) {
-          bool is_same_type = (blktype_b[imu] == blktype_b[inu]);
-
-          if (is_same_type &&
-              blknorms(imu, inu) < dbcsr::global::filter_eps) {
-            continue;
-          }
-
           for (size_t ix = 0; ix != x.size(); ++ix) {
+            if (scr->skip_block_xbb(ix,imu,inu)) continue;
             blkidx[0].push_back(ix);
             blkidx[1].push_back(imu);
             blkidx[2].push_back(inu);
@@ -742,17 +771,15 @@ delete[] work;
       work_time.finish();
     };  // end task function
     
-    int lb = frag_blkbounds[0];
-    int ub = frag_blkbounds[1];
+    //int lb = frag_blkbounds[0];
+    //int ub = frag_blkbounds[1];
     
     //int ntasks = (ub - lb + 1)*nfrags;
-    int ntasks = (ub - lb + 1)*(2*nfrags - ub - lb)/2;
+    //int ntasks = (ub - lb + 1)*(2*nfrags - ub - lb)/2;
     
-    util::basic_scheduler tasks(m_cart.comm(), ntasks, task_func);
+    util::basic_scheduler tasks(m_cart.comm(), task_vector.size(), task_func);
 
     tasks.run();
-
-    ntasks_off += ntasks;
 
     comp_time.start();
 

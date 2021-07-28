@@ -33,6 +33,8 @@ class screener {
   }
 
   virtual void compute() = 0;
+  
+  virtual bool skip_block_bb(int i, int j) = 0;
 
   virtual bool skip_block_xbb(int i, int j, int k) = 0;
   virtual bool skip_xbb(int i, int j, int k) = 0;
@@ -59,6 +61,8 @@ class schwarz_screener : public screener {
   }
 
   void compute() override;
+
+  bool skip_block_bb(int i, int j) override;
 
   bool skip_block_xbb(int i, int j, int k) override;
   bool skip_xbb(int i, int j, int k) override;
@@ -87,6 +91,8 @@ class atomic_screener : public screener {
   }
 
   void compute() override;
+  
+  bool skip_block_bb(int i, int j) override;
 
   bool skip_block_xbb(int i, int j, int k) override;
   bool skip_xbb(int i, int j, int k) override;

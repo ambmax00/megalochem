@@ -20,6 +20,10 @@ void schwarz_screener::compute()
   z_x_dist->release();
 }
 
+bool schwarz_screener::skip_block_bb(int i, int j) {
+  return (m_blk_norms_mn(i,j) <= m_blk_threshold);
+}
+
 bool schwarz_screener::skip_block_xbb(int i, int j, int k)
 {
   float f = m_blk_norms_mn(j, k) * m_blk_norms_x(i, 0);
@@ -87,6 +91,11 @@ void atomic_screener::compute()
   m_blklist_x = get_check(xbas);
 
   for (size_t ix = 0; ix != m_blklist_x.size(); ++ix) m_blklist_x[ix] = true;
+}
+
+bool atomic_screener::skip_block_bb(int i, int j)
+{
+  return false;
 }
 
 bool atomic_screener::skip_block_xbb(int i, int j, int k)
