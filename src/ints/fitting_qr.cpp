@@ -568,9 +568,31 @@ dbcsr::sbtensor<3, double> dfitting::compute_qr_new(
       
       aofac->ao_2c2e_setup(metric::coulomb);
       aofac->ao_2c_fill(m_xx_local);
+      m_xx_local->filter(dbcsr::global::filter_eps);
+      
+      std::vector<bool> blk_Q2_bool(x.size(),false);
+      std::vector<int> blk_Q2;
+      
+      
+      for (auto iq : blk_Q) {
+        for (auto ip : blk_P) {
+          bool found = false;
+          auto blk = m_xx_local->get_block_p(iq,ip,found);
+          if (found) {
+            blk_Q2_bool[iq] = true;
+            break;
+          }
+        }
+      }
+      
+      for (int ii = 0; ii != (int)x.size(); ++ii) {
+        if (blk_Q2_bool[ii]) blk_Q2.push_back(ii);
+      }
+      
+      blk_Q = blk_Q2;    
       
       /* NOT FILTERED BECAUSE IT IS USED IN QR */
-
+      
       coul_time.finish();
 
       // dbcsr::print(*eri_local);
@@ -653,7 +675,7 @@ dbcsr::sbtensor<3, double> dfitting::compute_qr_new(
         qoff = 0;
         poff += x[ip];
       }
-
+      
       m_xx_local->clear();
     
       // ===== Compute QR decomposition ====
