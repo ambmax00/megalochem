@@ -47,7 +47,6 @@ std::vector<block_info> get_block_info(desc::cluster_basis& cbas)
 dbcsr::sbtensor<3, double> dfitting::compute_qr_new(
     dbcsr::shared_matrix<double> s_bb,
     dbcsr::shared_matrix<double> s_xx_inv,
-    dbcsr::shared_matrix<double> m_xx,
     dbcsr::shared_pgrid<3> spgrid3_xbb,
     std::array<int, 3> bdims,
     dbcsr::btype mytype,
@@ -69,7 +68,7 @@ dbcsr::sbtensor<3, double> dfitting::compute_qr_new(
   auto x = m_mol->dims().x();
   auto b = m_mol->dims().b();
 
-  auto xoff = m_xx->row_blk_offsets();
+  auto xoff = s_xx_inv->row_blk_offsets();
   auto boff = b;
   int off = 0;
   for (size_t i = 0; i != b.size(); ++i) {

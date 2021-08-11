@@ -19,7 +19,8 @@ target_link_libraries(
 	Eigen3::Eigen
 	MPI::MPI_CXX
 	OpenMP::OpenMP_CXX
-	PkgConfig::deps
+	PkgConfig::LIBXSMMF
+	PkgConfig::LIBXSMMEXT
         DBCSR::dbcsr_c
 	SCALAPACK::SCALAPACK
 )

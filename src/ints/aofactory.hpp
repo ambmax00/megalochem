@@ -28,6 +28,7 @@ struct global {
   static inline double omega = 0.1;
   static inline double qr_theta = 1e-5;
   static inline double qr_rho = 40;
+  static inline double basis_lindep = 1e-10;
 };
 
 enum class metric { coulomb, erfc_coulomb, qr_fit, pari };

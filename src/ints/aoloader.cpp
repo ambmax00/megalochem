@@ -11,22 +11,35 @@ using smatd = dbcsr::shared_matrix<double>;
 using sbt3 = dbcsr::sbtensor<3, double>;
 using sbt4 = dbcsr::sbtensor<4, double>;
 
-std::pair<smatd, smatd> aoloader::invert(smatd in)
+
+  
+std::pair<smatd, smatd> aoloader::invert(smatd in, bool do_inv, bool do_invsqrt, 
+  std::optional<double> cutoff)
 {
   auto m = in->row_blk_sizes();
 
-  math::LLT chol(m_world, in, LOG.global_plev());
+  /*math::LLT chol(m_world, in, LOG.global_plev());
   chol.compute();
 
   auto linv = chol.L_inv(m);
   auto inv_sqrt = dbcsr::matrix<double>::transpose(*linv).build();
-  auto inv = chol.inverse(m);
+  auto inv = chol.inverse(m);*/
 
-  /*math::hermitian_eigen_solver herm(in, 'V', true);
+  math::hermitian_eigen_solver herm(m_world, in, 'V', true);
   herm.compute();
 
-  auto inv = herm.inverse();
-  auto inv_sqrt = herm.inverse_sqrt();*/
+  LOG.os<1>("Minimum eigenvalue of decomposition of ", in->name(), " : ", 
+    herm.eigvals()[0], '\n');
+  
+  decltype(in) inv(nullptr), inv_sqrt(nullptr);
+  
+  if (do_inv) {
+    inv = herm.inverse(cutoff);
+  } 
+  
+  if (do_invsqrt) {
+    inv_sqrt = herm.inverse_sqrt(cutoff);
+  }
 
   return std::make_pair<smatd, smatd>(std::move(inv), std::move(inv_sqrt));
 }
@@ -111,7 +124,7 @@ void aoloader::compute()
     auto& time = TIME.sub("Inverting overlap matrix");
     time.start();
     auto s = m_reg.get<smatd>(key::ovlp_bb);
-    auto p = invert(s);
+    auto p = invert(s,true,false,global::basis_lindep);
     auto s_inv = p.first;
     m_reg.insert(key::ovlp_bb_inv, s_inv);
     time.finish();
@@ -122,7 +135,7 @@ void aoloader::compute()
     auto& time = TIME.sub("Inverting auxiliary overlap matrix");
     time.start();
     auto s = m_reg.get<smatd>(key::ovlp_xx);
-    auto p = invert(s);
+    auto p = invert(s,true,false,global::basis_lindep);
     auto s_inv = p.first;
     m_reg.insert(key::ovlp_xx_inv, s_inv);
     time.finish();
@@ -136,28 +149,13 @@ void aoloader::compute()
     m_reg.insert(key::coul_xx, c);
     time.finish();
   }
-
+  
   if (comp(key::erfc_xx)) {
-    LOG.os<>("Computing erfc coulomb attenuated integrals\n");
-
-    auto& time = TIME.sub("Erfc-attenuated coulomb metric");
+    LOG.os<>("Computing coulomb attenuated metric\n");
+    auto& time = TIME.sub("Coulomb attenuated metric");
     time.start();
-
-    auto c = m_aofac->ao_2c2e(metric::coulomb);
-    auto e = m_aofac->ao_2c2e(metric::erfc_coulomb);
-    auto p = invert(c);
-    auto cinv = p.first;
-
-    smatd temp = dbcsr::matrix<>::create_template(*c)
-                     .name("temp")
-                     .matrix_type(dbcsr::type::no_symmetry)
-                     .build();
-
-    dbcsr::multiply('N', 'N', 1.0, *e, *cinv, 0.0, *temp).perform();
-    dbcsr::multiply('N', 'N', 1.0, *temp, *e, 0.0, *c).perform();
-
+    auto c = m_aofac->ao_2c2e(ints::metric::erfc_coulomb);
     m_reg.insert(key::erfc_xx, c);
-
     time.finish();
   }
 
@@ -167,15 +165,18 @@ void aoloader::compute()
     auto& time = TIME.sub("Inverting metric");
     time.start();
 
+    bool do_inv = comp(key::coul_xx_inv);
+    bool do_invsqrt = comp(key::coul_xx_invsqrt);
+
     auto c = m_reg.get<smatd>(key::coul_xx);
 
-    auto p = invert(c);
+    auto p = invert(c,do_inv,do_invsqrt,global::basis_lindep);
     auto cinv = p.first;
     auto cinvsqrt = p.second;
-    if (comp(key::coul_xx_inv)) {
+    if (do_inv) {
       m_reg.insert(key::coul_xx_inv, cinv);
     }
-    if (comp(key::coul_xx_invsqrt)) {
+    if (do_invsqrt) {
       m_reg.insert(key::coul_xx_invsqrt, cinvsqrt);
     }
 
@@ -185,19 +186,52 @@ void aoloader::compute()
   if (comp(key::erfc_xx_inv) || comp(key::erfc_xx_invsqrt)) {
     LOG.os<>("Computing metric (attenuated) inverse\n");
 
-    auto& time = TIME.sub("Inverting attenuated metric");
+    auto& time = TIME.sub("Inverting coulomb attenuated metric");
     time.start();
+    
+    bool do_inv = comp(key::erfc_xx_inv);
+    bool do_invsqrt = comp(key::erfc_xx_invsqrt);
 
     auto c = m_reg.get<smatd>(key::erfc_xx);
-    auto p = invert(c);
+    
+    auto p = invert(c,do_inv,do_invsqrt,global::basis_lindep);
+    
     auto cinv = p.first;
     auto cinvsqrt = p.second;
+    
     if (comp(key::erfc_xx_inv)) {
       m_reg.insert(key::erfc_xx_inv, cinv);
     }
     if (comp(key::coul_xx_invsqrt)) {
       m_reg.insert(key::erfc_xx_invsqrt, cinvsqrt);
     }
+
+    time.finish();
+  }
+
+  if (comp(key::erfc_xx_prod)) {
+    LOG.os<>("Computing (X|refc|Y)^-1 (Y|R) (R|Q)^-1\n");
+
+    auto& time = TIME.sub("Computing (X|refc|Y)^-1 (Y|R) (R|Q)^-1 matrix");
+    time.start();
+
+    auto s_inv = m_reg.get<smatd>(key::erfc_xx_inv);
+    auto c = m_reg.get<smatd>(key::coul_xx);
+    
+    auto temp = dbcsr::matrix<>::create_template(*c)
+      .name("temp")
+      .matrix_type(dbcsr::type::no_symmetry)
+      .build();
+      
+    auto scs = dbcsr::matrix<>::create_template(*c)
+      .name("temp")
+      .matrix_type(dbcsr::type::symmetric)
+      .build();
+
+    dbcsr::multiply('N', 'N', 1.0, *s_inv, *c, 0.0, *temp).perform();
+    dbcsr::multiply('N', 'N', 1.0, *temp, *s_inv, 0.0, *scs).perform();
+
+    m_reg.insert(key::erfc_xx_prod, scs);
 
     time.finish();
   }
@@ -411,7 +445,7 @@ void aoloader::compute()
     }
     if (comp(key::dfit_erfc_xbb)) {
       k_eri = key::erfc_xbb;
-      k_inv = key::erfc_xx_inv;
+      k_inv = key::erfc_xx_prod;
     }
 
     auto eri_batched = m_reg.get<sbt3>(k_eri);
@@ -465,11 +499,10 @@ void aoloader::compute()
 
     // auto eri_batched = m_reg.get<sbt3>(key::coul_xbb);
     auto s_bb = m_reg.get<smatd>(key::ovlp_bb);
-    auto m_xx = m_reg.get<smatd>(key::coul_xx);
     auto s_xx_inv = m_reg.get<smatd>(key::ovlp_xx_inv);
 
     auto c_xbb_qr = dfit.compute_qr_new(
-        s_bb, s_xx_inv, m_xx, spgrid3, bdims, m_btype_intermeds, scr);
+        s_bb, s_xx_inv, spgrid3, bdims, m_btype_intermeds, scr);
     m_reg.insert(key::qr_xbb, c_xbb_qr);
 
     auto mat = dfit.compute_idx(c_xbb_qr);

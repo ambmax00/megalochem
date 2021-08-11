@@ -497,31 +497,33 @@ inline void load_jints(jmethod jmet, ints::metric metr, ints::aoloader& ao)
 {
   // set J
   if (jmet == jmethod::exact) {
-    ao.request(ints::key::coul_bbbb, true);
+    ao.request(ints::key::coul_bbbb);
   }
   else if (jmet == jmethod::dfao) {
-    ao.request(ints::key::scr_xbb, true);
 
-    if (metr == ints::metric::coulomb) {
-      ao.request(ints::key::coul_xx, false);
-      ao.request(ints::key::coul_xx_inv, true);
-      ao.request(ints::key::coul_xbb, true);
-    }
-    else if (metr == ints::metric::erfc_coulomb) {
-      ao.request(ints::key::erfc_xx, false);
-      ao.request(ints::key::erfc_xx_inv, true);
-      ao.request(ints::key::erfc_xbb, true);
-    }
-    else if (metr == ints::metric::qr_fit) {
-      ao.request(ints::key::ovlp_bb, false);
-      ao.request(ints::key::coul_xx, true);
-      ao.request(ints::key::ovlp_xx, false);
-      ao.request(ints::key::ovlp_xx_inv, false);
-      ao.request(ints::key::qr_xbb, true);
-    }
-    else if (metr == ints::metric::pari) {
-      ao.request(ints::key::coul_xx, true);
-      ao.request(ints::key::pari_xbb, true);
+    switch (metr) {
+      
+      case ints::metric::coulomb: 
+        ao.request(ints::key::coul_xx_inv)
+          .request(ints::key::coul_xbb);
+        break;
+        
+      case ints::metric::erfc_coulomb:
+        ao.request(ints::key::erfc_xx_prod)
+          .request(ints::key::erfc_xbb);
+        break;
+    
+      case ints::metric::qr_fit:
+        ao.request(ints::key::coul_xx)
+          .request(ints::key::qr_xbb);
+        break;
+      case ints::metric::pari:
+        ao.request(ints::key::coul_xx)
+          .request(ints::key::pari_xbb);
+        break;
+        
+      default:
+        throw std::runtime_error("Unsupported metric in J kernel.");
     }
   }
 }
@@ -529,85 +531,83 @@ inline void load_jints(jmethod jmet, ints::metric metr, ints::aoloader& ao)
 inline void load_kints(kmethod kmet, ints::metric metr, ints::aoloader& ao)
 {
   if (kmet == kmethod::exact) {
-    ao.request(ints::key::coul_bbbb, true);
+    ao.request(ints::key::coul_bbbb);
   }
   else if (kmet == kmethod::dfao) {
-    ao.request(ints::key::scr_xbb, true);
+    
+    switch (metr) {
+      
+      case ints::metric::coulomb: 
+        ao.request(ints::key::coul_xbb);
+        ao.request(ints::key::dfit_coul_xbb);
+        break;
+        
+      case ints::metric::erfc_coulomb:
+        ao.request(ints::key::erfc_xbb);
+        ao.request(ints::key::dfit_erfc_xbb);
+        break;
+    
+      case ints::metric::qr_fit:
+        ao.request(ints::key::qr_xbb);
+        ao.request(ints::key::dfit_qr_xbb);
+        break;
+        
+      case ints::metric::pari:
+        ao.request(ints::key::pari_xbb);
+        ao.request(ints::key::dfit_pari_xbb);
+        break;
+        
+      default:
+        throw std::runtime_error("Unsupported metric in K kernel.");
+    }
 
+  } else if (kmet == kmethod::dfmo) {
+   
     if (metr == ints::metric::coulomb) {
-      ao.request(ints::key::coul_xx, false);
-      ao.request(ints::key::coul_xx_inv, false);
-      ao.request(ints::key::coul_xbb, true);
-      ao.request(ints::key::dfit_coul_xbb, true);
-    }
-    else if (metr == ints::metric::erfc_coulomb) {
-      ao.request(ints::key::erfc_xx, false);
-      ao.request(ints::key::erfc_xx_inv, false);
-      ao.request(ints::key::erfc_xbb, true);
-      ao.request(ints::key::dfit_erfc_xbb, true);
-    }
-    else if (metr == ints::metric::qr_fit) {
-      ao.request(ints::key::coul_xx, true);
-      ao.request(ints::key::ovlp_xx, false);
-      ao.request(ints::key::ovlp_bb, false);
-      ao.request(ints::key::ovlp_xx_inv, false);
-      ao.request(ints::key::qr_xbb, true);
-      ao.request(ints::key::dfit_qr_xbb, true);
-    }
-    else if (metr == ints::metric::pari) {
-      ao.request(ints::key::coul_xx, true);
-      ao.request(ints::key::pari_xbb, true);
-      ao.request(ints::key::dfit_pari_xbb, true);
-    }
-  }
-  else if (kmet == kmethod::dfmo) {
-    ao.request(ints::key::scr_xbb, true);
-
-    if (metr == ints::metric::coulomb) {
-      ao.request(ints::key::coul_xx, false);
-      ao.request(ints::key::coul_xx_invsqrt, true);
-      ao.request(ints::key::coul_xbb, true);
-    }
-    else {
+      ao.request(ints::key::coul_xx_invsqrt);
+      ao.request(ints::key::coul_xbb);
+    } else {
       throw std::runtime_error("DFMO with non coulomb metric disabled.");
     }
   }
   else if (kmet == kmethod::dfmem || kmet == kmethod::dflmo) {
-    ao.request(ints::key::scr_xbb, true);
 
-    if (metr == ints::metric::coulomb) {
-      ao.request(ints::key::coul_xx, false);
-      ao.request(ints::key::coul_xx_inv, true);
-      ao.request(ints::key::coul_xbb, true);
-    }
-    else if (metr == ints::metric::erfc_coulomb) {
-      ao.request(ints::key::erfc_xx, false);
-      ao.request(ints::key::erfc_xx_inv, true);
-      ao.request(ints::key::erfc_xbb, true);
-    }
-    else if (metr == ints::metric::qr_fit) {
-      ao.request(ints::key::coul_xx, true);
-      ao.request(ints::key::ovlp_bb, false);
-      ao.request(ints::key::ovlp_xx, false);
-      ao.request(ints::key::ovlp_xx_inv, false);
-      ao.request(ints::key::qr_xbb, true);
-    }
-    else if (metr == ints::metric::pari) {
-      ao.request(ints::key::coul_xx, true);
-      ao.request(ints::key::pari_xbb, true);
-    }
-  }
-  else if (kmet == kmethod::dfrobust) {
-    ao.request(ints::key::scr_xbb, true);
+    switch (metr) {
+      
+      case ints::metric::coulomb: 
+        ao.request(ints::key::coul_xx_inv);
+        ao.request(ints::key::coul_xbb);
+        break;
+        
+      case ints::metric::erfc_coulomb:
+        ao.request(ints::key::erfc_xx_prod);
+        ao.request(ints::key::erfc_xbb);
+        break;
+    
+      case ints::metric::qr_fit:
+        ao.request(ints::key::coul_xx);
+        ao.request(ints::key::qr_xbb);
+        break;
+        
+      case ints::metric::pari:
+        ao.request(ints::key::coul_xx);
+        ao.request(ints::key::pari_xbb);
+        break;
+        
+      default:
+        throw std::runtime_error("Unsupported metric in K kernel.");
+    }  
+
+  } else if (kmet == kmethod::dfrobust) {
 
     if (metr != ints::metric::pari) {
       throw std::runtime_error(
           "Cannot use robust k for method other than PARI");
     }
     else if (metr == ints::metric::pari) {
-      ao.request(ints::key::coul_xx, false);
-      ao.request(ints::key::coul_xbb, true);
-      ao.request(ints::key::pari_xbb, true);
+      ao.request(ints::key::coul_xx);
+      ao.request(ints::key::coul_xbb);
+      ao.request(ints::key::pari_xbb);
     }
   }
 }
@@ -659,7 +659,7 @@ class create_j_base {
       }
       else if (*c_metric == ints::metric::erfc_coulomb) {
         eris = aoreg.get<decltype(eris)>(ints::key::erfc_xbb);
-        v_inv = aoreg.get<decltype(v_inv)>(ints::key::erfc_xx_inv);
+        v_inv = aoreg.get<decltype(v_inv)>(ints::key::erfc_xx_prod);
       }
       else if (*c_metric == ints::metric::qr_fit) {
         eris = aoreg.get<decltype(eris)>(ints::key::qr_xbb);
@@ -783,7 +783,7 @@ class create_k_base {
           break;
         case ints::metric::erfc_coulomb:
           eris = aoreg.get<decltype(eris)>(ints::key::erfc_xbb);
-          v_xx = aoreg.get<decltype(v_xx)>(ints::key::erfc_xx_inv);
+          v_xx = aoreg.get<decltype(v_xx)>(ints::key::erfc_xx_prod);
           break;
         case ints::metric::qr_fit:
           eris = aoreg.get<decltype(eris)>(ints::key::qr_xbb);

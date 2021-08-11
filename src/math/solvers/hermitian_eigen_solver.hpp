@@ -65,9 +65,9 @@ class hermitian_eigen_solver {
     return m_eigvec;
   }
 
-  dbcsr::shared_matrix<double> inverse();
+  dbcsr::shared_matrix<double> inverse(std::optional<double>);
 
-  dbcsr::shared_matrix<double> inverse_sqrt();
+  dbcsr::shared_matrix<double> inverse_sqrt(std::optional<double>);
 };
 
 }  // namespace math

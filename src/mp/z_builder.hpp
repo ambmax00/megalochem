@@ -286,28 +286,18 @@ ${_MAKE_BUILDER_CLASS('LLMP_ASYM_Z', 'create', list, True)}$
 inline void load_zints(
     [[maybe_unused]] zmethod zmet, ints::metric metr, ints::aoloader& ao)
 {
-  // set J
-  ao.request(ints::key::scr_xbb, true);
-
+  
   switch (metr) {
     case ints::metric::coulomb: {
-      ao.request(ints::key::coul_xx, false);
-      ao.request(ints::key::coul_xx_inv, true);
-      ao.request(ints::key::coul_xbb, true);
+      ao.request(ints::key::coul_xbb);
       break;
     }
     case ints::metric::erfc_coulomb: {
-      ao.request(ints::key::erfc_xx, false);
-      ao.request(ints::key::erfc_xx_inv, true);
-      ao.request(ints::key::erfc_xbb, true);
+      ao.request(ints::key::erfc_xbb);
       break;
     }
     case ints::metric::qr_fit: {
-      ao.request(ints::key::ovlp_bb, false);
-      ao.request(ints::key::coul_xx, true);
-      ao.request(ints::key::ovlp_xx, false);
-      ao.request(ints::key::ovlp_xx_inv, false);
-      ao.request(ints::key::qr_xbb, true);
+      ao.request(ints::key::qr_xbb);
       break;
     }
     default: {

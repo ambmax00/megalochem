@@ -125,7 +125,7 @@ desc::shared_wavefunction mpmod::compute()
   auto zmetr = ints::str_to_metric(m_df_metric);
 
 #ifdef _ORTHOGONALIZE
-  ao->request(ints::key::ovlp_bb, true);
+  ao->request(ints::key::ovlp_bb);
 #endif
 
   load_zints(zmeth, zmetr, *ao);
@@ -152,7 +152,7 @@ desc::shared_wavefunction mpmod::compute()
 
     case ints::metric::erfc_coulomb:
       metric_matrix =
-          aoreg.get<dbcsr::shared_matrix<double>>(ints::key::erfc_xx_inv);
+          aoreg.get<dbcsr::shared_matrix<double>>(ints::key::erfc_xx_prod);
       break;
 
     case ints::metric::qr_fit:

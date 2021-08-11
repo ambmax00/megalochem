@@ -514,7 +514,7 @@ void adcmod::init_ao_tensors()
     }
   }
 
-  m_aoloader->request(ints::key::ovlp_bb, true);
+  m_aoloader->request(ints::key::ovlp_bb);
 
   m_aoloader->compute();
 
@@ -560,7 +560,7 @@ std::shared_ptr<MVP> adcmod::create_adc1(std::optional<canon_lmo> lmo_info)
     case ints::metric::erfc_coulomb: {
       get(eri3c2e, ints::key::erfc_xbb);
       get(fitting, ints::key::dfit_erfc_xbb);
-      get(v_xx, ints::key::erfc_xx_inv);
+      get(v_xx, ints::key::erfc_xx_prod);
       break;
     }
     case ints::metric::pari: {
@@ -654,7 +654,7 @@ std::shared_ptr<MVP> adcmod::create_adc2(std::optional<canon_lmo> clmo)
     case ints::metric::erfc_coulomb: {
       get(eri3c2e, ints::key::erfc_xbb);
       get(fitting, ints::key::dfit_erfc_xbb);
-      get(v_xx, ints::key::erfc_xx_inv);
+      get(v_xx, ints::key::erfc_xx_prod);
       break;
     }
     case ints::metric::pari: {

@@ -95,16 +95,17 @@ void hermitian_eigen_solver::compute()
   return;
 }
 
-smatrix hermitian_eigen_solver::inverse()
+smatrix hermitian_eigen_solver::inverse(std::optional<double> cutoff)
 {
   auto eigvec_copy = dbcsr::matrix<>::copy(*m_eigvec).build();
 
   // dbcsr::print(eigvec_copy);
+  double cutoff_intern = (cutoff) ? *cutoff : 1e-12;
 
   std::vector<double> eigval_copy = m_eigval;
 
-  std::for_each(eigval_copy.begin(), eigval_copy.end(), [](double& d) {
-    d = (fabs(d) < 1e-12) ? 0 : 1.0 / d;
+  std::for_each(eigval_copy.begin(), eigval_copy.end(), [cutoff_intern](double& d) {
+    d = (fabs(d) < cutoff_intern) ? 0 : 1.0 / d;
   });
 
   eigvec_copy->scale(eigval_copy, "right");
@@ -123,16 +124,17 @@ smatrix hermitian_eigen_solver::inverse()
   return inv;
 }
 
-smatrix hermitian_eigen_solver::inverse_sqrt()
+smatrix hermitian_eigen_solver::inverse_sqrt(std::optional<double> cutoff)
 {
   auto eigvec_copy = dbcsr::matrix<>::copy(*m_eigvec).build();
 
   // dbcsr::print(eigvec_copy);
+  double cutoff_intern = (cutoff) ? *cutoff : 1e-12;
 
   std::vector<double> eigval_copy = m_eigval;
 
-  std::for_each(eigval_copy.begin(), eigval_copy.end(), [](double& d) {
-    d = 1.0 / sqrt(d);
+  std::for_each(eigval_copy.begin(), eigval_copy.end(), [cutoff_intern](double& d) {
+    d = (fabs(d) < cutoff_intern) ? 0 : 1.0 / sqrt(d);
   });
 
   eigvec_copy->scale(eigval_copy, "right");

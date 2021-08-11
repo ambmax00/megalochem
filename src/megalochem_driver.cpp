@@ -32,6 +32,7 @@ static const nlohmann::json valid_globals = {
     {"integral_omega", 0.1},
     {"qr_T", 1e-6},
     {"qr_R", 40},
+    {"basis_lindep", 1e-6},
     {"_required", {"type"}}};
 
 static const nlohmann::json valid_basis = {
@@ -280,6 +281,7 @@ void driver::parse_globals(nlohmann::json& jdata)
   auto omega = json_optional<double>(jdata, "integral_omega");
   auto qrT = json_optional<double>(jdata, "qr_T");
   auto qrR = json_optional<double>(jdata, "qr_R");
+  auto lindep = json_optional<double>(jdata, "basis_lindep");
 
   if (block_t)
     dbcsr::global::filter_eps = *block_t;
@@ -289,6 +291,8 @@ void driver::parse_globals(nlohmann::json& jdata)
     ints::global::qr_theta = *qrT;
   if (qrR)
     ints::global::qr_rho = *qrR;
+  if (lindep)
+    ints::global::basis_lindep = *lindep;
 }
 
 void driver::parse_atoms(nlohmann::json& jdata)
