@@ -314,10 +314,14 @@ class davidson {
         // double alpha_ki = (ITER == 0) ? std::numeric_limits<double>::max()
         //		: fabs(evecs(m_subspace-1,iroot));
 
-        m_errs[iroot] =  // std::min(
-            r_k->norm(dbcsr_norm_frobenius);  //,
+        double alpha_ki = std::fabs(evecs(m_subspace-1,iroot));
+        double rnorm = r_k->norm(dbcsr_norm_frobenius);
+
+        m_errs[iroot] =  std::min(rnorm, alpha_ki);
         // alpha_ki
         //);
+        
+        LOG.os<>("Root ", iroot, " alpha_ki = ", alpha_ki, " res. norm = ", rnorm, '\n');
 
         max_err = std::max(max_err, m_errs[iroot]);
 

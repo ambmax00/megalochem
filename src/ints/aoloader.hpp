@@ -65,13 +65,13 @@ inline std::map<ints::key,std::vector<ints::key>> dependencies = {
   
   {ints::key::coul_xbb,           {ints::key::scr_xbb}},
   {ints::key::erfc_xbb,           {ints::key::scr_xbb}},
-  {ints::key::qr_xbb,             {ints::key::ovlp_xx_inv, ints::key::ovlp_bb}},
+  {ints::key::qr_xbb,             {ints::key::ovlp_xx, ints::key::ovlp_xx_inv, ints::key::ovlp_bb}},
   
   {ints::key::dfit_coul_xbb,      {ints::key::coul_xx_inv, ints::key::coul_xbb}},
   {ints::key::dfit_erfc_xbb,      {ints::key::erfc_xx, ints::key::erfc_xx_inv, ints::key::coul_xx, 
                                       ints::key::erfc_xx_prod}},
   {ints::key::dfit_pari_xbb,      {ints::key::pari_xbb, ints::key::coul_xx}},
-  {ints::key::dfit_qr_xbb,        {ints::key::ovlp_bb, ints::key::ovlp_xx_inv, 
+  {ints::key::dfit_qr_xbb,        {ints::key::ovlp_xx, ints::key::ovlp_bb, ints::key::ovlp_xx_inv, 
                                         ints::key::qr_xbb, ints::key::coul_xx}}
 };
 // clang-format on
