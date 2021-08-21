@@ -45,6 +45,10 @@ class pivinc_cd {
   void compute(
       std::optional<int> force_rank = std::nullopt,
       std::optional<double> eps = std::nullopt);
+      
+  void compute_old(
+      std::optional<int> force_rank = std::nullopt,
+      std::optional<double> eps = std::nullopt);
 
   void compute_sparse();
 

@@ -4,6 +4,7 @@
 #include "ints/integrals.hpp"
 #include "ints/screening.hpp"
 #include "math/linalg/piv_cd.hpp"
+#include "math/linalg/newton_schulz.hpp"
 #include "utils/mpi_time.hpp"
 
 extern "C" {
@@ -1009,6 +1010,8 @@ desc::shared_cluster_basis remove_lindep(
     std::optional<int> opt_nsplit)
 {
   util::mpi_log LOG(wrd.comm(), 0);
+  util::mpi_time TIME(wrd.comm(), "Removing linear dependencies", 0);
+  TIME.start();
 
   LOG.os<>("Removing linear dependencies in basis set...\n");
 
@@ -1017,7 +1020,6 @@ desc::shared_cluster_basis remove_lindep(
   auto ovlp = aofac.ao_overlap();
 
   math::pivinc_cd pivcd(wrd, ovlp, 2);
-
   pivcd.compute(std::nullopt, cutoff);
 
   int prank = pivcd.rank();

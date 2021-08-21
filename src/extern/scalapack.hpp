@@ -29,6 +29,16 @@ void blacs_gridinfo_(
 
 void blacs_gridexit_(int* ctxt);
 
+void igebs2d_(int* ictxt, char* scope, char* top, int* m, int* n, int* a, int* lda);
+
+void igebr2d_(int* ictxt, char* scope, char* top, int* m, int* n, int* a,
+  int* lda, int* rsrc, int* csrc);
+
+void dgebs2d_(int* ictxt, char* scope, char* top, int* m, int* n, double* a, int* lda);
+
+void dgebr2d_(int* ictxt, char* scope, char* top, int* m, int* n, double* a,
+  int* lda, int* rsrc, int* csrc);
+
 void blacs_exit_(int* cont);
 
 int numroc_(int* n, int* nb, int* iproc, int* isrcproc, int* nprocs);
@@ -57,6 +67,25 @@ void pdelget_(
     int* ia,
     int* ja,
     const int* desca);
+    
+void pdscal_(
+  int* n,
+  double* alpha,
+  double* x,
+  int* ix,
+  int* jx,
+  int* descx,
+  int* incx);
+
+void pdamax_(
+  int* n,
+  double* amax,
+  int* indx,
+  double* x,
+  int* ix,
+  int* jx,
+  int* descx,
+  int* incx);
 
 double pdlange_(
     char* nrom,
@@ -67,6 +96,20 @@ double pdlange_(
     int* ja,
     int* desca,
     double* work);
+
+void pdswap_(
+  int* n,
+  double* x, 
+  int* ix,
+  int* jx,
+  int* descx,
+  int* incx,
+  double* y,
+  int* iy,
+  int* jy,
+  int* descy,
+  int* incy
+);
 
 void pddot_(
     int* n,
@@ -186,6 +229,19 @@ void pdgeqrf_(
     double* work,
     int* lwork,
     int* info);
+    
+void pdgeqpf_(
+  int* m,
+  int* n,
+  double* a,
+  int* ia,
+  int* ja,
+  int* desca,
+  int* ipiv,
+  double* tau,
+  double* work,
+  int* lwork,
+  int* info);
 
 void pdormqr_(
     char* side,
@@ -324,6 +380,30 @@ inline void c_blacs_gridinfo(
   blacs_gridinfo_(&icontxt, nprow, npcol, myprow, mypcol);
 }
 
+inline void c_dgebs2d(int ictxt, char scope, char top, int m, int n, 
+  double* a, int lda)
+{
+  dgebs2d_(&ictxt,&scope,&top,&m,&n,a,&lda);
+}
+
+inline void c_dgebr2d(int ictxt, char scope, char top, int m, int n, double* a,
+  int lda, int rsrc, int csrc)
+{
+  dgebr2d_(&ictxt,&scope,&top,&m,&n,a,&lda,&rsrc,&csrc);
+}
+
+inline void c_igebs2d(int ictxt, char scope, char top, int m, int n, 
+  int* a, int lda)
+{
+  igebs2d_(&ictxt,&scope,&top,&m,&n,a,&lda);
+}
+
+inline void c_igebr2d(int ictxt, char scope, char top, int m, int n, int* a,
+  int lda, int rsrc, int csrc)
+{
+  igebr2d_(&ictxt,&scope,&top,&m,&n,a,&lda,&rsrc,&csrc);
+}
+
 inline void c_blacs_gridexit(int ctxt)
 {
   blacs_gridexit_(&ctxt);
@@ -332,6 +412,40 @@ inline void c_blacs_gridexit(int ctxt)
 inline void c_blacs_exit(int comt)
 {
   blacs_exit_(&comt);
+}
+
+inline void c_pdscal(
+  int n,
+  double alpha,
+  double* x,
+  int ix,
+  int jx,
+  int* descx,
+  int incx)
+{
+  int fix = ix + 1;
+  int fjx = jx + 1;
+  pdscal_(&n,&alpha,x,&fix,&fjx,descx,&incx);
+}
+
+inline void c_pdswap(
+  int n,
+  double* x, 
+  int ix,
+  int jx,
+  int* descx,
+  int incx,
+  double* y,
+  int iy,
+  int jy,
+  int* descy,
+  int incy)
+{
+  int fix = ix+1;
+  int fjx = jx+1;
+  int fiy = iy+1;
+  int fjy = jy+1;
+  pdswap_(&n,x,&fix,&fjx,descx,&incx,y,&fiy,&fjy,descy,&incy);
 }
 
 inline double c_pddot(
@@ -418,6 +532,22 @@ inline void c_pdelget(
   int f_ia = ia + 1;
   int f_ja = ja + 1;
   pdelget_(&scope, &top, alpha, A, &f_ia, &f_ja, desca);
+}
+
+inline void c_pdamax(
+  int n,
+  double* amax,
+  int* indx,
+  double* x,
+  int ix,
+  int jx,
+  int* descx,
+  int incx) 
+{
+  int fix = ix+1;
+  int fjx = jx+1;
+  pdamax_(&n,amax,indx,x,&fix,&fjx,descx,&incx);
+  --(*indx);
 }
 
 inline void c_pdsyev(
@@ -648,6 +778,24 @@ inline void c_pdgeqrf(
   int fja = ja + 1;
 
   pdgeqrf_(&m, &n, a, &fia, &fja, desca, tau, work, &lwork, info);
+}
+
+inline void c_pdgeqpf(
+  int m,
+  int n,
+  double* a,
+  int ia,
+  int ja,
+  int* desca,
+  int* ipiv,
+  double* tau,
+  double* work,
+  int lwork,
+  int* info)
+{
+  int fia = ia + 1;
+  int fja = ja + 1;
+  pdgeqpf_(&m,&n,a,&fia,&fja,desca,ipiv,tau,work,&lwork,info);
 }
 
 inline void c_pdormqr(
@@ -1033,6 +1181,16 @@ class distmat {
   int nfull_loc() const
   {
     return m_nrowsloc * m_ncolsloc;
+  }
+  
+  int nrows_loc() const 
+  {
+    return m_nrowsloc;
+  }
+  
+  int ncols_loc() const 
+  {
+    return m_ncolsloc;
   }
 
   T* data() const
