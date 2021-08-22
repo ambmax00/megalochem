@@ -893,7 +893,7 @@ inline void c_pdger(int m, int n, double alpha, double* x, int ix, int jx, int* 
 namespace scalapack {
 
 struct global {
-  inline static int block_size = 5;
+  inline static int block_size = 64;
 };
 
 class grid {
