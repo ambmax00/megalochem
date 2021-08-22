@@ -27,41 +27,27 @@ std::pair<smatd, smatd> aoloader::invert(smatd in, bool do_inv, bool do_invsqrt,
   auto inv_sqrt = dbcsr::matrix<double>::transpose(*linv).build();
   auto inv = chol.inverse(m);*
   */
-  util::mpi_time TIME(m_world.comm(), "Inverse", 0);
-  auto& time1 = TIME.sub("Schulz");
-  auto& time2 = TIME.sub("Eval");
 
-
-
-  //if (global::use_newton_schulz) {
+  if (global::use_newton_schulz) {
     
-    time1.start();
     math::newton_schulz nschulz(m_world, in, 1);
     nschulz.compute();
-    time1.finish();
         
-    //if (do_inv) inv = nschulz.compute_inverse();
-    //if (do_invsqrt) invsqrt = nschulz.inverse_sqrt();
+    if (do_inv) inv = nschulz.compute_inverse();
+    if (do_invsqrt) invsqrt = nschulz.inverse_sqrt();
     
-  //} else {
+  } else {
 
-    time2.start();
     math::hermitian_eigen_solver herm(m_world, in, 'V', true);
     herm.compute();
-    time2.finish();
 
-    //LOG.os<1>("Minimum eigenvalue of decomposition of ", in->name(), " : ", 
-     // herm.eigvals()[0], '\n');
+    LOG.os<1>("Minimum eigenvalue of decomposition of ", in->name(), " : ", 
+      herm.eigvals()[0], '\n');
   
-    //if (do_inv) inv = herm.inverse(cutoff);
-    //if (do_invsqrt) invsqrt = herm.inverse_sqrt(cutoff);
+    if (do_inv) inv = herm.inverse(cutoff);
+    if (do_invsqrt) invsqrt = herm.inverse_sqrt(cutoff);
   
-  //}
-  TIME.print_info();
-  MPI_Barrier(m_world.comm());
-  exit(0);
-  
-  
+  }
   return std::make_pair<smatd, smatd>(std::move(inv), std::move(invsqrt));
 }
 
