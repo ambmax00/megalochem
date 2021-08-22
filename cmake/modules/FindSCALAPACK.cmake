@@ -16,11 +16,16 @@ else()
 	message(STATUS "No MKL environment detected")
 endif()
 
+if ("${SCALAPACK_IMPLICIT}") 
+	message(STATUS "ScaLAPACK is linked implicitly")
+endif()
+
 find_package(LAPACK REQUIRED)
 find_package(MPI REQUIRED)
 
 message(STATUS "BLAS VENDOR: ${BLA_VENDOR}")
 
+if (NOT "${SCALAPACK_IMPLICIT}")
 if (USE_MKL) 
 
 	message(STATUS "Using Intel MKL")
@@ -92,6 +97,9 @@ else()
 		"${SCALAPACK_LIBRARIES};${LAPACK_LIBRARIES};${MPI_Fortran_LIBRARIES};gfortran"
         )
 
+endif()
+else()
+	add_library(SCALAPACK::SCALAPACK INTERFACE IMPORTED)
 endif()
 
 list(APPEND CMAKE_REQUIRED_LIBRARIES SCALAPACK::SCALAPACK)

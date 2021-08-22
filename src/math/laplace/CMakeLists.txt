@@ -40,18 +40,21 @@ add_library(chem_math_laplace ${SOURCES})
 
 # special compiler flags
 if(CMAKE_Fortran_COMPILER_ID MATCHES GNU)
-	set(LAP_FLAGS "-O3 -H -ffree-form -Wall")
+	target_compile_options(
+        	chem_math_laplace
+        	PRIVATE
+        	-march=x86-64 -H -ffree-form
+	)
 endif()
-
+	
+	
 if(CMAKE_Fortran_COMPILER_ID MATCHES Intel)
-	set(LAP_FLAGS "-O3 -free -warn all -assume protect_parens -nogen-interfaces")
+	target_compile_options(
+                chem_math_laplace
+                PRIVATE
+                -march=x86-64 -free -assume protect_parens -nogen-interfaces
+        )
 endif()
-
-set_target_properties(
-	chem_math_laplace
-	PROPERTIES
-	COMPILE_FLAGS ${LAP_FLAGS}
-)
 
 target_include_directories(
 	chem_math_laplace
