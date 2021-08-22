@@ -14,12 +14,11 @@ const double eigval_eps = 1e-6;
 
 std::tuple<double,double> newton_schulz::get_extremum_eigenvalues() {
 
-  auto print = [&](auto vec) {
+  /*auto print = [&](auto vec) {
     for (auto e : vec) {
       LOG.os<>(e, " ");
     } LOG.os<>('\n');
-  };
-
+  };*/
 
   // use gershgorin's theorem to estimate eigenvalues by summing rows/cols
   int N = m_mat->nfullrows_total();
@@ -61,11 +60,11 @@ std::tuple<double,double> newton_schulz::get_extremum_eigenvalues() {
   MPI_Allreduce(diag_local.data(), diag_global.data(), N, MPI_DOUBLE, MPI_SUM, m_world.comm());
   MPI_Allreduce(row_sum.data(), radii.data(), N, MPI_DOUBLE, MPI_SUM, m_world.comm());
   
-  LOG.os<>("Diag global\n");
-  print(diag_global);
+  //LOG.os<>("Diag global\n");
+  //print(diag_global);
   
-  LOG.os<>("Radii\n");
-  print(radii);
+  //LOG.os<>("Radii\n");
+  //print(radii);
   
   std::vector<double> max_err(N,0), min_err(N,0);
 
@@ -74,10 +73,10 @@ std::tuple<double,double> newton_schulz::get_extremum_eigenvalues() {
     min_err[ii] = diag_global[ii] - radii[ii];
   }
   
-  LOG.os<>("MAX:\n");
-  print(max_err);
-  LOG.os<>("MIN:\n");
-  print(min_err);
+  //LOG.os<>("MAX:\n");
+  //print(max_err);
+  //LOG.os<>("MIN:\n");
+  //print(min_err);
 
   double maxeval = *(std::max_element(max_err.begin(), max_err.end()));
   double mineval = *(std::min_element(min_err.begin(), min_err.end()));
@@ -125,28 +124,20 @@ void newton_schulz::fill_identity(dbcsr::matrix<double>& mat) {
   
 }
 
-dbcsr::shared_matrix<double> newton_schulz::taylor(dbcsr::matrix<double>& Xk) {
+void newton_schulz::taylor(
+  dbcsr::matrix<double>& Xk, dbcsr::matrix<double>& Tk) {
   
-  auto Tk = dbcsr::matrix<double>::create_template(Xk)
-    .name("Identity")
-    .build();
-    
-  fill_identity(*Tk);
+  Tk.clear();
+  fill_identity(Tk);
   
-  auto Xk2 = dbcsr::matrix<double>::create_template(Xk)
-    .name("X squared")
-    .build();
+  Tk.add(15, -10, Xk);
     
-  dbcsr::multiply('N', 'N', 1.0, Xk, Xk, 0.0, *Xk2)
-    .filter_eps(m_filter_eps_iter)
+  dbcsr::multiply('N', 'N', 3.0, Xk, Xk, 1.0, Tk)
+    //.filter_eps(m_filter_eps_iter)
     .perform();
     
-  Tk->add(15, -10, Xk);
-  Tk->add(1, 3, *Xk2);
-  Tk->scale(0.125);
-  
-  return Tk;
-  
+  Tk.scale(0.125);
+    
 } 
 
 double newton_schulz::mapping(double val) {
@@ -164,7 +155,7 @@ void newton_schulz::compute() {
   
   auto [mineval, maxeval] = get_extremum_eigenvalues();
     
-  decltype(m_mat) Xk, Zk, Yk, Zknew, Yknew;
+  decltype(m_mat) Xk, Zk, Yk, Tk, Zknew, Yknew;
   double lamk, emax, emin;
   
   emax = maxeval;
@@ -184,13 +175,18 @@ void newton_schulz::compute() {
   Yk->redistribute(*(m_mat->desymmetrize()));
   
   //Yk = m_mat->desymmetrize(); //dbcsr::matrix<double>::copy(*m_mat).build(); //
-  Yk->filter(m_filter_eps_iter);
+  //Yk->filter(m_filter_eps_iter);
   
   LOG.os<>("OCCUPATION: ", Yk->occupation(), '\n');
   
   Xk = dbcsr::matrix<double>::create_template(*Yk)
     .matrix_type(dbcsr::type::no_symmetry)
     .name("Xk")
+    .build();
+    
+  Tk = dbcsr::matrix<double>::create_template(*Yk)
+    .matrix_type(dbcsr::type::no_symmetry)
+    .name("Tk")
     .build();
   
   Zk = dbcsr::matrix<double>::create_template(*Yk)
@@ -210,22 +206,20 @@ void newton_schulz::compute() {
     
   fill_identity(*Zk);
   
-  double conv = std::max(m_conv, m_filter_eps);
-  
-  for (int k = 0; k != m_max_iter; ++k) {
+  double conv = m_conv; //std::max(m_conv, m_filter_eps);
+  int k = 0;
+    
+  while (k < m_max_iter) {
     
     LOG.os<>("EMAX/EMIN/LAM: ", emax, " ", emin, " ", lamk, '\n');
     
-    //print("Z", Zk);
-    //print("Y", Yk);
-   
     dbcsr::multiply('N', 'N', lamk, *Yk, *Zk, 0.0, *Xk)
-      .filter_eps(m_filter_eps_iter)
+      //.filter_eps(m_filter_eps_iter)
       .perform();
       
     //print("Xk", Xk);
     
-    auto Tk = taylor(*Xk);
+    taylor(*Xk, *Tk);
     
     //print("Tk", Tk);
     
@@ -236,11 +230,11 @@ void newton_schulz::compute() {
     Xk->clear();
         
     dbcsr::multiply('N', 'N', std::sqrt(lamk), *Zk, *Tk, 0.0, *Zknew)
-      .filter_eps(m_filter_eps_iter)
+      //.filter_eps(m_filter_eps_iter)
       .perform();
     
     dbcsr::multiply('N', 'N', std::sqrt(lamk), *Tk, *Yk, 0.0, *Yknew)
-      .filter_eps(m_filter_eps_iter)
+      //.filter_eps(m_filter_eps_iter)
       .perform();
     
     std::swap(Yk, Yknew);
@@ -250,18 +244,30 @@ void newton_schulz::compute() {
     double normy = std::sqrt(Yknew->dot(*Yknew));
     LOG.os<>("NORM: ", normy, '\n');
     LOG.os<>("OCCUPATION Zk: ", Zk->occupation(), '\n');
-    if (normy < conv) break;
+    
+    //if (normy < conv) break;
     
     Yknew->clear();
     Zknew->clear();
     
-    emax = mapping(lamk * emax);
-    emin = mapping(lamk * emin);
-    lamk = 2.0/(emax + emin);
-
-    //int i;
-    //std::cin >> i;
+    double emax_new = mapping(lamk * emax);
+    double emin_new = mapping(lamk * emin);
+    double lamk_new = 2.0/(emax_new + emin_new);
     
+    if (std::fabs(emax_new - emax) < m_conv && std::fabs(emin_new - emin) < m_conv) {
+      break;
+    }
+    
+    emax = emax_new;
+    emin = emin_new;
+    lamk = lamk_new;
+    
+    ++k;
+    
+  }
+  
+  if (k == m_max_iter) {
+    throw std::runtime_error("Newton-Schulz did not converge!");
   }
   
   m_mat_sqrt = dbcsr::matrix<double>::create_template(*m_mat)
@@ -282,7 +288,7 @@ void newton_schulz::compute() {
 dbcsr::shared_matrix<double> newton_schulz::compute_inverse() {
   auto inv = dbcsr::matrix<double>::create_template(*m_mat)
     .name("Matrix Inverse of " + m_mat->name())
-    .matrix_type(dbcsr::type::no_symmetry)
+    .matrix_type(dbcsr::type::symmetric)
     .build();
   dbcsr::multiply('N', 'N', 1.0, *m_mat_invsqrt, *m_mat_invsqrt, 0.0, *inv).perform();
   return inv;

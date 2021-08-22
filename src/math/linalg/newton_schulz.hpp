@@ -18,19 +18,20 @@ class newton_schulz {
   dbcsr::shared_matrix<double> m_mat, m_mat_invsqrt, m_mat_sqrt;
   
   double m_conv = 1e-12;
-  int m_max_iter = 20;
-  int m_blksize = 8;
+  int m_max_iter = 30;
+  int m_blksize = 128;
   double m_eps_div = 100.0;
-  double m_filter_eps = dbcsr::global::filter_eps;
-  double m_filter_eps_iter = m_filter_eps/m_eps_div;
-  
+  // ====== SPARSITY IS DISABLED FOR NOW =======
+  double m_filter_eps = -1; //dbcsr::global::filter_eps;
+  double m_filter_eps_iter = -1; //m_filter_eps/m_eps_div;
+    
   std::tuple<double,double> get_extremum_eigenvalues();
   
   void fill_identity(dbcsr::matrix<double>& mat);
   
   double mapping(double val);
   
-  dbcsr::shared_matrix<double> taylor(dbcsr::matrix<double>& Xk);
+  void taylor(dbcsr::matrix<double>& Xk, dbcsr::matrix<double>& Tk);
   
  public:
  

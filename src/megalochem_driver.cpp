@@ -30,6 +30,7 @@ static const nlohmann::json valid_globals = {
     {"type", "globals"},
     {"block_threshold", 1 - 6},
     {"integral_omega", 0.1},
+    {"use_newton_schulz", false},
     {"qr_T", 1e-6},
     {"qr_R", 40},
     {"basis_lindep", 1e-6},
@@ -282,11 +283,14 @@ void driver::parse_globals(nlohmann::json& jdata)
   auto qrT = json_optional<double>(jdata, "qr_T");
   auto qrR = json_optional<double>(jdata, "qr_R");
   auto lindep = json_optional<double>(jdata, "basis_lindep");
+  auto nschulz = json_optional<bool>(jdata, "use_newton_schulz");
 
   if (block_t)
     dbcsr::global::filter_eps = *block_t;
   if (omega)
     ints::global::omega = *omega;
+  if (nschulz) 
+    ints::global::use_newton_schulz = *nschulz;
   if (qrT)
     ints::global::qr_theta = *qrT;
   if (qrR)

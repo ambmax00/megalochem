@@ -1,6 +1,7 @@
 #include "ints/aoloader.hpp"
 #include "ints/fitting.hpp"
 #include "math/linalg/LLT.hpp"
+#include "math/linalg/newton_schulz.hpp"
 #include "math/solvers/hermitian_eigen_solver.hpp"
 
 namespace megalochem {
@@ -17,31 +18,37 @@ std::pair<smatd, smatd> aoloader::invert(smatd in, bool do_inv, bool do_invsqrt,
   std::optional<double> cutoff)
 {
   auto m = in->row_blk_sizes();
+  decltype(in) inv(nullptr), invsqrt(nullptr);
 
   /*math::LLT chol(m_world, in, LOG.global_plev());
   chol.compute();
 
   auto linv = chol.L_inv(m);
   auto inv_sqrt = dbcsr::matrix<double>::transpose(*linv).build();
-  auto inv = chol.inverse(m);*/
+  auto inv = chol.inverse(m);*
+  */
 
-  math::hermitian_eigen_solver herm(m_world, in, 'V', true);
-  herm.compute();
+  if (global::use_newton_schulz) {
+    
+    math::newton_schulz nschulz(m_world, in, 1);
+    nschulz.compute();
+        
+    if (do_inv) inv = nschulz.compute_inverse();
+    if (do_invsqrt) invsqrt = nschulz.inverse_sqrt();
+    
+  } else {
 
-  LOG.os<1>("Minimum eigenvalue of decomposition of ", in->name(), " : ", 
-    herm.eigvals()[0], '\n');
+    math::hermitian_eigen_solver herm(m_world, in, 'V', true);
+    herm.compute();
+
+    LOG.os<1>("Minimum eigenvalue of decomposition of ", in->name(), " : ", 
+      herm.eigvals()[0], '\n');
   
-  decltype(in) inv(nullptr), inv_sqrt(nullptr);
+    if (do_inv) inv = herm.inverse(cutoff);
+    if (do_invsqrt) invsqrt = herm.inverse_sqrt(cutoff);
   
-  if (do_inv) {
-    inv = herm.inverse(cutoff);
-  } 
-  
-  if (do_invsqrt) {
-    inv_sqrt = herm.inverse_sqrt(cutoff);
   }
-
-  return std::make_pair<smatd, smatd>(std::move(inv), std::move(inv_sqrt));
+  return std::make_pair<smatd, smatd>(std::move(inv), std::move(invsqrt));
 }
 
 void aoloader::compute()

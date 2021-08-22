@@ -29,6 +29,7 @@ struct global {
   static inline double qr_theta = 1e-5;
   static inline double qr_rho = 40;
   static inline double basis_lindep = 1e-10;
+  static inline bool use_newton_schulz = false;
 };
 
 enum class metric { coulomb, erfc_coulomb, qr_fit, pari };
