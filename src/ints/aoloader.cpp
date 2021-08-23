@@ -20,14 +20,6 @@ std::pair<smatd, smatd> aoloader::invert(smatd in, bool do_inv, bool do_invsqrt,
   auto m = in->row_blk_sizes();
   decltype(in) inv(nullptr), invsqrt(nullptr);
 
-  /*math::LLT chol(m_world, in, LOG.global_plev());
-  chol.compute();
-
-  auto linv = chol.L_inv(m);
-  auto inv_sqrt = dbcsr::matrix<double>::transpose(*linv).build();
-  auto inv = chol.inverse(m);*
-  */
-
   if (global::use_newton_schulz) {
     
     math::newton_schulz nschulz(m_world, in, 1);
@@ -38,7 +30,7 @@ std::pair<smatd, smatd> aoloader::invert(smatd in, bool do_inv, bool do_invsqrt,
     
   } else {
 
-    math::hermitian_eigen_solver herm(m_world, in, 'V', true);
+    /*math::hermitian_eigen_solver herm(m_world, in, 'V', true);
     herm.compute();
 
     LOG.os<1>("Minimum eigenvalue of decomposition of ", in->name(), " : ", 
@@ -46,6 +38,14 @@ std::pair<smatd, smatd> aoloader::invert(smatd in, bool do_inv, bool do_invsqrt,
   
     if (do_inv) inv = herm.inverse(cutoff);
     if (do_invsqrt) invsqrt = herm.inverse_sqrt(cutoff);
+    */
+    math::LLT chol(m_world, in, LOG.global_plev());
+    chol.compute();
+
+    auto linv = chol.L_inv(m);
+    
+    if (do_inv) inv = chol.inverse(m);
+    if (do_invsqrt) invsqrt = dbcsr::matrix<double>::transpose(*linv).build();
   
   }
   return std::make_pair<smatd, smatd>(std::move(inv), std::move(invsqrt));
