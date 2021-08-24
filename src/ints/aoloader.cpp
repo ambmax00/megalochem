@@ -506,10 +506,11 @@ void aoloader::compute()
 
     // auto eri_batched = m_reg.get<sbt3>(key::coul_xbb);
     auto s_bb = m_reg.get<smatd>(key::ovlp_bb);
+    auto s_xx = m_reg.get<smatd>(key::ovlp_xx);
     auto s_xx_inv = m_reg.get<smatd>(key::ovlp_xx_inv);
 
     auto c_xbb_qr = dfit.compute_qr_new(
-        s_bb, s_xx_inv, spgrid3, bdims, m_btype_intermeds, scr);
+        s_bb, s_xx, s_xx_inv, spgrid3, bdims, m_btype_intermeds, scr);
     m_reg.insert(key::qr_xbb, c_xbb_qr);
 
     auto mat = dfit.compute_idx(c_xbb_qr);

@@ -635,7 +635,15 @@ Eigen::SparseMatrix<double> sparse_block_norms(dbcsr::matrix<T>& m_in,
   
   int nblks = 0;
   
-  dbcsr::iterator iter(m_in);
+  dbcsr::matrix<double>* mat_ptr = nullptr;
+  if (m_in.matrix_type() == dbcsr::type::symmetric) {
+    auto desym = m_in.desymmetrize();
+    mat_ptr = new dbcsr::matrix<double>(std::move(*desym));
+  } else {
+    mat_ptr = &m_in;
+  }
+  
+  dbcsr::iterator iter(*mat_ptr);
   iter.start();
     
   while (iter.blocks_left()) {
@@ -645,7 +653,7 @@ Eigen::SparseMatrix<double> sparse_block_norms(dbcsr::matrix<T>& m_in,
     int icol = iter.col();
     
     bool found = true;
-    auto blk2 = m_in.get_block_p(irow, icol, found);
+    auto blk2 = mat_ptr->get_block_p(irow, icol, found);
     
     double val = blk2.norm(norm_type);
     
@@ -656,6 +664,10 @@ Eigen::SparseMatrix<double> sparse_block_norms(dbcsr::matrix<T>& m_in,
   }
   
   iter.stop();
+  
+  if (m_in.matrix_type() == dbcsr::type::symmetric) {
+    delete mat_ptr;
+  }
   
   //print(sdata);
   

@@ -46,6 +46,7 @@ std::vector<block_info> get_block_info(desc::cluster_basis& cbas)
 
 dbcsr::sbtensor<3, double> dfitting::compute_qr_new(
     dbcsr::shared_matrix<double> s_bb,
+    dbcsr::shared_matrix<double> s_xx,
     dbcsr::shared_matrix<double> s_xx_inv,
     dbcsr::shared_pgrid<3> spgrid3_xbb,
     std::array<int, 3> bdims,
@@ -64,6 +65,8 @@ dbcsr::sbtensor<3, double> dfitting::compute_qr_new(
   double qr_rho = global::qr_rho;
 
   prep_time.start();
+  
+  LOG.os<1>("QRDF parameters: ", qr_theta, " ", qr_rho, '\n');
 
   auto x = m_mol->dims().x();
   auto b = m_mol->dims().b();
@@ -83,6 +86,7 @@ dbcsr::sbtensor<3, double> dfitting::compute_qr_new(
 
   auto blkmap_b = m_mol->c_basis()->block_to_atom(m_mol->atoms());
   auto blkmap_x = m_mol->c_dfbasis()->block_to_atom(m_mol->atoms());
+    
   auto blktype_b = m_mol->c_basis()->shell_types();
 
   dbcsr::cart dcart_self(MPI_COMM_SELF);
@@ -152,6 +156,9 @@ dbcsr::sbtensor<3, double> dfitting::compute_qr_new(
 
   dbcsr::cart single_world(MPI_COMM_SELF);
 
+  auto s_xx_norms = dbcsr::sparse_block_norms(
+    *s_xx, dbcsr::global::filter_eps, dbcsr::norm::frobenius);
+
   auto s_xx_inv_norms = dbcsr::sparse_block_norms(
     *s_xx_inv, dbcsr::global::filter_eps, dbcsr::norm::frobenius);
     
@@ -160,12 +167,19 @@ dbcsr::sbtensor<3, double> dfitting::compute_qr_new(
   //Eigen::MatrixXd m_xx_eigen = dbcsr::matrix_to_eigen(*m_xx);
 
   // =============== CREATE FRAGMENT BLOCKS ==========================
-
-  auto is_diff = m_mol->c_basis()->diffuse();
-
+  
+  // a vector where entry i correponds to vector of all aux functions on fragment i
+  int natoms = (int)m_mol->atoms().size();
+  std::vector<std::vector<int>> atom2blk_x(natoms);
+  for (int ix = 0; ix < (int)x.size(); ++ix) {
+    atom2blk_x[blkmap_x[ix]].push_back(ix);
+  }
+  
+  
   // make sure that each process has one atom block, but diffuse
   // and tight blocks are separated
-  
+  auto is_diff = m_mol->c_basis()->diffuse();
+
   auto blk2frag = blkmap_b;
   
   int nfrags_nodiff = (int)blk2frag.size();
@@ -505,30 +519,37 @@ dbcsr::sbtensor<3, double> dfitting::compute_qr_new(
       }
 
       // ==== Get all Q functions ====
-      std::vector<bool> blk_Q_bool(
-          x.size(), false);  // whether block x is involved
+      
+      
+      std::vector<bool> blk_Q_atom_bool(natoms, false);  
 
-      for (int ix = 0; ix != nxblks; ++ix) {
-        for (auto ip : blk_P) {
-          auto& pos_x = blkinfo_x[ix].pos;
-          auto& pos_p = blkinfo_x[ip].pos;
-          double alpha_x = blkinfo_x[ix].alpha;
-          double alpha_p = blkinfo_x[ip].alpha;
-
-          double f = (alpha_x * alpha_p) / (alpha_x + alpha_p) *
-              pow(dist(pos_x, pos_p), 2.0);
-
-          if (f < qr_rho)
-            blk_Q_bool[ix] = true;
+      for (auto ip : blk_P) {
+        for(Eigen::SparseMatrix<double>::InnerIterator it(s_xx_norms,ip);
+          it; ++it)
+        {
+          int iq = it.row();
+          int nele = x[iq] * x[ip];
+          double val = std::sqrt(std::pow(it.value(),2)/double(nele));
+          
+          if (val < qr_rho) continue;
+          blk_Q_atom_bool[blkmap_x[iq]] = true;
         }
       }
+      
+      /*for (auto ele : blk_Q_atom_bool) {
+        std::cout << ele << " ";
+      } std::cout << std::endl;*/
 
       std::vector<int> blk_Q;
       blk_Q.reserve(x.size());
-      for (int ix = 0; ix != (int)x.size(); ++ix) {
-        if (blk_Q_bool[ix])
-          blk_Q.push_back(ix);
+      for (int iatom = 0; iatom != natoms; ++iatom) {
+        if (blk_Q_atom_bool[iatom]) {
+          blk_Q.insert(blk_Q.end(), atom2blk_x[iatom].begin(), atom2blk_x[iatom].end());
+        }
       }
+      
+      std::cout << "P/Q/X " << blk_P.size() << " " << blk_Q.size() << 
+        " " << x.size() << std::endl;
 
       // === Compute coulomb integrals
       arrvec<int, 3> coul_blk_idx;

@@ -32,7 +32,7 @@ static const nlohmann::json valid_globals = {
     {"integral_omega", 0.1},
     {"use_newton_schulz", false},
     {"qr_T", 1e-6},
-    {"qr_R", 40},
+    {"qr_R", 1e-6},
     {"basis_lindep", 1e-6},
     {"_required", {"type"}}};
 
