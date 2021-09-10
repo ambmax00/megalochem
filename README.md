@@ -1,57 +1,13 @@
-<img src="docs/MEGALOCHEM.png" width="600">
+<img src="docs/images/MEGALOCHEM.png" width="600">
 
-WORK IN PROGRESS!
-A quantum chemistry software package that is being designed for computing excitation energies of large molecules using ADC, using sparse matrix algebra. 
+MEGALOchem is a quantum chemistry program that specializes in and provides tools for low scaling electronic structure methods for ground and excited states in the atomic orbital basis. It is  MPI parallel and supports sparse matrix multiplication and tensor contractions via the DBCSR library.
 
-## Getting Started
+Features:
+1. Local density fitting algorithms (Coulomb-attenuated, PARI, quasi-robust density-fitting)
+2. Linear scaling Hartree-Fock, SOS-MP2 and SOS-ADC(2)
+3. Foster-Boys orbital localization
+4. MPI-parallel incomplete Cholesky decomposition with complete pivoting
 
-Coming soon...
+Go [here](docs/Home.md) for documentation.
 
-### Prerequisites
-
-Currently depends on:
-
-```
-libcint >= 4.0.7 
-ScaLAPACK (>= 2.0 for reference ScaLAPACK)
-HDF5 (with parallel libraries enabled)
-DBCSR (fork from ambmax00)
-python >= 3.6
-```
-
-### Installing
-
-In the build directory:
-
-```
-export PKG_CONFIG_PATH=/path/to/libxsmm/lib
-pkg-config libxsmm --libs
-
-CMAKE_PREFIX_PATH=/my/dbcsr/install/location/usr/local/lib/cmake
-cmake 
-    -DLIBCINT_DIR=(mylibcint_dir) 
-    -DSCALAPACK_DIR=(myscalapack_dir)  
-    -DCMAKE_CXX_COMPILER=(g++/icpc ...)
-    -DMPI_CXX_COMPILER=(mpic++,...)
-    -DMPI_VENDOR=(openmpi/intelmpi ...)
-    -DCMAKE_Fortran_COMPILER=(gfortran/ifort)
-    -DEigen3_DIR=(Eigen3_dir) 
-    ..
-```
-
-Compilers need MPI/OpenMP support. C++ needs to have at least C++17 standard.
-
-## Implemented
-
-* Hartree Fock (exact/df/df-mem/pari/lmo)
-* MP2 (SOS-AOMP2)
-* ADC (AO-ADC1, SOS-AO-ADC2)
-
-## License
-
-Coming soon....
-
-## Other
-
-* json.hpp from [here](https://github.com/nlohmann/json)
-* documentation is going to follow
+You can also look at the accompanying PhD thesis for more details on theory [here](https://github.com/ambmax00/dissertation)
