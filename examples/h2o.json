@@ -1,6 +1,12 @@
 {
-	"comment": "Water @ DF-Hartree-Fock + DF-AO-ADC(1) + DF-AO-SOS-ADC(2)",
 	"megalochem": [
+		{	
+			"type": "globals",
+			"block_threshold": 1e-8,
+			"integral_omega": 0.1,
+			"qr_T": 1e-5,
+			"qr_R": 1e-5
+		},
 		{
 			"type": "atoms",
 			"tag": "xyz",
@@ -16,7 +22,9 @@
 			"type": "basis",
 			"atoms": "xyz",
 			"tag": "basis1",
-			"name": "cc-pvdz"
+			"name": "cc-pvdz",
+			"ao_split_method": "multi_shell_strict_sp",
+			"augmentation": false
 		},
 		{
 			"type": "basis",
@@ -38,13 +46,13 @@
 			"tag": "hfwfn",
 			"molecule": "mol",
                 	"diis": true,
-               	 	"guess": "SAD",
+               	 	"guess": "core",
 	                "scf_thresh": 1e-6,
 	                "diis_start": 0,
 	                "build_J": "dfao",
 	                "build_K": "dfao",
 	                "print": 1,
-	                "df_metric": "coulomb",
+	                "df_metric": "qr_fit",
  	                "SAD_diis": true,
 	                "occ_nbatches": 2,
 	                "df_basis": "dfbasis",
@@ -55,35 +63,43 @@
 	                "nbatches_b": 2
         	},
 		{
-			"type": "adcwfn",
-			"tag": "adcwfn",
-			"wfn": "hfwfn",
-			"df_metric": "coulomb",
-			"method": "ri_ao_adc1",
-			"df_basis": "dfbasis",
-			"nbatches_b": 2,
-			"nbatches_x": 2,
-			"build_J": "dfao",
-			"build_K": "dfao",
-			"build_Z": "llmp_full",
-			"nroots": 1,
-			"nguesses": 1
-		},
-		{
                         "type": "adcwfn",
-                        "tag": "adc2wfn",
-                        "wfn": "adcwfn",
-			"guess": "adc",
+                        "tag": "adc1wfn",
+                        "wfn": "hfwfn",
                         "df_metric": "coulomb",
-                        "method": "sos_cd_ri_adc2",
+                        "method": "ri_ao_adc1",
                         "df_basis": "dfbasis",
-                        "nbatches_b": 2,
-                        "nbatches_x": 2,
+                        "conv": 1e-5,
+                        "nbatches_b": 5,
+                        "nbatches_x": 5,
                         "build_J": "dfao",
                         "build_K": "dfao",
                         "build_Z": "llmp_full",
                         "nroots": 1,
-                        "nguesses": 1
+                        "nguesses": 1,
+                        "read": false
+                },
+                {
+                        "type": "adcwfn",
+                        "tag": "adc2wfn",
+                        "wfn": "adc1wfn",
+                        "guess": "adc",
+                        "df_metric": "erfc_coulomb",
+                        "method": "sos_cd_ri_adc2",
+                        "df_basis": "dfbasis",
+                        "nbatches_b": 1,
+                        "nbatches_x": 1,
+                        "build_J": "dfao",
+                        "build_K": "dfao",
+                        "build_Z": "llmp_full",
+                        "nroots": 1,
+                        "nguesses": 1,
+                        "local": false,
+                        "cutoff": 1e-5,
+                        "local_method": "pao",
+                        "ortho_eps": 1e-4,
+                        "test_mvp": false,
+                        "print": 2
                 }
 	]
 }
