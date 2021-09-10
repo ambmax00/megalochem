@@ -1,8 +1,8 @@
-# Running MEGALOChem
+# Running MEGALOchem
 
 ## Parallel Runtime Environment
 
-After installing MEGALOChem, the executable `bin/chem` is found in the build directory. The program is launched with `mpirun`, `mpiexec` or `srun`, and takes two arguments
+After installing MEGALOchem, the executable `bin/chem` is found in the build directory. The program is launched with `mpirun`, `mpiexec` or `srun`, and takes two arguments
 ````
 mpirun -n <NP> bin/chem <INPUT> <DIRECTORY>
 ````
