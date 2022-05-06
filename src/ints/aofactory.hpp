@@ -79,7 +79,9 @@ class aofactory {
   dbcsr::shared_matrix<double> ao_schwarz();
   dbcsr::shared_matrix<double> ao_3cschwarz();
 
+#ifdef WITH_4C1E
   dbcsr::shared_matrix<double> ao_schwarz_ovlp();
+#endif
   dbcsr::shared_matrix<double> ao_3cschwarz_ovlp();
 
   std::array<dbcsr::shared_matrix<double>, 3> ao_emultipole(

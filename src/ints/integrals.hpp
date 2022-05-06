@@ -19,9 +19,9 @@ extern "C" {
 CINTIntegralFunction int3c2e_sph;
 
 CINTIntegralFunction int3c1e_sph;
-
+#ifdef WITH_4C1E
 CINTIntegralFunction int4c1e_sph;
-
+#endif
 CINTIntegralFunction int2c2e_sph;
 }
 

@@ -36,8 +36,12 @@ enum class ctr {
   c_3c1e = 3,
   c_3c2e = 4,
   c_4c2e = 5,
+#ifdef WITH_4C1E
   c_4c1e = 6,
   _END = 7
+#else
+  _END = 6
+#endif
 };
 
 constexpr int combine(op e1, ctr e2)
@@ -551,9 +555,11 @@ class aofactory::impl {
         m_intfunc = &int3c1e_sph;
         break;
 
+#ifdef WITH_4C1E
       case combine(op::overlap, ctr::c_4c1e):
         m_intfunc = &int4c1e_sph;
         break;
+#endif
 
       case combine(op::coulomb, ctr::c_2c2e):
         m_intfunc = &int2c2e_sph;
@@ -976,6 +982,7 @@ dbcsr::shared_matrix<double> aofactory::ao_3cschwarz()
   return pimpl->compute_screen("schwarz", "xx");
 }
 
+#ifdef WITH_4C1E
 dbcsr::shared_matrix<double> aofactory::ao_schwarz_ovlp()
 {
   pimpl->set_name("Z_mn");
@@ -985,6 +992,7 @@ dbcsr::shared_matrix<double> aofactory::ao_schwarz_ovlp()
   pimpl->setup_calc();
   return pimpl->compute_screen("schwarz", "bbbb");
 }
+#endif
 
 dbcsr::shared_matrix<double> aofactory::ao_3cschwarz_ovlp()
 {
