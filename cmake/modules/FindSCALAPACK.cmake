@@ -31,7 +31,8 @@ if (USE_MKL)
 	message(STATUS "Using Intel MKL")
 
 	if (NOT MPI_VENDOR) 
-		message(FATAL_ERROR "Please specify MPI_VENDOR (openmpi/intelmpi)")
+		message(STATUS "Defaulting to openmpi for mpi_vendor")
+		set(MPI_VENDOR "openmpi")
 	endif()	
 
 	if ("${LAPACK_LIBRARIES}" MATCHES ".*intel64_lin.*") 

@@ -30,9 +30,13 @@ find_package(SCALAPACK REQUIRED)
 
 find_package(QUADMATH)
 
+if (NOT LIBCINT_DIR)
+	set(LIBCINT_DIR /opt/libcint)
+endif()
+
 find_library(LIBCINT_LIBRARIES 
 	NAMES libcint.a 
-	PATHS ${LIBCINT_DIR}/lib/
+	PATHS ${LIBCINT_DIR}/lib/ 
 	REQUIRED
 )
 

@@ -120,3 +120,6 @@ RUN pkg-config libxsmm libxsmmext --libs \
 WORKDIR /
 
 ENV MKLROOT=/opt/intel/oneapi/mkl/latest/
+
+ENV OMPI_ALLOW_RUN_AS_ROOT=1 
+ENV OMPI_ALLOW_RUN_AS_ROOT_CONFIRM=1 
