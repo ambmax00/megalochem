@@ -35,6 +35,7 @@ RUN set -ex ; \
         unzip \
         rsync \
         valgrind \
+	xterm \
         ; \
     rm -rf /var/lib/apt/lists/* ; \
     localedef -i en_US -c -f UTF-8 -A /usr/share/locale/locale.alias en_US.UTF-8
@@ -121,5 +122,10 @@ WORKDIR /
 
 ENV MKLROOT=/opt/intel/oneapi/mkl/latest/
 
+ENV OMPI_MCA_btl_vader_single_copy_mechanism=none
 ENV OMPI_ALLOW_RUN_AS_ROOT=1 
 ENV OMPI_ALLOW_RUN_AS_ROOT_CONFIRM=1 
+
+RUN useradd -ms /bin/bash dev
+USER dev
+WORKDIR /home/dev

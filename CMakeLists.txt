@@ -2,6 +2,7 @@ cmake_minimum_required(VERSION 3.17 FATAL_ERROR)
 
 project(chem)
 enable_language(Fortran CXX)
+enable_testing()
 
 set(CMAKE_BUILD_TYPE RelWithDebInfo)
 set(CMAKE_CXX_STANDARD 17)
@@ -51,6 +52,7 @@ include_directories(
 )
 
 add_subdirectory(src)
+add_subdirectory(test)
 
 target_link_libraries(
 	chem
