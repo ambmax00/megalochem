@@ -290,14 +290,17 @@ inline void load_zints(
   switch (metr) {
     case ints::metric::coulomb: {
       ao.request(ints::key::coul_xbb);
+      ao.request(ints::key::coul_xx_inv);
       break;
     }
     case ints::metric::erfc_coulomb: {
-      ao.request(ints::key::erfc_xbb);
+      ao.request(ints::key::erfc_xbb)
+        .request(ints::key::erfc_xx_prod);
       break;
     }
     case ints::metric::qr_fit: {
-      ao.request(ints::key::qr_xbb);
+      ao.request(ints::key::coul_xx)
+        .request(ints::key::qr_xbb);
       break;
     }
     default: {

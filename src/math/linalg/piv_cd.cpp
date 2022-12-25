@@ -596,7 +596,7 @@ void pivinc_cd::compute(std::optional<int> force_rank, std::optional<double> eps
       
       MPI_Allreduce(&local, &global, 1, MPI_DOUBLE_INT, MPI_MAXABSLOC,diag_comm);
       
-      if (sgrid.nprow() != 1) {
+      if (sgrid.npcol() != 1) {
         c_igebs2d(sgrid.ctx(), 'C', ' ', 1, 1, &global.i, 1);
         c_dgebs2d(sgrid.ctx(), 'C', ' ', 1, 1, &global.d, 1);
       }
