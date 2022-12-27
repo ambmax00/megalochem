@@ -4,11 +4,11 @@ include_directories(
 	${CMAKE_BINARY_DIR}/src
 )
 
-add_executable(testHf test_hf.cpp)
+add_executable(test_h2o test_h2o.cpp)
 
-target_link_libraries(testHf megalochem)
+target_link_libraries(test_h2o megalochem)
 
 add_test(
-  NAME TestHf
-  COMMAND mpirun -np 2 ${CMAKE_CURRENT_BINARY_DIR}/testHf
+  NAME Test_h2o
+  COMMAND mpirun -np 2 ${CMAKE_CURRENT_BINARY_DIR}/test_h2o
 )

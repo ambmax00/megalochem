@@ -3,6 +3,7 @@
 #include <desc/wfn.hpp>
 #include <hf/hfmod.hpp>
 #include <mp/mpmod.hpp>
+#include <adc/adcmod.hpp>
 #include <utils/constants.hpp>
 #include <utils/mpi_log.hpp>
 
@@ -33,7 +34,7 @@
     {\
       LOG.scientific();\
       LOG.setprecision(14);\
-      LOG.os<>("Vectors ", #b, " ", #a, " differ: ", a[i], " ", b[i]);\
+      LOG.os<>("Vectors ", #b, " ", #a, " differ: ", a[i], " ", b[i], '\n');\
       result++;\
     }\
   }
@@ -206,6 +207,83 @@ int main(int argc, char** argv)
 
       CHECK_ALMOST_EQUAL(pMpFullWfn->mp_wfn->mp_energy(), 0.198172796878, result);
       CHECK_ALMOST_EQUAL(pMpMemWfn->mp_wfn->mp_energy(), 0.198172563454, result);
+
+      auto p_adc1_mod = megalochem::adc::adcmod::create()
+                       .set_world(mega_world)
+                       .set_wfn(pHfExactWfn)
+                       .balanced(true)
+                       .block(true)
+                       .build_J("dfao")
+                       .build_K("dfao")
+                       .c_os(1.3)
+                       .conv(1e-5)
+                       .dav_max_iter(30)
+                       .df_basis(pDfBasis)
+                       .df_metric("coulomb")
+                       .diis_max_iter(30)
+                       .eris("core")
+                       .guess("hf")
+                       .imeds("core")
+                       .method("ri_ao_adc1")
+                       .nbatches_b(2)
+                       .nbatches_occ(2)
+                       .nbatches_x(2)
+                       .nguesses(3)
+                       .nlap(5)
+                       .nroots(3)
+                       .build();
+
+      auto p_adc1_wfn = p_adc1_mod->compute();
+
+      std::vector<double> ref_adc1_values = 
+      {
+        3.38014255029556e-01, 
+        4.03651024358144e-01, 
+        4.35209348449793e-01
+      };
+
+      std::vector<double> comp_adc1_values = p_adc1_wfn->adc_wfn->davidson_eigenvalues();
+
+      CHECK_VECTOR_ALMOST_EQUAL(comp_adc1_values, ref_adc1_values, result);
+
+      auto p_adc2_mod = megalochem::adc::adcmod::create()
+                       .set_world(mega_world)
+                       .set_wfn(p_adc1_wfn)
+                       .balanced(true)
+                       .block(true)
+                       .build_J("dfao")
+                       .build_K("dfao")
+                       .build_Z("llmp_full")
+                       .c_os(1.3)
+                       .conv(1e-5)
+                       .dav_max_iter(30)
+                       .df_basis(pDfBasis)
+                       .df_metric("coulomb")
+                       .diis_max_iter(30)
+                       .eris("core")
+                       .guess("adc")
+                       .imeds("core")
+                       .method("sos_cd_ri_adc2")
+                       .nbatches_b(2)
+                       .nbatches_occ(2)
+                       .nbatches_x(2)
+                       .nguesses(3)
+                       .nlap(5)
+                       .nroots(3)
+                       .build();
+
+      auto p_adc2_wfn = p_adc2_mod->compute();
+
+      std::vector<double> ref_adc2_values = 
+      {
+        2.97067220357831e-01, 
+        3.72544119437024e-01,
+        3.94952524308013e-01
+      };
+
+      std::vector<double> comp_adc2_values = p_adc2_wfn->adc_wfn->davidson_eigenvalues();
+
+      CHECK_VECTOR_ALMOST_EQUAL(ref_adc2_values, comp_adc2_values, result);
 
   }
 
