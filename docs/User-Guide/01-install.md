@@ -6,7 +6,7 @@ MEGALOchem currently depends on:
 1. BLAS & LAPACK
 2. ScaLAPACK
 3. HDF5 (MPI enabled)
-4. DBCSR, configured with LIBXSMM. Please use the forked version from ambmax00, available [here](https://github.com/ambmax00/dbcsr/tree/feature_fixed)
+4. DBCSR, configured with LIBXSMM
 5. libcint (version 4.4.5 or higher), available [here](https://github.com/sunqm/libcint). Configure with CMake flags `WITH_RANGE_COULOMB=ON` and `WITH_COULOMB_ERF=ON`
 6. Eigen matrix library
 7. (Optional) Clang-format
